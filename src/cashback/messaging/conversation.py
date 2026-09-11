@@ -29,6 +29,10 @@ from ..messaging.zalo_client import Message, ZaloBot
 # were silently treated as ordinary chat.
 from ..shopee.dashboard_lookup import ANY_SHOPEE_URL as SHOPEE_URL
 
+from ..core.logging_setup import get_logger
+
+log = get_logger(__name__)
+
 # "STK: VCB - 0123456789 - NGUYEN VAN A"
 BANK_LINE = re.compile(
     r"stk\s*[:\-]?\s*(?P<bank>[^\-\n]{1,40}?)\s*-\s*(?P<account>[\d\s]{6,30}?)\s*-\s*"
@@ -69,9 +73,10 @@ def _plain(text: str) -> str:
 def find_command(text: str) -> str:
     """Return the command in the text, lowercased, or ''.
 
-    A slash is preferred, but a bare word is accepted too: people type
-    "huong dan" or "Hướng dẫn" and used to get an answer about something
-    else entirely, which reads as the bot being broken.
+    A slash is preferred, but a bare word is accepted too. People type the
+    command name on its own, with or without diacritics and in any case,
+    and used to get an answer about something else entirely -- which reads
+    as the bot being broken rather than as a typo.
     """
     match = COMMAND_TOKEN.search(text or "")
     if match:
@@ -371,7 +376,7 @@ def deliver_ready_links(
                 row["source_url"], bridge=bridge, third_party=third_party
             )
             if estimate:
-                print(f"[zalo] estimate for {row['request_id']}: "
+                log.info(f"estimate for {row['request_id']}: "
                       f"{estimate.commission:,} VND via {estimate.source}"
                       + ("  (capped)" if estimate.is_capped else ""))
                 with ledger.connect(db_path) as conn:
@@ -422,7 +427,7 @@ def deliver_ready_links(
         try:
             bot.send(row["private_chat_id"], text)
         except Exception as exc:  # a bad chat id must not stall the queue
-            print(f"[zalo] could not deliver {row['request_id']}: {exc}")
+            log.info(f"could not deliver {row['request_id']}: {exc}")
             continue
 
         with ledger.connect(db_path) as conn:
@@ -508,7 +513,7 @@ def notify_order_changes(
         try:
             bot.send(row["private_chat_id"], text)
         except Exception as exc:  # one bad chat id must not stall the rest
-            print(f"[zalo] could not notify {row['order_id']}: {exc}")
+            log.info(f"could not notify {row['order_id']}: {exc}")
             continue
 
         with ledger.connect(db_path) as conn:
@@ -523,7 +528,7 @@ def notify_order_changes(
             order_id=row["order_id"], status=status,
             cashback=row["cashback_amount"],
             reason=row["rejection_reason"])
-        print(f"[zalo] told {row['order_id']} owner: {status}")
+        log.info(f"told {row['order_id']} owner: {status}")
         sent += 1
     return sent
 
@@ -550,7 +555,7 @@ def notify_failed_links(db_path: Path, bot: ZaloBot) -> int:
         try:
             bot.send(row["private_chat_id"], messages.render("link_failed"))
         except Exception as exc:
-            print(f"[zalo] could not apologise for {row['request_id']}: {exc}")
+            log.info(f"could not apologise for {row['request_id']}: {exc}")
             continue
         with ledger.connect(db_path) as conn:
             conn.execute(
@@ -558,6 +563,6 @@ def notify_failed_links(db_path: Path, bot: ZaloBot) -> int:
                 (ledger.now(), row["request_id"]),
             )
         audit.record(audit.LINK_FAILED, request_id=row["request_id"])
-        print(f"[zalo] told owner of {row['request_id']}: link failed")
+        log.info(f"told owner of {row['request_id']}: link failed")
         sent += 1
     return sent

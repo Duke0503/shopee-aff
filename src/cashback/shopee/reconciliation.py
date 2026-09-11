@@ -17,6 +17,10 @@ from ..ledger import repository as ledger
 from ..shopee.report_importer import ReportRow
 from ..core.policy import TaxPolicy, split_commission
 
+from ..core.logging_setup import get_logger
+
+log = get_logger(__name__)
+
 
 @dataclass
 class Outcome:

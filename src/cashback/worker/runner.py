@@ -19,6 +19,10 @@ from ..shopee import link_generator as shopee_script
 from ..shopee.browser_bridge import Bridge
 from ..worker.batch_queue import BatchSettings
 
+from ..core.logging_setup import get_logger
+
+log = get_logger(__name__)
+
 
 @dataclass
 class Totals:
@@ -55,8 +59,7 @@ def run_one_pass(
 
     totals.passes += 1
     customers = len({job["sub_ids"][0] for job in jobs})
-    print(
-        f"[{_stamp()}] pass {totals.passes}: {len(jobs)} request(s) "
+    log.info(f"pass {totals.passes}: {len(jobs)} request(s) "
         f"from {customers} customer(s)"
     )
 
@@ -67,20 +70,19 @@ def run_one_pass(
         # the batch until the lease times out.
         for job in jobs:
             queue_batch.release(job["request_id"])
-        print(f"[{_stamp()}]   pass failed, will retry: {exc}")
+        log.info(f"pass failed, will retry: {exc}")
         return len(jobs)
 
     outcome = queue_batch.apply_results(db_path, results)
     totals.generated += outcome["stored"]
     totals.failed += outcome["failed"]
 
-    print(
-        f"[{_stamp()}]   stored {outcome['stored']}, "
+    log.info(f"stored {outcome['stored']}, "
         f"skipped {outcome['skipped']}, failed {outcome['failed']}"
     )
     for item in results:
         if item.get("error"):
-            print(f"[{_stamp()}]     {item['request_id']}: {item['error']}")
+            log.info(f"{item['request_id']}: {item['error']}")
     return len(jobs)
 
 
@@ -103,7 +105,7 @@ def loop(
     try:
         while True:
             if not bridge.connected():
-                print(f"[{_stamp()}] extension not responding, waiting...")
+                log.info(f"extension not responding, waiting...")
                 if not wait_for_extension(bridge, 30):
                     continue
 
@@ -115,8 +117,7 @@ def loop(
                 with ledger.connect(db_path) as conn:
                     expired = ledger.expire_stale_requests(conn, attribution_days)
                 if expired:
-                    print(
-                        f"[{_stamp()}] expired {expired} request(s) past "
+                    log.info(f"expired {expired} request(s) past "
                         f"{attribution_days} days"
                     )
 
