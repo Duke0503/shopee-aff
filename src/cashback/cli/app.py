@@ -9,6 +9,7 @@ from ..ledger import repository as ledger
 from ..messaging import templates as messages
 from ..ledger import metrics
 from ..core.config import Config, load
+from ..core.logging_setup import configure as configure_logging
 from ..core.policy import (
     WITHHOLDING_THRESHOLD_VND,
     TaxPolicy,
@@ -153,6 +154,55 @@ def cmd_expire(cfg: Config, _args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_audit(cfg: Config, args: argparse.Namespace) -> int:
+    """Read the trail: one customer's history, or the whole-list scan."""
+    from ..core import audit
+    from ..ledger import suspicion
+
+    if args.archive:
+        done = audit.archive_closed_months()
+        if not done:
+            print("Nothing to archive: only the current month is open.")
+            return 0
+        for path in done:
+            print(f"  archived {path.name}  ({path.stat().st_size:,} bytes)")
+        return 0
+
+    if args.customer:
+        events = suspicion.history(args.customer, months=args.months)
+        if not events:
+            print(f"No recorded activity for {args.customer}.")
+            return 0
+        print(f"{len(events)} event(s) for {args.customer}")
+        print()
+        for event in events:
+            extra = {k: v for k, v in event.items()
+                     if k not in ("at", "event", "customer_id")}
+            detail = "  ".join(f"{k}={v}" for k, v in extra.items())
+            print(f"  {event['at']}  {event['event']:<18} {detail}")
+        return 0
+
+    if args.scan:
+        with ledger.connect(cfg.db_path) as conn:
+            findings = suspicion.scan(conn, months=args.months)
+        if not findings:
+            print("Nothing flagged.")
+            return 0
+        print(f"{len(findings)} finding(s), most serious first.")
+        print("None of these prove anything -- they are shapes worth a look.")
+        print()
+        for f in findings:
+            print(f"  [{f.severity.upper():<6}] {f.customer_id}  {f.pattern}")
+            print(f"           {f.summary}")
+            for line in f.evidence:
+                print(f"           - {line}")
+            print()
+        return 0
+
+    print("Pick one: --customer <id>, --scan, or --archive")
+    return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cashback", description="Shopee affiliate cashback ledger"
@@ -180,6 +230,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--note", default="")
 
     sub.add_parser("expire", help="expire link requests past the attribution window")
+
+    p = sub.add_parser("audit", help="trace customer activity and flag odd accounts")
+    p.add_argument("--customer", help="show everything one customer did")
+    p.add_argument("--scan", action="store_true",
+                   help="list accounts worth a second look before paying")
+    p.add_argument("--archive", action="store_true",
+                   help="compress closed months to save disk")
+    p.add_argument("--months", type=int, default=3)
 
     p = sub.add_parser(
         "bridge", help="serve the local bridge for the browser helper extension"
@@ -389,6 +447,7 @@ def _handlers() -> dict:
         "payouts": cmd_payouts,
         "pay": cmd_pay,
         "expire": cmd_expire,
+        "audit": cmd_audit,
         "inspect-report": cmd_inspect_report,
         "reconcile": cmd_reconcile,
         "bridge": cmd_bridge,
@@ -407,6 +466,10 @@ def _handlers() -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Logging is set up before any command runs, so a failure during a
+    # long-running one leaves a file behind rather than only scrollback.
+    # `serve` is the one that matters: it runs for days unattended.
+    configure_logging(console=args.command == "serve")
     return _handlers()[args.command](load(), args)
 
 

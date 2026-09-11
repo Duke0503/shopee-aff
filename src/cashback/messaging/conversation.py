@@ -18,6 +18,7 @@ from pathlib import Path
 
 from ..ledger import repository as ledger
 from ..messaging import templates as messages
+from ..core import audit
 from ..core.identifiers import new_request_id, next_customer_id
 from ..core.policy import SHOPEE_COMMISSION_CAP_VND as CAP
 from ..messaging.zalo_client import Message, ZaloBot
@@ -171,6 +172,9 @@ def _ensure_customer(conn: sqlite3.Connection, msg: Message) -> sqlite3.Row:
             zalo_user_id=sender,
             private_chat_id=private,
         )
+        audit.record(audit.CUSTOMER_SEEN, customer_id=customer_id,
+                     zalo_user_id=sender, name=msg.sender_name or None,
+                     channel="group" if msg.chat.is_group else "private")
         return ledger.get_customer(conn, customer_id)
 
     # Backfill anything learned since the customer was first seen.
@@ -225,9 +229,14 @@ def handle(
         private = customer["private_chat_id"] or msg.sender_id or msg.chat.id
 
         command = find_command(text)
+        if command:
+            audit.record(audit.COMMAND_USED, customer_id=customer_id,
+                         command=command,
+                         channel="group" if in_group else "private")
 
         if command in COMMAND_FORGET:
             ledger.erase_bank_details(conn, customer_id)
+            audit.record(audit.BANK_ERASED, customer_id=customer_id)
             return [Reply(private, messages.render("bank_deleted"))]
 
         if command in COMMAND_RULES:
@@ -255,6 +264,9 @@ def handle(
             ledger.set_bank_details(
                 conn, customer_id, bank["bank"], bank["account"], bank["holder"]
             )
+            audit.record(audit.BANK_CHANGED, customer_id=customer_id,
+                         bank=bank["bank"],
+                         account=audit.fingerprint(bank["account"]))
             summary = f"{bank['bank']} - {bank['account']} - {bank['holder']}"
             return [Reply(private, messages.render("bank_saved", name=summary))]
 
@@ -294,15 +306,19 @@ def handle(
         # they have seen anything useful is how you lose them in the first
         # minute -- and the money is two months away regardless.
         for url in urls:
+            request_id = new_request_id()
             ledger.record_link_request(
                 conn,
-                request_id=new_request_id(),
+                request_id=request_id,
                 customer_id=customer_id,
                 source_url=url,
                 affiliate_url=None,
                 estimated_commission=None,
                 channel="zalo_group" if in_group else "zalo",
             )
+            audit.record(audit.LINK_REQUESTED, customer_id=customer_id,
+                         request_id=request_id, url=url,
+                         channel="group" if in_group else "private")
 
         # In a group several people may be asking at once, so name who this
         # acknowledgement belongs to. The platform has no mention support,
@@ -414,6 +430,10 @@ def deliver_ready_links(
                 "UPDATE link_requests SET notified_at=? WHERE request_id=?",
                 (ledger.now(), row["request_id"]),
             )
+        audit.record(audit.LINK_DELIVERED, request_id=row["request_id"],
+                     affiliate_url=row["affiliate_url"],
+                     commission=estimate.commission if estimate else None,
+                     source=estimate.source if estimate else None)
         sent += 1
     return sent
 
@@ -496,6 +516,13 @@ def notify_order_changes(
                 "UPDATE orders SET notified_status=? WHERE order_id=?",
                 (status, row["order_id"]),
             )
+        audit.record(
+            {ledger.AWAITING_APPROVAL: audit.ORDER_RECORDED,
+             ledger.APPROVED: audit.ORDER_APPROVED,
+             ledger.REJECTED: audit.ORDER_REJECTED}.get(status, "order.other"),
+            order_id=row["order_id"], status=status,
+            cashback=row["cashback_amount"],
+            reason=row["rejection_reason"])
         print(f"[zalo] told {row['order_id']} owner: {status}")
         sent += 1
     return sent
@@ -530,6 +557,7 @@ def notify_failed_links(db_path: Path, bot: ZaloBot) -> int:
                 "UPDATE link_requests SET notified_at=? WHERE request_id=?",
                 (ledger.now(), row["request_id"]),
             )
+        audit.record(audit.LINK_FAILED, request_id=row["request_id"])
         print(f"[zalo] told owner of {row['request_id']}: link failed")
         sent += 1
     return sent

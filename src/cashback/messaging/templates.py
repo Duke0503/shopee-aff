@@ -1,6 +1,6 @@
 """Customer-facing text.
 
-The wording lives in messages.vi.json at the project root, not here. That
+The wording lives in resources/messages.vi.json, not here. That
 file is the one that gets edited when a customer misunderstands something,
 and it should be editable without touching code or knowing Python.
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from ..core.config import PROJECT_ROOT
 
-MESSAGE_FILE = "messages.vi.json"
+MESSAGE_FILE = Path("resources") / "messages.vi.json"
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 _cache: dict[str, str] | None = None
