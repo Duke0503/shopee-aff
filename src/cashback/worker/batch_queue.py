@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from . import ledger
+from ..ledger import repository as ledger
 
 DEFAULT_LEASE_SECONDS = 120
 

@@ -54,8 +54,8 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import httpx
 
-from .bridge import Bridge, Job
-from .policy import SHOPEE_COMMISSION_CAP_VND
+from ..shopee.browser_bridge import Bridge, Job
+from ..core.policy import SHOPEE_COMMISSION_CAP_VND
 
 CONNECTOR = "shopee_affiliate"
 SEARCH_PATH = "/api/v3/offer/product/list"

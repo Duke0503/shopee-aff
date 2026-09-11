@@ -55,7 +55,7 @@ import httpx
 # Shortener domains come from shopee_lookup so there is only ever one
 # list to keep right: the two drifted apart once and shp.ee links were
 # silently treated as ordinary chat.
-from .shopee_lookup import SHORT_LINK
+from ..shopee.dashboard_lookup import SHORT_LINK
 
 API_URL = "https://data.addlivetag.com/product-data/product-data.php"
 TIMEOUT = 12.0

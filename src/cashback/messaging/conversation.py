@@ -16,16 +16,17 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import ledger, messages
-from .ids import new_request_id, next_customer_id
-from .policy import SHOPEE_COMMISSION_CAP_VND as CAP
-from .zalo import Message, ZaloBot
+from ..ledger import repository as ledger
+from ..messaging import templates as messages
+from ..core.identifiers import new_request_id, next_customer_id
+from ..core.policy import SHOPEE_COMMISSION_CAP_VND as CAP
+from ..messaging.zalo_client import Message, ZaloBot
 
 # Shopee product links, in the forms customers actually paste. The
 # pattern lives in shopee_lookup so this list cannot drift out of step
 # with the one the lookups use -- it already did once, and shp.ee links
 # were silently treated as ordinary chat.
-from .shopee_lookup import ANY_SHOPEE_URL as SHOPEE_URL
+from ..shopee.dashboard_lookup import ANY_SHOPEE_URL as SHOPEE_URL
 
 # "STK: VCB - 0123456789 - NGUYEN VAN A"
 BANK_LINE = re.compile(
@@ -341,7 +342,7 @@ def deliver_ready_links(
 
     sent = 0
     for row in rows:
-        from . import commission as commission_lookup
+        from .. import commission as commission_lookup
 
         # Reuse a breakdown worked out on an earlier pass; only ask a
         # source when there is nothing stored yet.

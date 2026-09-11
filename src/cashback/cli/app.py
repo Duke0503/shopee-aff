@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import ledger, messages, metrics
-from .config import Config, load
-from .policy import (
+from ..ledger import repository as ledger
+from ..messaging import templates as messages
+from ..ledger import metrics
+from ..core.config import Config, load
+from ..core.policy import (
     WITHHOLDING_THRESHOLD_VND,
     TaxPolicy,
     policy_warnings,
@@ -286,7 +288,7 @@ def cmd_inspect_report(cfg: Config, args: argparse.Namespace) -> int:
     """Print the headers found in a downloaded report, plus a guessed mapping."""
     from pathlib import Path
 
-    from .importer import MAPPING_FILE, ColumnMapping, detect_mapping, read_headers
+    from ..shopee.report_importer import MAPPING_FILE, ColumnMapping, detect_mapping, read_headers
 
     path = Path(args.file)
     headers = read_headers(path)
@@ -316,8 +318,8 @@ def cmd_inspect_report(cfg: Config, args: argparse.Namespace) -> int:
 def cmd_reconcile(cfg: Config, args: argparse.Namespace) -> int:
     from pathlib import Path
 
-    from . import reconcile
-    from .importer import MAPPING_FILE, ColumnMapping, read_rows
+    from ..shopee import reconciliation as reconcile
+    from ..shopee.report_importer import MAPPING_FILE, ColumnMapping, read_rows
 
     mapping = ColumnMapping.load(Path(MAPPING_FILE))
     missing = mapping.missing_required()
@@ -360,7 +362,7 @@ def cmd_reconcile(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_bridge(cfg: Config, args: argparse.Namespace) -> int:
-    from .bridge import Bridge, serve
+    from ..shopee.browser_bridge import Bridge, serve
 
     if not cfg.bridge_token:
         print("BRIDGE_TOKEN is empty. Set a long random value in .env first,")
@@ -423,7 +425,7 @@ def cmd_setup_token(cfg: Config, args: argparse.Namespace) -> int:
     import secrets
     from pathlib import Path
 
-    from .config import PROJECT_ROOT
+    from ..core.config import PROJECT_ROOT
 
     token = secrets.token_urlsafe(48)
 
@@ -478,8 +480,8 @@ def cmd_probe(cfg: Config, args: argparse.Namespace) -> int:
     import json as _json
     from pathlib import Path
 
-    from . import probe
-    from .bridge import Bridge, serve_in_background
+    from ..shopee import page_prober as probe
+    from ..shopee.browser_bridge import Bridge, serve_in_background
 
     if not cfg.bridge_token:
         print("BRIDGE_TOKEN is empty. Run: cashback setup-token")
@@ -550,8 +552,8 @@ def _print_safely(text: str) -> None:
 
 
 def _bridge_for(cfg: Config):
-    from .bridge import Bridge
-    from .selectors import CUSTOM_LINK_URL
+    from ..shopee.browser_bridge import Bridge
+    from ..shopee.page_selectors import CUSTOM_LINK_URL
 
     return Bridge(
         token=cfg.bridge_token,
@@ -561,8 +563,8 @@ def _bridge_for(cfg: Config):
 
 
 def cmd_add_customer(cfg: Config, args: argparse.Namespace) -> int:
-    from . import ledger
-    from .ids import next_customer_id
+    from ..ledger import repository as ledger
+    from ..core.identifiers import next_customer_id
 
     with ledger.connect(cfg.db_path) as conn:
         customer_id = args.id or next_customer_id(conn)
@@ -586,8 +588,8 @@ def cmd_add_customer(cfg: Config, args: argparse.Namespace) -> int:
 
 def cmd_request(cfg: Config, args: argparse.Namespace) -> int:
     """Queue a link request. This is what the Zalo bot will call."""
-    from . import ledger
-    from .ids import new_request_id
+    from ..ledger import repository as ledger
+    from ..core.identifiers import new_request_id
 
     with ledger.connect(cfg.db_path) as conn:
         ready, why = ledger.can_accept_orders(conn, args.customer_id)
@@ -613,7 +615,7 @@ def cmd_request(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_links(cfg: Config, args: argparse.Namespace) -> int:
-    from . import ledger
+    from ..ledger import repository as ledger
 
     with ledger.connect(cfg.db_path) as conn:
         rows = conn.execute(
@@ -636,9 +638,9 @@ def cmd_links(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
-    from . import worker
-    from .bridge import serve_in_background
-    from .queue_batch import BatchSettings
+    from ..worker import runner as worker
+    from ..shopee.browser_bridge import serve_in_background
+    from ..worker.batch_queue import BatchSettings
 
     if not cfg.bridge_token:
         print("BRIDGE_TOKEN is empty. Run: cashback setup-token")
@@ -684,7 +686,7 @@ def cmd_zalo_check(cfg: Config, args: argparse.Namespace) -> int:
     import json as _json
     import time
 
-    from .zalo import ZaloBot, ZaloError
+    from ..messaging.zalo_client import ZaloBot, ZaloError
 
     if not cfg.zalo_bot_token:
         print("ZALO_BOT_TOKEN is empty in .env")
@@ -761,10 +763,11 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     import threading
     import time
 
-    from . import worker, zalo_handler
-    from .bridge import serve_in_background
-    from .queue_batch import BatchSettings
-    from .zalo import ZaloBot, ZaloError
+    from ..worker import runner as worker
+    from ..messaging import conversation as zalo_handler
+    from ..shopee.browser_bridge import serve_in_background
+    from ..worker.batch_queue import BatchSettings
+    from ..messaging.zalo_client import ZaloBot, ZaloError
 
     if not cfg.zalo_bot_token:
         print("ZALO_BOT_TOKEN is empty. Run: cashback zalo-check")
@@ -873,7 +876,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
 
 def cmd_forget(cfg: Config, args: argparse.Namespace) -> int:
     """Erase a customer completely. Matches on id, name or Zalo id."""
-    from . import ledger
+    from ..ledger import repository as ledger
 
     with ledger.connect(cfg.db_path) as conn:
         needle = args.who
@@ -910,7 +913,7 @@ def cmd_forget(cfg: Config, args: argparse.Namespace) -> int:
 
 def cmd_reset(cfg: Config, args: argparse.Namespace) -> int:
     """Wipe the whole ledger. For testing only."""
-    from . import ledger
+    from ..ledger import repository as ledger
 
     if not args.yes:
         with ledger.connect(cfg.db_path) as conn:

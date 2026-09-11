@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cashback = "cashback.cli:main"
+cashback = "cashback.cli.app:main"
 
 [build-system]
 requires = ["hatchling"]

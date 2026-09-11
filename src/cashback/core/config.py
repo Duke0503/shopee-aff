@@ -10,9 +10,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .policy import TaxPolicy
+from ..core.policy import TaxPolicy
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# <project>/src/cashback/core/config.py -> <project>
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_dotenv() -> None:
@@ -67,7 +68,7 @@ class Config:
         cashback, so the honest figure is lower than `cashback_rate`.
         """
         if self.tax_policy is TaxPolicy.USER_ABSORBS:
-            from .policy import WITHHOLDING_TAX_RATE
+            from ..core.policy import WITHHOLDING_TAX_RATE
 
             return self.cashback_rate - WITHHOLDING_TAX_RATE
         return self.cashback_rate
