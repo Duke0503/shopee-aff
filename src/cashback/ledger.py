@@ -1,0 +1,520 @@
+"""The ledger. This is the product; everything else is plumbing.
+
+All money is stored as whole VND integers. Never floats.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Iterator
+
+# --- Link request states -----------------------------------------------
+PENDING = "pending"          # link issued, unknown whether the customer bought
+CONVERTED = "converted"      # produced at least one order
+EXPIRED = "expired"          # attribution window elapsed with no order
+
+# --- Order states ------------------------------------------------------
+MAX_LINK_ATTEMPTS = 3
+
+AWAITING_APPROVAL = "awaiting_approval"  # Shopee recorded the order
+APPROVED = "approved"                    # commission approved -> payout allowed
+PAID = "paid"                            # transferred to the customer, terminal
+REJECTED = "rejected"                    # cancelled / returned / not recorded
+
+# States only ever move forward along these edges.
+ALLOWED_TRANSITIONS = {
+    AWAITING_APPROVAL: {APPROVED, REJECTED},
+    APPROVED: {PAID},
+    PAID: set(),
+    REJECTED: set(),
+}
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS customers (
+    customer_id      TEXT PRIMARY KEY,
+    zalo_user_id     TEXT,
+    private_chat_id  TEXT,
+    display_name     TEXT,
+    bank_name        TEXT,
+    bank_account     TEXT,
+    account_holder   TEXT,
+    consent_at       TEXT,
+    status           TEXT NOT NULL DEFAULT 'active',
+    created_at       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS link_requests (
+    request_id           TEXT PRIMARY KEY,
+    customer_id          TEXT NOT NULL REFERENCES customers(customer_id),
+    created_at           TEXT NOT NULL,
+    source_url           TEXT NOT NULL,
+    affiliate_url        TEXT,
+    estimated_commission INTEGER,
+    channel              TEXT,
+    status               TEXT NOT NULL DEFAULT 'pending',
+    notified_at          TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_req_customer ON link_requests(customer_id);
+CREATE INDEX IF NOT EXISTS idx_req_status ON link_requests(status);
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id             TEXT PRIMARY KEY,
+    customer_id          TEXT REFERENCES customers(customer_id),
+    request_id           TEXT REFERENCES link_requests(request_id),
+    order_value          INTEGER,
+    estimated_commission INTEGER,
+    approved_commission  INTEGER,
+    cashback_amount      INTEGER,
+    status               TEXT NOT NULL,
+    rejection_reason     TEXT,
+    recorded_at          TEXT,
+    approved_at          TEXT,
+    paid_at              TEXT,
+    updated_at           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_order_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_order_status ON orders(status);
+
+-- Append-only. Never overwrite a row.
+CREATE TABLE IF NOT EXISTS state_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id    TEXT NOT NULL,
+    from_status TEXT,
+    to_status   TEXT NOT NULL,
+    changed_at  TEXT NOT NULL,
+    note        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_history_order ON state_history(order_id);
+
+-- Rows whose sub_id could not be matched. Never guess: leave them for a human.
+CREATE TABLE IF NOT EXISTS manual_review (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id   TEXT,
+    raw_data   TEXT NOT NULL,
+    reason     TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    resolved   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS reconciliation_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ran_at        TEXT NOT NULL,
+    source        TEXT NOT NULL,
+    period_start  TEXT,
+    period_end    TEXT,
+    rows_read     INTEGER NOT NULL DEFAULT 0,
+    orders_new    INTEGER NOT NULL DEFAULT 0,
+    approved      INTEGER NOT NULL DEFAULT 0,
+    rejected      INTEGER NOT NULL DEFAULT 0,
+    skipped       INTEGER NOT NULL DEFAULT 0,
+    needs_review  INTEGER NOT NULL DEFAULT 0,
+    error         TEXT
+);
+"""
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+@contextmanager
+def connect(db_path: Path) -> Iterator[sqlite3.Connection]:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def initialise(db_path: Path) -> None:
+    with connect(db_path) as conn:
+        conn.executescript(SCHEMA)
+        _add_missing_columns(conn)
+
+
+# Columns added after the first release. SQLite has no IF NOT EXISTS for
+# ADD COLUMN, so existing databases are upgraded by inspection.
+_LATER_COLUMNS = {
+    "link_requests": {
+        "notified_at": "TEXT",
+        "estimate_source": "TEXT",
+        "estimate_detail": "TEXT",
+        # How many times the browser has tried this one. A link that
+        # cannot be made was retried forever and the customer was never
+        # told; after MAX_LINK_ATTEMPTS it is given up on and they hear
+        # about it.
+        "attempts": "INTEGER NOT NULL DEFAULT 0",
+    },
+    # The last status the customer was actually told about. Compared with
+    # `status` to find who is owed an update, which makes the notifier safe
+    # to run repeatedly and safe across a restart.
+    "orders": {"notified_status": "TEXT"},
+}
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    for table, columns in _LATER_COLUMNS.items():
+        present = {
+            row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for name, kind in columns.items():
+            if name not in present:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+
+
+# ======================================================================
+# Customers
+# ======================================================================
+
+def add_customer(
+    conn: sqlite3.Connection,
+    customer_id: str,
+    display_name: str = "",
+    zalo_user_id: str = "",
+    private_chat_id: str = "",
+) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO customers"
+        " (customer_id, zalo_user_id, private_chat_id, display_name, created_at)"
+        " VALUES (?,?,?,?,?)",
+        (customer_id, zalo_user_id, private_chat_id, display_name, now()),
+    )
+
+
+def set_bank_details(
+    conn: sqlite3.Connection,
+    customer_id: str,
+    bank_name: str,
+    bank_account: str,
+    account_holder: str,
+) -> None:
+    """Collected ONCE at onboarding.
+
+    `consent_at` is recorded alongside: Vietnam's personal data protection
+    law takes effect 2026-01-01 and this is personal data.
+    """
+    conn.execute(
+        "UPDATE customers SET bank_name=?, bank_account=?, account_holder=?,"
+        " consent_at=? WHERE customer_id=?",
+        (bank_name, bank_account, account_holder, now(), customer_id),
+    )
+
+
+def erase_bank_details(conn: sqlite3.Connection, customer_id: str) -> None:
+    """Honour a customer's request to delete their banking details."""
+    conn.execute(
+        "UPDATE customers SET bank_name=NULL, bank_account=NULL,"
+        " account_holder=NULL, consent_at=NULL WHERE customer_id=?",
+        (customer_id,),
+    )
+
+
+def get_customer(conn: sqlite3.Connection, customer_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM customers WHERE customer_id=?", (customer_id,)
+    ).fetchone()
+
+
+def can_accept_orders(conn: sqlite3.Connection, customer_id: str) -> tuple[bool, str]:
+    """Refuse orders we would be unable to settle two months from now.
+
+    Without a private chat id the bot cannot message the customer when the
+    commission is finally approved, so the payout would silently strand.
+    """
+    row = get_customer(conn, customer_id)
+    if row is None:
+        return False, "unknown customer"
+    if not row["private_chat_id"]:
+        return False, "customer has never messaged the bot privately"
+    if not row["bank_account"]:
+        return False, "no bank account on file"
+    return True, ""
+
+
+# ======================================================================
+# Link requests
+# ======================================================================
+
+def record_link_request(
+    conn: sqlite3.Connection,
+    request_id: str,
+    customer_id: str,
+    source_url: str,
+    affiliate_url: str | None,
+    estimated_commission: int | None,
+    channel: str = "direct",
+) -> None:
+    conn.execute(
+        "INSERT INTO link_requests"
+        " (request_id, customer_id, created_at, source_url, affiliate_url,"
+        "  estimated_commission, channel, status)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (request_id, customer_id, now(), source_url, affiliate_url,
+         estimated_commission, channel, PENDING),
+    )
+
+
+def expire_stale_requests(conn: sqlite3.Connection, attribution_days: int) -> int:
+    """Mark requests expired once the attribution window has elapsed."""
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(days=attribution_days)
+    ).astimezone().isoformat()
+    cur = conn.execute(
+        "UPDATE link_requests SET status=? WHERE status=? AND created_at < ?",
+        (EXPIRED, PENDING, cutoff),
+    )
+    return cur.rowcount
+
+
+# ======================================================================
+# Orders
+# ======================================================================
+
+def _record_transition(
+    conn: sqlite3.Connection,
+    order_id: str,
+    from_status: str | None,
+    to_status: str,
+    note: str = "",
+) -> None:
+    conn.execute(
+        "INSERT INTO state_history (order_id, from_status, to_status, changed_at, note)"
+        " VALUES (?,?,?,?,?)",
+        (order_id, from_status, to_status, now(), note),
+    )
+
+
+def get_order(conn: sqlite3.Connection, order_id: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM orders WHERE order_id=?", (order_id,)).fetchone()
+
+
+def add_order(
+    conn: sqlite3.Connection,
+    order_id: str,
+    customer_id: str | None,
+    request_id: str | None,
+    order_value: int | None,
+    estimated_commission: int | None,
+) -> None:
+    conn.execute(
+        "INSERT INTO orders"
+        " (order_id, customer_id, request_id, order_value, estimated_commission,"
+        "  status, recorded_at, updated_at)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (order_id, customer_id, request_id, order_value, estimated_commission,
+         AWAITING_APPROVAL, now(), now()),
+    )
+    _record_transition(conn, order_id, None, AWAITING_APPROVAL, "recorded by Shopee")
+    if request_id:
+        conn.execute(
+            "UPDATE link_requests SET status=? WHERE request_id=? AND status=?",
+            (CONVERTED, request_id, PENDING),
+        )
+
+
+def mark_approved(
+    conn: sqlite3.Connection,
+    order_id: str,
+    approved_commission: int,
+    cashback_amount: int,
+) -> bool:
+    """RULE 2: an order that already has `paid_at` is never reprocessed.
+
+    Reconciliation runs repeatedly over overlapping periods. Without this
+    guard a single order gets paid out two or three times.
+
+    RULE 3: `cashback_amount` must be derived from the APPROVED commission,
+    never from the estimate. The caller computes it via policy.split_commission.
+    """
+    row = get_order(conn, order_id)
+    if row is None:
+        return False
+    if row["paid_at"]:
+        return False
+    if row["status"] != AWAITING_APPROVAL:
+        return False
+
+    conn.execute(
+        "UPDATE orders SET status=?, approved_commission=?, cashback_amount=?,"
+        " approved_at=?, updated_at=? WHERE order_id=?",
+        (APPROVED, approved_commission, cashback_amount, now(), now(), order_id),
+    )
+    _record_transition(
+        conn, order_id, row["status"], APPROVED,
+        f"approved commission {approved_commission} VND -> cashback {cashback_amount} VND",
+    )
+    return True
+
+
+def mark_rejected(conn: sqlite3.Connection, order_id: str, reason: str) -> bool:
+    row = get_order(conn, order_id)
+    if row is None or row["paid_at"]:
+        return False
+    if row["status"] != AWAITING_APPROVAL:
+        return False
+    conn.execute(
+        "UPDATE orders SET status=?, rejection_reason=?, updated_at=? WHERE order_id=?",
+        (REJECTED, reason, now(), order_id),
+    )
+    _record_transition(conn, order_id, row["status"], REJECTED, reason)
+    return True
+
+
+def mark_paid(conn: sqlite3.Connection, order_id: str, note: str = "") -> bool:
+    """RULE 1: only ever pay an order that is already APPROVED."""
+    row = get_order(conn, order_id)
+    if row is None:
+        return False
+    if row["status"] != APPROVED:
+        return False
+    if row["paid_at"]:
+        return False
+    conn.execute(
+        "UPDATE orders SET status=?, paid_at=?, updated_at=? WHERE order_id=?",
+        (PAID, now(), now(), order_id),
+    )
+    _record_transition(conn, order_id, APPROVED, PAID, note or "transferred")
+    return True
+
+
+def orders_awaiting_payout(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT o.*, c.display_name, c.bank_name, c.bank_account, c.account_holder,"
+        " c.private_chat_id"
+        " FROM orders o LEFT JOIN customers c ON c.customer_id = o.customer_id"
+        " WHERE o.status=? AND o.paid_at IS NULL"
+        " ORDER BY o.approved_at",
+        (APPROVED,),
+    ).fetchall()
+
+
+def flag_for_review(
+    conn: sqlite3.Connection, order_id: str | None, raw_data: str, reason: str
+) -> None:
+    conn.execute(
+        "INSERT INTO manual_review (order_id, raw_data, reason, created_at)"
+        " VALUES (?,?,?,?)",
+        (order_id, raw_data, reason, now()),
+    )
+
+
+# ======================================================================
+# Metrics live in metrics.py
+# ======================================================================
+# The three figures that matter -- effective commission rate, valid rate and
+# approved AOV -- are defined in metrics.py per audit v8 section 12.
+#
+# An earlier summary function here was removed for two defects:
+#   - it reported a "rejection ratio" in place of valid rate; the denominators
+#     differ, since valid rate counts every order that arose, including those
+#     still awaiting approval
+#   - its profit figure subtracted neither the 0.98% service fee nor the
+#     withheld tax, so it overstated earnings
+
+
+# ======================================================================
+# Link generation queue
+# ======================================================================
+
+def pending_link_jobs(
+    conn: sqlite3.Connection, limit: int = 100
+) -> list[sqlite3.Row]:
+    """Link requests still waiting for an affiliate URL, oldest first."""
+    return conn.execute(
+        "SELECT request_id, customer_id, source_url, created_at"
+        " FROM link_requests"
+        " WHERE status=? AND (affiliate_url IS NULL OR affiliate_url='')"
+        " ORDER BY created_at LIMIT ?",
+        (PENDING, limit),
+    ).fetchall()
+
+
+def attach_affiliate_url(
+    conn: sqlite3.Connection,
+    request_id: str,
+    affiliate_url: str,
+    estimated_commission: int | None = None,
+) -> bool:
+    """Store the generated link. Refuses to overwrite an existing one."""
+    row = conn.execute(
+        "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
+    ).fetchone()
+    if row is None or row["affiliate_url"]:
+        return False
+    if estimated_commission is None:
+        conn.execute(
+            "UPDATE link_requests SET affiliate_url=? WHERE request_id=?",
+            (affiliate_url, request_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE link_requests SET affiliate_url=?, estimated_commission=?"
+            " WHERE request_id=?",
+            (affiliate_url, estimated_commission, request_id),
+        )
+    return True
+
+
+def forget_customer(
+    conn: sqlite3.Connection, customer_id: str, force: bool = False
+) -> dict:
+    """Erase a customer and everything traceable to them.
+
+    Refuses while money is still owed: deleting a record that says you owe
+    someone 20,000 VND does not end the obligation, it just hides it. Pass
+    force only when that has been settled some other way.
+
+    A customer may ask for this under Vietnam's personal data protection
+    law, so it has to actually delete rather than flag as inactive.
+    """
+    row = get_customer(conn, customer_id)
+    if row is None:
+        return {"found": False}
+
+    owed = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(cashback_amount), 0) FROM orders"
+        " WHERE customer_id=? AND status=? AND paid_at IS NULL",
+        (customer_id, APPROVED),
+    ).fetchone()
+
+    if owed[0] and not force:
+        return {
+            "found": True,
+            "deleted": False,
+            "owed_orders": owed[0],
+            "owed_amount": owed[1],
+        }
+
+    order_ids = [
+        r[0] for r in conn.execute(
+            "SELECT order_id FROM orders WHERE customer_id=?", (customer_id,)
+        )
+    ]
+    for order_id in order_ids:
+        conn.execute("DELETE FROM state_history WHERE order_id=?", (order_id,))
+        conn.execute("DELETE FROM manual_review WHERE order_id=?", (order_id,))
+
+    counts = {}
+    for table in ("orders", "link_requests"):
+        cur = conn.execute(f"DELETE FROM {table} WHERE customer_id=?", (customer_id,))
+        counts[table] = cur.rowcount
+    conn.execute("DELETE FROM customers WHERE customer_id=?", (customer_id,))
+
+    return {
+        "found": True,
+        "deleted": True,
+        "display_name": row["display_name"],
+        "orders": counts["orders"],
+        "link_requests": counts["link_requests"],
+    }

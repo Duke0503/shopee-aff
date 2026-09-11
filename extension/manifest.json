@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Cashback Bridge",
+  "version": "1.0.0",
+  "description": "Drives the operator's own Shopee Affiliate dashboard on behalf of the local cashback ledger",
+  "permissions": [
+    "tabs",
+    "alarms",
+    "scripting",
+    "storage",
+    "debugger"
+  ],
+  "icons": {
+    "128": "icon.png"
+  },
+  "action": {
+    "default_title": "Cashback Bridge",
+    "default_icon": {
+      "128": "icon.png"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "host_permissions": [
+    "https://affiliate.shopee.vn/*",
+    "https://open-api.affiliate.shopee.vn/*",
+    "http://127.0.0.1/*",
+    "https://shopee.vn/*",
+    "https://*.shopee.vn/*"
+  ],
+  "background": {
+    "service_worker": "background/index.js",
+    "type": "module"
+  }
+}

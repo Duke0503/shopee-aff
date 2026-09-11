@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Secrets and local state
+.env
+extension/background/base_url.js
+
+# Data
+*.db
+*.db-wal
+*.db-shm
+
+# Runtime output
+*.log
+logs/
+var/
+
+# The dedicated browser profile: a full Chrome profile, including a live
+# Shopee session. Never commit it.
+.browser-profile/
+
+# Scratch output from `cashback probe`
+probe.json
+
+# Tooling
+_bmad-output/
+.pytest_cache/
+.ruff_cache/
