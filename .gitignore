@@ -29,6 +29,3 @@ probe.json
 _bmad-output/
 .pytest_cache/
 .ruff_cache/
-
-# Test output
-.pytest_cache/
