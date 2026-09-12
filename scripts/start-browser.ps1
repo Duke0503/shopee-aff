@@ -44,9 +44,21 @@ $Args = @(
   "--disable-sync"
   "--disable-background-networking"
   "--disable-component-update"
-  "--disable-features=Translate,OptimizationHints,MediaRouter"
+  # One --disable-features wins over another, so everything goes in one.
+  # CalculateNativeWinOcclusion is what decides a window is hidden; on a
+  # machine with no monitor it decides that about every window.
+  "--disable-features=Translate,OptimizationHints,MediaRouter,CalculateNativeWinOcclusion"
   # Two tabs share one renderer instead of taking one each.
   "--renderer-process-limit=2"
+  # With no monitor attached every tab counts as hidden, and Chrome
+  # throttles hidden tabs to save battery: timers drop to once a minute
+  # and rendering can stop. The extension drives those tabs, so this
+  # would surface as link generation that mysteriously takes minutes or
+  # hangs. None of this changes what Shopee sees -- it only stops Chrome
+  # powering down its own tabs.
+  "--disable-background-timer-throttling"
+  "--disable-backgrounding-occluded-windows"
+  "--disable-renderer-backgrounding"
   "https://affiliate.shopee.vn/offer/custom_link"
   "https://shopee.vn/"
 )
