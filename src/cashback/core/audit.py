@@ -44,7 +44,22 @@ from typing import Any, Iterator
 
 from .config import PROJECT_ROOT
 
-AUDIT_DIR = PROJECT_ROOT / "logs" / "audit"
+# Overridable so a test suite never writes into the operator's real
+# trail. An audit trail whose integrity depends on nobody running pytest
+# is not an audit trail.
+_DIRECTORY = PROJECT_ROOT / "logs" / "audit"
+
+
+def directory() -> Path:
+    return _DIRECTORY
+
+
+def set_directory(path: Path) -> None:
+    """Point the trail somewhere else. For tests only."""
+    global _DIRECTORY
+    _DIRECTORY = Path(path)
+
+
 TIMEZONE = timezone(timedelta(hours=7))
 
 # Events. Adding one is fine; renaming one breaks every past query, so
@@ -69,7 +84,7 @@ def _now() -> datetime:
 
 def current_file(when: datetime | None = None) -> Path:
     moment = when or _now()
-    return AUDIT_DIR / f"audit-{moment:%Y-%m}.jsonl"
+    return directory() / f"audit-{moment:%Y-%m}.jsonl"
 
 
 def fingerprint(value: str) -> str:
@@ -86,7 +101,7 @@ def record(event: str, **fields: Any) -> None:
     it: a full disk must not stop a customer being paid.
     """
     try:
-        AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+        directory().mkdir(parents=True, exist_ok=True)
         line = {"at": _now().isoformat(timespec="seconds"), "event": event}
         line.update({k: v for k, v in fields.items() if v is not None})
         with current_file().open("a", encoding="utf-8") as handle:
@@ -101,10 +116,11 @@ def read(months: int = 3) -> Iterator[dict]:
     Reads the gzipped archives too, so a query does not silently skip
     whatever was compressed last week.
     """
-    if not AUDIT_DIR.exists():
+    root = directory()
+    if not root.exists():
         return
-    files = sorted(AUDIT_DIR.glob("audit-*.jsonl")) + \
-        sorted(AUDIT_DIR.glob("audit-*.jsonl.gz"))
+    files = sorted(root.glob("audit-*.jsonl")) + \
+        sorted(root.glob("audit-*.jsonl.gz"))
     for path in sorted(files, key=lambda p: p.name)[-months * 2:]:
         opener = gzip.open if path.suffix == ".gz" else open
         try:
@@ -128,9 +144,10 @@ def archive_closed_months(keep_plain: int = 1) -> list[Path]:
     Everything older is gzipped in place; JSONL is highly repetitive and
     shrinks by roughly nine tenths.
     """
-    if not AUDIT_DIR.exists():
+    root = directory()
+    if not root.exists():
         return []
-    plain = sorted(AUDIT_DIR.glob("audit-*.jsonl"))
+    plain = sorted(root.glob("audit-*.jsonl"))
     done: list[Path] = []
     for path in plain[:-keep_plain] if keep_plain else plain:
         target = path.with_suffix(".jsonl.gz")
