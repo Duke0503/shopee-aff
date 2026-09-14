@@ -170,3 +170,80 @@ class TestIdempotence:
         with ledger.connect(db) as conn:
             count = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
         assert count == 1
+
+
+class TestResendingAProductReusesTheLink:
+    """Sending the same product again means "I never got it".
+
+    Treating each send as a new request produced three links for one item,
+    three trips to Shopee, and three near-identical messages the customer
+    then had to choose between.
+    """
+
+    def test_a_second_send_makes_no_second_request(self, db):
+        from cashback.ledger import repository as ledger
+        send(db, "hi")
+        send(db, "https://vn.shp.ee/SAME")
+        send(db, "https://vn.shp.ee/SAME")
+        with ledger.connect(db) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM link_requests").fetchone()[0]
+        assert count == 1
+
+    def test_an_already_generated_link_is_queued_to_go_out_again(self, db):
+        from cashback.ledger import repository as ledger
+        send(db, "hi")
+        send(db, "https://vn.shp.ee/SAME")
+        with ledger.connect(db) as conn:
+            request_id = conn.execute(
+                "SELECT request_id FROM link_requests").fetchone()[0]
+            ledger.attach_affiliate_url(conn, request_id,
+                                        "https://s.shopee.vn/aff", 9_000)
+            conn.execute("UPDATE link_requests SET notified_at=? "
+                         "WHERE request_id=?", (ledger.now(), request_id))
+
+        send(db, "https://vn.shp.ee/SAME")        # asked again
+        with ledger.connect(db) as conn:
+            row = conn.execute(
+                "SELECT notified_at FROM link_requests").fetchone()
+        assert row["notified_at"] is None         # queued for redelivery
+
+    def test_a_different_product_still_makes_its_own_request(self, db):
+        from cashback.ledger import repository as ledger
+        send(db, "hi")
+        send(db, "https://vn.shp.ee/AAA")
+        send(db, "https://vn.shp.ee/BBB")
+        with ledger.connect(db) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM link_requests").fetchone()[0]
+        assert count == 2
+
+    def test_another_customer_asking_for_it_gets_their_own(self, db):
+        from cashback.ledger import repository as ledger
+        send(db, "hi", user="u1")
+        send(db, "https://vn.shp.ee/SAME", user="u1")
+        send(db, "hi", user="u2", name="Someone Else")
+        send(db, "https://vn.shp.ee/SAME", user="u2", name="Someone Else")
+        with ledger.connect(db) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM link_requests").fetchone()[0]
+        # Attribution is per customer; sharing one link would pay the wrong
+        # person.
+        assert count == 2
+
+    def test_past_the_attribution_window_a_fresh_link_is_made(self, db):
+        from cashback.ledger import repository as ledger
+        from cashback.messaging import conversation as c
+        from cashback.messaging.zalo_client import Chat, Message as M
+        send(db, "hi")
+        send(db, "https://vn.shp.ee/SAME")
+        with ledger.connect(db) as conn:
+            conn.execute("UPDATE link_requests SET created_at='2020-01-01T00:00:00+07:00'")
+        msg = M(message_id="m", chat=Chat(id="u1", type="USER"),
+                text="https://vn.shp.ee/SAME",
+                from_user={"id": "u1", "display_name": "Test Person"})
+        c.handle(db, msg, 0.70, "30-70 ngay", attribution_days=7)
+        with ledger.connect(db) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM link_requests").fetchone()[0]
+        assert count == 2

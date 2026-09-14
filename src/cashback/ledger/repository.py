@@ -440,6 +440,40 @@ def pending_link_jobs(
     ).fetchall()
 
 
+def find_reusable_request(
+    conn: sqlite3.Connection,
+    customer_id: str,
+    source_url: str,
+    within_days: int,
+) -> sqlite3.Row | None:
+    """A link this customer already has for this exact product, if any.
+
+    People resend a product when no reply arrives. Treating each send as a
+    new request made three links for one item, three trips to Shopee, and
+    three near-identical messages the customer had to choose between.
+
+    Only requests inside the attribution window count: past it the link no
+    longer earns anything and a fresh one is the right answer.
+    """
+    cutoff = (datetime.now(timezone.utc).astimezone()
+              - timedelta(days=within_days)).isoformat()
+    return conn.execute(
+        "SELECT * FROM link_requests"
+        " WHERE customer_id=? AND source_url=? AND created_at >= ?"
+        "   AND status != 'failed'"
+        " ORDER BY created_at DESC LIMIT 1",
+        (customer_id, source_url, cutoff),
+    ).fetchone()
+
+
+def resend_request(conn: sqlite3.Connection, request_id: str) -> None:
+    """Queue an already-generated link to go out again."""
+    conn.execute(
+        "UPDATE link_requests SET notified_at=NULL WHERE request_id=?",
+        (request_id,),
+    )
+
+
 def attach_affiliate_url(
     conn: sqlite3.Connection,
     request_id: str,

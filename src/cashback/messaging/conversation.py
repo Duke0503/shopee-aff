@@ -198,7 +198,7 @@ def _ensure_customer(conn: sqlite3.Connection, msg: Message) -> sqlite3.Row:
 
 def handle(
     db_path: Path, msg: Message, cashback_rate: float, payout_window: str,
-    event_name: str = "",
+    event_name: str = "", attribution_days: int = 7,
 ) -> list[Reply]:
     """Decide what a single incoming message means. Returns replies to send."""
     if not msg or not msg.chat.id:
@@ -310,7 +310,21 @@ def handle(
         # Queue the links first. Making someone hand over bank details before
         # they have seen anything useful is how you lose them in the first
         # minute -- and the money is two months away regardless.
+        resent = 0
         for url in urls:
+            # Someone resending a product almost always means "I never got
+            # it", not "make me a second one". Reusing the link they already
+            # have answers that, saves a trip to Shopee, and spares them
+            # three near-identical messages to choose between.
+            existing = ledger.find_reusable_request(
+                conn, customer_id, url, attribution_days)
+            if existing is not None:
+                if existing["affiliate_url"]:
+                    ledger.resend_request(conn, existing["request_id"])
+                    resent += 1
+                # Still being generated: it is already queued, leave it be.
+                continue
+
             request_id = new_request_id()
             ledger.record_link_request(
                 conn,

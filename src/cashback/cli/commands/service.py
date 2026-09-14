@@ -200,6 +200,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                         replies = zalo_handler.handle(
                             cfg.db_path, msg, cfg.advertised_cashback_rate,
                             PAYOUT_WINDOW_TEXT, update.event_name,
+                            attribution_days=cfg.link_attribution_days,
                         )
                         zalo_handler.send_replies(bot, replies)
                     except Exception as exc:
