@@ -73,13 +73,21 @@ _CLICK_TEMPLATE = """
 # The result lands in a disabled textarea, so read .value, not .innerText.
 # Poll rather than sleeping a fixed time: the page is sometimes instant and
 # sometimes takes several seconds.
+# The result box is only trusted when it holds something DIFFERENT from
+# what was in it before this submission. Waiting for "not empty" was
+# enough only because every pass used to reload the page and wipe it; the
+# moment that reload was skipped, the previous customer's link was still
+# sitting there and got read back as this customer's answer.
 _READ_TEMPLATE = """
 (() => {
   const deadline = Date.now() + %(timeout_ms)d;
+  const previous = %(previous)s;
   const read = () => {
     const el = document.querySelector(%(result)s);
     const text = (el && el.value) ? el.value.trim() : '';
-    return text && /shopee/i.test(text) ? text : '';
+    if (!text || !/shopee/i.test(text)) return '';
+    if (text === previous) return '';        // still the last answer
+    return text;
   };
   return new Promise(resolve => {
     const tick = () => {
@@ -191,7 +199,16 @@ def convert_chunk(
     for value in sub_ids:
         assert_valid_sub_id(value)
 
-    all_fields = [SOURCE_TEXTAREA, *SUB_ID_FIELDS]
+    # Whatever is in the result box belongs to the previous submission.
+    # Read it first so the new answer can be told apart from it, then
+    # clear it along with the inputs.
+    previous = _js(
+        bridge,
+        "({v: (document.querySelector(%s)||{}).value || ''})"
+        % json.dumps(RESULT_FIELD),
+    ).get("v", "").strip()
+
+    all_fields = [SOURCE_TEXTAREA, RESULT_FIELD, *SUB_ID_FIELDS]
     _js(bridge, _CLEAR_TEMPLATE % {"all_fields": json.dumps(all_fields)})
 
     filled = _js(
@@ -215,7 +232,9 @@ def convert_chunk(
     read = _js(
         bridge,
         _READ_TEMPLATE
-        % {"result": json.dumps(RESULT_FIELD), "timeout_ms": result_timeout_ms},
+        % {"result": json.dumps(RESULT_FIELD),
+           "previous": json.dumps(previous),
+           "timeout_ms": result_timeout_ms},
         timeout=result_timeout_ms / 1000 + 30,
     )
     if not read.get("ok"):

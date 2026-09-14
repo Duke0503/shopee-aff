@@ -446,11 +446,28 @@ def attach_affiliate_url(
     affiliate_url: str,
     estimated_commission: int | None = None,
 ) -> bool:
-    """Store the generated link. Refuses to overwrite an existing one."""
+    """Store the generated link. Refuses an overwrite, and a wrong link.
+
+    The second refusal matters more than it looks. An affiliate link points
+    at ONE product. If the browser hands back a link already recorded
+    against a different source URL, the page returned a stale answer -- and
+    storing it would send a customer a link to somebody else's product,
+    quietly, with the cashback quoted for the item they asked about. That
+    has happened once, when a page stopped being reloaded between passes.
+    """
     row = conn.execute(
-        "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
+        "SELECT affiliate_url, source_url FROM link_requests WHERE request_id=?",
+        (request_id,),
     ).fetchone()
     if row is None or row["affiliate_url"]:
+        return False
+
+    clash = conn.execute(
+        "SELECT request_id FROM link_requests"
+        " WHERE affiliate_url=? AND source_url != ? LIMIT 1",
+        (affiliate_url, row["source_url"]),
+    ).fetchone()
+    if clash:
         return False
     if estimated_commission is None:
         conn.execute(

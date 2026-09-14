@@ -159,3 +159,39 @@ class TestSubIdSafety:
     def test_separators_are_refused(self, bad):
         with pytest.raises(ValueError):
             assert_valid_sub_id(bad)
+
+
+class TestNeverStoreSomeoneElsesLink:
+    """An affiliate link points at one product.
+
+    A stale read from the browser once handed the previous customer's link
+    back as this customer's answer. The message would have quoted the right
+    price for the wrong product, and the purchase would have earned
+    commission on something the customer never asked for.
+    """
+
+    def test_a_link_already_used_for_another_product_is_refused(self, conn, customer):
+        ledger.record_link_request(conn, "R00000000001", customer,
+                                   "https://s.shopee.vn/aaa", None, None, "zalo")
+        ledger.record_link_request(conn, "R00000000002", customer,
+                                   "https://s.shopee.vn/bbb", None, None, "zalo")
+        assert ledger.attach_affiliate_url(
+            conn, "R00000000001", "https://s.shopee.vn/SAME") is True
+        assert ledger.attach_affiliate_url(
+            conn, "R00000000002", "https://s.shopee.vn/SAME") is False
+        second = ledger.get_link_request(conn, "R00000000002") \
+            if hasattr(ledger, "get_link_request") else conn.execute(
+                "SELECT affiliate_url FROM link_requests WHERE request_id=?",
+                ("R00000000002",)).fetchone()
+        assert second["affiliate_url"] is None
+
+    def test_the_same_product_twice_may_share_a_link(self, conn, customer):
+        """Two people asking for one product is normal, not a clash."""
+        for request_id in ("R00000000003", "R00000000004"):
+            ledger.record_link_request(conn, request_id, customer,
+                                       "https://s.shopee.vn/same-product",
+                                       None, None, "zalo")
+        assert ledger.attach_affiliate_url(
+            conn, "R00000000003", "https://s.shopee.vn/X") is True
+        assert ledger.attach_affiliate_url(
+            conn, "R00000000004", "https://s.shopee.vn/X") is True
