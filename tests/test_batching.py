@@ -103,3 +103,48 @@ class TestSubIdsCarryAttribution:
         _request(db, "R00000000001", customer_id="C0007")
         job = batch_queue.collect(db, batch_queue.BatchSettings())[0]
         assert job["sub_ids"] == ["C0007", "R00000000001"]
+
+
+class TestAFailedRequestComesBack:
+    """A submission that produced no link must be retried, not dropped.
+
+    The customer is still waiting and the ledger still says pending; the
+    only thing that failed was one attempt at the browser.
+    """
+
+    def test_a_failure_leaves_it_pending_and_counts_the_attempt(self, db):
+        from cashback.worker import batch_queue as q
+        _request(db, "R00000000001")
+        q.collect(db, q.BatchSettings())
+        q.apply_results(db, [{"request_id": "R00000000001",
+                              "error": "no link came back"}])
+        with ledger.connect(db) as conn:
+            row = conn.execute(
+                "SELECT status, attempts, affiliate_url FROM link_requests"
+                " WHERE request_id='R00000000001'").fetchone()
+        assert row["status"] == "pending"
+        assert row["attempts"] == 1
+        assert row["affiliate_url"] is None
+
+    def test_it_is_handed_out_again_on_the_next_pass(self, db):
+        from cashback.worker import batch_queue as q
+        _request(db, "R00000000001")
+        q.collect(db, q.BatchSettings())
+        q.apply_results(db, [{"request_id": "R00000000001", "error": "boom"}])
+        q._last_pass_at = datetime.now() - timedelta(seconds=999)
+        assert len(q.collect(db, q.BatchSettings())) == 1
+
+    def test_it_is_given_up_on_after_the_limit(self, db):
+        from cashback.worker import batch_queue as q
+        _request(db, "R00000000001")
+        for _ in range(ledger.MAX_LINK_ATTEMPTS):
+            q._last_pass_at = None
+            q.collect(db, q.BatchSettings())
+            q.apply_results(db, [{"request_id": "R00000000001", "error": "boom"}])
+        with ledger.connect(db) as conn:
+            status = conn.execute(
+                "SELECT status FROM link_requests WHERE request_id='R00000000001'"
+            ).fetchone()["status"]
+        # 'failed' is what makes the apology sendable; pending forever is
+        # what left a customer waiting all evening.
+        assert status == "failed"

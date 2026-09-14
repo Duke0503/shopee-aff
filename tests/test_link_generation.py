@@ -107,3 +107,67 @@ class TestResultMapping:
     def test_no_jobs_means_no_browser_work(self, captured):
         assert gen.generate(FakeBridge(), []) == []
         assert captured == []
+
+
+class TestOneFailureDoesNotContaminateTheOthers:
+    """The exact shape that went wrong this morning, in reverse.
+
+    Three links go out one at a time. The second submission fails. The
+    question that matters is what the second customer receives -- and the
+    answer has to be nothing, not whatever was left in the result box from
+    the first.
+    """
+
+    @pytest.fixture
+    def flaky_browser(self, monkeypatch):
+        """Models the result box: cleared, then filled -- or not."""
+        state = {"box": "", "n": 0}
+        seen: list[dict] = []
+
+        def submit(bridge, urls, sub_ids, **kwargs):
+            state["n"] += 1
+            previous = state["box"]
+            state["box"] = ""                      # convert_chunk clears it
+            if state["n"] == 2:
+                # The click did nothing: the box stays as the clear left it.
+                seen.append({"request": sub_ids[1], "previous": previous,
+                             "outcome": "failed"})
+                raise RuntimeError("no link came back: timed out")
+            state["box"] = f"https://s.shopee.vn/real{state['n']}"
+            seen.append({"request": sub_ids[1], "previous": previous,
+                         "outcome": state["box"]})
+            return [state["box"]]
+
+        monkeypatch.setattr(gen, "convert_chunk", submit)
+        monkeypatch.setattr(gen, "open_page", lambda *a, **k: None)
+        monkeypatch.setattr(gen, "_pause", lambda *a, **k: None)
+        return seen
+
+    def test_the_failed_request_gets_an_error_not_a_leftover_link(
+            self, flaky_browser):
+        results = gen.generate(FakeBridge(), _jobs("C0001", 3))
+        by_request = {r["request_id"]: r for r in results}
+
+        failed = by_request["R00000000001"]
+        assert "error" in failed
+        assert "affiliate_url" not in failed
+
+    def test_the_other_two_get_their_own_distinct_links(self, flaky_browser):
+        results = gen.generate(FakeBridge(), _jobs("C0001", 3))
+        urls = [r["affiliate_url"] for r in results if r.get("affiliate_url")]
+        assert len(urls) == 2
+        assert len(set(urls)) == 2               # no two requests share one
+
+    def test_the_third_submission_is_compared_against_an_empty_box(
+            self, flaky_browser):
+        """After a failure the box is empty, so the next answer is anything
+        non-empty -- it cannot be mistaken for a link that was never made."""
+        gen.generate(FakeBridge(), _jobs("C0001", 3))
+        assert flaky_browser[2]["previous"] == ""
+
+    def test_each_submission_is_compared_against_the_one_before_it(
+            self, flaky_browser):
+        """Not against a value cached at the start of the pass."""
+        gen.generate(FakeBridge(), _jobs("C0001", 3))
+        assert flaky_browser[0]["previous"] == ""          # nothing yet
+        assert flaky_browser[1]["previous"] == "https://s.shopee.vn/real1"
