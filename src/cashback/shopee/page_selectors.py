@@ -29,7 +29,25 @@ RESULT_FIELD = "textarea.ant-input.ant-input-disabled"
 # --- Limits the page itself imposes -----------------------------------
 
 # "vui long dien toi da 5 lien ket trong cac hang khac nhau"
+# What the page accepts in one submission.
 MAX_LINKS_PER_SUBMIT = 5
+
+# What this system actually sends. One, deliberately.
+#
+# Filling five at a time costs two things the speed was never worth:
+#
+#   sub_id cannot vary within a submission, so a chunk of five gets
+#   sub_id1 (the customer) and no sub_id2 (the request). Reconciliation
+#   can then say an order belongs to C0003 but not which of their five
+#   links produced it.
+#
+#   five urls in, five links out, matched by POSITION -- an order
+#   nothing in the page promises to keep.
+#
+# One url per submission makes both problems disappear rather than
+# guarding against them. It costs about three seconds per extra link,
+# and only when one customer sends several at once.
+LINKS_PER_SUBMIT = 1
 
 # "Chi duoc phep nhap gia tri chu va so (a-z,A-Z, 0-9)"
 # No dashes, no underscores, no dots. Identifiers must respect this or the

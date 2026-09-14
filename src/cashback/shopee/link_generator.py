@@ -18,6 +18,7 @@ from ..shopee.browser_bridge import Bridge, Job
 from ..core.identifiers import assert_valid_sub_id
 from ..shopee.page_selectors import (
     CUSTOM_LINK_URL,
+    LINKS_PER_SUBMIT,
     MAX_LINKS_PER_SUBMIT,
     RESULT_FIELD,
     SOURCE_TEXTAREA,
@@ -267,8 +268,8 @@ def generate(bridge: Bridge, jobs: list[dict]) -> list[dict]:
     results: list[dict] = []
 
     for customer_id, group in by_customer.items():
-        for start in range(0, len(group), MAX_LINKS_PER_SUBMIT):
-            chunk = group[start : start + MAX_LINKS_PER_SUBMIT]
+        for start in range(0, len(group), LINKS_PER_SUBMIT):
+            chunk = group[start : start + LINKS_PER_SUBMIT]
 
             # sub_id1 is the customer, shared by the chunk. sub_id2 would be
             # the request, but it cannot vary within a submission, so it is
@@ -292,5 +293,11 @@ def generate(bridge: Bridge, jobs: list[dict]) -> list[dict]:
                 results.append(
                     {"request_id": job["request_id"], "affiliate_url": link}
                 )
+
+            # A pause between submissions. One customer sending five
+            # links becomes five clicks; spacing them keeps that looking
+            # like a person rather than a script.
+            if start + LINKS_PER_SUBMIT < len(group):
+                _pause(bridge, 1200)
 
     return results
