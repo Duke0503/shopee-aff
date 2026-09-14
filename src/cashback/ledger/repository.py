@@ -14,7 +14,8 @@ from typing import Iterator
 # --- Link request states -----------------------------------------------
 PENDING = "pending"          # link issued, unknown whether the customer bought
 CONVERTED = "converted"      # produced at least one order
-EXPIRED = "expired"          # attribution window elapsed with no order
+EXPIRED = "expired"          # no order arrived in the window; bookkeeping
+                             # only -- the link still works if clicked
 
 # --- Order states ------------------------------------------------------
 MAX_LINK_ATTEMPTS = 3
@@ -444,19 +445,26 @@ def find_reusable_request(
     conn: sqlite3.Connection,
     customer_id: str,
     source_url: str,
-    within_days: int,
+    resend_within_days: int,
 ) -> sqlite3.Row | None:
-    """A link this customer already has for this exact product, if any.
+    """A link this customer asked for recently for this exact product.
 
     People resend a product when no reply arrives. Treating each send as a
     new request made three links for one item, three trips to Shopee, and
     three near-identical messages the customer had to choose between.
 
-    Only requests inside the attribution window count: past it the link no
-    longer earns anything and a fresh one is the right answer.
+    THE LINK ITSELF NEVER EXPIRES. Shopee's seven days start when the
+    customer CLICKS, not when the link was made, so one created a month ago
+    still earns if it is clicked today -- and reconciliation still finds
+    its request whatever status the row carries.
+
+    The window here is therefore not an expiry. It separates "I never got
+    it" from "I am shopping for this again": past it the quoted price and
+    commission are stale and the message would be wrong, so a fresh
+    request is made to get fresh numbers.
     """
     cutoff = (datetime.now(timezone.utc).astimezone()
-              - timedelta(days=within_days)).isoformat()
+              - timedelta(days=resend_within_days)).isoformat()
     return conn.execute(
         "SELECT * FROM link_requests"
         " WHERE customer_id=? AND source_url=? AND created_at >= ?"
@@ -467,9 +475,16 @@ def find_reusable_request(
 
 
 def resend_request(conn: sqlite3.Connection, request_id: str) -> None:
-    """Queue an already-generated link to go out again."""
+    """Queue an already-generated link to go out again, with fresh numbers.
+
+    The link is reused; the price and commission are not. Shopee prices
+    move -- a flash sale is enough -- and a message quoting what the item
+    cost the last time it was asked about is simply wrong. Clearing the
+    stored estimate makes delivery look it up again.
+    """
     conn.execute(
-        "UPDATE link_requests SET notified_at=NULL WHERE request_id=?",
+        "UPDATE link_requests SET notified_at=NULL, estimate_detail=NULL,"
+        " estimated_commission=NULL, estimate_source=NULL WHERE request_id=?",
         (request_id,),
     )
 

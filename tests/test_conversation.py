@@ -247,3 +247,31 @@ class TestResendingAProductReusesTheLink:
             count = conn.execute(
                 "SELECT COUNT(*) FROM link_requests").fetchone()[0]
         assert count == 2
+
+    def test_a_resend_drops_the_stored_numbers_so_they_are_looked_up_again(self, db):
+        """The link is reused; the price is not.
+
+        Shopee prices move -- a flash sale is enough -- and quoting what the
+        item cost last time is simply wrong.
+        """
+        from cashback.ledger import repository as ledger
+        send(db, "hi")
+        send(db, "https://vn.shp.ee/SAME")
+        with ledger.connect(db) as conn:
+            request_id = conn.execute(
+                "SELECT request_id FROM link_requests").fetchone()[0]
+            ledger.attach_affiliate_url(conn, request_id,
+                                        "https://s.shopee.vn/aff", 9_000)
+            conn.execute(
+                "UPDATE link_requests SET notified_at=?, estimate_detail=?,"
+                " estimate_source='shopee' WHERE request_id=?",
+                (ledger.now(), '{"stale": true}', request_id))
+
+        send(db, "https://vn.shp.ee/SAME")
+        with ledger.connect(db) as conn:
+            row = conn.execute(
+                "SELECT affiliate_url, estimate_detail, estimated_commission"
+                " FROM link_requests").fetchone()
+        assert row["affiliate_url"] == "https://s.shopee.vn/aff"   # link kept
+        assert row["estimate_detail"] is None                      # numbers dropped
+        assert row["estimated_commission"] is None

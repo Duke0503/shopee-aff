@@ -317,7 +317,7 @@ def handle(
             # have answers that, saves a trip to Shopee, and spares them
             # three near-identical messages to choose between.
             existing = ledger.find_reusable_request(
-                conn, customer_id, url, attribution_days)
+                conn, customer_id, url, resend_within_days=attribution_days)
             if existing is not None:
                 if existing["affiliate_url"]:
                     ledger.resend_request(conn, existing["request_id"])

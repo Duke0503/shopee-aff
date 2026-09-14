@@ -105,6 +105,15 @@ hướng dẫn khách bấm ✕ xoá khung ảnh.
 **Trong nhóm, bot chỉ nhận tin khi được @tag hoặc bị reply.** Không nghe
 được cả nhóm.
 
+**Link tiếp thị KHÔNG hết hạn.** Bảy ngày của Shopee tính từ lúc khách
+**bấm** link, không phải từ lúc tạo link. Link tạo một tháng trước, hôm nay
+bấm thì vẫn ăn hoa hồng, và đối soát vẫn tìm được yêu cầu gốc dù dòng đó
+mang trạng thái `expired`. Trạng thái `expired` chỉ là ghi sổ.
+
+`LINK_ATTRIBUTION_DAYS` **không phải hạn dùng của link**. Nó phân biệt
+*"tôi chưa nhận được"* với *"tôi đang tìm mua lại"*: quá hạn đó thì giá và
+hoa hồng đã cũ, nên tạo yêu cầu mới để lấy số mới.
+
 **Danh sách tên miền Shopee phải nằm ở một chỗ duy nhất**
 (`shopee/dashboard_lookup.py`). Đã từng có hai bản sao lệch nhau và link
 `shp.ee` bị coi là tin nhắn thường suốt một buổi.
