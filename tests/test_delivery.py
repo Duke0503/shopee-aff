@@ -1,0 +1,169 @@
+"""Sending finished links and order news back to the customer.
+
+These exercise the two loops `serve` runs on a timer. Nothing here was
+covered before, and that gap cost a customer their link: a rewritten
+import inside `deliver_ready_links` raised ImportError on every pass, the
+error was caught and logged, and the bot went on cheerfully answering
+"dang tao link cho ban" forever.
+
+Function-local imports only fail when the line runs. Importing the module
+proves nothing. These tests run the line.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from cashback.ledger import repository as ledger
+from cashback.messaging import conversation as convo
+
+
+class FakeBot:
+    """Records what would have been sent."""
+
+    def __init__(self, fail: bool = False):
+        self.sent: list[tuple[str, str]] = []
+        self.fail = fail
+
+    def send(self, chat_id: str, text: str):
+        if self.fail:
+            raise RuntimeError("chat_id is empty")
+        self.sent.append((chat_id, text))
+        return [{}]
+
+
+@pytest.fixture
+def ready_link(db: Path) -> str:
+    """One customer with a generated link, not yet delivered."""
+    with ledger.connect(db) as conn:
+        ledger.add_customer(conn, "C0001", display_name="Test",
+                            zalo_user_id="u1", private_chat_id="u1")
+        ledger.record_link_request(conn, "R00000000001", "C0001",
+                                   "https://s.shopee.vn/x", None, 9_263, "zalo")
+        ledger.attach_affiliate_url(conn, "R00000000001",
+                                    "https://s.shopee.vn/aff", 9_263)
+    return "R00000000001"
+
+
+class TestLinkDelivery:
+    def test_a_ready_link_is_sent(self, db, ready_link):
+        bot = FakeBot()
+        sent = convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False)
+        assert sent == 1
+        chat_id, text = bot.sent[0]
+        assert chat_id == "u1"
+        assert "https://s.shopee.vn/aff" in text
+
+    def test_it_is_not_sent_twice(self, db, ready_link):
+        bot = FakeBot()
+        convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay", third_party=False)
+        again = convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                          third_party=False)
+        assert again == 0
+        assert len(bot.sent) == 1
+
+    def test_a_failed_send_is_retried_next_pass(self, db, ready_link):
+        """Marking it delivered before the send succeeds loses the link."""
+        convo.deliver_ready_links(db, FakeBot(fail=True), 0.70, "30-70 ngay",
+                                  third_party=False)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 1
+
+    def test_a_customer_with_no_private_chat_is_skipped_not_crashed(self, db):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0002", zalo_user_id="u2",
+                                private_chat_id="")
+            ledger.record_link_request(conn, "R00000000002", "C0002",
+                                       "https://s.shopee.vn/y", None, 1_000, "zalo")
+            ledger.attach_affiliate_url(conn, "R00000000002",
+                                        "https://s.shopee.vn/aff2", 1_000)
+        assert convo.deliver_ready_links(db, FakeBot(), 0.70, "30-70 ngay",
+                                         third_party=False) == 0
+
+    def test_no_estimate_still_delivers_the_link(self, db):
+        """A link with no price attached must still reach the customer."""
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            ledger.record_link_request(conn, "R00000000003", "C0001",
+                                       "https://shopee.vn/khong-co-gi",
+                                       None, None, "zalo")
+            ledger.attach_affiliate_url(conn, "R00000000003",
+                                        "https://s.shopee.vn/aff3", None)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 1
+        assert "https://s.shopee.vn/aff3" in bot.sent[0][1]
+
+
+class TestOrderNotifications:
+    def _order(self, db: Path, status: str = ledger.AWAITING_APPROVAL):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            ledger.add_order(conn, "O0001", "C0001", None,
+                             order_value=97_500, estimated_commission=9_263)
+            if status == ledger.APPROVED:
+                ledger.mark_approved(conn, "O0001", 9_263, 6_484)
+            elif status == ledger.REJECTED:
+                ledger.mark_rejected(conn, "O0001", "returned")
+
+    def test_a_recorded_order_is_announced(self, db):
+        self._order(db)
+        bot = FakeBot()
+        assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 1
+        assert "O0001" in bot.sent[0][1]
+
+    def test_announced_once_not_on_every_pass(self, db):
+        self._order(db)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 0
+
+    def test_a_new_status_is_announced_again(self, db):
+        self._order(db)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        with ledger.connect(db) as conn:
+            ledger.mark_approved(conn, "O0001", 9_263, 6_484)
+        assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 1
+
+    def test_approval_asks_for_a_bank_account_only_when_missing(self, db):
+        self._order(db, ledger.APPROVED)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        assert "STK:" in bot.sent[0][1]
+
+    def test_approval_names_the_account_when_it_is_known(self, db):
+        self._order(db, ledger.APPROVED)
+        with ledger.connect(db) as conn:
+            ledger.set_bank_details(conn, "C0001", "VCB", "0123456789", "NGUYEN A")
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        text = bot.sent[0][1]
+        assert "0123456789" in text
+        assert "STK:" not in text          # no need to ask again
+
+    def test_a_rejection_carries_the_reason(self, db):
+        self._order(db, ledger.REJECTED)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        assert "returned" in bot.sent[0][1]
+
+
+class TestFailedLinkApology:
+    def test_a_given_up_request_gets_an_apology(self, db):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            ledger.record_link_request(conn, "R00000000009", "C0001",
+                                       "https://s.shopee.vn/bad", None, None, "zalo")
+            conn.execute("UPDATE link_requests SET status='failed'"
+                         " WHERE request_id='R00000000009'")
+        bot = FakeBot()
+        assert convo.notify_failed_links(db, bot) == 1
+        assert convo.notify_failed_links(db, bot) == 0

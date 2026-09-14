@@ -357,13 +357,17 @@ def deliver_ready_links(
             " FROM link_requests r JOIN customers c"
             "   ON c.customer_id = r.customer_id"
             " WHERE r.affiliate_url IS NOT NULL AND r.affiliate_url != ''"
-            "   AND r.notified_at IS NULL AND c.private_chat_id IS NOT NULL"
+            # An empty string is not NULL, and Zalo answers an empty
+            # chat_id with a 400 on every pass forever. The other two
+            # queries in this module already guard it; this one did not.
+            "   AND r.notified_at IS NULL"
+            "   AND c.private_chat_id IS NOT NULL AND c.private_chat_id != ''"
             " ORDER BY r.created_at"
         ).fetchall()
 
     sent = 0
     for row in rows:
-        from .. import commission as commission_lookup
+        from ..shopee import commission as commission_lookup
 
         # Reuse a breakdown worked out on an earlier pass; only ask a
         # source when there is nothing stored yet.
