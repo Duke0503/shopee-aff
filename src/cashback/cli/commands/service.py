@@ -46,6 +46,7 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     settings = BatchSettings(
         window_seconds=args.window or cfg.batch_window_seconds,
         max_size=args.max_size or cfg.batch_max_size,
+        min_gap_seconds=cfg.batch_min_gap_seconds,
     )
     try:
         worker.loop(cfg.db_path, bridge, settings, cfg.link_attribution_days)
@@ -172,6 +173,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     settings = BatchSettings(
         window_seconds=args.window or cfg.batch_window_seconds,
         max_size=args.max_size or cfg.batch_max_size,
+        min_gap_seconds=cfg.batch_min_gap_seconds,
     )
 
     def zalo_loop() -> None:

@@ -22,13 +22,24 @@ DEFAULT_LEASE_SECONDS = 120
 # Requests handed out but not yet answered. Cleared on result or when the
 # lease expires, so a crashed extension does not strand the queue.
 _in_flight: dict[str, datetime] = {}
+
+# When the browser last did a pass. Starts unset so the first request
+# after startup is served immediately rather than waiting out a window
+# it was never queued behind.
+_last_pass_at: datetime | None = None
 _lock = threading.Lock()
 
 
 @dataclass(frozen=True)
 class BatchSettings:
-    window_seconds: int = 150      # about two and a half minutes
+    # The LONGEST anyone waits, not the wait everyone gets.
+    window_seconds: int = 150
     max_size: int = 20
+    # The shortest gap between two browser passes. This, not the
+    # window, is what bounds how often Shopee is touched: when the
+    # browser has been idle longer than this there is nothing to gain
+    # by making a customer wait, so the work starts at once.
+    min_gap_seconds: int = 20
     lease_seconds: int = DEFAULT_LEASE_SECONDS
 
 
@@ -74,13 +85,29 @@ def collect(db_path: Path, settings: BatchSettings) -> list[dict]:
     if not waiting:
         return []
 
+    global _last_pass_at
+
     oldest_age = max(_age_seconds(row["created_at"]) for row in waiting)
-    if not (len(waiting) >= settings.max_size or oldest_age >= settings.window_seconds):
+
+    with _lock:
+        idle_for = (
+            (datetime.now() - _last_pass_at).total_seconds()
+            if _last_pass_at else float("inf")
+        )
+
+    # Three reasons to go now. The third is what makes a quiet minute fast:
+    # batching a single customer with nobody else only delays them.
+    full = len(waiting) >= settings.max_size
+    waited_long_enough = oldest_age >= settings.window_seconds
+    browser_is_idle = idle_for >= settings.min_gap_seconds
+
+    if not (full or waited_long_enough or browser_is_idle):
         return []
 
     selected = waiting[: settings.max_size]
     leased_at = datetime.now()
     with _lock:
+        _last_pass_at = leased_at
         for row in selected:
             _in_flight[row["request_id"]] = leased_at
 

@@ -145,11 +145,29 @@ def blocked_by_verification(bridge: Bridge) -> str:
 
 
 def open_page(bridge: Bridge, settle_ms: int = 3500) -> None:
-    bridge.submit(
-        Job(connector=CONNECTOR, action="navigate", params={"url": CUSTOM_LINK_URL}),
-        timeout=90,
-    )
-    _pause(bridge, settle_ms)
+    """Make sure the tab is on the Custom Link page and ready to drive.
+
+    Reloading a page that is already open costs about three and a half
+    seconds of every pass and gains nothing: the form is still there, and
+    the previous submission left it in a state the next one clears anyway.
+    Skipping it is most of the difference between a customer waiting eight
+    seconds and waiting four.
+    """
+    here = _js(bridge, "({href: location.href})").get("href") or ""
+    already_there = CUSTOM_LINK_URL.rstrip("/") in here
+
+    if not already_there:
+        bridge.submit(
+            Job(connector=CONNECTOR, action="navigate",
+                params={"url": CUSTOM_LINK_URL}),
+            timeout=90,
+        )
+        _pause(bridge, settle_ms)
+    else:
+        # The form is live already; this is only breathing room for any
+        # in-flight render from the last pass.
+        _pause(bridge, 300)
+
     stuck = blocked_by_verification(bridge)
     if stuck:
         raise RuntimeError(

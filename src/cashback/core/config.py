@@ -45,6 +45,7 @@ class Config:
     bridge_token: str
     batch_window_seconds: int
     batch_max_size: int
+    batch_min_gap_seconds: int
     third_party_fallback: bool
 
     @property
@@ -102,6 +103,7 @@ def load() -> Config:
         bridge_token=os.getenv("BRIDGE_TOKEN", "").strip(),
         batch_window_seconds=int(os.getenv("BATCH_WINDOW_SECONDS", "150")),
         batch_max_size=int(os.getenv("BATCH_MAX_SIZE", "20")),
+        batch_min_gap_seconds=int(os.getenv("BATCH_MIN_GAP_SECONDS", "20")),
         third_party_fallback=os.getenv(
             "THIRD_PARTY_FALLBACK", "true"
         ).strip().lower() in ("1", "true", "yes"),
