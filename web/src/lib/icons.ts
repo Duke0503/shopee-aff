@@ -29,6 +29,8 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Eye,
+  EyeOff,
   Inbox,
   KeyRound,
   Landmark,
@@ -68,6 +70,8 @@ export const Icon = {
   // Signing in
   signIn: LockKeyhole,
   password: KeyRound,
+  reveal: Eye,
+  conceal: EyeOff,
 
   // States
   warning: AlertTriangle,

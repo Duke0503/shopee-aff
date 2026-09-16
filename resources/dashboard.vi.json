@@ -155,5 +155,7 @@
   "me_greeting_morning": "Chào buổi sáng, {name}!",
   "me_greeting_afternoon": "Chào buổi chiều, {name}!",
   "me_greeting_evening": "Chào buổi tối, {name}!",
-  "me_headline_orders": "từ {count} đơn đã được Shopee duyệt"
+  "me_headline_orders": "từ {count} đơn đã được Shopee duyệt",
+  "password_show": "Hiện mật khẩu",
+  "password_hide": "Ẩn mật khẩu"
 }
