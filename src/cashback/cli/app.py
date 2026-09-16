@@ -141,9 +141,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("file")
 
     p = sub.add_parser(
-        "reconcile", help="apply a downloaded conversion report to the ledger"
+        "reconcile", help="apply a conversion report to the ledger"
     )
-    p.add_argument("file")
+    p.add_argument("file", nargs="?",
+                   help="a CSV exported from the dashboard; omit with --live")
+    p.add_argument(
+        "--live", action="store_true",
+        help="read the report from the dashboard instead of a file",
+    )
+    p.add_argument("--days", type=int, default=60,
+                   help="how far back --live reads")
+    p.add_argument("--port", type=int, default=None)
     p.add_argument(
         "--withheld",
         action="store_true",

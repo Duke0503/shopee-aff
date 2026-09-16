@@ -46,6 +46,13 @@ def cmd_reconcile(cfg: Config, args: argparse.Namespace) -> int:
     from ...shopee import reconciliation as reconcile
     from ...shopee.report_importer import MAPPING_FILE, ColumnMapping, read_rows
 
+    if args.live:
+        return _reconcile_live(cfg, args)
+
+    if not args.file:
+        print("Give --file <report.csv>, or --live to read from the dashboard.")
+        return 1
+
     mapping = ColumnMapping.load(Path(MAPPING_FILE))
     missing = mapping.missing_required()
     if missing:
@@ -82,4 +89,82 @@ def cmd_reconcile(cfg: Config, args: argparse.Namespace) -> int:
     if outcome.needs_review:
         print(f"\n{outcome.needs_review} row(s) need a human. "
               f"See the manual_review table.")
+    return 0
+
+
+def _reconcile_live(cfg: Config, args: argparse.Namespace) -> int:
+    """Read the report straight from the dashboard, no CSV export.
+
+    Same reconciliation afterwards -- only where the rows come from
+    differs, so a live run and a file run cannot drift apart in how they
+    decide anything.
+    """
+    from ...shopee import reconciliation as reconcile, report_reader
+    from ...shopee.browser_bridge import serve_in_background
+    from ...worker import runner as worker
+    from .browser import _bridge_for
+
+    if not cfg.bridge_token:
+        print("BRIDGE_TOKEN is empty. Run: cashback setup-token")
+        return 1
+
+    bridge = _bridge_for(cfg)
+    server = serve_in_background(bridge, args.port or cfg.bridge_port)
+    print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}. "
+          "Waiting for the extension...")
+    if not worker.wait_for_extension(bridge, 45):
+        server.shutdown()
+        print()
+        print("The extension never checked in. Open the bot browser first:")
+        print("  powershell scripts/start-browser.ps1")
+        return 1
+
+    try:
+        print(f"Reading the last {args.days} day(s) of conversions...")
+        rows = report_reader.read(bridge, days=args.days)
+    except RuntimeError as exc:
+        server.shutdown()
+        print(f"Could not read the report: {exc}")
+        return 1
+
+    print(f"{len(rows)} conversion(s) found.")
+    print()
+    unknown = [r for r in rows if r.status == "unknown"]
+    if unknown:
+        print(f"{len(unknown)} row(s) carry a status this system does not "
+              "recognise. They go to manual review rather than to a payout "
+              "decision.")
+
+    if args.dry_run:
+        for row in rows[:20]:
+            print(f"  {row.order_id:<18} {row.status:<10}"
+                  f" value={row.order_value} commission={row.commission}"
+                  f" sub_id1={row.customer_code!r} sub_id2={row.request_code!r}")
+        if len(rows) > 20:
+            print(f"  ... and {len(rows) - 20} more")
+        print()
+        print("Dry run: nothing was written.")
+        server.shutdown()
+        return 0
+
+    with ledger.connect(cfg.db_path) as conn:
+        outcome = reconcile.run(
+            conn, rows,
+            cashback_rate=cfg.cashback_rate,
+            tax_policy=cfg.tax_policy,
+            period_is_withheld=args.withheld,
+            source="dashboard:live",
+        )
+    server.shutdown()
+
+    print(outcome.summary())
+    if outcome.notify_approved:
+        print()
+        print(f"To notify (approved): {len(outcome.notify_approved)}")
+    if outcome.notify_rejected:
+        print(f"To notify (rejected): {len(outcome.notify_rejected)}")
+    if outcome.needs_review:
+        print()
+        print(f"{outcome.needs_review} row(s) need a human. "
+              "See the manual_review table.")
     return 0
