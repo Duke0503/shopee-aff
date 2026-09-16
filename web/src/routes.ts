@@ -1,15 +1,63 @@
-/**
- * Two audiences, one bundle.
- *
- * The operator console lives at "/" and is served only to loopback; the
- * customer view lives at "/tra-cuu" (and "/orders", which is the path
- * people already know from similar tools). Routing is a path check
- * rather than a router: there are two screens, and a routing library
- * would be more code than the thing it routes.
- */
-export const CUSTOMER_PATHS = ["/tra-cuu", "/orders", "/don-hang"]
+import { useEffect, useState } from "react"
 
-export function isCustomerPath(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/, "") || "/"
-  return CUSTOMER_PATHS.includes(path)
+/**
+ * Four screens, one bundle, English paths.
+ *
+ * "/"        the landing page -- public, and what a link from a Zalo
+ *            group actually opens. Nine in ten people who tap that link
+ *            want to see what this is, not to sign in.
+ * "/login"   reached by pressing a button, never shown by default.
+ * "/orders"  a customer's own orders; needs a session.
+ * "/admin"   the payout console; the server refuses it off loopback.
+ *
+ * A router library would be more code than the thing it routes, but
+ * links still have to feel like links -- so navigation goes through
+ * history.pushState and a subscription, not a page reload.
+ */
+export type Route = "home" | "login" | "orders" | "admin"
+
+const PATHS: Record<string, Route> = {
+  "/": "home",
+  "/login": "login",
+  "/orders": "orders",
+  "/admin": "admin",
+}
+
+export function routeFor(pathname: string): Route {
+  return PATHS[pathname.replace(/\/+$/, "") || "/"] ?? "home"
+}
+
+export function pathFor(route: Route): string {
+  return Object.keys(PATHS).find((path) => PATHS[path] === route) ?? "/"
+}
+
+const listeners = new Set<() => void>()
+
+export function navigate(route: Route) {
+  window.history.pushState({}, "", pathFor(route))
+  listeners.forEach((notify) => notify())
+  window.scrollTo(0, 0)
+}
+
+export function useRoute(): Route {
+  const [route, setRoute] = useState(() => routeFor(window.location.pathname))
+  useEffect(() => {
+    const sync = () => setRoute(routeFor(window.location.pathname))
+    listeners.add(sync)
+    // The back button has to work, or the page feels broken in a way
+    // people blame on the site rather than on the router.
+    window.addEventListener("popstate", sync)
+    return () => {
+      listeners.delete(sync)
+      window.removeEventListener("popstate", sync)
+    }
+  }, [])
+  return route
+}
+
+export const TITLE_KEY: Record<Route, string> = {
+  home: "brand",
+  login: "login_title",
+  orders: "me_title",
+  admin: "title",
 }

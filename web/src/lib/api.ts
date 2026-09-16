@@ -137,3 +137,12 @@ export const logout = () => post("/api/auth/logout")
 
 export const changePassword = (current: string, replacement: string) =>
   post("/api/auth/password", { current, replacement })
+
+/** Figures the public pages quote. Policy, not wording. */
+export interface Site {
+  rate: string
+  reduced: string
+  days: string
+}
+
+export const fetchSite = () => get<Site>("/api/site")

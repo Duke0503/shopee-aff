@@ -6,10 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PayoutCard } from "@/features/PayoutCard"
 import { PipelineTable } from "@/features/PipelineTable"
 import { CustomerView } from "@/features/CustomerView"
-import { fetchLabels, fetchSnapshot } from "@/lib/api"
+import { Home } from "@/features/Home"
+import { Login } from "@/features/Login"
+import { fetchLabels, fetchSite, fetchSnapshot } from "@/lib/api"
 import { configure, shortDate, vnd } from "@/lib/format"
+import { useQueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
 import { LabelProvider, useT } from "@/lib/labels"
-import { isCustomerPath } from "@/routes"
+import { TITLE_KEY, navigate, useRoute } from "@/routes"
 
 export default function App() {
   const labels = useQuery({
@@ -17,15 +21,43 @@ export default function App() {
     queryFn: fetchLabels,
     staleTime: Infinity,
   })
-  // Which screen this is never changes after load, so it is read once
-  // rather than held in state.
-  const forCustomer = isCustomerPath(window.location.pathname)
-  // The currency mark and separator are labels too, so formatting waits
-  // for them rather than hard-coding a Vietnamese character in source.
+  // The rate and the payout window appear inside the wording, so they
+  // are substituted into every label rather than passed at each call
+  // site and forgotten at one of them.
+  const site = useQuery({
+    queryKey: ["site"],
+    queryFn: fetchSite,
+    staleTime: Infinity,
+  })
+  const route = useRoute()
+  const queryClient = useQueryClient()
+
   if (labels.data) configure(labels.data)
+
+  const brand = labels.data?.brand ?? ""
+  const screen = labels.data?.[TITLE_KEY[route]] ?? ""
+  useEffect(() => {
+    if (!brand) return
+    document.title =
+      screen && screen !== brand ? `${screen} · ${brand}` : brand
+  }, [brand, screen])
+
   return (
-    <LabelProvider value={labels.data ?? {}}>
-      {forCustomer ? <CustomerView /> : <Console />}
+    <LabelProvider
+      value={labels.data ?? {}}
+      defaults={site.data ? { ...site.data } : {}}
+    >
+      {route === "home" && <Home />}
+      {route === "login" && (
+        <Login
+          onSignedIn={() => {
+            queryClient.invalidateQueries({ queryKey: ["me"] })
+            navigate("orders")
+          }}
+        />
+      )}
+      {route === "orders" && <CustomerView />}
+      {route === "admin" && <Console />}
     </LabelProvider>
   )
 }

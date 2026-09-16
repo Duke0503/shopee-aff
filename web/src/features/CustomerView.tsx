@@ -3,11 +3,12 @@ import { Icon } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ChangePassword } from "@/features/ChangePassword"
-import { Login } from "@/features/Login"
 import { MyOrdersTable } from "@/features/MyOrders"
 import { fetchMe, logout } from "@/lib/api"
 import { vnd } from "@/lib/format"
 import { useT } from "@/lib/labels"
+import { navigate } from "@/routes"
+import { Footer, Header } from "@/components/Chrome"
 
 /**
  * What one customer sees of their own ledger.
@@ -42,16 +43,31 @@ export function CustomerView() {
 
   if (!data) {
     return (
-      <Login
-        onSignedIn={() => queryClient.invalidateQueries({ queryKey: ["me"] })}
-      />
+      <>
+        <Header current="orders" />
+        <main className="mx-auto max-w-md px-4 py-16 text-center sm:px-6">
+          <span className="bg-secondary text-muted-foreground mx-auto grid size-12 place-items-center rounded-xl">
+            <Icon.signIn className="size-6" />
+          </span>
+          <h1 className="mt-4 text-xl font-bold">{t("orders_signed_out_title")}</h1>
+          <p className="text-muted-foreground mt-1.5 text-sm">
+            {t("orders_signed_out_body")}
+          </p>
+          <Button size="lg" className="mt-6" onClick={() => navigate("login")}>
+            <Icon.signIn /> {t("nav_login")}
+          </Button>
+        </main>
+        <Footer />
+      </>
     )
   }
 
   const { balance } = data
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6">
+    <>
+      <Header current="orders" />
+      <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="truncate text-lg font-bold sm:text-xl">
@@ -117,7 +133,9 @@ export function CustomerView() {
       <div className="mt-8 max-w-md">
         <ChangePassword />
       </div>
-    </div>
+      </div>
+      <Footer />
+    </>
   )
 }
 

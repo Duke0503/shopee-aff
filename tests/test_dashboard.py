@@ -337,3 +337,24 @@ class TestTheFrontendHasNoWordingOfItsOwn:
     def test_the_currency_mark_is_a_label(self):
         assert dashboard.labels()["currency"]
         assert dashboard.labels()["thousands_separator"]
+
+    def test_every_label_the_app_asks_for_exists(self):
+        """A key with no label renders as the key itself.
+
+        On the landing page that means a visitor reads "home_hero_title"
+        where the headline should be -- and nothing crashes, so it ships.
+        """
+        import re
+
+        used = set()
+        for path in self._web_sources():
+            source = path.read_text(encoding="utf-8")
+            used |= set(re.findall(r'\bt\(\s*"([a-z0-9_]+)"', source))
+            # Keys built from a loop counter, as in `t(`home_how_${n}_title`)`
+            for prefix, suffix in re.findall(
+                    r'\bt\(\s*`([a-z0-9_]+)\$\{[^}]+\}([a-z0-9_]*)`', source):
+                used |= {key for key in dashboard.labels()
+                         if key.startswith(prefix) and key.endswith(suffix)}
+
+        missing = sorted(used - set(dashboard.labels()))
+        assert not missing, f"missing from dashboard.vi.json: {missing}"

@@ -205,10 +205,20 @@ sản phẩm tiếp là mình làm luôn."*
 
 Việc quản trị làm ở hai chỗ:
 
-### Trang web — <http://127.0.0.1:8899>
+### Trang web
 
-Việc hằng ngày: xem ai cần chuyển tiền, quét QR, bấm "Đã chuyển", bấm nút
-nhắn hỏi số tài khoản.
+| Đường dẫn | Ai vào | Nội dung |
+|---|---|---|
+| `/` | ai cũng vào được | Trang giới thiệu: bot làm gì, hoàn bao nhiêu, khi nào **không** được hoàn |
+| `/login` | khách | Đăng nhập bằng mã bot cấp (`/id`) + mật khẩu (`/matkhau`) |
+| `/orders` | khách đã đăng nhập | Đơn của chính họ, trạng thái Shopee, số tiền |
+| `/admin` | **chỉ máy chạy bot** | Bảng chuyển tiền: QR, nút "Đã chuyển", nút nhắn hỏi STK |
+
+Việc hằng ngày của anh nằm ở `/admin`: <http://127.0.0.1:8899/admin>
+
+`/api/payouts` và hai nút chuyển tiền **từ chối mọi request không đến từ
+loopback**, không phải chỉ dựa vào địa chỉ bind. Nên khi anh đưa `/` và
+`/orders` lên tên miền thật, phần admin không lộ theo.
 
 ### Dòng lệnh
 

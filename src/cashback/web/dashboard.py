@@ -66,6 +66,41 @@ def labels() -> dict[str, str]:
     return _labels
 
 
+def site_figures(cfg: Config) -> dict:
+    """The handful of numbers the public pages quote.
+
+    The worked example comes from the same two constants the bot uses in
+    its greeting. A percentage is not a figure anyone converts into money
+    in their head, so both places show one -- and showing two different
+    ones would be worse than showing none.
+    """
+    from ..messaging.conversation import EXAMPLE_ORDER_VND, EXAMPLE_RATE
+
+    rate = cfg.advertised_cashback_rate
+    return {
+        "rate": f"{rate:.0%}",
+        "reduced": f"{cfg.reduced_cashback_rate:.0%}",
+        "days": _payout_window(),
+        "example_order": _vnd(EXAMPLE_ORDER_VND),
+        "example_commission": f"{EXAMPLE_RATE:.0%}",
+        "example_cashback": _vnd(round_dong(
+            EXAMPLE_ORDER_VND * EXAMPLE_RATE * rate)),
+    }
+
+
+def _vnd(amount: int) -> str:
+    """Money as the labels spell it, so the page and the bot agree."""
+    grouped = f"{round(amount):,}".replace(",", t("thousands_separator"))
+    return grouped + t("currency")
+
+
+def _payout_window() -> str:
+    """How long Shopee takes, in the same words the bot uses."""
+    from ..messaging import templates as messages
+
+    return messages.render("payout_window")
+
+
 def t(key: str, **values) -> str:
     """One label, with {placeholders} filled in."""
     text = labels().get(key, key)
@@ -402,6 +437,11 @@ class _Handler(BaseHTTPRequestHandler):
                 snapshot(self.cfg.db_path, self.cfg.advertised_cashback_rate))
         if path == "/api/labels":
             return self._json(labels())
+        if path == "/api/site":
+            # Public: the figures the landing page quotes. Policy rather
+            # than wording, so not in the labels file -- and deliberately
+            # not read from /api/payouts, which never leaves loopback.
+            return self._json(site_figures(self.cfg))
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
