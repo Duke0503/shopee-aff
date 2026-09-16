@@ -134,3 +134,54 @@ def _cfg(db_path):
     cfg = load()
     object.__setattr__(cfg, "db_path", db_path)
     return cfg
+
+
+class TestThePipelineIsVisible:
+    """A page showing only what is payable is blank on most days.
+
+    Three real orders worth 12,287 VND were in flight and the page said
+    nothing, which reads as "nothing is happening".
+    """
+
+    @pytest.fixture
+    def awaiting(self, conn, db):
+        ledger.add_customer(conn, "C0003", display_name="Xuan Phuoc",
+                            private_chat_id="u1")
+        ledger.record_link_request(conn, "R00000000001", "C0003",
+                                   "https://shopee.vn/x", None, 5_522, "zalo")
+        ledger.attach_affiliate_url(conn, "R00000000001",
+                                    "https://s.shopee.vn/aff1", 5_522)
+        conn.execute(
+            "UPDATE link_requests SET estimate_detail=? WHERE request_id=?",
+            ('{"commission":5522,"price":73631,"total_rate":7.5,'
+             '"shopee_rate":2.5,"seller_rate":5.0,"shopee_part":1841,'
+             '"seller_part":3682,"is_capped":false,'
+             '"name":"Tui Trang Diem Dung Tich Lon","source":"shopee"}',
+             "R00000000001"))
+        ledger.add_order(conn, "2609141J5XWTHY", "C0003", "R00000000001",
+                         order_value=73_631, estimated_commission=5_522)
+        conn.commit()
+        return db
+
+    def test_awaiting_orders_appear(self, awaiting):
+        data = dashboard.snapshot(awaiting)
+        assert len(data["pipeline"]) == 1
+        assert data["pipeline_total"] == 5_522
+
+    def test_the_page_names_the_product(self, awaiting):
+        page = dashboard.render(dashboard.snapshot(awaiting))
+        assert "Tui Trang Diem" in page
+
+    def test_the_link_is_there_to_check_against_shopee(self, awaiting):
+        page = dashboard.render(dashboard.snapshot(awaiting))
+        assert "https://s.shopee.vn/aff1" in page
+
+    def test_it_is_not_counted_as_owed(self, awaiting):
+        """Nothing here is payable. The owed total must stay zero."""
+        data = dashboard.snapshot(awaiting)
+        assert data["total"] == 0
+        assert data["ready"] == []
+
+    def test_the_page_says_the_figure_is_an_estimate(self, awaiting):
+        page = dashboard.render(dashboard.snapshot(awaiting))
+        assert dashboard.t("section_pipeline_hint") in page

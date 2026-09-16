@@ -86,11 +86,46 @@ def _orders_of(conn, customer_id: str) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def _pipeline(conn) -> list[dict]:
+    """Orders Shopee has recorded but not yet settled.
+
+    Nothing here is payable, and the page must say so. But a page that
+    shows only what is payable is blank on most days, which reads as
+    "nothing is happening" when in fact several orders are in flight.
+    """
+    rows = conn.execute(
+        "SELECT o.order_id, o.customer_id, o.order_value,"
+        "       o.estimated_commission, o.recorded_at,"
+        "       c.display_name, r.affiliate_url, r.source_url, r.estimate_detail"
+        "  FROM orders o"
+        "  LEFT JOIN customers c ON c.customer_id = o.customer_id"
+        "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
+        " WHERE o.status = 'awaiting_approval'"
+        " ORDER BY o.recorded_at DESC"
+    ).fetchall()
+    out = []
+    for row in rows:
+        item = dict(row)
+        item["product"] = _product_name(row["estimate_detail"])
+        out.append(item)
+    return out
+
+
+def _product_name(detail: str | None) -> str:
+    if not detail:
+        return ""
+    from ..shopee.commission import Estimate
+
+    estimate = Estimate.from_json(detail)
+    return estimate.name if estimate else ""
+
+
 def snapshot(db_path: Path) -> dict:
     """Everything the page needs, in one read."""
     with ledger.connect(db_path) as conn:
         owed = payouts.collect(conn)
         detail = {p.customer_id: _orders_of(conn, p.customer_id) for p in owed}
+        pipeline = _pipeline(conn)
     ready, waiting = payouts.split_by_threshold(owed)
     no_bank = [p for p in waiting if not p.has_bank_details]
     short = [p for p in waiting if p.has_bank_details]
@@ -99,6 +134,8 @@ def snapshot(db_path: Path) -> dict:
         "short": short,
         "no_bank": no_bank,
         "orders": detail,
+        "pipeline": pipeline,
+        "pipeline_total": sum(r["estimated_commission"] or 0 for r in pipeline),
         "total": sum(p.amount for p in owed),
     }
 
@@ -230,7 +267,25 @@ def _no_bank_card(entry, orders: list[dict]) -> str:
     )
 
 
-def render(data: dict) -> str:
+def _pipeline_card(row: dict, rate: float) -> str:
+    estimate = row.get("estimated_commission") or 0
+    link = row.get("affiliate_url") or row.get("source_url") or ""
+    anchor = (f'<a href="{esc(link)}" target="_blank" rel="noreferrer">'
+              f'{esc(t("btn_open_order"))}</a>') if link else ""
+    return (
+        "<div class=card>"
+        f"<div class=who>{esc(row.get('display_name') or row.get('customer_id'))}</div>"
+        f"<div class=amt>{vnd(round(estimate * rate))}</div>"
+        f"<div class=bank>{esc(row.get('product') or '')}"
+        f"<br>{esc(t('order_value'))} {vnd(row.get('order_value'))}"
+        f" &middot; {esc(t('order_commission'))} {vnd(estimate)}</div>"
+        f"<table><tr><td><code>{esc(row['order_id'])}</code><br>{anchor}</td>"
+        f"<td>{esc(row.get('recorded_at') or '')[:10]}</td></tr></table>"
+        "</div>"
+    )
+
+
+def render(data: dict, rate: float = 0.70) -> str:
     ready, short, no_bank = data["ready"], data["short"], data["no_bank"]
     orders = data["orders"]
 
@@ -241,12 +296,22 @@ def render(data: dict) -> str:
         return (f"<h2>{esc(title)}</h2><p class=hint>{esc(hint)}</p>"
                 f"<div class=grid>{cards}</div>")
 
+    pipeline = data.get("pipeline") or []
+    pipeline_html = ""
+    if pipeline:
+        cards = "".join(_pipeline_card(r, rate) for r in pipeline)
+        pipeline_html = (
+            f"<h2>{esc(t('section_pipeline'))}</h2>"
+            f"<p class=hint>{esc(t('section_pipeline_hint'))}</p>"
+            f"<div class=grid>{cards}</div>")
+
     body = (
         section(t("section_ready"), t("section_ready_hint"), ready, _ready_card)
         + section(t("section_no_bank"), t("section_no_bank_hint"),
                   no_bank, _no_bank_card)
         + section(t("section_waiting", threshold=vnd(payouts.MIN_PAYOUT_VND)),
                   t("section_waiting_hint"), short, _short_card)
+        + pipeline_html
     )
     if not body:
         body = f"<p class=empty>{esc(t('nothing_at_all'))}</p>"
@@ -261,6 +326,8 @@ def render(data: dict) -> str:
         f"<div class=tile><b>{len(ready)}</b><span>{esc(t('summary_ready'))}</span></div>"
         f"<div class=tile><b>{len(short)}</b><span>{esc(t('summary_waiting'))}</span></div>"
         f"<div class=tile><b>{len(no_bank)}</b><span>{esc(t('summary_no_bank'))}</span></div>"
+        f"<div class=tile><b>{len(data.get('pipeline') or [])}</b>"
+        f"<span>{esc(t('summary_pipeline'))}</span></div>"
         f"<div class=tile><b>{vnd(data['total'])}</b>"
         f"<span>{esc(t('summary_total'))}</span></div>"
         "</div>"
@@ -352,7 +419,8 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0].rstrip("/") or "/"
         if path != "/":
             return self._send(404, b"not found", "text/plain")
-        page = render(snapshot(self.cfg.db_path))
+        page = render(snapshot(self.cfg.db_path),
+                      rate=self.cfg.advertised_cashback_rate)
         self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
 
     def do_POST(self):

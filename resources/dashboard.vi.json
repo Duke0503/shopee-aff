@@ -1,43 +1,38 @@
 {
   "_note": "Chu hien tren trang quan tri. Sua o day, khong can dong vao code.",
-
   "title": "Bảng chuyển tiền",
   "subtitle": "Cập nhật lúc {time}",
-
   "summary_ready": "Cần chuyển hôm nay",
   "summary_waiting": "Đang chờ đủ ngưỡng",
   "summary_no_bank": "Chưa có số tài khoản",
   "summary_total": "Tổng đang nợ khách",
-
   "section_ready": "💵 CẦN CHUYỂN TIỀN",
   "section_ready_hint": "Quét mã bằng app ngân hàng, xong bấm “Đã chuyển”.",
   "section_waiting": "⏳ CHƯA ĐỦ NGƯỠNG {threshold}",
   "section_waiting_hint": "Vẫn đang nợ, để dồn tiếp cho đủ rồi trả một lần.",
   "section_no_bank": "🏦 CHƯA CÓ SỐ TÀI KHOẢN",
   "section_no_bank_hint": "Bấm nút để bot nhắn riêng hỏi khách.",
-
   "nothing_to_pay": "Không có ai cần chuyển tiền.",
-  "nothing_at_all": "Chưa có đơn nào được Shopee duyệt.",
-
+  "nothing_at_all": "Chưa có đơn nào. Khi khách mua qua link, đơn sẽ tự hiện ở đây.",
   "col_orders": "{count} đơn",
   "col_short": "còn thiếu {amount}",
   "no_qr_warning": "Không tạo được mã QR: tên ngân hàng “{bank}” không khớp chắc chắn với ngân hàng nào. Chuyển tay để tránh gửi nhầm người.",
-
   "btn_paid": "Đã chuyển",
   "btn_ask_bank": "Nhắn hỏi số tài khoản",
   "btn_asked": "Đã nhắn",
   "btn_open_order": "Xem link",
-
   "order_link": "Link đã gửi khách",
   "order_source": "Sản phẩm gốc",
   "order_value": "Giá trị đơn",
   "order_commission": "Hoa hồng",
   "order_cashback": "Khách nhận",
-
   "ask_sent": "Đã nhắn cho {name}.",
   "ask_failed": "Không nhắn được: {reason}",
   "paid_done": "Đã ghi nhận chuyển tiền cho {name}.",
   "paid_failed": "Không ghi được: {reason}",
-
-  "refresh": "Tải lại"
+  "refresh": "Tải lại",
+  "summary_pipeline": "Đang chờ Shopee duyệt",
+  "section_pipeline": "⏳ ĐANG CHỜ SHOPEE DUYỆT",
+  "section_pipeline_hint": "Chưa trả được — Shopee chưa chốt hoa hồng. Số ở đây là ước tính.",
+  "pipeline_unpaid": "khách chưa thanh toán"
 }

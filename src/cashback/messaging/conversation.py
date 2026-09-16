@@ -471,6 +471,29 @@ def deliver_ready_links(
     return sent
 
 
+def _order_identity(row) -> tuple[str, str]:
+    """What the customer needs to recognise their own order.
+
+    An order code is Shopee's, not theirs. The product name and the link
+    they were given are the two things they will recognise, and the link
+    is clickable -- they can open it and see the item.
+    """
+    name = ""
+    detail = row["estimate_detail"] if "estimate_detail" in row.keys() else None
+    if detail:
+        from ..shopee.commission import Estimate
+
+        estimate = Estimate.from_json(detail)
+        if estimate:
+            name = _short(estimate.name, 44)
+    link = ""
+    for key in ("affiliate_url", "source_url"):
+        if key in row.keys() and row[key]:
+            link = row[key]
+            break
+    return name, link
+
+
 def notify_order_changes(
     db_path: Path, bot: ZaloBot, cashback_rate: float, payout_window: str,
 ) -> int:
@@ -489,8 +512,13 @@ def notify_order_changes(
         rows = conn.execute(
             "SELECT o.order_id, o.status, o.cashback_amount,"
             " o.estimated_commission, o.rejection_reason,"
-            " c.private_chat_id, c.bank_name, c.bank_account, c.account_holder"
+            " c.private_chat_id, c.bank_name, c.bank_account, c.account_holder,"
+            # An order code means nothing to the person who sent a link.
+            # The product name and the link they used are what let them
+            # recognise their own order.
+            " r.affiliate_url, r.source_url, r.estimate_detail"
             " FROM orders o JOIN customers c ON c.customer_id = o.customer_id"
+            " LEFT JOIN link_requests r ON r.request_id = o.request_id"
             " WHERE c.private_chat_id IS NOT NULL AND c.private_chat_id != ''"
             "   AND (o.notified_status IS NULL OR o.notified_status != o.status)"
             " ORDER BY o.updated_at"
@@ -499,11 +527,14 @@ def notify_order_changes(
     sent = 0
     for row in rows:
         status = row["status"]
+        product, link = _order_identity(row)
         if status == ledger.AWAITING_APPROVAL:
             estimate = row["estimated_commission"]
             text = messages.render(
                 "order_recorded",
                 order_id=row["order_id"],
+                product=product,
+                link=link,
                 cashback=_vnd(round((estimate or 0) * cashback_rate))
                 if estimate else messages.render("cashback_unknown"),
                 days=payout_window,
@@ -518,14 +549,17 @@ def notify_order_changes(
                         f'{row["account_holder"]}')
                 text = messages.render(
                     "order_approved", order_id=row["order_id"],
+                    product=product, link=link,
                     cashback=_vnd(row["cashback_amount"] or 0), bank=bank)
             else:
                 text = messages.render(
                     "order_approved_need_bank", order_id=row["order_id"],
+                    product=product, link=link,
                     cashback=_vnd(row["cashback_amount"] or 0))
         elif status == ledger.REJECTED:
             text = messages.render(
                 "order_rejected", order_id=row["order_id"],
+                product=product, link=link,
                 reason=row["rejection_reason"] or "Shopee khong ghi nhan")
         else:
             # PAID and anything added later: the customer already heard the
