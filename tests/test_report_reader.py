@@ -141,3 +141,45 @@ class TestRowConversion:
                                          "checkout_id": "999"})
         assert row.order_id == "999"
         assert row.order_value is None
+
+
+class TestUnpaidOrdersAreNotEarnings:
+    """An unpaid order still reports a full commission breakdown.
+
+    Shopee computes what it WOULD earn -- 2.5% plus the shop's XTRA, to
+    the dong -- and then prints a dash for it, because the buyer has not
+    paid. Anything reading this API has to keep that distinction or it
+    will show money that does not exist as money already made.
+    """
+
+    UNPAID = {
+        "utm_content": "C0003-R26091441451---",
+        "estimated_total_commission": 462_300_000,
+        "orders": [{
+            "order_sn": "26091558DJHJSQ",
+            "order_status": "UNPAID",
+            "items": [{
+                "actual_amount": 6_164_000_000,
+                "item_commission": 154_100_000,
+                "capped_brand_commission": 308_200_000,
+                "display_item_status": "Unpaid",
+            }],
+        }],
+    }
+
+    def test_an_unpaid_order_is_flagged(self):
+        assert reader.buyer_has_paid(self.UNPAID) is False
+
+    def test_a_paid_order_is_not(self):
+        paid = {"orders": [{"order_status": "PAID",
+                            "items": [{"display_item_status": "Pending"}]}]}
+        assert reader.buyer_has_paid(paid) is True
+
+    def test_it_still_never_reaches_a_payout(self):
+        """Whatever the figure, an unpaid order sits in awaiting."""
+        assert reader._row_to_report_row(self.UNPAID).status == "awaiting"
+
+    def test_the_projected_figure_is_still_reported(self):
+        """Hiding it would be worse: the operator wants to see what is
+        coming, they just must not mistake it for earned."""
+        assert reader._row_to_report_row(self.UNPAID).commission == 4_623

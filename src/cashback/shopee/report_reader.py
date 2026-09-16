@@ -110,6 +110,24 @@ def parse_sub_ids(utm_content: str) -> list[str]:
     return (utm_content or "").split("-")
 
 
+def buyer_has_paid(raw: dict) -> bool:
+    """Has the buyer actually paid for this order?
+
+    An unpaid order still comes back with a full commission breakdown --
+    2.5% plus the shop's XTRA, to the dong -- because that is what it
+    WOULD earn. The dashboard prints a dash for it, and so should anything
+    built on this: showing 4,623 next to a real 5,522 invites reading
+    money that does not exist yet as money already made.
+    """
+    orders = raw.get("orders") or []
+    first = orders[0] if orders else {}
+    items = first.get("items") or []
+    states = [str(first.get("order_status", "")).strip().lower()]
+    if items:
+        states.append(str((items[0] or {}).get("display_item_status", "")).strip().lower())
+    return "unpaid" not in states
+
+
 def map_status(display_item_status: str, order_status: str) -> str:
     """Prefer the readable commission status; fall back to the order's.
 

@@ -137,8 +137,13 @@ def _reconcile_live(cfg: Config, args: argparse.Namespace) -> int:
 
     if args.dry_run:
         for row in rows[:20]:
+            # An unpaid order carries a commission figure that Shopee shows
+            # as a dash: it is what the order would earn, not what it has.
+            paid = report_reader.buyer_has_paid(row.raw)
+            money = (f"commission={row.commission}" if paid
+                     else f"commission={row.commission} (not paid for yet)")
             print(f"  {row.order_id:<18} {row.status:<10}"
-                  f" value={row.order_value} commission={row.commission}"
+                  f" value={row.order_value} {money}"
                   f" sub_id1={row.customer_code!r} sub_id2={row.request_code!r}")
         if len(rows) > 20:
             print(f"  ... and {len(rows) - 20} more")
