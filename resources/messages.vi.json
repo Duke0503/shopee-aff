@@ -43,5 +43,8 @@
   "payout_note_ready_need_bank": "💳 Tổng bạn đang có: {total} — đủ để chuyển rồi.\n\nBạn gửi số tài khoản để mình chuyển nhé:\nSTK: <ngân hàng> - <số tài khoản> - <tên chủ tài khoản>\n\nVí dụ:\nSTK: VCB - 0123456789 - NGUYEN VAN A\n\n(Mình chỉ dùng để chuyển tiền hoàn cho bạn. Muốn xoá lúc nào cũng được: /xoathongtin)",
   "balance_waiting": "👉 Chưa đơn nào được Shopee duyệt xong. Duyệt xong mình nhắn bạn ngay.",
   "order_identity_product": "📦 {product}",
-  "order_identity_link": "🔗 {link}"
+  "order_identity_link": "🔗 {link}",
+  "order_paid": "💸 Mình đã chuyển tiền cho bạn rồi nhé!\n\n━━━━━━━━━━━━━━━\n💵 SỐ TIỀN: {amount}\n━━━━━━━━━━━━━━━\n\n📦 Gồm {count} đơn\n🏦 Vào tài khoản: {bank}\n📝 Nội dung: {reference}\n\nBạn kiểm tra app ngân hàng nhé. Nếu 30 phút nữa chưa thấy thì nhắn mình, mình gửi lại ảnh chuyển khoản.\n\nCảm ơn bạn đã mua qua link của mình 🙏 Lần sau cứ gửi link, mình làm tiếp.",
+  "order_paid_no_bank": "💸 Mình đã chuyển tiền cho bạn rồi nhé!\n\n━━━━━━━━━━━━━━━\n💵 SỐ TIỀN: {amount}\n━━━━━━━━━━━━━━━\n\n📦 Gồm {count} đơn\n📝 Nội dung: {reference}\n\nBạn kiểm tra app ngân hàng nhé. Nếu 30 phút nữa chưa thấy thì nhắn mình, mình gửi lại ảnh chuyển khoản.\n\nCảm ơn bạn đã mua qua link của mình 🙏 Lần sau cứ gửi link, mình làm tiếp.",
+  "balance_settled": "👉 Bạn không còn khoản nào chờ. Gửi link sản phẩm tiếp là mình làm luôn."
 }

@@ -274,3 +274,60 @@ class TestAProductWithNoCommission:
         from cashback.shopee import commission as c
         assert c._build(100_000, 0.0, 0.0, "x", c.SOURCE_SHOPEE).earns_nothing
         assert not c._build(100_000, 2.5, 7.0, "x", c.SOURCE_SHOPEE).earns_nothing
+
+
+class TestTheTransferIsAnnounced:
+    """The one thing the bot never said.
+
+    The operator scanned the QR, the money landed, and the conversation
+    stayed silent. The only proof the arrangement pays anything was a
+    line in a bank app the customer had to think to check.
+    """
+
+    def _paid(self, db: Path, amounts: list[int], *, bank: bool = True):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            if bank:
+                ledger.set_bank_details(conn, "C0001", "VCB", "0123456789",
+                                        "NGUYEN A")
+            for n, amount in enumerate(amounts, 1):
+                ledger.add_order(conn, f"O{n}", "C0001", None,
+                                 order_value=97_500,
+                                 estimated_commission=int(amount / 0.70))
+                ledger.mark_approved(conn, f"O{n}", int(amount / 0.70), amount)
+        convo.notify_order_changes(db, FakeBot(), 0.70, "30-70 ngay")
+        with ledger.connect(db) as conn:
+            for n, _ in enumerate(amounts, 1):
+                ledger.mark_paid(conn, f"O{n}")
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        return bot
+
+    def test_the_customer_is_told(self, db):
+        assert len(self._paid(db, [PAYABLE]).sent) == 1
+
+    def test_three_orders_paid_together_are_one_message(self, db):
+        """One QR was scanned, so one transfer happened. Three messages
+        would read as having been paid three times."""
+        assert len(self._paid(db, [30_000, 25_000, 20_000]).sent) == 1
+
+    def test_it_names_the_total_not_one_order(self, db):
+        text = self._paid(db, [30_000, 25_000, 20_000]).sent[0][1]
+        assert _vnd(75_000) in text
+
+    def test_it_names_the_account_so_the_customer_can_check(self, db):
+        assert "0123456789" in self._paid(db, [PAYABLE]).sent[0][1]
+
+    def test_it_names_the_transfer_reference(self, db):
+        """What the customer will actually see in their bank app."""
+        assert "Hoan tien Shopee C0001" in self._paid(db, [PAYABLE]).sent[0][1]
+
+    def test_an_account_we_do_not_have_is_not_printed_as_a_blank(self, db):
+        text = self._paid(db, [PAYABLE], bank=False).sent[0][1]
+        assert "Hoan tien Shopee C0001" in text
+        assert "- - " not in text
+
+    def test_it_is_said_once_not_on_every_pass(self, db):
+        bot = self._paid(db, [PAYABLE])
+        assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 0

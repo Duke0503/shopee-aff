@@ -9,6 +9,10 @@
 3. [`diagrams/sequence-link-request.md`](diagrams/sequence-link-request.md) — luồng chạy nhiều nhất
 4. [`02-architecture/overview.md`](02-architecture/overview.md) — các tầng và ranh giới
 
+**Sắp mở nhóm cho khách?** Đọc
+[`03-operations/group-setup.md`](03-operations/group-setup.md) — có sẵn hai
+tin ghim copy dán thẳng vào Zalo.
+
 **Chỉ cần vận hành, không sửa code?** Đọc
 [`03-operations/runbook.md`](03-operations/runbook.md) và
 [`04-reference/cli-commands.md`](04-reference/cli-commands.md).
@@ -40,6 +44,7 @@
 | File | Nội dung |
 |---|---|
 | [`runbook.md`](03-operations/runbook.md) | Hệ thống chạy thế nào, làm gì hằng ngày |
+| [`group-setup.md`](03-operations/group-setup.md) | Dựng nhóm: tin ghim, 11 bước của khách, admin bấm gì |
 
 ### 04 — Tham chiếu
 

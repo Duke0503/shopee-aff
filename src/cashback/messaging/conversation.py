@@ -295,11 +295,16 @@ def handle(
             elif balance.approved:
                 status = messages.render(
                     "balance_short", short=_vnd(balance.short_by), **common)
-            else:
+            elif balance.awaiting:
                 # Nothing approved yet: there is no shortfall to report,
                 # only a wait. Saying "short by 50,000 of 50,000" reads as
                 # a bug and tells the customer nothing.
                 status = messages.render("balance_waiting")
+            else:
+                # Everything owed has been sent. Saying "nothing has been
+                # approved yet" to someone who was paid this morning reads
+                # as the bot having lost their history.
+                status = messages.render("balance_settled")
             return [Reply(private, messages.render(
                 "balance",
                 approved=_vnd(balance.approved),
@@ -575,6 +580,53 @@ def _order_identity(row) -> tuple[str, str]:
     return name, link, (block + "\n\n" if block else "")
 
 
+def _announce_transfers(db_path: Path, bot: ZaloBot, rows: list) -> int:
+    """Tell each customer their money has actually been sent.
+
+    This was the one thing the bot never said. The operator scanned the
+    QR, the money landed, and the conversation stayed silent -- so the
+    only proof the arrangement pays anything at all was a line in a bank
+    app the customer had to think to check. In a cashback group that
+    message is the whole product: it is what turns a first-time buyer
+    into someone who sends the next link.
+
+    One message per customer, not per order, because one transfer
+    covered all of them.
+    """
+    by_customer: dict[str, list] = {}
+    for row in rows:
+        by_customer.setdefault(row["customer_id"], []).append(row)
+
+    sent = 0
+    for customer_id, paid in by_customer.items():
+        chat_id = paid[0]["private_chat_id"]
+        total = sum(r["cashback_amount"] or 0 for r in paid)
+        bank = ""
+        if paid[0]["bank_account"]:
+            bank = (f'{paid[0]["bank_name"]} - {paid[0]["bank_account"]} - '
+                    f'{paid[0]["account_holder"]}')
+        text = messages.render(
+            "order_paid" if bank else "order_paid_no_bank",
+            amount=_vnd(total), count=len(paid), bank=bank,
+            reference=f"Hoan tien Shopee {customer_id}")
+        try:
+            bot.send(chat_id, text)
+        except Exception as exc:
+            log.info(f"could not tell {customer_id} about the transfer: {exc}")
+            continue
+        with ledger.connect(db_path) as conn:
+            conn.executemany(
+                "UPDATE orders SET notified_status=? WHERE order_id=?",
+                [(ledger.PAID, r["order_id"]) for r in paid])
+        for row in paid:
+            audit.record(audit.ORDER_PAID,
+                         order_id=row["order_id"], status=ledger.PAID,
+                         cashback=row["cashback_amount"])
+        log.info(f"told {customer_id} about a transfer of {total}")
+        sent += 1
+    return sent
+
+
 def notify_order_changes(
     db_path: Path, bot: ZaloBot, cashback_rate: float, payout_window: str,
 ) -> int:
@@ -606,8 +658,17 @@ def notify_order_changes(
         ).fetchall()
 
     sent = 0
+    # A transfer covers a BALANCE, not an order: the operator scans one QR
+    # for three orders at once. Announcing each of them separately would
+    # tell the customer they had been paid three times. These are pulled
+    # out of the per-order loop and sent as one message each.
+    sent += _announce_transfers(
+        db_path, bot, [r for r in rows if r["status"] == ledger.PAID])
+
     for row in rows:
         status = row["status"]
+        if status == ledger.PAID:
+            continue
         _, _, identity = _order_identity(row)
         if status == ledger.AWAITING_APPROVAL:
             estimate = row["estimated_commission"]
