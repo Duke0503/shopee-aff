@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from cashback.ledger import repository as ledger
 from cashback.messaging import conversation as convo
 from cashback.messaging.zalo_client import Chat, Message
 
@@ -275,3 +276,85 @@ class TestResendingAProductReusesTheLink:
         assert row["affiliate_url"] == "https://s.shopee.vn/aff"   # link kept
         assert row["estimate_detail"] is None                      # numbers dropped
         assert row["estimated_commission"] is None
+
+
+class TestTheCustomerCanAskWhereTheirMoneyIs:
+    """The payout threshold used to be invisible from the customer's side.
+
+    A customer was told "you get 6,484" and then heard nothing for
+    months, because 6,484 is below the threshold and nothing said so.
+    From their side that is indistinguishable from being ignored, and
+    the only way to find out was to ask a human.
+    """
+
+    def _balance(self, db: Path) -> str:
+        return first_text(send(db, "/sodu"))
+
+    def test_someone_with_no_orders_is_told_so_plainly(self, db):
+        send(db, "hi")
+        assert "chưa có đơn nào" in self._balance(db).lower()
+
+    def test_an_order_awaiting_shopee_is_shown_as_awaiting(self, db):
+        send(db, "hi")
+        with ledger.connect(db) as conn:
+            ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
+                             estimated_commission=9_263)
+        text = self._balance(db)
+        assert "6.484" in text                  # 70% of the estimate
+        assert "Shopee duyệt" in text
+
+    def test_below_the_threshold_it_names_the_shortfall(self, db):
+        send(db, "hi")
+        with ledger.connect(db) as conn:
+            ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
+                             estimated_commission=9_263)
+            ledger.mark_approved(conn, "O1", 9_263, 6_484)
+        assert "43.516" in self._balance(db)     # 50,000 - 6,484
+
+    def test_a_payable_balance_says_the_money_is_coming(self, db):
+        send(db, "hi")
+        with ledger.connect(db) as conn:
+            ledger.set_bank_details(conn, "C0001", "VCB", "0123456789", "A")
+            ledger.add_order(conn, "O1", "C0001", None, order_value=900_000,
+                             estimated_commission=90_000)
+            ledger.mark_approved(conn, "O1", 90_000, 63_000)
+        assert "đủ ngưỡng" in self._balance(db)
+
+    def test_a_payable_balance_with_no_account_asks_for_one(self, db):
+        send(db, "hi")
+        with ledger.connect(db) as conn:
+            ledger.add_order(conn, "O1", "C0001", None, order_value=900_000,
+                             estimated_commission=90_000)
+            ledger.mark_approved(conn, "O1", 90_000, 63_000)
+        assert "/nganhang" in self._balance(db)
+
+    def test_the_amount_is_never_sent_to_a_group(self, db):
+        """What one customer earns is nobody else's business."""
+        send(db, "hi", group=True)
+        with ledger.connect(db) as conn:
+            ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
+                             estimated_commission=9_263)
+            ledger.mark_approved(conn, "O1", 9_263, 6_484)
+        replies = send(db, "/sodu", group=True)
+        assert all(reply.chat_id != "g1" for reply in replies)
+
+
+class TestTheThresholdIsDisclosedBeforeItBites:
+    """Stating it only after the fact is how a cashback group gets a
+    reputation for not paying."""
+
+    def _messages(self):
+        import json
+        from cashback.core.config import PROJECT_ROOT
+        return json.loads((PROJECT_ROOT / "resources" / "messages.vi.json")
+                          .read_text(encoding="utf-8"))
+
+    @pytest.mark.parametrize("key", ["policy", "terms"])
+    def test_the_explainer_pages_state_it(self, key):
+        assert "{payout_threshold_line}" in self._messages()[key]
+
+    def test_a_percentage_is_paired_with_a_worked_example(self, db):
+        """"80% of commission" is not a number anyone can convert into
+        money. The first thing a customer reads must name one."""
+        greeting = first_text(send(db, "hi"))
+        assert "200.000" in greeting and "hoa hồng 8%" in greeting

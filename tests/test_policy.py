@@ -197,8 +197,17 @@ class TestTheConditionTravelsWithTheFigure:
     def test_the_conditions_page_explains_it_in_full(self):
         assert "{tax_clause_full}" in self._messages()["terms"]
 
-    def test_the_greeting_mentions_the_lower_figure(self):
-        assert "{reduced}" in self._messages()["welcome"]
+    def test_the_greeting_is_allowed_to_be_just_the_offer(self):
+        """The greeting is a hook, not a contract.
+
+        The condition belongs where the money is quoted -- the link
+        message names an amount, and that is where a customer forms an
+        expectation. A greeting that opens with a deduction sells nothing
+        and tells them nothing they can act on yet.
+        """
+        greeting = self._messages()["welcome"]
+        assert "{rate}" in greeting
+        assert "/huongdan" in greeting or "/coche" in greeting
 
     def test_the_clause_names_both_numbers(self):
         clause = self._messages()["tax_clause_short"]

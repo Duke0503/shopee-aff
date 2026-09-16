@@ -16,11 +16,11 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..ledger import repository as ledger
+from ..ledger import payouts, repository as ledger
 from ..messaging import templates as messages
 from ..core import audit
 from ..core.identifiers import new_request_id, next_customer_id
-from ..core.policy import SHOPEE_COMMISSION_CAP_VND as CAP
+from ..core.policy import SHOPEE_COMMISSION_CAP_VND as CAP, round_dong
 from ..messaging.zalo_client import Message, ZaloBot
 
 # Shopee product links, in the forms customers actually paste. The
@@ -49,6 +49,9 @@ COMMAND_POLICY = ("/coche", "/chinhsach")
 COMMAND_TERMS = ("/dieukien", "/dieukhoan", "/khinao")
 COMMAND_FORGET = ("/xoathongtin", "/xoadulieu")
 COMMAND_BANK = ("/nganhang", "/taikhoan", "/stk")
+# Without this the only way to answer "where is my money" is a human
+# reading the ledger, which does not scale past one operator.
+COMMAND_BALANCE = ("/sodu", "/tien", "/kiemtra")
 
 # In a group the text arrives with the mention glued to the front, as in
 # "@Bot DP Shopee Affiliate /huongdan". The bot's display name contains
@@ -59,8 +62,13 @@ COMMAND_TOKEN = re.compile(r"(?:^|\s)(/[a-z0-9_]+)", re.IGNORECASE)
 
 KNOWN_COMMANDS = (
     COMMAND_RULES + COMMAND_POLICY + COMMAND_FORGET
-    + COMMAND_TERMS + COMMAND_BANK
+    + COMMAND_TERMS + COMMAND_BANK + COMMAND_BALANCE
 )
+
+# A worked example for the greeting: a mid-sized order at a commission
+# rate typical of the categories these customers actually buy.
+EXAMPLE_ORDER_VND = 200_000
+EXAMPLE_RATE = 0.08
 
 
 def _plain(text: str) -> str:
@@ -220,7 +228,15 @@ def handle(
         "rate": f"{cashback_rate:.0%}",
         "reduced": f"{reduced:.0%}",
         "days": payout_window,
+        "threshold": _vnd(payouts.MIN_PAYOUT_VND),
+        # A percentage of a commission is not a number anyone can convert
+        # into money in their head. One worked example at a typical rate
+        # does what the percentage cannot.
+        "example": _vnd(round_dong(
+            EXAMPLE_ORDER_VND * EXAMPLE_RATE * cashback_rate)),
     }
+    common["payout_threshold_line"] = messages.render(
+        "payout_threshold_line", **common)
     common["tax_clause"] = (
         "" if reduced >= cashback_rate
         else messages.render("tax_clause_short", **common)
@@ -267,6 +283,33 @@ def handle(
         if command in COMMAND_TERMS:
             return [Reply(public, messages.render("terms", **common))]
 
+        if command in COMMAND_BALANCE:
+            # Always private: this is the one command that names a sum.
+            balance = payouts.balance_for(conn, customer_id, cashback_rate)
+            if balance.is_empty:
+                return [Reply(private, messages.render("balance_empty"))]
+            if balance.is_payable and not customer["bank_account"]:
+                status = messages.render("balance_need_bank")
+            elif balance.is_payable:
+                status = messages.render("balance_ready")
+            elif balance.approved:
+                status = messages.render(
+                    "balance_short", short=_vnd(balance.short_by), **common)
+            else:
+                # Nothing approved yet: there is no shortfall to report,
+                # only a wait. Saying "short by 50,000 of 50,000" reads as
+                # a bug and tells the customer nothing.
+                status = messages.render("balance_waiting")
+            return [Reply(private, messages.render(
+                "balance",
+                approved=_vnd(balance.approved),
+                approved_orders=balance.approved_orders,
+                awaiting=_vnd(balance.awaiting),
+                awaiting_orders=balance.awaiting_orders,
+                paid=_vnd(balance.paid),
+                status_line=status,
+            ))]
+
         if command in COMMAND_BANK:
             saved = customer["bank_account"]
             if saved:
@@ -310,10 +353,10 @@ def handle(
                 # them the moment they are seen creates the conversation on
                 # their side, on every device they use.
                 if first_contact and private != public:
-                    out.append(Reply(private, messages.render("first_touch")))
+                    out.append(Reply(private, messages.render("first_touch", **common)))
                 return out
             if first_contact:
-                return [Reply(private, messages.render("first_touch"))]
+                return [Reply(private, messages.render("first_touch", **common))]
             # Anything else from someone already known: one short nudge.
             # Bank details are NOT asked for here. Asking a stranger for an
             # account number before a single dong exists reads exactly like
@@ -504,6 +547,11 @@ def _order_identity(row) -> tuple[str, str]:
     An order code is Shopee's, not theirs. The product name and the link
     they were given are the two things they will recognise, and the link
     is clickable -- they can open it and see the item.
+
+    Returns the name, the link, and a ready-to-insert block of whichever
+    of them exist. An order that reconciliation could not match back to a
+    link request has neither, and the block is empty rather than two bare
+    emoji on their own lines.
     """
     name = ""
     detail = row["estimate_detail"] if "estimate_detail" in row.keys() else None
@@ -518,7 +566,13 @@ def _order_identity(row) -> tuple[str, str]:
         if key in row.keys() and row[key]:
             link = row[key]
             break
-    return name, link
+    lines = []
+    if name:
+        lines.append(messages.render("order_identity_product", product=name))
+    if link:
+        lines.append(messages.render("order_identity_link", link=link))
+    block = "\n".join(lines)
+    return name, link, (block + "\n\n" if block else "")
 
 
 def notify_order_changes(
@@ -537,7 +591,7 @@ def notify_order_changes(
     """
     with ledger.connect(db_path) as conn:
         rows = conn.execute(
-            "SELECT o.order_id, o.status, o.cashback_amount,"
+            "SELECT o.order_id, o.customer_id, o.status, o.cashback_amount,"
             " o.estimated_commission, o.rejection_reason,"
             " c.private_chat_id, c.bank_name, c.bank_account, c.account_holder,"
             # An order code means nothing to the person who sent a link.
@@ -554,39 +608,58 @@ def notify_order_changes(
     sent = 0
     for row in rows:
         status = row["status"]
-        product, link = _order_identity(row)
+        _, _, identity = _order_identity(row)
         if status == ledger.AWAITING_APPROVAL:
             estimate = row["estimated_commission"]
             text = messages.render(
                 "order_recorded",
                 order_id=row["order_id"],
-                product=product,
-                link=link,
-                cashback=_vnd(round((estimate or 0) * cashback_rate))
+                identity=identity,
+                cashback=_vnd(round_dong((estimate or 0) * cashback_rate))
                 if estimate else messages.render("cashback_unknown"),
                 days=payout_window,
             )
         elif status == ledger.APPROVED:
-            # The account number is asked for HERE and nowhere earlier.
-            # Before this point there is no money, and asking a stranger for
-            # their bank details to pay a sum that does not exist yet is
-            # indistinguishable from a scam.
-            if row["bank_account"]:
-                bank = (f'{row["bank_name"]} - {row["bank_account"]} - '
-                        f'{row["account_holder"]}')
-                text = messages.render(
-                    "order_approved", order_id=row["order_id"],
-                    product=product, link=link,
-                    cashback=_vnd(row["cashback_amount"] or 0), bank=bank)
+            # What follows the amount depends on two things at once, and
+            # getting it wrong is the one mistake here that loses customers
+            # in bulk: this message used to say "transferring to your
+            # account" on every approval, including the ones far below the
+            # payout threshold. The customer then watched their bank app
+            # for a week. Promising a transfer that will not happen reads
+            # exactly like being cheated.
+            #
+            # The account number is also asked for HERE and nowhere
+            # earlier -- and only once the balance can actually be paid.
+            # Asking a stranger for bank details to send a sum that is not
+            # payable yet is indistinguishable from a scam.
+            with ledger.connect(db_path) as balance_conn:
+                balance = payouts.balance_for(
+                    balance_conn, row["customer_id"], cashback_rate)
+            note_args = {
+                "total": _vnd(balance.approved),
+                "short": _vnd(balance.short_by),
+                "threshold": _vnd(payouts.MIN_PAYOUT_VND),
+            }
+            if balance.is_payable and row["bank_account"]:
+                note_args["bank"] = (
+                    f'{row["bank_name"]} - {row["bank_account"]} - '
+                    f'{row["account_holder"]}')
+                note = messages.render("payout_note_ready", **note_args)
+            elif balance.is_payable:
+                note = messages.render(
+                    "payout_note_ready_need_bank", **note_args)
+            elif row["bank_account"]:
+                note = messages.render("payout_note_short", **note_args)
             else:
-                text = messages.render(
-                    "order_approved_need_bank", order_id=row["order_id"],
-                    product=product, link=link,
-                    cashback=_vnd(row["cashback_amount"] or 0))
+                note = messages.render(
+                    "payout_note_short_need_bank", **note_args)
+            text = messages.render(
+                "order_approved", order_id=row["order_id"], identity=identity,
+                cashback=_vnd(row["cashback_amount"] or 0),
+                payout_note=note)
         elif status == ledger.REJECTED:
             text = messages.render(
-                "order_rejected", order_id=row["order_id"],
-                product=product, link=link,
+                "order_rejected", order_id=row["order_id"], identity=identity,
                 reason=row["rejection_reason"] or "Shopee khong ghi nhan")
         else:
             # PAID and anything added later: the customer already heard the

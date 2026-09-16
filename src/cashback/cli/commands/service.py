@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 
 from ...core.config import Config
+from ...core.logging_setup import get_logger
 from ...ledger import repository as ledger
 from ...messaging import templates as messages
 from .browser import _bridge_for
 from ..formatting import _pct, _vnd
+
+log = get_logger(__name__)
 
 # Customer-facing wording lives in the message file, never in code:
 # written here it had to go without diacritics and reached customers
@@ -302,11 +305,34 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             if outcome.needs_review:
                 log.info(f"[reconcile] {outcome.needs_review} row(s) need a human")
 
-    threads = [threading.Thread(target=zalo_loop, daemon=True)]
+    def guarded(name: str, loop):
+        """Run a loop so that one bad pass cannot end it for good.
+
+        A thread that raises is gone until the next restart, and nothing
+        says so: the process stays up, the other loops keep working, and
+        the dead one is only noticed days later by its absence. That is
+        exactly how reconciliation stopped after its first successful
+        pass -- a NameError on the line that logged the result, after the
+        orders had already been written, so the ledger looked healthy.
+        """
+        def run():
+            while not stop.is_set():
+                try:
+                    loop()
+                    return                      # asked to stop; done
+                except Exception as exc:
+                    log.exception(f"[{name}] crashed, restarting: {exc}")
+                    if stop.wait(30):
+                        return
+        return run
+
+    threads = [threading.Thread(target=guarded("zalo", zalo_loop), daemon=True)]
     if not args.no_browser:
-        threads.append(threading.Thread(target=link_loop, daemon=True))
+        threads.append(threading.Thread(
+            target=guarded("links", link_loop), daemon=True))
         if not args.no_reconcile:
-            threads.append(threading.Thread(target=reconcile_loop, daemon=True))
+            threads.append(threading.Thread(
+                target=guarded("reconcile", reconcile_loop), daemon=True))
     for t in threads:
         t.start()
 

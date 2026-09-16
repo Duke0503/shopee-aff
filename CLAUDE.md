@@ -114,6 +114,24 @@ mang trạng thái `expired`. Trạng thái `expired` chỉ là ghi sổ.
 *"tôi chưa nhận được"* với *"tôi đang tìm mua lại"*: quá hạn đó thì giá và
 hoa hồng đã cũ, nên tạo yêu cầu mới để lấy số mới.
 
+**Ngưỡng chuyển tiền phải nói TRƯỚC khi nó chặn tiền.** `MIN_PAYOUT_VND`
+= 50.000₫ mỗi khách. Hoa hồng một đơn chỉ vài nghìn, nên phần lớn khách
+chưa đủ ngưỡng ở đơn đầu tiên. Tin báo đơn được duyệt từng nói *"Mình
+chuyển vào tài khoản này nhé"* trên **mọi** đơn — khách 6.484₫ canh app
+ngân hàng cả tuần rồi kết luận bị quỵt. Giờ tin này có **4 dạng**, chọn
+theo *số dư* chứ không theo *đơn vừa duyệt*, và cũng không xin số tài
+khoản khi tiền chưa đủ để chuyển. Khách tự tra bằng `/sodu`.
+
+**Phần trăm không phải là số tiền.** *"Hoàn 80% hoa hồng"* không ai quy
+ra tiền được, và người mua hàng bình thường hiểu nhầm thành 80% giá trị
+đơn. Mọi chỗ nêu phần trăm phải kèm một ví dụ bằng đồng
+(`EXAMPLE_ORDER_VND`, `EXAMPLE_RATE` trong `conversation.py`).
+
+**Emoji cũng là câu chữ, không được nằm trong code.** Cùng lý do với
+tiếng Việt: chúng thuộc `resources/messages.vi.json` (xem
+`order_identity_product`). Kiểm bằng cách quét ký tự `> 0x2100` trong
+`src/`.
+
 **Danh sách tên miền Shopee phải nằm ở một chỗ duy nhất**
 (`shopee/dashboard_lookup.py`). Đã từng có hai bản sao lệch nhau và link
 `shp.ee` bị coi là tin nhắn thường suốt một buổi.

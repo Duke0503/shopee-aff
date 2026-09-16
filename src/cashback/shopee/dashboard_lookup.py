@@ -50,12 +50,11 @@ import json
 import re
 import urllib.parse
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
 
 import httpx
 
 from ..shopee.browser_bridge import Bridge, Job
-from ..core.policy import SHOPEE_COMMISSION_CAP_VND
+from ..core.policy import SHOPEE_COMMISSION_CAP_VND, round_dong
 
 CONNECTOR = "shopee_affiliate"
 SEARCH_PATH = "/api/v3/offer/product/list"
@@ -99,18 +98,6 @@ SHORT_LINK = re.compile(
     "(" + "|".join(d.replace(".", r"\.") for d in SHORT_DOMAINS) + ")/",
     re.IGNORECASE,
 )
-
-
-def round_dong(amount: float) -> int:
-    """Round to whole dong, halves upward.
-
-    Python's round() sends a half to the nearest EVEN number, so
-    9262.5 becomes 9262 while every other tool in this market shows
-    9263. A one dong gap is nothing to pay out, but a customer who
-    compares two bots and sees different figures has no way to tell
-    which one is shading them.
-    """
-    return int(Decimal(str(amount)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 @dataclass(frozen=True)

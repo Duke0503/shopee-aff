@@ -1,7 +1,13 @@
 # Mẫu tin nhắn bot — bản viết lại
 
-> Ngày: 09/09/2026
-> Cài đặt đang dùng: **hoàn 70%** *(có tháng lên 80%)* · **trả sau khi Shopee duyệt đơn**
+> Ngày viết: 09/09/2026 · Cập nhật: 16/09/2026
+> Cài đặt đang dùng: **báo hoàn 80%** *(kỳ nào bị giữ thuế thì khách nhận 70%)*
+> · **trả sau khi Shopee duyệt đơn** · **gom đủ 50.000₫ mới chuyển**
+>
+> ⚠️ Phần thân bài dưới đây là **bản thiết kế gốc ngày 09/09**, giữ lại để
+> hiểu *vì sao* từng câu được viết như vậy. Câu chữ đang chạy thật nằm ở
+> [`resources/messages.vi.json`](../../resources/messages.vi.json), và danh
+> sách lệnh ở [mục cuối file này](#lệnh-khách-gõ-được).
 > Đi kèm: [Phân tích mô hình](./shopee-cashback-bot-analysis.md)
 
 ---
@@ -193,3 +199,55 @@ Bạn nghĩ đó là mẹo giúp khách giữ hoa hồng. Shopee đọc nó ra t
 | `/luatchoi` | Tên lệnh bạn muốn đặt |
 
 **Một điều nên làm ngay:** đo xem thực tế Shopee trả tiền cho bạn sau bao nhiêu ngày. Nếu là 55 ngày thì viết 55, đừng viết "50–70". **Con số càng cụ thể, khách càng ít hỏi và càng ít nghĩ bạn câu giờ.** Cách đo: xem lịch sử thanh toán trong tài khoản, đối chiếu ngày đơn hoàn tất với ngày tiền về.
+
+
+---
+
+## Lệnh khách gõ được
+
+Định nghĩa ở `COMMAND_*` trong `src/cashback/messaging/conversation.py`.
+Gõ không dấu, không phân biệt hoa thường, và gõ trống chữ (không có dấu `/`)
+vẫn nhận — `sodu` cũng chạy như `/sodu`.
+
+| Lệnh | Tên gọi khác | Trả lời gì | Gửi ở đâu |
+|---|---|---|---|
+| `/huongdan` | `/help` `/batdau` `/start` `/cachdung` | 4 bước dùng bot | nơi khách gõ |
+| `/coche` | `/chinhsach` | tiền ở đâu ra, bao nhiêu, khi nào có | nơi khách gõ |
+| `/dieukien` | `/dieukhoan` `/khinao` | 4 trường hợp không được hoàn + điều khoản thuế | nơi khách gõ |
+| `/sodu` | `/tien` `/kiemtra` | số dư của khách: đã duyệt / đang chờ / đã trả | **luôn riêng tư** |
+| `/nganhang` | `/taikhoan` `/stk` | xem hoặc gửi số tài khoản | **luôn riêng tư** |
+| `/xoathongtin` | `/xoadulieu` | xoá số tài khoản đã lưu | **luôn riêng tư** |
+
+Lệnh không có trong danh sách thì bot nói thẳng là không có, kèm danh sách
+lệnh đúng — thay vì im lặng trả lời chuyện khác.
+
+### Vì sao có `/sodu`
+
+Ngưỡng chuyển tiền là **50.000₫ mỗi khách** (`payouts.MIN_PAYOUT_VND`).
+Hoa hồng một đơn thường chỉ vài nghìn, nên khách bình thường phải mua nhiều
+đơn mới đủ. Trước khi có lệnh này, khách nghe *"bạn nhận 6.484₫"* rồi im
+lặng hàng tháng — từ phía họ không phân biệt được với việc bị quỵt, và cách
+duy nhất để biết là nhắn hỏi người thật.
+
+Ba chỗ nói về ngưỡng, và phải nói **trước** khi nó chặn tiền:
+
+1. `/coche` và `/dieukien` — dòng `payout_threshold_line`
+2. Tin báo đơn được duyệt — `payout_note_short`, nói rõ còn thiếu bao nhiêu
+3. `/sodu` — khách tự tra bất cứ lúc nào
+
+### Tin báo đơn được duyệt có 4 dạng
+
+Phụ thuộc **hai** điều kiện cùng lúc, không phải một:
+
+| Số dư | Có STK chưa | Nói gì |
+|---|---|---|
+| đủ 50.000₫ | rồi | `payout_note_ready` — đọc lại STK, báo sắp chuyển |
+| đủ 50.000₫ | chưa | `payout_note_ready_need_bank` — xin STK |
+| chưa đủ | rồi | `payout_note_short` — còn thiếu bao nhiêu |
+| chưa đủ | chưa | `payout_note_short_need_bank` — còn thiếu, chưa xin STK vội |
+
+**Không được gộp bốn dạng này lại.** Bản cũ nói *"Mình chuyển vào tài khoản
+này nhé"* trên **mọi** đơn được duyệt, kể cả đơn 6.484₫ — khách canh app
+ngân hàng cả tuần rồi kết luận là bị lừa. Và cũng không xin số tài khoản khi
+tiền chưa đủ để chuyển: hỏi số tài khoản của người lạ để trả một khoản chưa
+tồn tại thì không khác gì lừa đảo.

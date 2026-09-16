@@ -16,8 +16,18 @@ from pathlib import Path
 
 import pytest
 
-from cashback.ledger import repository as ledger
+from cashback.ledger import payouts, repository as ledger
 from cashback.messaging import conversation as convo
+
+# Two amounts either side of the payout threshold, so a test says which
+# side it is testing rather than hiding it in a literal.
+BELOW = 6_484
+PAYABLE = payouts.MIN_PAYOUT_VND + 12_000
+
+
+def _vnd(amount: int) -> str:
+    """Money as the bot writes it, for asserting on message text."""
+    return convo._vnd(amount)
 
 
 class FakeBot:
@@ -101,14 +111,15 @@ class TestLinkDelivery:
 
 
 class TestOrderNotifications:
-    def _order(self, db: Path, status: str = ledger.AWAITING_APPROVAL):
+    def _order(self, db: Path, status: str = ledger.AWAITING_APPROVAL,
+               cashback: int = 6_484):
         with ledger.connect(db) as conn:
             ledger.add_customer(conn, "C0001", zalo_user_id="u1",
                                 private_chat_id="u1")
             ledger.add_order(conn, "O0001", "C0001", None,
                              order_value=97_500, estimated_commission=9_263)
             if status == ledger.APPROVED:
-                ledger.mark_approved(conn, "O0001", 9_263, 6_484)
+                ledger.mark_approved(conn, "O0001", 9_263, cashback)
             elif status == ledger.REJECTED:
                 ledger.mark_rejected(conn, "O0001", "returned")
 
@@ -133,13 +144,13 @@ class TestOrderNotifications:
         assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 1
 
     def test_approval_asks_for_a_bank_account_only_when_missing(self, db):
-        self._order(db, ledger.APPROVED)
+        self._order(db, ledger.APPROVED, cashback=PAYABLE)
         bot = FakeBot()
         convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
         assert "STK:" in bot.sent[0][1]
 
     def test_approval_names_the_account_when_it_is_known(self, db):
-        self._order(db, ledger.APPROVED)
+        self._order(db, ledger.APPROVED, cashback=PAYABLE)
         with ledger.connect(db) as conn:
             ledger.set_bank_details(conn, "C0001", "VCB", "0123456789", "NGUYEN A")
         bot = FakeBot()
@@ -153,6 +164,65 @@ class TestOrderNotifications:
         bot = FakeBot()
         convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
         assert "returned" in bot.sent[0][1]
+
+
+class TestApprovalNeverPromisesATransferItCannotMake:
+    """The approval notice used to end "transferring to your account" on
+    every approval, including balances far below the payout threshold.
+
+    A customer told that, on 6,484 VND, watches their bank app for a week
+    and concludes they were cheated. The message now depends on the
+    balance, not on the single order that triggered it.
+    """
+
+    def _approved(self, db: Path, cashback: int, *, bank: bool):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            if bank:
+                ledger.set_bank_details(conn, "C0001", "VCB", "0123456789",
+                                        "NGUYEN A")
+            ledger.add_order(conn, "O0001", "C0001", None, order_value=97_500,
+                             estimated_commission=int(cashback / 0.70))
+            ledger.mark_approved(conn, "O0001", int(cashback / 0.70), cashback)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        return bot.sent[0][1]
+
+    def test_below_the_threshold_it_says_how_much_is_missing(self, db):
+        text = self._approved(db, BELOW, bank=True)
+        assert _vnd(payouts.MIN_PAYOUT_VND - BELOW) in text
+
+    def test_below_the_threshold_it_does_not_say_it_is_transferring(self, db):
+        text = self._approved(db, BELOW, bank=True)
+        assert "0123456789" not in text
+
+    def test_below_the_threshold_it_does_not_ask_for_a_bank_account(self, db):
+        """Asking for an account number to send a sum that is not payable
+        yet is what a scam looks like from the customer's side."""
+        assert "STK:" not in self._approved(db, BELOW, bank=False)
+
+    def test_at_the_threshold_it_names_the_account(self, db):
+        assert "0123456789" in self._approved(db, PAYABLE, bank=True)
+
+    def test_at_the_threshold_with_no_account_it_asks(self, db):
+        assert "STK:" in self._approved(db, PAYABLE, bank=False)
+
+    def test_the_threshold_is_reached_by_the_BALANCE_not_one_order(self, db):
+        """Two small orders that add up are payable; neither is alone."""
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            ledger.set_bank_details(conn, "C0001", "VCB", "0123456789", "NGUYEN A")
+            for n, amount in ((1, 30_000), (2, 25_000)):
+                ledger.add_order(conn, f"O000{n}", "C0001", None,
+                                 order_value=97_500, estimated_commission=40_000)
+                ledger.mark_approved(conn, f"O000{n}", 40_000, amount)
+        bot = FakeBot()
+        convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
+        # Both notices are sent after both orders exist, so both see the
+        # combined 55,000 balance and both say a transfer is coming.
+        assert all("0123456789" in text for _, text in bot.sent)
 
 
 class TestFailedLinkApology:

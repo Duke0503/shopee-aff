@@ -34,6 +34,7 @@ import urllib.parse
 from dataclasses import dataclass, field
 
 from ..core import banks
+from ..core.policy import round_dong
 
 # Below this a customer's balance waits rather than being transferred.
 MIN_PAYOUT_VND = 50_000
@@ -133,3 +134,60 @@ def split_by_threshold(
     ready = [p for p in payables if p.is_payable and p.has_bank_details]
     waiting = [p for p in payables if not (p.is_payable and p.has_bank_details)]
     return ready, waiting
+
+
+@dataclass
+class Balance:
+    """What one customer is owed, as that customer would ask it.
+
+    Three numbers, because a customer asking "where is my money" is
+    really asking three questions: what is approved and waiting to be
+    sent, what is still in Shopee's hands, and what has already arrived.
+    """
+
+    approved: int = 0
+    awaiting: int = 0
+    paid: int = 0
+    approved_orders: int = 0
+    awaiting_orders: int = 0
+
+    @property
+    def is_payable(self) -> bool:
+        return self.approved >= MIN_PAYOUT_VND
+
+    @property
+    def short_by(self) -> int:
+        return max(0, MIN_PAYOUT_VND - self.approved)
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.approved or self.awaiting or self.paid)
+
+
+def balance_for(conn: sqlite3.Connection, customer_id: str,
+                cashback_rate: float) -> Balance:
+    """One customer's own ledger line, in the money THEY receive.
+
+    An approved order already stores the customer's share, so it is used
+    as it stands. An awaiting order stores the estimated COMMISSION, so
+    the rate is applied here -- and the result is an estimate twice over
+    (the commission is unsettled, and the rate can be cut by withholding),
+    which is why every message showing it says so.
+    """
+    balance = Balance()
+    rows = conn.execute(
+        "SELECT status, cashback_amount, estimated_commission, paid_at"
+        "  FROM orders WHERE customer_id = ?",
+        (customer_id,),
+    ).fetchall()
+    for row in rows:
+        if row["paid_at"]:
+            balance.paid += row["cashback_amount"] or 0
+        elif row["status"] == "approved":
+            balance.approved += row["cashback_amount"] or 0
+            balance.approved_orders += 1
+        elif row["status"] == "awaiting_approval":
+            balance.awaiting += round_dong(
+                (row["estimated_commission"] or 0) * cashback_rate)
+            balance.awaiting_orders += 1
+    return balance

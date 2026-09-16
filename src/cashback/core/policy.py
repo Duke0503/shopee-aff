@@ -11,6 +11,7 @@ ever read back from real data -- see metrics.py.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 
 # Shopee Affiliate service fee.
@@ -66,6 +67,18 @@ class TaxPolicy(str, Enum):
     OWNER_ABSORBS = "owner_absorbs"
     USER_ABSORBS = "user_absorbs"
 
+
+def round_dong(amount: float) -> int:
+    """Round to whole dong, halves upward.
+
+    Python's round() sends a half to the nearest EVEN number, so
+    9262.5 becomes 9262 while every other tool in this market shows
+    9263. A one dong gap is nothing to pay out, but a customer who
+    compares two bots and sees different figures has no way to tell
+    which one is shading them.
+    """
+    return int(Decimal(str(amount)).quantize(Decimal("1"),
+                                             rounding=ROUND_HALF_UP))
 
 @dataclass(frozen=True)
 class Split:
