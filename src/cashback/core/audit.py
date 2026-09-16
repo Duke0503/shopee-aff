@@ -75,6 +75,11 @@ ORDER_RECORDED = "order.recorded"
 ORDER_APPROVED = "order.approved"
 ORDER_REJECTED = "order.rejected"
 ORDER_PAID = "order.paid"
+# Issuing a password ends every session the customer had open,
+# so it belongs in the trail even though no money moves.
+PASSWORD_ISSUED = "account.password_issued"
+LOGIN_OK = "account.login"
+LOGIN_REFUSED = "account.login_refused"
 CUSTOMER_ERASED = "customer.erased"
 
 

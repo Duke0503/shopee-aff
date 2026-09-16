@@ -297,3 +297,43 @@ class TestOverHTTP:
         with pytest.raises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(request, timeout=5)
         assert caught.value.code == 400
+
+
+class TestTheFrontendHasNoWordingOfItsOwn:
+    """Same rule as the Python side: nothing a reader sees is in source.
+
+    The currency mark slipped into a TypeScript file once, which is how
+    a second copy of the wording starts -- and the two copies disagree
+    the first time one of them is edited.
+    """
+
+    def _web_sources(self):
+        from pathlib import Path
+        from cashback.core.config import PROJECT_ROOT
+
+        root = PROJECT_ROOT / "web" / "src"
+        return list(root.rglob("*.ts")) + list(root.rglob("*.tsx"))
+
+    def test_no_vietnamese_text_in_the_app_source(self):
+        import unicodedata
+
+        offenders = []
+        for path in self._web_sources():
+            for number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), 1):
+                if any(ord(c) > 127 and "LATIN" in unicodedata.name(c, "")
+                       for c in line):
+                    offenders.append(f"{path.name}:{number}")
+        assert not offenders, f"wording in source: {offenders}"
+
+    def test_icons_come_from_one_place(self):
+        """react-icons bundles twenty families; mixing them is what makes
+        an app look like nobody decided anything. One set, imported once."""
+        direct = [p.name for p in self._web_sources()
+                  if "lucide-react" in p.read_text(encoding="utf-8")
+                  and p.name != "icons.ts"]
+        assert not direct, f"importing icons directly: {direct}"
+
+    def test_the_currency_mark_is_a_label(self):
+        assert dashboard.labels()["currency"]
+        assert dashboard.labels()["thousands_separator"]

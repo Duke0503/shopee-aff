@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-table"
 import { useState } from "react"
 import { Icon } from "@/lib/icons"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -17,65 +17,56 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { PipelineRow } from "@/lib/api"
+import type { MyOrder } from "@/lib/api"
 import { shortDate, vnd } from "@/lib/format"
 import { useT } from "@/lib/labels"
 
-/**
- * Orders Shopee has recorded but not settled.
- *
- * None of this is payable and none of it is counted as owed. It is here
- * because a console showing only what is payable is blank most days,
- * which reads as the bot having stopped working.
- */
-export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
+const TONE: Record<MyOrder["status"], "secondary" | "warning" | "success"> = {
+  awaiting_approval: "warning",
+  approved: "secondary",
+  paid: "success",
+  rejected: "secondary",
+}
+
+export function MyOrdersTable({ orders }: { orders: MyOrder[] }) {
   const t = useT()
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "recorded_at", desc: true },
-  ])
+  const [sorting, setSorting] = useState<SortingState>([])
 
-  const sortable = (id: string, label: string) => ({
-    header: ({ column }: { column: { toggleSorting: (d?: boolean) => void; getIsSorted: () => false | string } }) => (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-3 h-7 px-2 text-xs"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        {label}
-        <Icon.sort className="size-3" />
-      </Button>
-    ),
-    id,
-  })
-
-  const columns: ColumnDef<PipelineRow>[] = [
+  const columns: ColumnDef<MyOrder>[] = [
     {
-      accessorKey: "display_name",
-      ...sortable("display_name", t("col_customer")),
+      accessorKey: "product",
+      header: () => t("col_product"),
       cell: ({ row }) => (
         <div className="min-w-0">
-          <div className="truncate font-medium">
-            {row.original.display_name || row.original.customer_id}
+          <div className="max-w-[24ch] truncate font-medium sm:max-w-[40ch]">
+            {row.original.product || row.original.order_id}
           </div>
           <div className="text-muted-foreground font-mono text-[11px]">
-            {row.original.customer_id}
+            {row.original.order_id}
           </div>
         </div>
       ),
     },
     {
-      accessorKey: "product",
-      header: () => t("col_product"),
+      accessorKey: "status",
+      header: () => t("col_status"),
       cell: ({ row }) => (
-        <span className="block max-w-[20ch] truncate sm:max-w-[36ch]">
-          {row.original.product || row.original.order_id}
-        </span>
+        <div className="space-y-1">
+          <Badge variant={TONE[row.original.status]}>
+            {t(`status_${row.original.status}`)}
+          </Badge>
+          {/* A rejection without a reason reads as arbitrary. */}
+          {row.original.rejection_reason && (
+            <div className="text-muted-foreground text-[11px]">
+              {row.original.rejection_reason}
+            </div>
+          )}
+        </div>
       ),
     },
     {
       accessorKey: "order_value",
-      ...sortable("order_value", t("col_value")),
+      header: () => t("col_value"),
       cell: ({ getValue }) => (
         <span className="tnum text-muted-foreground">
           {vnd(getValue<number | null>())}
@@ -84,22 +75,28 @@ export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
     },
     {
       accessorKey: "cashback",
-      ...sortable("cashback", t("col_cashback")),
-      cell: ({ getValue }) => (
-        <span className="tnum font-medium">
-          {vnd(getValue<number>())}{" "}
-          <span className="text-muted-foreground text-[11px] font-normal">
-            {t("estimate_note")}
-          </span>
+      header: () => t("col_cashback"),
+      cell: ({ row }) => (
+        <span className="tnum font-semibold">
+          {vnd(row.original.cashback)}
+          {row.original.is_estimate && (
+            <span className="text-muted-foreground ml-1 text-[11px] font-normal">
+              {t("estimate_note")}
+            </span>
+          )}
         </span>
       ),
     },
     {
-      accessorKey: "recorded_at",
-      ...sortable("recorded_at", t("col_date")),
-      cell: ({ getValue }) => (
+      id: "when",
+      header: () => t("col_date"),
+      cell: ({ row }) => (
         <span className="tnum text-muted-foreground">
-          {shortDate(getValue<string | null>())}
+          {shortDate(
+            row.original.paid_at ??
+              row.original.approved_at ??
+              row.original.recorded_at,
+          )}
         </span>
       ),
     },
@@ -125,7 +122,7 @@ export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
   ]
 
   const table = useReactTable({
-    data: rows,
+    data: orders,
     columns,
     state: { sorting },
     onSortingChange: setSorting,

@@ -1,0 +1,77 @@
+/**
+ * Every icon in the app, named for what it MEANS.
+ *
+ * Two rules, and both exist because of what happens when they are
+ * broken.
+ *
+ * ONE SET. Not react-icons: that is a bundle of twenty different icon
+ * families, and importing FaLock beside MdPayment beside BsWallet puts
+ * three different pen strokes on one screen. That mix is exactly what
+ * makes an app look like nobody decided anything. Lucide is one family,
+ * one 1.5px stroke, drawn by one hand -- so anything picked from it
+ * matches anything else picked from it, for free.
+ *
+ * NAMED BY MEANING, NOT BY PICTURE. A component asks for `Icon.owed`,
+ * never `Wallet`. It has no business knowing whether money owed is
+ * drawn as a wallet or a banknote this month. With the names in here,
+ * changing the whole visual language is an edit to this file; with
+ * `import { Wallet }` scattered across eight components, it is eight
+ * edits and one that gets missed.
+ */
+
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  Banknote,
+  Check,
+  ChevronDown,
+  Clock,
+  Copy,
+  ExternalLink,
+  Inbox,
+  KeyRound,
+  Landmark,
+  LoaderCircle,
+  LockKeyhole,
+  LogOut,
+  Package,
+  RefreshCw,
+  Send,
+  Wallet,
+  XCircle,
+} from "lucide-react"
+
+export const Icon = {
+  // Money, in the three states it can be in
+  owed: Wallet,
+  payable: Banknote,
+  pending: Clock,
+  paid: Landmark,
+  rejected: XCircle,
+
+  // Things
+  order: Package,
+  bank: Landmark,
+  reference: Copy,
+
+  // Doing something
+  confirm: Check,
+  send: Send,
+  refresh: RefreshCw,
+  expand: ChevronDown,
+  sort: ArrowUpDown,
+  open: ExternalLink,
+  copy: Copy,
+  signOut: LogOut,
+
+  // Signing in
+  signIn: LockKeyhole,
+  password: KeyRound,
+
+  // States
+  warning: AlertTriangle,
+  busy: LoaderCircle,
+  empty: Inbox,
+} as const
+
+export type IconName = keyof typeof Icon

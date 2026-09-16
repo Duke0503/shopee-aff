@@ -141,11 +141,26 @@ def connect(db_path: Path) -> Iterator[sqlite3.Connection]:
 def initialise(db_path: Path) -> None:
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        _add_missing_tables(conn)
         _add_missing_columns(conn)
 
 
 # Columns added after the first release. SQLite has no IF NOT EXISTS for
 # ADD COLUMN, so existing databases are upgraded by inspection.
+_SESSIONS_DDL = """
+-- Browser sessions for the customer-facing view. The token itself is
+-- never stored: only its SHA-256, so a copy of this file does not hand
+-- over live sessions. See core/accounts.py.
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash  TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_customer ON sessions(customer_id);
+"""
+
+
 _LATER_COLUMNS = {
     "link_requests": {
         "notified_at": "TEXT",
@@ -161,7 +176,20 @@ _LATER_COLUMNS = {
     # `status` to find who is owed an update, which makes the notifier safe
     # to run repeatedly and safe across a restart.
     "orders": {"notified_status": "TEXT"},
+    # Signing in to the customer-facing view. password_hash is PBKDF2 and
+    # cannot be read back -- asking the bot for a password issues a new
+    # one rather than repeating the old.
+    "customers": {
+        "password_hash": "TEXT",
+        "password_set_at": "TEXT",
+        "failed_logins": "INTEGER NOT NULL DEFAULT 0",
+        "locked_until": "TEXT",
+    },
 }
+
+
+def _add_missing_tables(conn: sqlite3.Connection) -> None:
+    conn.executescript(_SESSIONS_DDL)
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:

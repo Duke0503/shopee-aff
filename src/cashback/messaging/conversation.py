@@ -52,6 +52,11 @@ COMMAND_BANK = ("/nganhang", "/taikhoan", "/stk")
 # Without this the only way to answer "where is my money" is a human
 # reading the ledger, which does not scale past one operator.
 COMMAND_BALANCE = ("/sodu", "/tien", "/kiemtra")
+# Signing in to the customer-facing page. The bot IS the channel: it
+# already knows the one fact that matters, which is that this person
+# controls this Zalo account. See core/accounts.py.
+COMMAND_ID = ("/id", "/ma", "/taikhoancuatoi")
+COMMAND_PASSWORD = ("/matkhau", "/password", "/quenmatkhau")
 
 # In a group the text arrives with the mention glued to the front, as in
 # "@Bot DP Shopee Affiliate /huongdan". The bot's display name contains
@@ -63,6 +68,7 @@ COMMAND_TOKEN = re.compile(r"(?:^|\s)(/[a-z0-9_]+)", re.IGNORECASE)
 KNOWN_COMMANDS = (
     COMMAND_RULES + COMMAND_POLICY + COMMAND_FORGET
     + COMMAND_TERMS + COMMAND_BANK + COMMAND_BALANCE
+    + COMMAND_ID + COMMAND_PASSWORD
 )
 
 # A worked example for the greeting: a mid-sized order at a commission
@@ -280,6 +286,27 @@ def handle(
 
         if command in COMMAND_TERMS:
             return [Reply(public, messages.render("terms", **common))]
+
+        if command in COMMAND_ID:
+            return [Reply(private, messages.render(
+                "account_id",
+                customer_id=customer_id,
+                zalo_id=customer["zalo_user_id"] or customer_id))]
+
+        if command in COMMAND_PASSWORD:
+            # A request is a RESET, never a reminder. The password is
+            # stored hashed, so there is nothing to remind anyone of --
+            # and a system that can re-read a password guarding bank
+            # details is storing it wrong.
+            from ..core import accounts
+
+            password = accounts.issue_password(conn, customer_id)
+            if password is None:
+                return [Reply(private, messages.render("password_failed"))]
+            audit.record(audit.PASSWORD_ISSUED, customer_id=customer_id)
+            return [Reply(private, messages.render(
+                "password_issued",
+                customer_id=customer_id, password=password))]
 
         if command in COMMAND_BALANCE:
             # Always private: this is the one command that names a sum.

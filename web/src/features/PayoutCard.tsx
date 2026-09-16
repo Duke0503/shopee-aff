@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, Check, ChevronDown, Copy, Send } from "lucide-react"
+import { Icon } from "@/lib/icons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -94,7 +94,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
 
         {entry.has_bank && !entry.qr_url && (
           <p className="bg-[var(--warning)]/10 text-[var(--warning)] flex gap-2 rounded-md p-2.5 text-xs">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            <Icon.warning className="mt-0.5 size-3.5 shrink-0" />
             <span>{t("no_qr_warning", { bank: entry.bank_name })}</span>
           </p>
         )}
@@ -108,7 +108,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
               <code className="block truncate text-xs">{entry.reference}</code>
             </div>
             <Button size="sm" variant="ghost" onClick={copyReference}>
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? <Icon.confirm className="size-3.5" /> : <Icon.copy className="size-3.5" />}
               {copied ? t("btn_copied") : t("btn_copy")}
             </Button>
           </div>
@@ -148,7 +148,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
             </div>
           ) : (
             <Button className="w-full" onClick={() => setConfirming(true)}>
-              <Check /> {t("btn_paid")}
+              <Icon.confirm /> {t("btn_paid")}
             </Button>
           )
         ) : (
@@ -158,7 +158,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
             disabled={ask.isPending || ask.data?.ok}
             onClick={() => ask.mutate()}
           >
-            <Send />
+            <Icon.send />
             {ask.data?.ok
               ? t("btn_asked")
               : ask.isPending
@@ -179,7 +179,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
           className="w-full"
           onClick={() => setShowOrders((open) => !open)}
         >
-          <ChevronDown
+          <Icon.expand
             className={showOrders ? "rotate-180 transition-transform" : "transition-transform"}
           />
           {showOrders

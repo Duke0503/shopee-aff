@@ -83,3 +83,57 @@ export const markPaid = (customerId: string, orderIds: string[]) =>
 
 export const askForBank = (customerId: string) =>
   post(`/api/customers/${customerId}/ask-bank`)
+
+// ---------------------------------------------------------------------
+// The customer's own view
+// ---------------------------------------------------------------------
+
+export interface MyOrder {
+  order_id: string
+  status: "awaiting_approval" | "approved" | "rejected" | "paid"
+  order_value: number | null
+  estimated_commission: number | null
+  approved_commission: number | null
+  cashback_amount: number | null
+  cashback: number
+  is_estimate: boolean
+  recorded_at: string | null
+  approved_at: string | null
+  paid_at: string | null
+  rejection_reason: string | null
+  affiliate_url: string | null
+  source_url: string | null
+  product: string
+}
+
+export interface Me {
+  customer_id: string
+  display_name: string
+  bank_name: string
+  bank_account_tail: string
+  rate: number
+  balance: {
+    approved: number
+    awaiting: number
+    paid: number
+    approved_orders: number
+    awaiting_orders: number
+  }
+  orders: MyOrder[]
+}
+
+/** null rather than a throw: "not signed in" is a state, not an error. */
+export async function fetchMe(): Promise<Me | null> {
+  const response = await fetch("/api/me")
+  if (response.status === 401) return null
+  if (!response.ok) throw new Error(`/api/me: ${response.status}`)
+  return response.json() as Promise<Me>
+}
+
+export const login = (name: string, password: string) =>
+  post("/api/auth/login", { name, password })
+
+export const logout = () => post("/api/auth/logout")
+
+export const changePassword = (current: string, replacement: string) =>
+  post("/api/auth/password", { current, replacement })

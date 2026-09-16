@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query"
-import { Banknote, Clock, Landmark, RefreshCw, Wallet } from "lucide-react"
+import { Icon } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PayoutCard } from "@/features/PayoutCard"
 import { PipelineTable } from "@/features/PipelineTable"
+import { CustomerView } from "@/features/CustomerView"
 import { fetchLabels, fetchSnapshot } from "@/lib/api"
-import { shortDate, vnd } from "@/lib/format"
+import { configure, shortDate, vnd } from "@/lib/format"
 import { LabelProvider, useT } from "@/lib/labels"
+import { isCustomerPath } from "@/routes"
 
 export default function App() {
   const labels = useQuery({
@@ -15,9 +17,15 @@ export default function App() {
     queryFn: fetchLabels,
     staleTime: Infinity,
   })
+  // Which screen this is never changes after load, so it is read once
+  // rather than held in state.
+  const forCustomer = isCustomerPath(window.location.pathname)
+  // The currency mark and separator are labels too, so formatting waits
+  // for them rather than hard-coding a Vietnamese character in source.
+  if (labels.data) configure(labels.data)
   return (
     <LabelProvider value={labels.data ?? {}}>
-      <Console />
+      {forCustomer ? <CustomerView /> : <Console />}
     </LabelProvider>
   )
 }
@@ -77,25 +85,25 @@ function Console() {
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile
-          icon={<Wallet className="size-3.5" />}
+          icon={<Icon.owed className="size-3.5" />}
           label={t("summary_owed")}
           value={vnd(totals.owed)}
           note={t("summary_customers", { count: totals.owed_customers })}
         />
         <Tile
-          icon={<Banknote className="size-3.5" />}
+          icon={<Icon.payable className="size-3.5" />}
           label={t("summary_ready")}
           value={vnd(totals.ready)}
           note={t("summary_customers", { count: data.ready.length })}
         />
         <Tile
-          icon={<Landmark className="size-3.5" />}
+          icon={<Icon.bank className="size-3.5" />}
           label={t("summary_no_bank")}
           value={vnd(totals.no_bank)}
           note={t("summary_customers", { count: data.no_bank.length })}
         />
         <Tile
-          icon={<Clock className="size-3.5" />}
+          icon={<Icon.pending className="size-3.5" />}
           label={t("summary_pipeline")}
           value={vnd(totals.pipeline)}
           note={t("summary_orders", { count: totals.pipeline_orders })}
@@ -190,7 +198,7 @@ function Shell({
         </div>
         {onRefresh && (
           <Button variant="outline" size="sm" onClick={onRefresh}>
-            <RefreshCw className={refreshing ? "animate-spin" : ""} />
+            <Icon.refresh className={refreshing ? "animate-spin" : ""} />
             {t("refresh")}
           </Button>
         )}

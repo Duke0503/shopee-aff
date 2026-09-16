@@ -4,7 +4,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table"
-import { ExternalLink } from "lucide-react"
+import { Icon } from "@/lib/icons"
 import {
   Table,
   TableBody,
@@ -75,7 +75,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
             className="text-primary inline-flex items-center gap-1 hover:underline"
           >
             {t("btn_open_link")}
-            <ExternalLink className="size-3" />
+            <Icon.open className="size-3" />
           </a>
         )
       },

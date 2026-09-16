@@ -19,11 +19,16 @@ person, the other records that money left the account. Both refuse an id
 that is not plainly alphanumeric, and mark_paid refuses an order that
 already has a paid_at, so a double click cannot pay twice.
 
-LOOPBACK ONLY
--------------
-This serves bank account numbers and what each person is owed. It binds
-to 127.0.0.1 and nothing else. There is no authentication here because
-there is no network here -- exposing it needs auth written first.
+TWO AUDIENCES, TWO SETS OF ROUTES
+---------------------------------
+/api/payouts and the two actions are the OPERATOR's. They carry bank
+account numbers and other people's balances, and they refuse any request
+that did not arrive on loopback -- so putting the customer page on a real
+domain later cannot expose them by accident.
+
+/api/auth/* and /api/me are the CUSTOMER's. They need a session, and they
+read through `my_orders`, which has no code path to anyone else's row.
+See core/accounts.py for why the bot is the login channel.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from ..core import accounts
 from ..core.config import PROJECT_ROOT, Config
 from ..core.policy import round_dong
 from ..ledger import payouts
@@ -177,6 +183,74 @@ def snapshot(db_path: Path, rate: float = 0.80) -> dict:
 
 
 # ----------------------------------------------------------------------
+# One customer's own view
+# ----------------------------------------------------------------------
+
+def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
+    """What one customer can see: their orders and nothing else.
+
+    Deliberately a separate read from `snapshot`. The operator view
+    carries bank account numbers and other people's balances, and the
+    cheapest way to never leak those is for the customer endpoint to
+    have no code path that can reach them.
+    """
+    with ledger.connect(db_path) as conn:
+        customer = ledger.get_customer(conn, customer_id)
+        balance = payouts.balance_for(conn, customer_id, rate)
+        rows = conn.execute(
+            "SELECT o.order_id, o.status, o.order_value,"
+            "       o.estimated_commission, o.approved_commission,"
+            "       o.cashback_amount, o.recorded_at, o.approved_at,"
+            "       o.paid_at, o.rejection_reason,"
+            "       r.affiliate_url, r.source_url, r.estimate_detail"
+            "  FROM orders o"
+            "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
+            " WHERE o.customer_id = ?"
+            " ORDER BY COALESCE(o.recorded_at, o.approved_at) DESC",
+            (customer_id,),
+        ).fetchall()
+
+    orders = []
+    for row in rows:
+        item = dict(row)
+        item["product"] = _product_name(item.pop("estimate_detail", None))
+        # An awaiting order has no settled figure, so show the estimate
+        # of the customer's share and let the view label it as one.
+        if item["cashback_amount"] is None:
+            item["cashback"] = round_dong(
+                (item["estimated_commission"] or 0) * rate)
+            item["is_estimate"] = True
+        else:
+            item["cashback"] = item["cashback_amount"]
+            item["is_estimate"] = False
+        orders.append(item)
+
+    return {
+        "customer_id": customer_id,
+        "display_name": (customer["display_name"] if customer else "") or "",
+        # Enough to recognise the account, never enough to reconstruct it.
+        "bank_name": (customer["bank_name"] if customer else "") or "",
+        "bank_account_tail": _tail(
+            customer["bank_account"] if customer else ""),
+        "rate": rate,
+        "balance": {
+            "approved": balance.approved,
+            "awaiting": balance.awaiting,
+            "paid": balance.paid,
+            "approved_orders": balance.approved_orders,
+            "awaiting_orders": balance.awaiting_orders,
+        },
+        "orders": orders,
+    }
+
+
+def _tail(account: str) -> str:
+    """Last four digits. The customer confirms it; nobody else can use it."""
+    account = (account or "").strip()
+    return f"***{account[-4:]}" if len(account) >= 4 else ""
+
+
+# ----------------------------------------------------------------------
 # Actions
 # ----------------------------------------------------------------------
 
@@ -235,6 +309,23 @@ def mark_paid(cfg: Config, customer_id: str, order_ids: list[str]) -> dict:
 # Serving
 # ----------------------------------------------------------------------
 
+SESSION_COOKIE = "cashback_session"
+
+# The operator routes never leave this machine. Checked per request
+# rather than trusted to the bind address, because the bind address is
+# one config change away from being wrong.
+LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+def _cookies(header: str | None) -> dict[str, str]:
+    jar = {}
+    for part in (header or "").split(";"):
+        name, _, value = part.strip().partition("=")
+        if name:
+            jar[name] = value
+    return jar
+
+
 _MISSING_BUILD = (
     "<!doctype html><meta charset=utf-8><title>Giao dien chua build</title>"
     "<body style=\"font:15px/1.6 system-ui;padding:40px;max-width:640px\">"
@@ -252,11 +343,16 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         return
 
+    _extra_headers: list[tuple[str, str]] = []
+
     def _send(self, status: int, body: bytes, content_type: str):
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            for name, value in self._extra_headers:
+                self.send_header(name, value)
+            self._extra_headers = []
             self.end_headers()
             self.wfile.write(body)
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
@@ -267,15 +363,52 @@ class _Handler(BaseHTTPRequestHandler):
                    json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
 
+    # -- helpers --------------------------------------------------------
+    @property
+    def from_loopback(self) -> bool:
+        return (self.client_address[0] or "") in LOOPBACK
+
+    def _session_customer(self) -> str | None:
+        token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
+        if not token:
+            return None
+        with ledger.connect(self.cfg.db_path) as conn:
+            customer_id = accounts.customer_for_token(conn, token)
+            conn.commit()
+        return customer_id
+
+    def _set_session(self, token: str, clear: bool = False):
+        # HttpOnly so a script on the page cannot read it, SameSite=Strict
+        # so another site cannot ride it. Not Secure: this runs over plain
+        # http on loopback today, and setting it there means the cookie is
+        # silently dropped. Turn it on with the domain.
+        parts = [
+            f"{SESSION_COOKIE}={token}",
+            "Path=/",
+            "HttpOnly",
+            "SameSite=Strict",
+            "Max-Age=0" if clear else f"Max-Age={accounts.SESSION_DAYS * 86400}",
+        ]
+        self._extra_headers = [("Set-Cookie", "; ".join(parts))]
+
     # -- GET ------------------------------------------------------------
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
 
         if path == "/api/payouts":
+            if not self.from_loopback:
+                return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._json(
                 snapshot(self.cfg.db_path, self.cfg.advertised_cashback_rate))
         if path == "/api/labels":
             return self._json(labels())
+        if path == "/api/me":
+            customer_id = self._session_customer()
+            if customer_id is None:
+                return self._json({"ok": False, "message": "not_signed_in"}, 401)
+            return self._json(my_orders(
+                self.cfg.db_path, customer_id,
+                self.cfg.advertised_cashback_rate))
         if path.startswith("/api/"):
             return self._json({"ok": False, "message": "unknown endpoint"}, 404)
 
@@ -314,8 +447,17 @@ class _Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         parts = path.strip("/").split("/")
 
+        if path == "/api/auth/login":
+            return self._login()
+        if path == "/api/auth/logout":
+            return self._logout()
+        if path == "/api/auth/password":
+            return self._change_password()
+
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
+            if not self.from_loopback:
+                return self._json({"ok": False, "message": "forbidden"}, 403)
             customer_id, action = parts[2], parts[3]
             if action == "ask-bank":
                 return self._json(ask_for_bank(self.cfg, customer_id))
@@ -326,6 +468,48 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json(
                     mark_paid(self.cfg, customer_id, [str(i) for i in ids]))
         return self._json({"ok": False, "message": "unknown action"}, 404)
+
+    # -- auth routes ----------------------------------------------------
+    def _login(self):
+        from ..core import audit
+
+        body = self._body()
+        with ledger.connect(self.cfg.db_path) as conn:
+            result = accounts.login(conn, str(body.get("name") or ""),
+                                    str(body.get("password") or ""))
+            conn.commit()
+        if not result.ok:
+            # Failures are audited but never told apart for the caller:
+            # distinguishing "no such account" from "wrong password" turns
+            # the form into a way to ask who uses this service.
+            audit.record(audit.LOGIN_REFUSED,
+                         name=str(body.get("name") or "")[:40],
+                         reason=result.reason)
+            return self._json({"ok": False, "message": result.reason}, 401)
+        audit.record(audit.LOGIN_OK, customer_id=result.customer_id)
+        self._set_session(result.token)
+        return self._json({"ok": True, "customer_id": result.customer_id})
+
+    def _logout(self):
+        token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
+        if token:
+            with ledger.connect(self.cfg.db_path) as conn:
+                accounts.logout(conn, token)
+                conn.commit()
+        self._set_session("", clear=True)
+        return self._json({"ok": True, "message": "ok"})
+
+    def _change_password(self):
+        customer_id = self._session_customer()
+        if customer_id is None:
+            return self._json({"ok": False, "message": "not_signed_in"}, 401)
+        body = self._body()
+        with ledger.connect(self.cfg.db_path) as conn:
+            ok, reason = accounts.change_password(
+                conn, customer_id, str(body.get("current") or ""),
+                str(body.get("replacement") or ""))
+            conn.commit()
+        return self._json({"ok": ok, "message": reason}, 200 if ok else 400)
 
     def _body(self) -> dict:
         try:

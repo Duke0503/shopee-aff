@@ -26,7 +26,7 @@
   "terms": "📋 ĐIỀU KIỆN HOÀN TIỀN\n\n{tax_clause_full}\n\n━━━━━━━━━━━━━━━━\n\n✅ Mua thế nào để chắc được hoàn:\n 1. Bấm link mình gửi\n 2. Mua luôn, đừng để hôm sau\n 3. Mua trên đúng máy vừa bấm link\n 4. Đừng bấm thêm link hoàn tiền nào khác cho đơn đó\n\n❌ 4 trường hợp KHÔNG được hoàn:\n 1. Bạn huỷ đơn hoặc trả hàng\n 2. Bạn bấm link hoàn tiền của nhóm khác sau link này\n 3. Shopee không ghi nhận đơn\n 4. Shop đó không tham gia chương trình hoa hồng\n\n📅 Tiền về sau {days}, tính từ khi Shopee duyệt.\n\nℹ️ Số tiền trên tin nhắn link là ước tính theo giá lúc đó. Số cuối cùng tính theo mức Shopee duyệt.\n\nGõ /huongdan xem cách dùng • /coche xem bot hoạt động • /sodu xem số dư.",
   "currency": "đ",
   "thousands_separator": ".",
-  "unknown_command": "Mình không có lệnh \"{command}\" 🤔\n\nCác lệnh mình hiểu:\n/huongdan — cách sử dụng\n/coche — bot hoạt động thế nào\n/sodu — xem bạn đang có bao nhiêu tiền\n/dieukien — khi nào được hoàn tiền\n/nganhang — gửi hoặc đổi số tài khoản\n/xoathongtin — xoá thông tin của bạn",
+  "unknown_command": "Mình không có lệnh \"{command}\" 🤔\n\nCác lệnh mình hiểu:\n/huongdan — cách sử dụng\n/coche — bot hoạt động thế nào\n/sodu — xem bạn đang có bao nhiêu tiền\n/id — xem mã đăng nhập trang tra cứu\n/matkhau — cấp mật khẩu mới\n/dieukien — khi nào được hoàn tiền\n/nganhang — gửi hoặc đổi số tài khoản\n/xoathongtin — xoá thông tin của bạn",
   "bank_current": "🏦 Số tài khoản mình đang giữ của bạn:\n\n{name}\n\nMuốn đổi thì gửi lại theo mẫu:\nSTK: <ngân hàng> - <số tài khoản> - <tên chủ tài khoản>\n\nMuốn xoá thì nhắn /xoathongtin",
   "link_ready_no_commission": "⚠️ Sản phẩm này KHÔNG có hoàn tiền\n\n🔗 {link}\n\n📦 {product}\n💵 Giá: {price}\n\nShop này không tham gia chương trình hoa hồng của Shopee, nên mình không hoàn được đồng nào cho đơn này.\n\nBạn vẫn mua bình thường được — chỉ là không có hoàn tiền thôi.\n\n💡 Muốn có hoàn tiền thì tìm sản phẩm tương tự ở shop khác rồi gửi mình link nhé.",
   "tax_clause_short": "\nℹ️ Tháng nào Shopee giữ thuế thu nhập 10% thì bạn nhận {reduced} thay vì {rate}. Xem /dieukien.",
@@ -42,5 +42,8 @@
   "order_identity_link": "🔗 {link}",
   "order_paid": "💸 Mình đã chuyển tiền cho bạn rồi nhé!\n\n━━━━━━━━━━━━━━━\n💵 SỐ TIỀN: {amount}\n━━━━━━━━━━━━━━━\n\n📦 Gồm {count} đơn\n🏦 Vào tài khoản: {bank}\n📝 Nội dung: {reference}\n\nBạn kiểm tra app ngân hàng nhé. Nếu 30 phút nữa chưa thấy thì nhắn mình, mình gửi lại ảnh chuyển khoản.\n\nCảm ơn bạn đã mua qua link của mình 🙏 Lần sau cứ gửi link, mình làm tiếp.",
   "order_paid_no_bank": "💸 Mình đã chuyển tiền cho bạn rồi nhé!\n\n━━━━━━━━━━━━━━━\n💵 SỐ TIỀN: {amount}\n━━━━━━━━━━━━━━━\n\n📦 Gồm {count} đơn\n📝 Nội dung: {reference}\n\nBạn kiểm tra app ngân hàng nhé. Nếu 30 phút nữa chưa thấy thì nhắn mình, mình gửi lại ảnh chuyển khoản.\n\nCảm ơn bạn đã mua qua link của mình 🙏 Lần sau cứ gửi link, mình làm tiếp.",
-  "balance_settled": "👉 Bạn không còn khoản nào chờ. Gửi link sản phẩm tiếp là mình làm luôn."
+  "balance_settled": "👉 Bạn không còn khoản nào chờ. Gửi link sản phẩm tiếp là mình làm luôn.",
+  "account_id": "🆔 THÔNG TIN TÀI KHOẢN\n\nMã khách hàng: {customer_id}\nZalo ID: {zalo_id}\n\nDùng một trong hai cái trên để đăng nhập trang tra cứu đơn.\nChưa có mật khẩu thì gõ /matkhau.",
+  "password_issued": "🔑 MẬT KHẨU MỚI CỦA BẠN\n\nMã đăng nhập: {customer_id}\nMật khẩu: {password}\n\n⚠️ Mật khẩu CŨ không dùng được nữa, và nếu bạn đang đăng nhập ở đâu thì cũng bị thoát ra.\n\nĐăng nhập xong nên đổi mật khẩu ngay trên trang cho dễ nhớ.\nQuên thì cứ gõ /matkhau, mình cấp mật khẩu mới — mình không xem lại được mật khẩu cũ của bạn đâu.",
+  "password_failed": "Chưa cấp được mật khẩu. Bạn gửi mình một link sản phẩm trước đã nhé, để mình tạo tài khoản cho bạn."
 }
