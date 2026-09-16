@@ -16,7 +16,7 @@
  */
 @layer base {
   :root {
-    --background: oklch(0.985 0.004 250);
+    --background: oklch(0.985 0.006 80);
     --foreground: oklch(0.19 0.02 260);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.19 0.02 260);
@@ -48,10 +48,10 @@
     --border: oklch(0.92 0.006 265);
     --input: oklch(0.9 0.008 265);
     --ring: oklch(0.52 0.19 268);
-    --radius: 0.75rem;
+    --radius: 1.1rem;
 
-    --shadow-card: 0 1px 2px oklch(0.2 0.02 265 / 0.04),
-                   0 4px 16px oklch(0.2 0.02 265 / 0.05);
+    --shadow-card: 0 1px 2px oklch(0.2 0.02 265 / 0.05),
+                   0 8px 28px oklch(0.2 0.02 265 / 0.07);
   }
 
   :root:not([data-theme="light"]) {
@@ -172,5 +172,28 @@
   }
   .card-shadow {
     box-shadow: var(--shadow-card);
+  }
+}
+
+@layer components {
+  /* Parts arriving in order read as something handed over; parts
+     arriving at once read as a document displayed. */
+  .reveal {
+    animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      animation: none;
+    }
   }
 }

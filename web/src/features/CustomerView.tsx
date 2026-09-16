@@ -4,6 +4,8 @@ import { Footer, Header } from "@/components/Chrome"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { IconChip } from "@/components/ui/icon-chip"
+import { Mascot } from "@/components/Mascot"
+import { Reveal } from "@/components/Reveal"
 import { ChangePassword } from "@/features/ChangePassword"
 import { OrderList } from "@/features/OrderList"
 import { fetchMe, logout } from "@/lib/api"
@@ -27,6 +29,14 @@ import { navigate } from "@/routes"
  * the shape of the page should make the intent obvious to whoever
  * changes it next.
  */
+/** The bot greets by the clock, the way a person would. */
+function greetingKey(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return "me_greeting_morning"
+  if (hour < 18) return "me_greeting_afternoon"
+  return "me_greeting_evening"
+}
+
 export function CustomerView() {
   const t = useT()
   const queryClient = useQueryClient()
@@ -59,7 +69,7 @@ export function CustomerView() {
       <>
         <Header current="orders" />
         <main className="mx-auto max-w-md px-4 py-16 text-center sm:px-6">
-          <IconChip icon={Icon.signIn} tone="neutral" size="lg" className="mx-auto" />
+          <Mascot className="mx-auto size-24" mood="waiting" />
           <h1 className="mt-4 text-xl font-bold">
             {t("orders_signed_out_title")}
           </h1>
@@ -85,7 +95,9 @@ export function CustomerView() {
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold sm:text-xl">
-              {t("me_hello", { name: data.display_name || data.customer_id })}
+              {t(greetingKey(), {
+                name: data.display_name || data.customer_id,
+              })}
             </h1>
             <p className="text-muted-foreground font-mono text-xs">
               {data.customer_id}
@@ -102,22 +114,33 @@ export function CustomerView() {
         </div>
 
         {/* -- the answer ------------------------------------------- */}
+        <Reveal>
         <Card className="hero-wash overflow-hidden p-5 sm:p-6">
-          <div className="text-muted-foreground text-xs">
-            {t("me_headline_label")}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-muted-foreground text-sm">
+                {t("me_headline_label")}
+              </div>
+              <div className="tnum mt-1 text-4xl leading-none font-bold sm:text-5xl">
+                {vnd(balance.approved)}
+              </div>
+              {balance.approved > 0 ? (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  {t("me_headline_orders", {
+                    count: balance.approved_orders,
+                  })}
+                </p>
+              ) : (
+                <p className="text-muted-foreground mt-2 max-w-sm text-sm leading-relaxed">
+                  {t("me_headline_empty")}
+                </p>
+              )}
+            </div>
+            <Mascot
+              className="hidden size-20 shrink-0 sm:block"
+              mood={balance.approved > 0 ? "celebrating" : "happy"}
+            />
           </div>
-          <div className="tnum mt-1 text-4xl leading-none font-bold sm:text-5xl">
-            {vnd(balance.approved)}
-          </div>
-          {balance.approved > 0 ? (
-            <p className="text-muted-foreground mt-2 text-xs">
-              {t("summary_orders", { count: balance.approved_orders })}
-            </p>
-          ) : (
-            <p className="text-muted-foreground mt-2 text-xs">
-              {t("me_headline_empty")}
-            </p>
-          )}
 
           <div className="mt-5 grid grid-cols-2 gap-3 border-t pt-4">
             <Secondary
@@ -135,8 +158,9 @@ export function CustomerView() {
             />
           </div>
         </Card>
+        </Reveal>
 
-        <p className="text-muted-foreground mt-2 text-xs">
+        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
           {t("me_estimate_note")}
         </p>
 
@@ -145,11 +169,13 @@ export function CustomerView() {
           {t("me_orders_title")}
         </h2>
         {data.orders.length ? (
-          <OrderList orders={data.orders} />
+          <Reveal delay={90}>
+            <OrderList orders={data.orders} />
+          </Reveal>
         ) : (
           <Card className="p-8 text-center">
-            <IconChip icon={Icon.empty} tone="neutral" size="lg" className="mx-auto" />
-            <p className="text-muted-foreground mt-3 text-sm">
+            <Mascot className="mx-auto size-24" mood="waiting" />
+            <p className="text-muted-foreground mx-auto mt-4 max-w-sm text-sm leading-relaxed">
               {t("me_no_orders")}
             </p>
           </Card>

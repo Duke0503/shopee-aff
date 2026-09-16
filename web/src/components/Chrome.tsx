@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/lib/icons"
+import { Mascot } from "@/components/Mascot"
 import { useT } from "@/lib/labels"
 import { navigate, type Route } from "@/routes"
 
@@ -20,9 +21,7 @@ export function Header({ current }: { current: Route }) {
           onClick={() => navigate("home")}
           className="flex items-center gap-2 font-semibold"
         >
-          <span className="bg-primary text-primary-foreground grid size-7 place-items-center rounded-md">
-            <Icon.payable className="size-4" />
-          </span>
+          <Mascot className="size-8 shrink-0" />
           <span className="truncate">{t("brand")}</span>
         </button>
 

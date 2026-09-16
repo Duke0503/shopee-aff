@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { IconChip, type Tone } from "@/components/ui/icon-chip"
 import { Icon } from "@/lib/icons"
+import { Mascot } from "@/components/Mascot"
+import { Reveal } from "@/components/Reveal"
 import { useT } from "@/lib/labels"
 import { navigate } from "@/routes"
 
@@ -37,6 +39,7 @@ export function Home() {
         <section className="py-12 sm:py-20">
           <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
             <div>
+              <Mascot className="mb-4 size-16 lg:hidden" />
               <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
                 {t("home_hero_title")}
               </h1>
@@ -67,7 +70,9 @@ export function Home() {
 
             {/* The worked example, given the weight of a headline
                 because it is the only number anyone can act on. */}
-            <Card className="p-6">
+            <Reveal delay={80}>
+            <Card className="relative p-6">
+              <Mascot className="absolute -top-7 -right-3 hidden size-20 lg:block" mood="celebrating" />
               <div className="text-muted-foreground text-xs">
                 {t("home_hero_example_label")}
               </div>
@@ -87,6 +92,7 @@ export function Home() {
                 </div>
               </div>
             </Card>
+            </Reveal>
           </div>
         </section>
 

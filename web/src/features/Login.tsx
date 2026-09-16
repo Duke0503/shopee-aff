@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input, Label } from "@/components/ui/input"
 import { Icon } from "@/lib/icons"
+import { Mascot } from "@/components/Mascot"
+import { Reveal } from "@/components/Reveal"
 import { login } from "@/lib/api"
 import { useT } from "@/lib/labels"
 import { navigate } from "@/routes"
@@ -52,9 +54,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
 
       <main className="mx-auto w-full max-w-md px-4 py-10 sm:px-6 sm:py-16">
         <div className="mb-7 text-center">
-          <span className="bg-primary-soft text-primary mx-auto grid size-12 place-items-center rounded-xl">
-            <Icon.signIn className="size-6" />
-          </span>
+          <Mascot className="mx-auto size-20" />
           <h1 className="mt-4 text-2xl font-bold tracking-tight">
             {t("login_title")}
           </h1>
@@ -63,6 +63,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
           </p>
         </div>
 
+        <Reveal delay={60}>
         <Card>
           <CardContent className="pt-5">
             <form
@@ -125,6 +126,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
             </form>
           </CardContent>
         </Card>
+        </Reveal>
 
         <Card className="bg-secondary mt-4 border-0">
           <CardContent className="pt-4">
