@@ -17,11 +17,24 @@ def cmd_init(cfg: Config, _args: argparse.Namespace) -> int:
 
 
 def cmd_status(cfg: Config, _args: argparse.Namespace) -> int:
+    from ...ledger import payouts
+
     print(f"Mode      : {cfg.describe_mode()}")
     print(f"Database  : {cfg.db_path}")
     print(f"Cashback  : {cfg.cashback_rate:.0%} of approved commission")
     print(f"Tax policy: {cfg.tax_policy.value}")
-    print(f"Advertise : {cfg.advertised_cashback_rate:.0%}  <- the honest figure")
+    # The headline is defensible only because the condition is stated
+    # wherever it appears. Printing the headline alone hides the half of
+    # the arrangement the operator has to keep honouring.
+    if cfg.reduced_cashback_rate < cfg.cashback_rate:
+        print(f"Advertise : {cfg.advertised_cashback_rate:.0%}, dropping to "
+              f"{cfg.reduced_cashback_rate:.0%} in a withheld period")
+        state = "withheld" if cfg.period_is_withheld else "not withheld"
+        print(f"This period: {state}  (PAYOUT_PERIOD_WITHHELD)")
+    else:
+        print(f"Advertise : {cfg.advertised_cashback_rate:.0%}, unconditional")
+    print(f"Threshold : {_vnd(payouts.MIN_PAYOUT_VND)} per customer "
+          f"before a transfer")
     print(f"Auto payout: {cfg.auto_payout}")
     return 0
 
@@ -30,11 +43,18 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
     """Who is owed money, grouped by person rather than by order."""
     from ...ledger import payouts
 
+    from ...web import dashboard
+
     with ledger.connect(cfg.db_path) as conn:
         owed = payouts.collect(conn)
+    # Orders Shopee has not settled yet are not payable and must never be
+    # counted as owed -- but printing "nothing awaiting payout" while real
+    # orders are in flight reads as "nothing is happening", which is how
+    # an operator concludes the bot has stopped working.
+    pipeline = dashboard.snapshot(cfg.db_path)
 
-    if not owed:
-        print("Nothing awaiting payout.")
+    if not owed and not pipeline["pipeline"]:
+        print("Nothing awaiting payout, and nothing in flight.")
         return 0
 
     ready, waiting = payouts.split_by_threshold(owed)
@@ -64,6 +84,24 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
                 why = f"{_vnd(short)} short of the threshold"
             print(f"  {entry.customer_id:<8} {entry.display_name or '-':<20}"
                   f" {_vnd(entry.amount):>14}   {why}")
+
+    if pipeline["pipeline"]:
+        from ...core.policy import round_dong
+
+        rows = pipeline["pipeline"]
+        print()
+        print(f"AWAITING SHOPEE  ({len(rows)} order(s) -- NOT payable, "
+              f"figures are estimates)")
+        print()
+        for row in rows:
+            share = round_dong(
+                (row["estimated_commission"] or 0) * cfg.cashback_rate)
+            print(f"  {row['customer_id']:<8} "
+                  f"{(row['product'] or row['order_id'])[:30]:<30}"
+                  f" {_vnd(share):>12}")
+        print()
+        print(f"  estimated total to customers: "
+              f"{_vnd(round_dong(pipeline['pipeline_total'] * cfg.cashback_rate))}")
 
     if args.qr:
         return _write_qr_page(ready, waiting)

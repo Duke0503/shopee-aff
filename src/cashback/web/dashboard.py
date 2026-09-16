@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from ..core.config import PROJECT_ROOT, Config
+from ..core.policy import round_dong
 from ..ledger import payouts
 from ..ledger import repository as ledger
 
@@ -275,7 +276,7 @@ def _pipeline_card(row: dict, rate: float) -> str:
     return (
         "<div class=card>"
         f"<div class=who>{esc(row.get('display_name') or row.get('customer_id'))}</div>"
-        f"<div class=amt>{vnd(round(estimate * rate))}</div>"
+        f"<div class=amt>{vnd(round_dong(estimate * rate))}</div>"
         f"<div class=bank>{esc(row.get('product') or '')}"
         f"<br>{esc(t('order_value'))} {vnd(row.get('order_value'))}"
         f" &middot; {esc(t('order_commission'))} {vnd(estimate)}</div>"
@@ -285,7 +286,7 @@ def _pipeline_card(row: dict, rate: float) -> str:
     )
 
 
-def render(data: dict, rate: float = 0.70) -> str:
+def render(data: dict, rate: float = 0.80) -> str:
     ready, short, no_bank = data["ready"], data["short"], data["no_bank"]
     orders = data["orders"]
 

@@ -60,7 +60,19 @@ class Config:
         return bool(self.zalo_bot_token)
 
     def describe_mode(self) -> str:
-        shopee = "live" if self.has_shopee_credentials else "SIMULATED (no credentials)"
+        """How links are actually produced, not which API keys exist.
+
+        This used to print "Shopee: SIMULATED (no credentials)" whenever
+        the Open API keys were absent -- which is always, because Shopee
+        refused the application and that path is dead. Meanwhile the bot
+        was generating real links through the browser the whole time.
+        An operator reading "SIMULATED" at eleven at night concludes the
+        links they have been sending out are fake.
+        """
+        if self.has_shopee_credentials:
+            shopee = "Open API"
+        else:
+            shopee = "browser (real links; Open API was refused)"
         zalo = "live" if self.has_zalo_credentials else "STDOUT (no token)"
         return f"Shopee: {shopee}  |  Zalo: {zalo}"
 

@@ -173,3 +173,140 @@ def _reconcile_live(cfg: Config, args: argparse.Namespace) -> int:
         print(f"{outcome.needs_review} row(s) need a human. "
               "See the manual_review table.")
     return 0
+
+
+def cmd_review(cfg: Config, args: argparse.Namespace) -> int:
+    """Rows reconciliation refused to guess at, and what to do with them.
+
+    These were only ever reachable by opening the database by hand. A
+    parked row is money that may be owed to a real customer, so leaving
+    it visible solely to whoever remembers the table name is how a
+    customer goes unpaid without anyone ever deciding to skip them.
+
+    Most parked rows are parked for one of two reasons: an unfamiliar
+    status value, or a sub_id that matches no customer. The first kind
+    is usually fixed by a later release, which is why --retry exists:
+    the raw row was stored, so it can be pushed back through the current
+    mapping rather than judged by hand.
+    """
+    import json
+
+    if args.resolve:
+        return cmd_review_resolve(cfg, args)
+
+    with ledger.connect(cfg.db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, order_id, reason, created_at, raw_data"
+            "  FROM manual_review WHERE resolved=0 ORDER BY id"
+        ).fetchall()
+
+    if not rows:
+        print("Nothing waiting for a human.")
+        return 0
+
+    if args.retry:
+        return _retry_parked(cfg, rows)
+
+    print(f"{len(rows)} row(s) need a decision\n")
+    for row in rows:
+        raw = {}
+        try:
+            raw = json.loads(row["raw_data"])
+        except (ValueError, TypeError):
+            pass
+        print(f"  #{row['id']}  {row['order_id'] or '(no order id)'}")
+        print(f"      reason  : {row['reason']}")
+        print(f"      seen    : {row['created_at'][:16]}")
+        if raw.get("utm_content"):
+            print(f"      sub_ids : {raw['utm_content']}")
+        item = _first_item(raw)
+        if item:
+            print(f"      item    : {item.get('item_name', '')[:60]}")
+            print(f"      status  : {item.get('display_item_status', '?')}"
+                  f"  (order: {_order_status(raw)})")
+        print()
+
+    print("cashback review --retry      push them back through the current "
+          "mapping\ncashback review --resolve N  mark one as dealt with by hand")
+    return 0
+
+
+def _first_item(raw: dict) -> dict | None:
+    for order in raw.get("orders") or []:
+        for item in order.get("items") or []:
+            return item
+    return None
+
+
+def _order_status(raw: dict) -> str:
+    for order in raw.get("orders") or []:
+        return str(order.get("order_status", "?"))
+    return "?"
+
+
+def _retry_parked(cfg: Config, rows) -> int:
+    """Re-apply stored raw rows through today's mapping.
+
+    A row parked by a mapping gap stays parked forever once the gap is
+    closed, because nothing re-reads it. This does, and clears only the
+    rows that actually went somewhere this time.
+    """
+    import json
+
+    from ...shopee import reconciliation as reconcile
+    from ...shopee.report_reader import _row_to_report_row
+
+    parsed, unparsable = [], 0
+    keep = {}
+    for row in rows:
+        try:
+            raw = json.loads(row["raw_data"])
+            report_row = _row_to_report_row(raw)
+        except Exception:
+            unparsable += 1
+            continue
+        if report_row.status == "unknown" or not report_row.customer_code:
+            continue                       # still not something to act on
+        parsed.append(report_row)
+        keep[report_row.order_id] = row["id"]
+
+    if not parsed:
+        print(f"None of the {len(rows)} parked row(s) can be applied yet.")
+        if unparsable:
+            print(f"({unparsable} could not be parsed at all.)")
+        return 0
+
+    with ledger.connect(cfg.db_path) as conn:
+        outcome = reconcile.run(
+            conn, parsed,
+            cashback_rate=cfg.cashback_rate,
+            tax_policy=cfg.tax_policy,
+            period_is_withheld=cfg.period_is_withheld,
+            source="manual-review:retry",
+        )
+        # Clear only what the ledger actually took. A row that came back
+        # needing review is still parked, under a fresh entry.
+        for order_id, review_id in keep.items():
+            if ledger.get_order(conn, order_id) is not None:
+                conn.execute(
+                    "UPDATE manual_review SET resolved=1 WHERE id=?",
+                    (review_id,))
+        conn.commit()
+
+    print(outcome.summary())
+    print(f"\n{len(parsed)} parked row(s) retried.")
+    return 0
+
+
+def cmd_review_resolve(cfg: Config, args: argparse.Namespace) -> int:
+    """Mark a parked row as dealt with, without touching the ledger."""
+    with ledger.connect(cfg.db_path) as conn:
+        changed = conn.execute(
+            "UPDATE manual_review SET resolved=1 WHERE id=? AND resolved=0",
+            (args.resolve,)).rowcount
+        conn.commit()
+    if not changed:
+        print(f"No unresolved row #{args.resolve}.")
+        return 1
+    print(f"Row #{args.resolve} marked resolved. The ledger was not changed.")
+    return 0

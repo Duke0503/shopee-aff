@@ -159,6 +159,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("file")
 
     p = sub.add_parser(
+        "review",
+        help="rows reconciliation would not guess at, and how to clear them",
+    )
+    p.add_argument(
+        "--retry", action="store_true",
+        help="re-apply parked rows through the current mapping",
+    )
+    p.add_argument(
+        "--resolve", type=int, metavar="ID",
+        help="mark one row as dealt with by hand; the ledger is not changed",
+    )
+
+    p = sub.add_parser(
         "reconcile", help="apply a conversion report to the ledger"
     )
     p.add_argument("file", nargs="?",
@@ -215,6 +228,7 @@ def _handlers() -> dict:
 
         "inspect-report": reports.cmd_inspect_report,
         "reconcile": reports.cmd_reconcile,
+        "review": reports.cmd_review,
 
         "bridge": browser.cmd_bridge,
         "setup-token": browser.cmd_setup_token,
