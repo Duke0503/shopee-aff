@@ -77,6 +77,15 @@ MAX_PAGES = 20            # 1000 orders; far beyond this operation's volume
 # it. Anything absent from here is deliberately NOT guessed.
 STATUS_MAP = {
     "pending": "awaiting",
+    # The ORDER is finished -- delivered and confirmed. The commission
+    # on it is validated separately and monthly, so this is still
+    # awaiting: mapping it to approved would make it payable before
+    # Shopee has agreed to pay anything.
+    "completed": "awaiting",
+    "delivered": "awaiting",
+    "shipping": "awaiting",
+    "to_ship": "awaiting",
+    "processing": "awaiting",
     # The buyer has not paid yet. Recording it as awaiting is both true and
     # safe: awaiting never releases money, so being wrong about whether it
     # will ever be paid costs nothing. The alternative -- manual review --
@@ -129,16 +138,25 @@ def buyer_has_paid(raw: dict) -> bool:
 
 
 def map_status(display_item_status: str, order_status: str) -> str:
-    """Prefer the readable commission status; fall back to the order's.
+    """What this system should call the state of this commission.
 
-    Returns "unknown" when neither is recognised, which routes the row to
-    manual review rather than to a payout decision.
+    The commission's own status decides. The order's status is only
+    consulted when the commission has none -- an order being COMPLETED
+    says the buyer received their parcel, not that Shopee has agreed to
+    pay for it.
+
+    So a commission status that is present but unrecognised returns
+    "unknown", even when the order beside it is one we understand. Letting
+    the order status stand in would quietly file something that might mean
+    "reversed" as merely waiting, and the customer would wait forever.
+
+    "unknown" routes the row to manual review rather than to a decision.
     """
-    for candidate in (display_item_status, order_status):
-        mapped = STATUS_MAP.get(str(candidate or "").strip().lower())
-        if mapped:
-            return mapped
-    return "unknown"
+    written = str(display_item_status or "").strip().lower()
+    if written:
+        return STATUS_MAP.get(written, "unknown")
+    fallback = str(order_status or "").strip().lower()
+    return STATUS_MAP.get(fallback, "unknown")
 
 
 _FETCH_JS = """

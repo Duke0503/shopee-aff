@@ -101,9 +101,26 @@ def run(
                 customer_id=row.customer_code,
                 request_id=request_id,
                 order_value=row.order_value,
-                estimated_commission=None,
+                # The report carries what the order WOULD earn. It is an
+                # estimate and is never paid from -- mark_approved below
+                # overwrites the payable figure with what Shopee agreed --
+                # but discarding it left the ledger blank and the customer
+                # told "amount to be confirmed" when the number was known.
+                estimated_commission=row.commission,
             )
             result.orders_new += 1
+            existing = ledger.get_order(conn, row.order_id)
+        elif existing["estimated_commission"] is None and row.commission:
+            # An order recorded before the report was read for its estimate,
+            # or by a run that discarded it. Filling it in costs nothing and
+            # is what the payout page and the customer's message read from.
+            # Never touches the APPROVED figure, which only mark_approved
+            # sets.
+            conn.execute(
+                "UPDATE orders SET estimated_commission=?, updated_at=?"
+                " WHERE order_id=? AND estimated_commission IS NULL",
+                (row.commission, ledger.now(), row.order_id),
+            )
             existing = ledger.get_order(conn, row.order_id)
 
         # RULE 2: an order already paid is never reprocessed, whatever the

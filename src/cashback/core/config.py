@@ -47,6 +47,8 @@ class Config:
     batch_max_size: int
     batch_min_gap_seconds: int
     third_party_fallback: bool
+    reconcile_interval_minutes: int
+    reconcile_days: int
 
     @property
     def has_shopee_credentials(self) -> bool:
@@ -107,4 +109,7 @@ def load() -> Config:
         third_party_fallback=os.getenv(
             "THIRD_PARTY_FALLBACK", "true"
         ).strip().lower() in ("1", "true", "yes"),
+        reconcile_interval_minutes=int(
+            os.getenv("RECONCILE_INTERVAL_MINUTES", "60")),
+        reconcile_days=int(os.getenv("RECONCILE_DAYS", "90")),
     )

@@ -183,3 +183,111 @@ class TestUnpaidOrdersAreNotEarnings:
         """Hiding it would be worse: the operator wants to see what is
         coming, they just must not mistake it for earned."""
         assert reader._row_to_report_row(self.UNPAID).commission == 4_623
+
+
+class TestOrderProgressIsNotCommissionApproval:
+    """An order moving forward is not Shopee agreeing to pay.
+
+    A real order changed from 'Pending' to 'Completed' between two reads.
+    Completed means delivered and confirmed; the commission on it is
+    validated separately, monthly. Mapping it to approved would have made
+    it payable before anyone agreed to pay it.
+    """
+
+    @pytest.mark.parametrize("display", [
+        "Completed", "Delivered", "Shipping", "To_ship", "Processing", "Pending",
+    ])
+    def test_every_stage_of_an_order_is_still_awaiting(self, display):
+        assert reader.map_status(display, "COMPLETED") == "awaiting"
+
+    def test_only_validation_marks_it_approved(self):
+        assert reader.map_status("Validated", "COMPLETED") == "approved"
+
+    def test_a_cancelled_commission_beats_a_completed_order(self):
+        assert reader.map_status("Cancelled", "COMPLETED") == "rejected"
+
+    def test_a_stage_nobody_has_seen_still_goes_to_a_human(self):
+        assert reader.map_status("Teleported", "COMPLETED") == "unknown"
+
+
+class TestTheEstimateSurvivesReconciliation:
+    """The reader works out what an order would earn; it must reach the ledger.
+
+    It was discarded, so the ledger held a blank and the customer was told
+    the amount would be confirmed later -- when it was already known.
+    """
+
+    def test_reconciliation_stores_what_the_reader_computed(self, conn):
+        from cashback.ledger import repository as ledger
+        from cashback.shopee import reconciliation
+        from cashback.core.policy import TaxPolicy
+
+        ledger.add_customer(conn, "C0003", display_name="Xuan Phuoc",
+                            private_chat_id="u1")
+        row = reader._row_to_report_row({
+            "utm_content": "C0003----",
+            "estimated_total_commission": 552_232_500,
+            "orders": [{
+                "order_sn": "2609141J5XWTHY", "order_status": "PAID",
+                "items": [{"actual_amount": 7_363_100_000,
+                           "display_item_status": "Pending"}],
+            }],
+        })
+        reconciliation.run(conn, [row], cashback_rate=0.80,
+                           tax_policy=TaxPolicy.USER_ABSORBS,
+                           period_is_withheld=False, source="test")
+        stored = ledger.get_order(conn, "2609141J5XWTHY")
+        assert stored["estimated_commission"] == 5_522
+        assert stored["order_value"] == 73_631
+
+    def test_an_order_recorded_without_an_estimate_gets_one_later(self, conn):
+        """Rows already in the ledger are filled in on a later pass.
+
+        The estimate was discarded for a while, so orders recorded then
+        hold a blank. They should not stay blank forever.
+        """
+        from cashback.ledger import repository as ledger
+        from cashback.shopee import reconciliation
+        from cashback.core.policy import TaxPolicy
+
+        ledger.add_customer(conn, "C0003", private_chat_id="u1")
+        ledger.add_order(conn, "OLD1", "C0003", None,
+                         order_value=73_631, estimated_commission=None)
+        row = reader._row_to_report_row({
+            "utm_content": "C0003----",
+            "estimated_total_commission": 552_232_500,
+            "orders": [{
+                "order_sn": "OLD1", "order_status": "PAID",
+                "items": [{"actual_amount": 7_363_100_000,
+                           "display_item_status": "Pending"}],
+            }],
+        })
+        reconciliation.run(conn, [row], cashback_rate=0.80,
+                           tax_policy=TaxPolicy.USER_ABSORBS,
+                           period_is_withheld=False, source="test")
+        assert ledger.get_order(conn, "OLD1")["estimated_commission"] == 5_522
+
+    def test_backfill_never_touches_an_approved_figure(self, conn):
+        """Only mark_approved sets what is actually payable."""
+        from cashback.ledger import repository as ledger
+        from cashback.shopee import reconciliation
+        from cashback.core.policy import TaxPolicy
+
+        ledger.add_customer(conn, "C0003", private_chat_id="u1")
+        ledger.add_order(conn, "OLD2", "C0003", None,
+                         order_value=73_631, estimated_commission=None)
+        ledger.mark_approved(conn, "OLD2", approved_commission=9_999,
+                             cashback_amount=7_000)
+        row = reader._row_to_report_row({
+            "utm_content": "C0003----",
+            "estimated_total_commission": 552_232_500,
+            "orders": [{"order_sn": "OLD2", "order_status": "PAID",
+                        "items": [{"actual_amount": 7_363_100_000,
+                                   "display_item_status": "Pending"}]}],
+        })
+        reconciliation.run(conn, [row], cashback_rate=0.80,
+                           tax_policy=TaxPolicy.USER_ABSORBS,
+                           period_is_withheld=False, source="test")
+        stored = ledger.get_order(conn, "OLD2")
+        assert stored["approved_commission"] == 9_999
+        assert stored["cashback_amount"] == 7_000

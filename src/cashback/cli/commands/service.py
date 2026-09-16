@@ -245,9 +245,66 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                     print(f"[links] pass error: {exc}")
             time.sleep(5)
 
+    def reconcile_loop() -> None:
+        """Pull the conversion report in, on a timer.
+
+        This was the last thing left running by hand, and leaving it there
+        meant an order could sit unrecorded for days: the customer heard
+        nothing after buying, and the payout page stayed empty while money
+        was in fact owed.
+
+        The interval is deliberately unhurried. Commissions validate
+        monthly and a payout is thirty to seventy days out, so nothing
+        here is urgent; what matters is that the customer gets told their
+        order landed within an hour or so rather than whenever someone
+        remembers to run a command. One pass is a page load and a couple
+        of reads, which is nothing next to link generation.
+        """
+        from ...shopee import reconciliation as reconcile, report_reader
+
+        # Wait before the first pass: the extension has just connected and
+        # the browser is more useful to a waiting customer than to a report.
+        first = True
+        while not stop.is_set():
+            wait = 60 if first else cfg.reconcile_interval_minutes * 60
+            first = False
+            if stop.wait(wait):
+                return
+            if not bridge.connected():
+                continue
+            try:
+                rows = report_reader.read(bridge, days=cfg.reconcile_days)
+            except Exception as exc:
+                log.info(f"[reconcile] could not read the report: {exc}")
+                continue
+            if not rows:
+                continue
+            try:
+                with ledger.connect(cfg.db_path) as conn:
+                    outcome = reconcile.run(
+                        conn, rows,
+                        cashback_rate=cfg.cashback_rate,
+                        tax_policy=cfg.tax_policy,
+                        period_is_withheld=False,
+                        source="dashboard:auto",
+                    )
+            except Exception as exc:
+                log.info(f"[reconcile] could not apply the report: {exc}")
+                continue
+            if outcome.orders_new or outcome.approved or outcome.rejected:
+                log.info(
+                    f"[reconcile] {len(rows)} row(s): "
+                    f"{outcome.orders_new} new, {outcome.approved} approved, "
+                    f"{outcome.rejected} rejected"
+                )
+            if outcome.needs_review:
+                log.info(f"[reconcile] {outcome.needs_review} row(s) need a human")
+
     threads = [threading.Thread(target=zalo_loop, daemon=True)]
     if not args.no_browser:
         threads.append(threading.Thread(target=link_loop, daemon=True))
+        if not args.no_reconcile:
+            threads.append(threading.Thread(target=reconcile_loop, daemon=True))
     for t in threads:
         t.start()
 
