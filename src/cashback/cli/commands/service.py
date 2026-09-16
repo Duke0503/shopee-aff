@@ -214,6 +214,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                             cfg.db_path, msg, cfg.advertised_cashback_rate,
                             PAYOUT_WINDOW_TEXT, update.event_name,
                             attribution_days=cfg.link_attribution_days,
+                            reduced_rate=cfg.reduced_cashback_rate,
                         )
                         zalo_handler.send_replies(bot, replies)
                     except Exception as exc:
@@ -224,6 +225,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                         cfg.db_path, bot, cfg.advertised_cashback_rate,
                         PAYOUT_WINDOW_TEXT, bridge=bridge,
                         third_party=cfg.third_party_fallback,
+                        reduced_rate=cfg.reduced_cashback_rate,
                     )
                     if sent:
                         print(f"[zalo] delivered {sent} link(s) to customers")
@@ -285,7 +287,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                         conn, rows,
                         cashback_rate=cfg.cashback_rate,
                         tax_policy=cfg.tax_policy,
-                        period_is_withheld=False,
+                        period_is_withheld=cfg.period_is_withheld,
                         source="dashboard:auto",
                     )
             except Exception as exc:

@@ -77,7 +77,7 @@ def cmd_reconcile(cfg: Config, args: argparse.Namespace) -> int:
             rows,
             cashback_rate=cfg.cashback_rate,
             tax_policy=cfg.tax_policy,
-            period_is_withheld=args.withheld,
+            period_is_withheld=args.withheld or cfg.period_is_withheld,
             source=f"csv:{path.name}",
         )
 
@@ -157,7 +157,7 @@ def _reconcile_live(cfg: Config, args: argparse.Namespace) -> int:
             conn, rows,
             cashback_rate=cfg.cashback_rate,
             tax_policy=cfg.tax_policy,
-            period_is_withheld=args.withheld,
+            period_is_withheld=args.withheld or cfg.period_is_withheld,
             source="dashboard:live",
         )
     server.shutdown()

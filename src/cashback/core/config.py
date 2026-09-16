@@ -49,6 +49,7 @@ class Config:
     third_party_fallback: bool
     reconcile_interval_minutes: int
     reconcile_days: int
+    _period_is_withheld: bool
 
     @property
     def has_shopee_credentials(self) -> bool:
@@ -65,16 +66,48 @@ class Config:
 
     @property
     def advertised_cashback_rate(self) -> float:
-        """What customers actually receive, which is what you may advertise.
+        """The headline figure shown to customers.
 
-        Under USER_ABSORBS the withholding comes out of the customer's
-        cashback, so the honest figure is lower than `cashback_rate`.
+        The operator chose to advertise the full rate and state the
+        deduction as a condition, rather than quote the lower number.
+
+        That is only honest while the condition is stated everywhere the
+        figure appears -- see `reduced_cashback_rate` and the messages that
+        carry it. Withholding applies to a PAYOUT PERIOD, not to an order,
+        so whether a given customer sees the full rate depends on the
+        operator's total that period, which the customer cannot see. Saying
+        so plainly is the whole of what makes this defensible.
+        """
+        return self.cashback_rate
+
+    @property
+    def reduced_cashback_rate(self) -> float:
+        """What a customer receives in a period Shopee withholds tax on.
+
+        Ten points lower under USER_ABSORBS, because the withholding comes
+        out of their share. Identical to the headline rate under
+        OWNER_ABSORBS, where the operator carries it.
         """
         if self.tax_policy is TaxPolicy.USER_ABSORBS:
             from ..core.policy import WITHHOLDING_TAX_RATE
 
             return self.cashback_rate - WITHHOLDING_TAX_RATE
         return self.cashback_rate
+
+    @property
+    def period_is_withheld(self) -> bool:
+        """Is the current payout period over the withholding threshold?
+
+        Shopee withholds 10% on any single payout of 2,000,000 VND or
+        more. Until this operation reaches that, nothing is withheld and
+        customers receive the full rate.
+
+        It is a setting rather than something inferred, because the
+        threshold applies to what Shopee pays the operator, and that is
+        only known when Shopee pays it. `cashback metrics` warns when the
+        ledger suggests this is set wrong.
+        """
+        return self._period_is_withheld
 
 
 def load() -> Config:
@@ -112,4 +145,7 @@ def load() -> Config:
         reconcile_interval_minutes=int(
             os.getenv("RECONCILE_INTERVAL_MINUTES", "60")),
         reconcile_days=int(os.getenv("RECONCILE_DAYS", "90")),
+        _period_is_withheld=os.getenv(
+            "PAYOUT_PERIOD_WITHHELD", "false"
+        ).strip().lower() in ("1", "true", "yes"),
     )

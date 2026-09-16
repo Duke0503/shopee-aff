@@ -137,3 +137,69 @@ class TestEdges:
         split = split_commission(10_000, 1.0, TaxPolicy.OWNER_ABSORBS, False)
         assert split.customer_receives == 10_000
         assert split.operator_keeps == -98        # the 0.98% service fee
+
+
+class TestAdvertisingTheFullRateWithACondition:
+    """The operator advertises 80% and states the deduction as a condition.
+
+    That is defensible only while the condition travels with the figure.
+    These pin both halves: the rate customers are quoted, and the rate
+    they actually receive when a payout period is withheld.
+    """
+
+    def test_the_headline_is_the_full_rate(self):
+        from cashback.core.config import load
+        cfg = load()
+        assert cfg.advertised_cashback_rate == cfg.cashback_rate
+
+    def test_the_reduced_rate_is_ten_points_lower(self):
+        from cashback.core.config import load
+        cfg = load()
+        assert cfg.reduced_cashback_rate == pytest.approx(
+            cfg.cashback_rate - WITHHOLDING_TAX_RATE)
+
+    def test_a_quiet_period_really_does_pay_the_headline_rate(self):
+        split = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS,
+                                 period_is_withheld=False)
+        assert split.customer_share == pytest.approx(0.80, abs=0.001)
+
+    def test_a_withheld_period_pays_the_reduced_rate(self):
+        split = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS,
+                                 period_is_withheld=True)
+        assert split.customer_share == pytest.approx(0.70, abs=0.001)
+
+    def test_the_operator_keeps_the_same_either_way(self):
+        """The ten points go to the tax office, not to the operator.
+
+        If this ever differs, the condition being shown to customers has
+        stopped being true.
+        """
+        quiet = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS, False)
+        withheld = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS, True)
+        assert quiet.operator_keeps == withheld.operator_keeps
+
+
+class TestTheConditionTravelsWithTheFigure:
+    """Every message quoting the rate must also say when it drops."""
+
+    def _messages(self):
+        import json
+        from pathlib import Path
+        from cashback.core.config import PROJECT_ROOT
+        return json.loads(
+            (PROJECT_ROOT / "resources" / "messages.vi.json")
+            .read_text(encoding="utf-8"))
+
+    @pytest.mark.parametrize("key", ["link_ready", "link_ready_no_estimate"])
+    def test_link_messages_carry_the_clause(self, key):
+        assert "{tax_clause}" in self._messages()[key]
+
+    def test_the_conditions_page_explains_it_in_full(self):
+        assert "{tax_clause_full}" in self._messages()["terms"]
+
+    def test_the_greeting_mentions_the_lower_figure(self):
+        assert "{reduced}" in self._messages()["welcome"]
+
+    def test_the_clause_names_both_numbers(self):
+        clause = self._messages()["tax_clause_short"]
+        assert "{rate}" in clause and "{reduced}" in clause

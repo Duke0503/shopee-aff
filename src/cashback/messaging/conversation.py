@@ -199,6 +199,7 @@ def _ensure_customer(conn: sqlite3.Connection, msg: Message) -> sqlite3.Row:
 def handle(
     db_path: Path, msg: Message, cashback_rate: float, payout_window: str,
     event_name: str = "", attribution_days: int = 7,
+    reduced_rate: float | None = None,
 ) -> list[Reply]:
     """Decide what a single incoming message means. Returns replies to send."""
     if not msg or not msg.chat.id:
@@ -211,7 +212,20 @@ def handle(
         return [Reply(msg.chat.id, messages.render("link_preview_blocked"))]
 
     text = (msg.text or "").strip()
-    common = {"rate": f"{cashback_rate:.0%}", "days": payout_window}
+    # The headline figure never appears without the condition attached.
+    # Advertising the full rate is only honest while every message that
+    # carries it also says when it drops.
+    reduced = cashback_rate if reduced_rate is None else reduced_rate
+    common = {
+        "rate": f"{cashback_rate:.0%}",
+        "reduced": f"{reduced:.0%}",
+        "days": payout_window,
+    }
+    common["tax_clause"] = (
+        "" if reduced >= cashback_rate
+        else messages.render("tax_clause_short", **common)
+    )
+    common["tax_clause_full"] = messages.render("tax_clause_full", **common)
 
     in_group = msg.chat.is_group
     # Replies go back where the message came from, except anything involving
@@ -361,7 +375,7 @@ def send_replies(bot: ZaloBot, replies: list[Reply]) -> None:
 
 def deliver_ready_links(
     db_path: Path, bot: ZaloBot, cashback_rate: float, payout_window: str,
-    bridge=None, third_party: bool = True,
+    bridge=None, third_party: bool = True, reduced_rate: float | None = None,
 ) -> int:
     """Send out links generated since the last pass. Idempotent via notified_at."""
     with ledger.connect(db_path) as conn:
@@ -378,6 +392,17 @@ def deliver_ready_links(
             "   AND c.private_chat_id IS NOT NULL AND c.private_chat_id != ''"
             " ORDER BY r.created_at"
         ).fetchall()
+
+    # The headline rate never goes out without the condition attached.
+    # Advertising the full figure is only honest while every message that
+    # carries it also says when it drops.
+    reduced = cashback_rate if reduced_rate is None else reduced_rate
+    tax_clause = (
+        "" if reduced >= cashback_rate
+        else messages.render(
+            "tax_clause_short",
+            rate=f"{cashback_rate:.0%}", reduced=f"{reduced:.0%}")
+    )
 
     sent = 0
     for row in rows:
@@ -439,6 +464,7 @@ def deliver_ready_links(
                 cap_line=cap_line,
                 cashback=_vnd(estimate.cashback(cashback_rate)),
                 rate=f"{cashback_rate:.0%}",
+                tax_clause=tax_clause,
                 days=payout_window,
             )
         else:
@@ -450,6 +476,7 @@ def deliver_ready_links(
                 "link_ready_no_estimate",
                 link=row["affiliate_url"],
                 rate=f"{cashback_rate:.0%}",
+                tax_clause=tax_clause,
                 days=payout_window,
             )
         try:
