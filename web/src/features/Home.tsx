@@ -52,9 +52,17 @@ export function Home() {
                   <Icon.signIn /> {t("nav_login")}
                 </Button>
               </div>
-              <p className="text-muted-foreground mt-3 text-xs">
-                {t("home_hero_note")}
-              </p>
+              {/* The second objection, after "will they actually
+                  pay": whether buying through a link costs more. It is
+                  never typed and never asked, so it is answered here. */}
+              <ul className="mt-6 space-y-1.5">
+                {[1, 2, 3].map((n) => (
+                  <li key={n} className="flex items-center gap-2 text-sm">
+                    <Icon.confirm className="text-success size-4 shrink-0" />
+                    <span>{t(`home_reassure_${n}`)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
             {/* The worked example, given the weight of a headline

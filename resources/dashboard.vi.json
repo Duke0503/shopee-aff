@@ -136,5 +136,20 @@
   "login_help_body": "Không cần đăng ký. Nhắn bot trên Zalo, gõ /id để lấy mã đăng nhập và /matkhau để bot cấp mật khẩu.",
   "orders_signed_out_title": "Bạn chưa đăng nhập",
   "orders_signed_out_body": "Đăng nhập để xem đơn hàng và số tiền hoàn của bạn.",
-  "home_hero_example_amount": "{example_cashback}"
+  "home_hero_example_amount": "{example_cashback}",
+  "me_headline_label": "Sắp chuyển cho bạn",
+  "me_headline_empty": "Chưa có khoản nào chờ chuyển",
+  "me_secondary_awaiting": "Đang chờ Shopee duyệt",
+  "me_secondary_paid": "Đã chuyển từ trước tới nay",
+  "step_recorded": "Ghi nhận",
+  "step_approved": "Shopee duyệt",
+  "step_paid": "Chuyển tiền",
+  "step_rejected": "Không được duyệt",
+  "me_order_cashback_label": "Bạn nhận",
+  "me_account_title": "Tài khoản của bạn",
+  "me_account_open": "Xem và đổi mật khẩu",
+  "me_account_close": "Thu gọn",
+  "home_reassure_1": "Giá y hệt lúc bạn tự mua",
+  "home_reassure_2": "Không mất phí, không đăng ký",
+  "home_reassure_3": "Không cần cài thêm app nào"
 }

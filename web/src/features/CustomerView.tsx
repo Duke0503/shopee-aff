@@ -1,27 +1,37 @@
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Icon } from "@/lib/icons"
+import { Footer, Header } from "@/components/Chrome"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { IconChip } from "@/components/ui/icon-chip"
 import { ChangePassword } from "@/features/ChangePassword"
-import { MyOrdersTable } from "@/features/MyOrders"
+import { OrderList } from "@/features/OrderList"
 import { fetchMe, logout } from "@/lib/api"
+import { Icon } from "@/lib/icons"
 import { vnd } from "@/lib/format"
 import { useT } from "@/lib/labels"
 import { navigate } from "@/routes"
-import { Footer, Header } from "@/components/Chrome"
 
 /**
  * What one customer sees of their own ledger.
  *
- * Deliberately narrow: their orders, their three balances, the last four
- * digits of the account money goes to. No bank account in full, nothing
- * about anyone else. The server enforces that too -- this view has no
- * endpoint that could return another person's row -- but the shape of
- * the page should make the intent obvious to whoever changes it next.
+ * They opened this to answer ONE question -- how much am I getting --
+ * so one figure carries it and the other two sit underneath as context.
+ * Three numbers at the same size answered nothing: the eye had nowhere
+ * to land, and the page read as a report rather than an answer.
+ *
+ * Deliberately narrow beyond that: their orders, their three balances,
+ * the last four digits of the account the money goes to. Nothing in
+ * full, nothing about anyone else. The server enforces that too -- this
+ * view has no endpoint that could return another person's row -- but
+ * the shape of the page should make the intent obvious to whoever
+ * changes it next.
  */
 export function CustomerView() {
   const t = useT()
   const queryClient = useQueryClient()
+  const [accountOpen, setAccountOpen] = useState(false)
+
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
@@ -35,9 +45,12 @@ export function CustomerView() {
 
   if (isLoading) {
     return (
-      <p className="text-muted-foreground p-8 text-center text-sm">
-        {t("loading")}
-      </p>
+      <>
+        <Header current="orders" />
+        <p className="text-muted-foreground p-8 text-center text-sm">
+          {t("loading")}
+        </p>
+      </>
     )
   }
 
@@ -46,10 +59,10 @@ export function CustomerView() {
       <>
         <Header current="orders" />
         <main className="mx-auto max-w-md px-4 py-16 text-center sm:px-6">
-          <span className="bg-secondary text-muted-foreground mx-auto grid size-12 place-items-center rounded-xl">
-            <Icon.signIn className="size-6" />
-          </span>
-          <h1 className="mt-4 text-xl font-bold">{t("orders_signed_out_title")}</h1>
+          <IconChip icon={Icon.signIn} tone="neutral" size="lg" className="mx-auto" />
+          <h1 className="mt-4 text-xl font-bold">
+            {t("orders_signed_out_title")}
+          </h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
             {t("orders_signed_out_body")}
           </p>
@@ -67,97 +80,159 @@ export function CustomerView() {
   return (
     <>
       <Header current="orders" />
-      <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold sm:text-xl">
-            {t("me_hello", { name: data.display_name || data.customer_id })}
-          </h1>
-          <p className="text-muted-foreground font-mono text-xs">
-            {data.customer_id}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => signOut.mutate()}
-          disabled={signOut.isPending}
-        >
-          <Icon.signOut /> {t("logout")}
-        </Button>
-      </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Money
-          icon={<Icon.owed className="size-3.5" />}
-          label={t("me_balance_approved")}
-          value={vnd(balance.approved)}
-          note={t("summary_orders", { count: balance.approved_orders })}
-        />
-        <Money
-          icon={<Icon.pending className="size-3.5" />}
-          label={t("me_balance_awaiting")}
-          value={vnd(balance.awaiting)}
-          note={t("summary_orders", { count: balance.awaiting_orders })}
-        />
-        <Money
-          icon={<Icon.paid className="size-3.5" />}
-          label={t("me_balance_paid")}
-          value={vnd(balance.paid)}
-        />
-      </div>
-      <p className="text-muted-foreground mt-2 text-xs">
-        {t("me_estimate_note")}
-      </p>
-
-      <Card className="mt-4 p-3.5">
-        <div className="text-muted-foreground text-xs">{t("me_bank")}</div>
-        {data.bank_account_tail ? (
-          <div className="mt-0.5 text-sm font-medium">
-            {data.bank_name} · <span className="tnum">{data.bank_account_tail}</span>
+      <main className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold sm:text-xl">
+              {t("me_hello", { name: data.display_name || data.customer_id })}
+            </h1>
+            <p className="text-muted-foreground font-mono text-xs">
+              {data.customer_id}
+            </p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => signOut.mutate()}
+            disabled={signOut.isPending}
+          >
+            <Icon.signOut /> {t("logout")}
+          </Button>
+        </div>
+
+        {/* -- the answer ------------------------------------------- */}
+        <Card className="hero-wash overflow-hidden p-5 sm:p-6">
+          <div className="text-muted-foreground text-xs">
+            {t("me_headline_label")}
+          </div>
+          <div className="tnum mt-1 text-4xl leading-none font-bold sm:text-5xl">
+            {vnd(balance.approved)}
+          </div>
+          {balance.approved > 0 ? (
+            <p className="text-muted-foreground mt-2 text-xs">
+              {t("summary_orders", { count: balance.approved_orders })}
+            </p>
+          ) : (
+            <p className="text-muted-foreground mt-2 text-xs">
+              {t("me_headline_empty")}
+            </p>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t pt-4">
+            <Secondary
+              icon={Icon.pending}
+              tone="warning"
+              label={t("me_secondary_awaiting")}
+              value={vnd(balance.awaiting)}
+              note={t("summary_orders", { count: balance.awaiting_orders })}
+            />
+            <Secondary
+              icon={Icon.paid}
+              tone="success"
+              label={t("me_secondary_paid")}
+              value={vnd(balance.paid)}
+            />
+          </div>
+        </Card>
+
+        <p className="text-muted-foreground mt-2 text-xs">
+          {t("me_estimate_note")}
+        </p>
+
+        {/* -- orders ------------------------------------------------ */}
+        <h2 className="mt-8 mb-3 text-sm font-semibold">
+          {t("me_orders_title")}
+        </h2>
+        {data.orders.length ? (
+          <OrderList orders={data.orders} />
         ) : (
-          <p className="text-warning mt-0.5 text-xs">
-            {t("me_bank_none")}
-          </p>
+          <Card className="p-8 text-center">
+            <IconChip icon={Icon.empty} tone="neutral" size="lg" className="mx-auto" />
+            <p className="text-muted-foreground mt-3 text-sm">
+              {t("me_no_orders")}
+            </p>
+          </Card>
         )}
-      </Card>
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold">{t("me_orders_title")}</h2>
-      {data.orders.length ? (
-        <MyOrdersTable orders={data.orders} />
-      ) : (
-        <p className="text-muted-foreground text-sm">{t("me_no_orders")}</p>
-      )}
+        {/* -- account, out of the way until wanted ------------------ */}
+        <section className="mt-10">
+          <h2 className="mb-3 text-sm font-semibold">{t("me_account_title")}</h2>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <IconChip icon={Icon.bank} tone="neutral" size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="text-muted-foreground text-xs">
+                  {t("me_bank")}
+                </div>
+                {data.bank_account_tail ? (
+                  <div className="truncate text-sm font-medium">
+                    {data.bank_name} &middot;{" "}
+                    <span className="tnum">{data.bank_account_tail}</span>
+                  </div>
+                ) : (
+                  <p className="text-warning mt-0.5 text-xs">
+                    {t("me_bank_none")}
+                  </p>
+                )}
+              </div>
+            </div>
 
-      <div className="mt-8 max-w-md">
-        <ChangePassword />
-      </div>
-      </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3 w-full"
+              onClick={() => setAccountOpen((open) => !open)}
+            >
+              <Icon.expand
+                className={
+                  accountOpen
+                    ? "rotate-180 transition-transform"
+                    : "transition-transform"
+                }
+              />
+              {accountOpen ? t("me_account_close") : t("me_account_open")}
+            </Button>
+          </Card>
+
+          {accountOpen && (
+            <div className="mt-3 max-w-md">
+              <ChangePassword />
+            </div>
+          )}
+        </section>
+      </main>
+
       <Footer />
     </>
   )
 }
 
-function Money({
+function Secondary({
   icon,
+  tone,
   label,
   value,
   note,
 }: {
-  icon: React.ReactNode
+  icon: React.ComponentProps<typeof IconChip>["icon"]
+  tone: React.ComponentProps<typeof IconChip>["tone"]
   label: string
   value: string
   note?: string
 }) {
   return (
-    <Card className="p-3.5">
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        {icon}
-        {label}
+    <div className="flex items-start gap-2.5">
+      <IconChip icon={icon} tone={tone} size="sm" />
+      <div className="min-w-0">
+        <div className="text-muted-foreground text-[11px] leading-tight">
+          {label}
+        </div>
+        <div className="tnum text-base font-semibold">{value}</div>
+        {note && (
+          <div className="text-muted-foreground text-[11px]">{note}</div>
+        )}
       </div>
-      <div className="tnum mt-1 text-2xl font-bold">{value}</div>
-      {note && <div className="text-muted-foreground text-[11px]">{note}</div>}
-    </Card>
+    </div>
   )
 }
