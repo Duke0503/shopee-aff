@@ -26,20 +26,129 @@ def cmd_status(cfg: Config, _args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_payouts(cfg: Config, _args: argparse.Namespace) -> int:
+def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
+    """Who is owed money, grouped by person rather than by order."""
+    from ...ledger import payouts
+
     with ledger.connect(cfg.db_path) as conn:
-        rows = ledger.orders_awaiting_payout(conn)
-    if not rows:
+        owed = payouts.collect(conn)
+
+    if not owed:
         print("Nothing awaiting payout.")
         return 0
-    print(f"{len(rows)} order(s) approved and awaiting transfer:\n")
-    total = 0
-    for r in rows:
-        total += r["cashback_amount"] or 0
-        print(f"  {r['order_id']:<16} {r['display_name'] or r['customer_id']:<20}"
-              f" {_vnd(r['cashback_amount']):>14}"
-              f"  {r['bank_name'] or '?'} {r['bank_account'] or '?'}")
-    print(f"\n  total: {_vnd(total)}")
+
+    ready, waiting = payouts.split_by_threshold(owed)
+
+    if ready:
+        print(f"READY TO PAY  ({len(ready)} customer(s), "
+              f"threshold {_vnd(payouts.MIN_PAYOUT_VND)})")
+        print()
+        for entry in ready:
+            print(f"  {entry.customer_id:<8} {entry.display_name or '-':<20}"
+                  f" {_vnd(entry.amount):>14}"
+                  f"  {entry.bank_name} {entry.bank_account}")
+            print(f"           {len(entry.order_ids)} order(s): "
+                  f"{', '.join(entry.order_ids)}")
+        print()
+        print(f"  total: {_vnd(sum(e.amount for e in ready))}")
+
+    if waiting:
+        print()
+        print(f"STILL ACCUMULATING  ({len(waiting)} customer(s))")
+        print()
+        for entry in waiting:
+            if not entry.has_bank_details:
+                why = "no bank details yet"
+            else:
+                short = payouts.MIN_PAYOUT_VND - entry.amount
+                why = f"{_vnd(short)} short of the threshold"
+            print(f"  {entry.customer_id:<8} {entry.display_name or '-':<20}"
+                  f" {_vnd(entry.amount):>14}   {why}")
+
+    if args.qr:
+        return _write_qr_page(ready, waiting)
+    return 0
+
+
+def _write_qr_page(ready, waiting) -> int:
+    """One page of scannable transfers, opened in a browser and paid off."""
+    from pathlib import Path
+
+    from ...ledger import payouts
+
+    if not ready:
+        print()
+        print("No QR page written: nobody has cleared the threshold yet.")
+        return 0
+
+    cards = []
+    manual = []
+    for entry in ready:
+        url = entry.qr_url()
+        if url is None:
+            manual.append(entry)
+            continue
+        cards.append(
+            "<article>"
+            f"<h2>{entry.display_name or entry.customer_id}</h2>"
+            f"<p class=amount>{_vnd(entry.amount)}</p>"
+            f"<img src=\"{url}\" alt=\"QR\">"
+            f"<p class=meta>{entry.bank_name} &middot; {entry.bank_account}"
+            f"<br>{entry.account_holder}"
+            f"<br><code>{entry.reference}</code></p>"
+            f"<p class=orders>{len(entry.order_ids)} order(s): "
+            f"{', '.join(entry.order_ids)}</p>"
+            "</article>"
+        )
+
+    warning = ""
+    if manual:
+        rows = "".join(
+            f"<li>{e.customer_id} &mdash; {e.display_name} &mdash; "
+            f"{_vnd(e.amount)} &mdash; <b>{e.bank_name}</b> {e.bank_account}</li>"
+            for e in manual)
+        warning = (
+            "<section class=manual><h2>Transfer these by hand</h2>"
+            "<p>The bank written on the account could not be matched to "
+            "exactly one bank, so no QR was made. Guessing it could send "
+            "the money to a stranger holding the same account number at a "
+            "different bank.</p><ul>" + rows + "</ul></section>")
+
+    page = (
+        "<!doctype html><meta charset=utf-8>"
+        "<title>Cashback payouts</title>"
+        "<style>"
+        "body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px;"
+        "background:#f6f7f9;color:#111}"
+        "h1{font-size:20px;margin:0 0 4px}"
+        ".sub{color:#666;margin:0 0 24px}"
+        ".grid{display:grid;gap:16px;"
+        "grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}"
+        "article{background:#fff;border:1px solid #e3e5e8;border-radius:12px;"
+        "padding:16px;text-align:center}"
+        "article h2{font-size:15px;margin:0 0 2px}"
+        ".amount{font-size:24px;font-weight:700;margin:0 0 10px}"
+        "img{width:100%;max-width:220px;border-radius:8px}"
+        ".meta{font-size:13px;color:#555;margin:10px 0 0}"
+        ".orders{font-size:12px;color:#888;margin:6px 0 0}"
+        "code{background:#f0f1f3;padding:1px 5px;border-radius:4px;font-size:12px}"
+        ".manual{background:#fff8e6;border:1px solid #f0d9a0;border-radius:12px;"
+        "padding:16px;margin-top:24px}"
+        ".manual p{font-size:14px;color:#664d00}"
+        "</style>"
+        f"<h1>Cashback payouts &mdash; {len(cards)} to transfer</h1>"
+        f"<p class=sub>Total {_vnd(sum(e.amount for e in ready))}. "
+        "Scan each with your banking app, confirm, then run "
+        "<code>cashback pay &lt;order-id&gt;</code> for that customer's "
+        "orders.</p>"
+        "<div class=grid>" + "".join(cards) + "</div>" + warning
+    )
+
+    out = Path("payouts.html")
+    out.write_text(page, encoding="utf-8")
+    print()
+    print(f"QR page written to {out.resolve()}")
+    print(f"  {len(cards)} scannable, {len(manual)} need a manual transfer")
     return 0
 
 

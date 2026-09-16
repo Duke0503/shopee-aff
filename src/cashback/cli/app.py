@@ -38,7 +38,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="assume the payout period was withheld at 10%%",
     )
 
-    sub.add_parser("payouts", help="orders approved and awaiting transfer")
+    p = sub.add_parser("payouts",
+                       help="who is owed money, grouped by customer")
+    p.add_argument("--qr", action="store_true",
+                   help="also write payouts.html with a VietQR per customer")
 
     p = sub.add_parser("pay", help="mark an order as transferred")
     p.add_argument("order_id")
