@@ -54,6 +54,16 @@ class Estimate:
     name: str
     source: str
 
+    @property
+    def earns_nothing(self) -> bool:
+        """The product is real and carries no commission at all.
+
+        Different from not knowing: the customer must be told plainly
+        that buying through this link pays them nothing, rather than
+        being promised a share of zero.
+        """
+        return self.commission <= 0
+
     def cashback(self, rate: float) -> int:
         return round_dong(self.commission * rate)
 
@@ -103,7 +113,10 @@ def lookup(url: str, bridge=None, third_party: bool = True) -> Estimate | None:
             found = shopee_lookup.lookup(bridge, url)
         except Exception:
             found = None
-        if found and found.total_rate > 0 and found.price > 0:
+        # A rate of zero is an ANSWER, not a failure. Discarding it made
+        # the bot fall through to 'we could not look this up' and then
+        # promise a share of a commission that does not exist.
+        if found and found.price > 0:
             return _build(found.price, found.base_rate, found.seller_rate,
                           found.name, SOURCE_SHOPEE)
 
@@ -116,7 +129,7 @@ def lookup(url: str, bridge=None, third_party: bool = True) -> Estimate | None:
         other = product_info.lookup(url)
     except Exception:
         other = None
-    if other and other.total_rate > 0 and other.price > 0:
+    if other and other.price > 0:
         return _build(other.price, other.shopee_rate, other.seller_rate,
                       other.name, SOURCE_THIRD_PARTY)
 

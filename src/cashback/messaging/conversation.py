@@ -405,7 +405,17 @@ def deliver_ready_links(
                          estimate.to_json(), row["request_id"]),
                     )
 
-        if estimate:
+        if estimate and estimate.earns_nothing:
+            # Real product, real price, no commission. Saying "you get 70%
+            # of the commission" here promises a share of nothing, and the
+            # customer only finds out after they have bought.
+            text = messages.render(
+                "link_ready_no_commission",
+                link=row["affiliate_url"],
+                product=_short(estimate.name) or "San pham",
+                price=_vnd(estimate.price),
+            )
+        elif estimate:
             # A capped order gets two marks: a tag on the Shopee line so the
             # figure is not read as arithmetic gone wrong, and one sentence
             # underneath. That sentence exists to say "we are not keeping

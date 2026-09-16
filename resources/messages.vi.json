@@ -28,5 +28,6 @@
   "thousands_separator": ".",
   "unknown_command": "Mình không có lệnh \"{command}\" 🤔\n\nCác lệnh mình hiểu:\n/huongdan — cách sử dụng\n/coche — bot hoạt động thế nào\n/dieukien — khi nào được hoàn tiền\n/nganhang — gửi hoặc đổi số tài khoản\n/xoathongtin — xoá thông tin của bạn",
   "bank_current": "🏦 Số tài khoản mình đang giữ của bạn:\n\n{name}\n\nMuốn đổi thì gửi lại theo mẫu:\nSTK: <ngân hàng> - <số tài khoản> - <tên chủ tài khoản>\n\nMuốn xoá thì nhắn /xoathongtin",
-  "order_approved_need_bank": "🎉 Đơn {order_id} đã được Shopee duyệt!\n\n💵 Bạn được hoàn: {cashback}\n\nBạn gửi số tài khoản để mình chuyển nhé:\nSTK: <ngân hàng> - <số tài khoản> - <tên chủ tài khoản>\n\nVí dụ:\nSTK: VCB - 0123456789 - NGUYEN VAN A\n\n(Mình chỉ dùng để chuyển tiền hoàn cho bạn. Muốn xoá lúc nào cũng được: /xoathongtin)"
+  "order_approved_need_bank": "🎉 Đơn {order_id} đã được Shopee duyệt!\n\n💵 Bạn được hoàn: {cashback}\n\nBạn gửi số tài khoản để mình chuyển nhé:\nSTK: <ngân hàng> - <số tài khoản> - <tên chủ tài khoản>\n\nVí dụ:\nSTK: VCB - 0123456789 - NGUYEN VAN A\n\n(Mình chỉ dùng để chuyển tiền hoàn cho bạn. Muốn xoá lúc nào cũng được: /xoathongtin)",
+  "link_ready_no_commission": "⚠️ Sản phẩm này KHÔNG có hoàn tiền\n\n🔗 {link}\n\n📦 {product}\n💵 Giá: {price}\n\nShop này không tham gia chương trình hoa hồng của Shopee, nên mình không hoàn được đồng nào cho đơn này.\n\nBạn vẫn mua bình thường được — chỉ là không có hoàn tiền thôi.\n\n💡 Muốn có hoàn tiền thì tìm sản phẩm tương tự ở shop khác rồi gửi mình link nhé."
 }

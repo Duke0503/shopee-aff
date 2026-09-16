@@ -167,3 +167,40 @@ class TestFailedLinkApology:
         bot = FakeBot()
         assert convo.notify_failed_links(db, bot) == 1
         assert convo.notify_failed_links(db, bot) == 0
+
+
+class TestAProductWithNoCommission:
+    """A real product that pays nothing is an answer, not a lookup failure.
+
+    Treating zero as "could not look it up" sent the customer the generic
+    message promising 70% of the commission -- of a commission that does
+    not exist. They find out after buying.
+    """
+
+    def test_the_customer_is_told_plainly(self, db, monkeypatch):
+        from cashback.shopee import commission as commission_lookup
+        from cashback.ledger import repository as ledger
+
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "C0001", zalo_user_id="u1",
+                                private_chat_id="u1")
+            ledger.record_link_request(conn, "R00000000001", "C0001",
+                                       "https://s.shopee.vn/x", None, None, "zalo")
+            ledger.attach_affiliate_url(conn, "R00000000001",
+                                        "https://s.shopee.vn/aff", None)
+
+        zero = commission_lookup._build(100_000, 0.0, 0.0, "Khong hoa hong",
+                                        commission_lookup.SOURCE_SHOPEE)
+        monkeypatch.setattr(commission_lookup, "lookup", lambda *a, **k: zero)
+
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 1
+        text = bot.sent[0][1]
+        assert "https://s.shopee.vn/aff" in text       # link still delivered
+        assert "70%" not in text                       # nothing promised
+
+    def test_zero_is_recognised_as_earning_nothing(self):
+        from cashback.shopee import commission as c
+        assert c._build(100_000, 0.0, 0.0, "x", c.SOURCE_SHOPEE).earns_nothing
+        assert not c._build(100_000, 2.5, 7.0, "x", c.SOURCE_SHOPEE).earns_nothing
