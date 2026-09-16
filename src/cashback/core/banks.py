@@ -62,17 +62,25 @@ def load(path: Path | None = None) -> list[dict]:
         return []
 
 
+# Words every Vietnamese bank's registered name carries, which therefore
+# distinguish none of them. Matched against the accent-stripped form, so
+# these stay plain ASCII -- no Vietnamese belongs in this file.
+_BOILERPLATE = re.compile(
+    r"nganhang|thuongmai|cophan|tmcp|vietnam|tnhh|mtv"
+)
+
+
 def _aliases(bank: dict) -> set[str]:
     """Every spelling of one bank that can be matched without ambiguity."""
     names = {bank.get("code"), bank.get("shortName"), bank.get("bin")}
-    full = bank.get("name") or ""
-    # "Ngan hang TMCP Ngoai Thuong Viet Nam" -> also match the distinctive
-    # part, without the boilerplate every Vietnamese bank name carries.
-    trimmed = re.sub(
-        r"ng[aâ]n h[aà]ng|thương m[aạ]i|c[oổ] ph[aầ]n|tmcp|vi[eệ]t nam|tnhh|mtv",
-        " ", full, flags=re.IGNORECASE)
-    names.add(trimmed)
-    return {_plain(n) for n in names if n and _plain(n)}
+    aliases = {_plain(n) for n in names if n and _plain(n)}
+
+    # "Ngan hang TMCP Ngoai Thuong Viet Nam" -> "ngoaithuong", so someone
+    # writing the distinctive part of the name still lands on it.
+    distinctive = _BOILERPLATE.sub("", _plain(bank.get("name") or ""))
+    if len(distinctive) >= 4:
+        aliases.add(distinctive)
+    return aliases
 
 
 def find(written: str, banks: list[dict] | None = None) -> dict | None:
