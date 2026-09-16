@@ -142,6 +142,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-browser", action="store_true",
         help="Zalo side only; queue links but do not generate them"
     )
+    p.add_argument("--dashboard-port", type=int, default=8899)
+    p.add_argument(
+        "--no-dashboard", action="store_true",
+        help="do not serve the payout page"
+    )
 
     p = sub.add_parser(
         "inspect-report",

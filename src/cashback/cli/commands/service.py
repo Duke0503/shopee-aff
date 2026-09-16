@@ -128,11 +128,17 @@ def cmd_zalo_check(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
-    """Run everything: listen on Zalo, generate links, reply.
+    """Run everything: listen on Zalo, generate links, reply, and serve
+    the payout page.
 
     Two loops share one ledger. The Zalo loop only touches the database;
     the link loop only touches the browser. Neither blocks the other, so a
     slow browser pass never stops the bot from answering.
+
+    The payout page rides along on a third thread. It used to be a
+    separate command, which meant the operator opened the URL at the end
+    of a day and got a connection refused, because nobody remembers to
+    start two things.
     """
     import threading
     import time
@@ -158,6 +164,13 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     stop = threading.Event()
     bridge = _bridge_for(cfg)
     server = serve_in_background(bridge, args.port or cfg.bridge_port)
+
+    dashboard_server = None
+    if not args.no_dashboard:
+        from ...web import dashboard
+        dashboard_server = dashboard.serve_in_background(
+            cfg, port=args.dashboard_port)
+        print(f"Payout page on http://127.0.0.1:{args.dashboard_port}")
     print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}.")
 
     if not args.no_browser:
