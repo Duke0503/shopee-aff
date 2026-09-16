@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Icon } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { IconChip, type Tone } from "@/components/ui/icon-chip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PayoutCard } from "@/features/PayoutCard"
 import { PipelineTable } from "@/features/PipelineTable"
@@ -64,23 +65,25 @@ export default function App() {
 
 function Tile({
   icon,
+  tone,
   label,
   value,
   note,
 }: {
-  icon: React.ReactNode
+  icon: React.ComponentProps<typeof IconChip>["icon"]
+  tone: Tone
   label: string
   value: string
   note?: string
 }) {
   return (
-    <Card className="p-3.5">
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        {icon}
-        {label}
+    <Card className="flex items-start gap-3 p-3.5">
+      <IconChip icon={icon} tone={tone} size="sm" />
+      <div className="min-w-0">
+        <div className="text-muted-foreground text-xs">{label}</div>
+        <div className="tnum mt-0.5 text-xl font-bold sm:text-2xl">{value}</div>
+        {note && <div className="text-muted-foreground text-[11px]">{note}</div>}
       </div>
-      <div className="tnum mt-1 text-xl font-bold sm:text-2xl">{value}</div>
-      {note && <div className="text-muted-foreground text-[11px]">{note}</div>}
     </Card>
   )
 }
@@ -98,7 +101,7 @@ function Console() {
   if (error || !data) {
     return (
       <Shell>
-        <p className="text-[var(--destructive)] text-sm">
+        <p className="text-destructive text-sm">
           {t("load_failed", { reason: String(error) })}
         </p>
       </Shell>
@@ -117,25 +120,29 @@ function Console() {
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile
-          icon={<Icon.owed className="size-3.5" />}
+          icon={Icon.owed}
+          tone="primary"
           label={t("summary_owed")}
           value={vnd(totals.owed)}
           note={t("summary_customers", { count: totals.owed_customers })}
         />
         <Tile
-          icon={<Icon.payable className="size-3.5" />}
+          icon={Icon.payable}
+          tone="success"
           label={t("summary_ready")}
           value={vnd(totals.ready)}
           note={t("summary_customers", { count: data.ready.length })}
         />
         <Tile
-          icon={<Icon.bank className="size-3.5" />}
+          icon={Icon.bank}
+          tone="danger"
           label={t("summary_no_bank")}
           value={vnd(totals.no_bank)}
           note={t("summary_customers", { count: data.no_bank.length })}
         />
         <Tile
-          icon={<Icon.pending className="size-3.5" />}
+          icon={Icon.pending}
+          tone="warning"
           label={t("summary_pipeline")}
           value={vnd(totals.pipeline)}
           note={t("summary_orders", { count: totals.pipeline_orders })}

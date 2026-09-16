@@ -52,7 +52,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
 
       <main className="mx-auto w-full max-w-md px-4 py-10 sm:px-6 sm:py-16">
         <div className="mb-7 text-center">
-          <span className="bg-primary/10 text-primary mx-auto grid size-12 place-items-center rounded-xl">
+          <span className="bg-primary-soft text-primary mx-auto grid size-12 place-items-center rounded-xl">
             <Icon.signIn className="size-6" />
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight">
@@ -99,7 +99,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
               </div>
 
               {message && (
-                <p className="bg-[var(--destructive)]/10 text-[var(--destructive)] flex gap-2 rounded-md p-3 text-sm">
+                <p className="bg-destructive-soft text-destructive flex gap-2 rounded-md p-3 text-sm">
                   <Icon.warning className="mt-0.5 size-4 shrink-0" />
                   <span>{message}</span>
                 </p>

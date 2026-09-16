@@ -117,7 +117,7 @@ export function CustomerView() {
             {data.bank_name} · <span className="tnum">{data.bank_account_tail}</span>
           </div>
         ) : (
-          <p className="text-[var(--warning)] mt-0.5 text-xs">
+          <p className="text-warning mt-0.5 text-xs">
             {t("me_bank_none")}
           </p>
         )}

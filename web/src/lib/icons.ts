@@ -19,6 +19,7 @@
  * edits and one that gets missed.
  */
 
+import type { LucideIcon } from "lucide-react"
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -75,3 +76,4 @@ export const Icon = {
 } as const
 
 export type IconName = keyof typeof Icon
+export type { LucideIcon }

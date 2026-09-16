@@ -21,12 +21,13 @@ import type { MyOrder } from "@/lib/api"
 import { shortDate, vnd } from "@/lib/format"
 import { useT } from "@/lib/labels"
 
-const TONE: Record<MyOrder["status"], "secondary" | "warning" | "success"> = {
+// The same four colours the rest of the site uses for these states.
+const TONE = {
   awaiting_approval: "warning",
-  approved: "secondary",
+  approved: "info",
   paid: "success",
-  rejected: "secondary",
-}
+  rejected: "danger",
+} as const
 
 export function MyOrdersTable({ orders }: { orders: MyOrder[] }) {
   const t = useT()

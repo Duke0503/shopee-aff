@@ -93,7 +93,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
         )}
 
         {entry.has_bank && !entry.qr_url && (
-          <p className="bg-[var(--warning)]/10 text-[var(--warning)] flex gap-2 rounded-md p-2.5 text-xs">
+          <p className="bg-warning-soft text-warning flex gap-2 rounded-md p-2.5 text-xs">
             <Icon.warning className="mt-0.5 size-3.5 shrink-0" />
             <span>{t("no_qr_warning", { bank: entry.bank_name })}</span>
           </p>
@@ -168,7 +168,7 @@ export function PayoutCard({ entry }: { entry: Payable }) {
         )}
 
         {(pay.data && !pay.data.ok) || (ask.data && !ask.data.ok) ? (
-          <p className="text-[var(--destructive)] text-xs">
+          <p className="text-destructive text-xs">
             {pay.data?.ok === false ? pay.data.message : ask.data?.message}
           </p>
         ) : null}

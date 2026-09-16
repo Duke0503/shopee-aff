@@ -73,8 +73,8 @@ export function ChangePassword() {
             <p
               className={
                 result?.ok
-                  ? "text-[var(--success)] text-sm"
-                  : "text-[var(--destructive)] text-sm"
+                  ? "text-success text-sm"
+                  : "text-destructive text-sm"
               }
             >
               {message}

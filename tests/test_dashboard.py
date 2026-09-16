@@ -358,3 +358,18 @@ class TestTheFrontendHasNoWordingOfItsOwn:
 
         missing = sorted(used - set(dashboard.labels()))
         assert not missing, f"missing from dashboard.vi.json: {missing}"
+
+    def test_colour_is_used_through_tokens_not_raw_values(self):
+        """A colour written inline in one component is a colour that
+        does not change when the theme does -- and a state that reads
+        differently on two screens is worse than one that reads dully on
+        both."""
+        offenders = []
+        for path in self._web_sources():
+            if path.name == "icon-chip.tsx":
+                continue                      # the tone table itself
+            for number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), 1):
+                if "var(--" in line and "--ring" not in line:
+                    offenders.append(f"{path.name}:{number}")
+        assert not offenders, f"raw colour in a component: {offenders}"
