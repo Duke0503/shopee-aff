@@ -306,3 +306,22 @@ def cmd_reset(cfg: Config, args: argparse.Namespace) -> int:
     ledger.initialise(cfg.db_path)
     print(f"Ledger wiped and recreated at {cfg.db_path}")
     return 0
+
+
+def cmd_dashboard(cfg: Config, args: argparse.Namespace) -> int:
+    """Serve the end-of-day payout page on loopback."""
+    import webbrowser
+
+    from ...web import dashboard
+
+    port = args.port
+    if args.open:
+        # Opened after a moment so the server is listening by the time the
+        # browser asks for the page.
+        import threading
+        threading.Timer(
+            1.0, lambda: webbrowser.open(f"http://127.0.0.1:{port}")
+        ).start()
+
+    dashboard.serve(cfg, port=port)
+    return 0

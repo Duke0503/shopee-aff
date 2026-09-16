@@ -29,3 +29,7 @@ probe.json
 _bmad-output/
 .pytest_cache/
 .ruff_cache/
+
+# Generated payout pages
+payouts.html
+dashboard-preview.html

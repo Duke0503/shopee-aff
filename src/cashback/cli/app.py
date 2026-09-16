@@ -43,6 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--qr", action="store_true",
                    help="also write payouts.html with a VietQR per customer")
 
+    p = sub.add_parser("dashboard",
+                       help="open the end-of-day payout page in a browser")
+    p.add_argument("--port", type=int, default=8899)
+    p.add_argument("--open", action="store_true",
+                   help="also open it in the default browser")
+
     p = sub.add_parser("pay", help="mark an order as transferred")
     p.add_argument("order_id")
     p.add_argument("--note", default="")
@@ -185,6 +191,7 @@ def _handlers() -> dict:
         "init": ledger_ops.cmd_init,
         "status": ledger_ops.cmd_status,
         "payouts": ledger_ops.cmd_payouts,
+        "dashboard": ledger_ops.cmd_dashboard,
         "pay": ledger_ops.cmd_pay,
         "expire": ledger_ops.cmd_expire,
         "links": ledger_ops.cmd_links,
