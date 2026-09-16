@@ -79,10 +79,8 @@ Gõ /huongdan để bot chỉ lại từng bước.
 📅 Shopee duyệt đơn xong mới có tiền — khoảng 30-70 ngày
    kể từ lúc đơn hoàn tất. Bot tự nhắn bạn, không cần hỏi.
 
-💳 Gom đủ 50.000đ mới chuyển một lần, cho đỡ lặt vặt.
-   Chưa đủ thì tiền vẫn của bạn, để dồn sang đơn sau.
-
-🔎 Gõ /sodu bất cứ lúc nào để xem bạn đang có bao nhiêu.
+🔎 Gõ /sodu bất cứ lúc nào để xem bạn đang có bao nhiêu:
+   đã duyệt · đang chờ Shopee · đã chuyển cho bạn.
 
 ━━━━━━ 4 TRƯỜNG HỢP KHÔNG ĐƯỢC HOÀN ━━━━━━
 
@@ -155,27 +153,19 @@ một dòng nói đang ở đâu trong quy trình.
 **Luôn trả vào chat riêng**, kể cả khi khách gõ trong nhóm — số tiền của
 một người không phải việc của cả nhóm.
 
-### Bước 6 — Shopee duyệt, nhưng chưa đủ 50.000đ
+### Bước 6-7 — Shopee duyệt
 
-`order_approved` + `payout_note_short`: *"Tổng bạn đang có 7.410đ. Còn
-thiếu 42.590đ nữa là đủ 50.000đ để mình chuyển."*
+`order_approved` báo số tiền, rồi tuỳ đã có số tài khoản chưa:
 
-**Không** xin số tài khoản ở đây. Hỏi số tài khoản của người lạ để trả một
-khoản chưa đủ để chuyển thì không khác gì lừa đảo.
-
-### Bước 7 — Đơn thứ ba làm tròn đủ ngưỡng
-
-Cùng `order_approved`, nhưng đuôi đổi sang `payout_note_ready_need_bank`:
-*"Tổng bạn đang có 53.410đ — đủ để chuyển rồi. Bạn gửi số tài khoản…"*
-
-Bốn dạng đuôi, chọn theo **số dư** chứ không theo đơn vừa duyệt:
-
-| Số dư | Có STK | Đuôi |
+| Có STK | Đuôi tin | Nói gì |
 |---|---|---|
-| đủ | rồi | đọc lại STK, báo sắp chuyển |
-| đủ | chưa | xin STK |
-| chưa đủ | rồi | còn thiếu bao nhiêu |
-| chưa đủ | chưa | còn thiếu, chưa xin STK vội |
+| rồi | `payout_note_ready` | đọc lại STK, *"chuyển xong mình nhắn ngay"* |
+| chưa | `payout_note_ready_need_bank` | xin STK theo mẫu |
+
+**Không hứa ngày.** Chuyển lúc nào là quyết định của anh; khách biết tiền
+đã đi khi anh bấm nút, không phải trước đó. Số tài khoản cũng chỉ hỏi từ
+đây trở đi — trước lúc có đơn được duyệt thì chưa có đồng nào, hỏi số tài
+khoản của người lạ lúc đó không khác gì lừa đảo.
 
 ### Bước 8 — Khách gửi số tài khoản
 

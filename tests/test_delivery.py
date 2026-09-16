@@ -16,13 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from cashback.ledger import payouts, repository as ledger
+from cashback.ledger import repository as ledger
 from cashback.messaging import conversation as convo
 
-# Two amounts either side of the payout threshold, so a test says which
-# side it is testing rather than hiding it in a literal.
+# A small balance. There is no minimum any more, so this is payable like
+# any other -- which is the point of the class that uses it.
 BELOW = 6_484
-PAYABLE = payouts.MIN_PAYOUT_VND + 12_000
+PAYABLE = 62_000
 
 
 def _vnd(amount: int) -> str:
@@ -166,13 +166,13 @@ class TestOrderNotifications:
         assert "returned" in bot.sent[0][1]
 
 
-class TestApprovalNeverPromisesATransferItCannotMake:
-    """The approval notice used to end "transferring to your account" on
-    every approval, including balances far below the payout threshold.
+class TestApprovalSaysWhatHappensNext:
+    """What follows the amount: read the account back, or ask for one.
 
-    A customer told that, on 6,484 VND, watches their bank app for a week
-    and concludes they were cheated. The message now depends on the
-    balance, not on the single order that triggered it.
+    It must not name a date. When a balance is sent is the operator's
+    call, and the customer hears about it from order_paid when it
+    actually happens. A promised day that then slips is how a cashback
+    group earns a reputation for not paying.
     """
 
     def _approved(self, db: Path, cashback: int, *, bank: bool):
@@ -189,27 +189,25 @@ class TestApprovalNeverPromisesATransferItCannotMake:
         convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
         return bot.sent[0][1]
 
-    def test_below_the_threshold_it_says_how_much_is_missing(self, db):
-        text = self._approved(db, BELOW, bank=True)
-        assert _vnd(payouts.MIN_PAYOUT_VND - BELOW) in text
+    def test_a_small_balance_is_treated_like_any_other(self, db):
+        """6,484 VND used to be held back by a minimum nobody could see."""
+        assert "0123456789" in self._approved(db, BELOW, bank=True)
 
-    def test_below_the_threshold_it_does_not_say_it_is_transferring(self, db):
-        text = self._approved(db, BELOW, bank=True)
-        assert "0123456789" not in text
-
-    def test_below_the_threshold_it_does_not_ask_for_a_bank_account(self, db):
-        """Asking for an account number to send a sum that is not payable
-        yet is what a scam looks like from the customer's side."""
-        assert "STK:" not in self._approved(db, BELOW, bank=False)
-
-    def test_at_the_threshold_it_names_the_account(self, db):
+    def test_it_names_the_account_it_will_send_to(self, db):
         assert "0123456789" in self._approved(db, PAYABLE, bank=True)
 
-    def test_at_the_threshold_with_no_account_it_asks(self, db):
+    def test_with_no_account_on_file_it_asks_for_one(self, db):
         assert "STK:" in self._approved(db, PAYABLE, bank=False)
 
-    def test_the_threshold_is_reached_by_the_BALANCE_not_one_order(self, db):
-        """Two small orders that add up are payable; neither is alone."""
+    def test_it_promises_no_date(self, db):
+        """When a balance moves is the operator's call. The customer is
+        told it happened, by order_paid, not told when it will."""
+        text = self._approved(db, PAYABLE, bank=True)
+        for guess in ("hôm nay", "ngày mai", "trong ngày", "24h"):
+            assert guess not in text.lower()
+
+    def test_the_amount_shown_is_the_BALANCE_not_one_order(self, db):
+        """Two orders, one balance: the note names the sum of both."""
         with ledger.connect(db) as conn:
             ledger.add_customer(conn, "C0001", zalo_user_id="u1",
                                 private_chat_id="u1")
@@ -220,9 +218,9 @@ class TestApprovalNeverPromisesATransferItCannotMake:
                 ledger.mark_approved(conn, f"O000{n}", 40_000, amount)
         bot = FakeBot()
         convo.notify_order_changes(db, bot, 0.70, "30-70 ngay")
-        # Both notices are sent after both orders exist, so both see the
-        # combined 55,000 balance and both say a transfer is coming.
-        assert all("0123456789" in text for _, text in bot.sent)
+        # Both notices go out after both orders exist, so both see the
+        # combined 55,000 balance rather than their own order alone.
+        assert all(_vnd(55_000) in text for _, text in bot.sent)
 
 
 class TestFailedLinkApology:

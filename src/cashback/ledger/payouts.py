@@ -1,18 +1,20 @@
-"""Who is owed money, and whether it is worth moving yet.
+"""Who is owed money, grouped the way it gets paid.
 
-Two things turn a list of approved orders into a payout run.
+WHEN A BALANCE IS PAID IS THE OPERATOR'S CALL
+--------------------------------------------
+There was a 50,000 VND minimum here once: balances accumulated and only
+became payable together. It was removed deliberately. A rule the
+customer cannot see or influence means a customer with 6,000 VND waits
+an unbounded time for a payout nobody ever promised them a date for,
+and every message about it has to explain a policy instead of a payment.
 
-THE THRESHOLD
--------------
-Commissions here are small -- a few thousand dong an order. Transferring
-6,131 VND to one person, then 2,142 the next week, is more of the
-operator's evening than it is worth to anybody. So a customer's approved
-orders accumulate, and only become payable once they clear
-MIN_PAYOUT_VND together. Below it they are still owed, still visible, and
-still counted; they simply wait.
+So everything approved and unpaid is payable, and the operator decides
+when to send it -- one customer tonight, everyone on Sunday, whatever
+suits. Nothing here waits for a number to be reached.
 
-The threshold is per CUSTOMER, never per order: an order is not a debt
-that stands alone, it is part of what one person is owed.
+What still groups is the CUSTOMER: an order is not a debt standing
+alone, it is part of what one person is owed, and one transfer settles
+all of them at once.
 
 THE QR
 ------
@@ -36,9 +38,6 @@ from dataclasses import dataclass, field
 from ..core import banks
 from ..core.policy import round_dong
 
-# Below this a customer's balance waits rather than being transferred.
-MIN_PAYOUT_VND = 50_000
-
 QR_BASE = "https://img.vietqr.io/image"
 QR_TEMPLATE = "compact2"
 
@@ -57,10 +56,6 @@ class Payable:
     amount: int
     order_ids: list[str] = field(default_factory=list)
     bank: dict | None = None
-
-    @property
-    def is_payable(self) -> bool:
-        return self.amount >= MIN_PAYOUT_VND
 
     @property
     def has_bank_details(self) -> bool:
@@ -127,13 +122,19 @@ def collect(conn: sqlite3.Connection) -> list[Payable]:
     return sorted(by_customer.values(), key=lambda p: -p.amount)
 
 
-def split_by_threshold(
+def split_by_bank_details(
     payables: list[Payable],
 ) -> tuple[list[Payable], list[Payable]]:
-    """(ready to pay, still accumulating)."""
-    ready = [p for p in payables if p.is_payable and p.has_bank_details]
-    waiting = [p for p in payables if not (p.is_payable and p.has_bank_details)]
-    return ready, waiting
+    """(can be paid now, blocked on a missing account number).
+
+    A missing account number is the only thing left that stops a
+    transfer, and it is not something the operator can fix alone -- the
+    customer has to send it. That is why it is its own group rather than
+    a note on a row.
+    """
+    ready = [p for p in payables if p.has_bank_details]
+    blocked = [p for p in payables if not p.has_bank_details]
+    return ready, blocked
 
 
 @dataclass
@@ -153,11 +154,8 @@ class Balance:
 
     @property
     def is_payable(self) -> bool:
-        return self.approved >= MIN_PAYOUT_VND
-
-    @property
-    def short_by(self) -> int:
-        return max(0, MIN_PAYOUT_VND - self.approved)
+        """Anything approved and not yet sent. No minimum."""
+        return self.approved > 0
 
     @property
     def is_empty(self) -> bool:

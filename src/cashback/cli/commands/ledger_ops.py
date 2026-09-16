@@ -17,8 +17,6 @@ def cmd_init(cfg: Config, _args: argparse.Namespace) -> int:
 
 
 def cmd_status(cfg: Config, _args: argparse.Namespace) -> int:
-    from ...ledger import payouts
-
     print(f"Mode      : {cfg.describe_mode()}")
     print(f"Database  : {cfg.db_path}")
     print(f"Cashback  : {cfg.cashback_rate:.0%} of approved commission")
@@ -33,8 +31,6 @@ def cmd_status(cfg: Config, _args: argparse.Namespace) -> int:
         print(f"This period: {state}  (PAYOUT_PERIOD_WITHHELD)")
     else:
         print(f"Advertise : {cfg.advertised_cashback_rate:.0%}, unconditional")
-    print(f"Threshold : {_vnd(payouts.MIN_PAYOUT_VND)} per customer "
-          f"before a transfer")
     print(f"Auto payout: {cfg.auto_payout}")
     return 0
 
@@ -57,11 +53,10 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
         print("Nothing awaiting payout, and nothing in flight.")
         return 0
 
-    ready, waiting = payouts.split_by_threshold(owed)
+    ready, blocked = payouts.split_by_bank_details(owed)
 
     if ready:
-        print(f"READY TO PAY  ({len(ready)} customer(s), "
-              f"threshold {_vnd(payouts.MIN_PAYOUT_VND)})")
+        print(f"READY TO PAY  ({len(ready)} customer(s))")
         print()
         for entry in ready:
             print(f"  {entry.customer_id:<8} {entry.display_name or '-':<20}"
@@ -72,18 +67,13 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
         print()
         print(f"  total: {_vnd(sum(e.amount for e in ready))}")
 
-    if waiting:
+    if blocked:
         print()
-        print(f"STILL ACCUMULATING  ({len(waiting)} customer(s))")
+        print(f"WAITING ON AN ACCOUNT NUMBER  ({len(blocked)} customer(s))")
         print()
-        for entry in waiting:
-            if not entry.has_bank_details:
-                why = "no bank details yet"
-            else:
-                short = payouts.MIN_PAYOUT_VND - entry.amount
-                why = f"{_vnd(short)} short of the threshold"
+        for entry in blocked:
             print(f"  {entry.customer_id:<8} {entry.display_name or '-':<20}"
-                  f" {_vnd(entry.amount):>14}   {why}")
+                  f" {_vnd(entry.amount):>14}   owed, no bank details yet")
 
     if pipeline["pipeline"]:
         from ...core.policy import round_dong
@@ -104,7 +94,7 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
               f"{_vnd(round_dong(pipeline['pipeline_total'] * cfg.cashback_rate))}")
 
     if args.qr:
-        return _write_qr_page(ready, waiting)
+        return _write_qr_page(ready, blocked)
     return 0
 
 
@@ -116,7 +106,7 @@ def _write_qr_page(ready, waiting) -> int:
 
     if not ready:
         print()
-        print("No QR page written: nobody has cleared the threshold yet.")
+        print("No QR page written: nobody is owed anything right now.")
         return 0
 
     cards = []

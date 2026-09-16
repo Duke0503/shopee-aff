@@ -114,13 +114,15 @@ mang trạng thái `expired`. Trạng thái `expired` chỉ là ghi sổ.
 *"tôi chưa nhận được"* với *"tôi đang tìm mua lại"*: quá hạn đó thì giá và
 hoa hồng đã cũ, nên tạo yêu cầu mới để lấy số mới.
 
-**Ngưỡng chuyển tiền phải nói TRƯỚC khi nó chặn tiền.** `MIN_PAYOUT_VND`
-= 50.000₫ mỗi khách. Hoa hồng một đơn chỉ vài nghìn, nên phần lớn khách
-chưa đủ ngưỡng ở đơn đầu tiên. Tin báo đơn được duyệt từng nói *"Mình
-chuyển vào tài khoản này nhé"* trên **mọi** đơn — khách 6.484₫ canh app
-ngân hàng cả tuần rồi kết luận bị quỵt. Giờ tin này có **4 dạng**, chọn
-theo *số dư* chứ không theo *đơn vừa duyệt*, và cũng không xin số tài
-khoản khi tiền chưa đủ để chuyển. Khách tự tra bằng `/sodu`.
+**Không còn ngưỡng chuyển tiền.** Từng có mức 50.000₫ mỗi khách. Đã bỏ
+hẳn: đó là luật khách không nhìn thấy và không tác động được, làm mọi tin
+nhắn về tiền phải giải thích chính sách thay vì nói về khoản tiền. Giờ
+**mọi đơn đã duyệt và chưa trả đều trả được**, gom theo khách, chuyển lúc
+nào là quyết định của chủ.
+
+Hệ quả: tin báo đơn duyệt **không được hứa ngày**. Khách biết tiền đã đi
+qua `order_paid`, gửi đúng lúc chủ bấm nút. Thứ duy nhất còn chặn được một
+lần chuyển là **thiếu số tài khoản**, và cái đó chủ không tự gỡ được.
 
 **Phần trăm không phải là số tiền.** *"Hoàn 80% hoa hồng"* không ai quy
 ra tiền được, và người mua hàng bình thường hiểu nhầm thành 80% giá trị

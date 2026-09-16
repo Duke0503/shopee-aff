@@ -1,29 +1,35 @@
-"""The end-of-day page: who to pay, scan, done.
+"""The payout console: JSON for the browser, and the two actions on it.
 
-Answers one question -- "what do I owe tonight?" -- without the operator
-opening a database, a terminal, and a banking app in three windows and
-copying an account number between them.
+This module used to render HTML from Python. It now serves data, and
+serves the built React app, and knows nothing about how either looks.
+The split matters for a reason beyond tidiness: a customer-facing view
+is coming, and it has to read the same ledger through the same code.
+Two views over one set of dicts is fine; two views over two hand-written
+HTML builders is how they start disagreeing about what someone is owed.
 
-For each customer who has cleared the threshold it shows the amount, a
-VietQR carrying bank, account, amount and reference already filled in,
-and the orders behind the figure with their affiliate links, so the
-figure can be checked against Shopee before any money moves.
+WHAT IS AND IS NOT PAYABLE
+--------------------------
+Everything approved and unpaid is payable, grouped by customer. There is
+no minimum -- see ledger.payouts for why the old 50,000 VND one went.
+Orders Shopee has not settled are listed separately and never counted as
+owed; those figures are estimates twice over and every view says so.
 
-For a customer with no bank details on file there is a button: the bot
-messages them privately and asks. That is the only way to ask without it
-reading as a scam, because by then there is real money waiting.
+The two actions are not conveniences. One sends a real message to a real
+person, the other records that money left the account. Both refuse an id
+that is not plainly alphanumeric, and mark_paid refuses an order that
+already has a paid_at, so a double click cannot pay twice.
 
 LOOPBACK ONLY
 -------------
-This page prints bank account numbers and what each person is owed. It
-binds to 127.0.0.1 and nothing else. Do not make it reachable; there is
-no authentication here because there is no network here.
+This serves bank account numbers and what each person is owed. It binds
+to 127.0.0.1 and nothing else. There is no authentication here because
+there is no network here -- exposing it needs auth written first.
 """
 
 from __future__ import annotations
 
-import html
 import json
+import mimetypes
 import re
 import threading
 import urllib.parse
@@ -37,6 +43,12 @@ from ..ledger import payouts
 from ..ledger import repository as ledger
 
 LABELS_FILE = Path("resources") / "dashboard.vi.json"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+# Ids this system issues are alphanumeric. Anything else arriving on an
+# action route is not a typo, it is an attempt.
+SAFE_ID = re.compile(r"^[A-Za-z0-9]+$")
+
 _labels: dict[str, str] | None = None
 
 
@@ -56,14 +68,6 @@ def t(key: str, **values) -> str:
     return text
 
 
-def vnd(amount: int | None) -> str:
-    return "-" if amount is None else f"{round(amount):,}".replace(",", ".") + "d"
-
-
-def esc(text) -> str:
-    return html.escape(str(text or ""))
-
-
 # ----------------------------------------------------------------------
 # Reading
 # ----------------------------------------------------------------------
@@ -77,22 +81,27 @@ def _orders_of(conn, customer_id: str) -> list[dict]:
     rows = conn.execute(
         "SELECT o.order_id, o.order_value, o.approved_commission,"
         "       o.cashback_amount, o.approved_at,"
-        "       r.source_url, r.affiliate_url"
+        "       r.source_url, r.affiliate_url, r.estimate_detail"
         "  FROM orders o"
         "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
         " WHERE o.customer_id = ? AND o.status = 'approved' AND o.paid_at IS NULL"
         " ORDER BY o.approved_at",
         (customer_id,),
     ).fetchall()
-    return [dict(row) for row in rows]
+    out = []
+    for row in rows:
+        item = dict(row)
+        item["product"] = _product_name(item.pop("estimate_detail", None))
+        out.append(item)
+    return out
 
 
-def _pipeline(conn) -> list[dict]:
+def _pipeline(conn, rate: float) -> list[dict]:
     """Orders Shopee has recorded but not yet settled.
 
-    Nothing here is payable, and the page must say so. But a page that
-    shows only what is payable is blank on most days, which reads as
-    "nothing is happening" when in fact several orders are in flight.
+    Nothing here is payable, and every view must say so. But a console
+    showing only what is payable is blank on most days, which reads as
+    "nothing is happening" when several orders are in flight.
     """
     rows = conn.execute(
         "SELECT o.order_id, o.customer_id, o.order_value,"
@@ -107,7 +116,8 @@ def _pipeline(conn) -> list[dict]:
     out = []
     for row in rows:
         item = dict(row)
-        item["product"] = _product_name(row["estimate_detail"])
+        item["product"] = _product_name(item.pop("estimate_detail", None))
+        item["cashback"] = round_dong((item["estimated_commission"] or 0) * rate)
         out.append(item)
     return out
 
@@ -121,229 +131,54 @@ def _product_name(detail: str | None) -> str:
     return estimate.name if estimate else ""
 
 
-def snapshot(db_path: Path) -> dict:
-    """Everything the page needs, in one read."""
-    with ledger.connect(db_path) as conn:
-        owed = payouts.collect(conn)
-        detail = {p.customer_id: _orders_of(conn, p.customer_id) for p in owed}
-        pipeline = _pipeline(conn)
-    ready, waiting = payouts.split_by_threshold(owed)
-    no_bank = [p for p in waiting if not p.has_bank_details]
-    short = [p for p in waiting if p.has_bank_details]
+def _payable_json(entry, orders: list[dict]) -> dict:
     return {
-        "ready": ready,
-        "short": short,
-        "no_bank": no_bank,
-        "orders": detail,
-        "pipeline": pipeline,
-        "pipeline_total": sum(r["estimated_commission"] or 0 for r in pipeline),
-        "total": sum(p.amount for p in owed),
+        "customer_id": entry.customer_id,
+        "display_name": entry.display_name,
+        "amount": entry.amount,
+        "bank_name": entry.bank_name,
+        "bank_account": entry.bank_account,
+        "account_holder": entry.account_holder,
+        "has_bank": entry.has_bank_details,
+        "reference": entry.reference,
+        # None when the written bank name matched no bank, or more than
+        # one. The view then shows the raw details and says to transfer
+        # by hand; a guess here sends money to a stranger.
+        "qr_url": entry.qr_url(),
+        "order_ids": list(entry.order_ids),
+        "orders": orders,
     }
 
 
-# ----------------------------------------------------------------------
-# Rendering
-# ----------------------------------------------------------------------
+def snapshot(db_path: Path, rate: float = 0.80) -> dict:
+    """Everything either view needs, in one read, as plain JSON."""
+    with ledger.connect(db_path) as conn:
+        owed = payouts.collect(conn)
+        detail = {p.customer_id: _orders_of(conn, p.customer_id) for p in owed}
+        pipeline = _pipeline(conn, rate)
 
-STYLE = """
-*{box-sizing:border-box}
-body{font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;margin:0;
-     padding:24px;background:#f5f6f8;color:#16181d}
-h1{font-size:21px;margin:0 0 2px}
-.sub{color:#6b7280;margin:0 0 22px;font-size:13px}
-.tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-       margin-bottom:28px}
-.tile{background:#fff;border:1px solid #e4e6ea;border-radius:10px;padding:14px}
-.tile b{display:block;font-size:22px;line-height:1.2}
-.tile span{color:#6b7280;font-size:12px}
-h2{font-size:14px;letter-spacing:.04em;margin:28px 0 2px}
-.hint{color:#6b7280;font-size:12px;margin:0 0 12px}
-.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-.card{background:#fff;border:1px solid #e4e6ea;border-radius:12px;padding:16px}
-.who{font-weight:600}
-.amt{font-size:26px;font-weight:700;margin:6px 0 10px}
-.qr{width:100%;max-width:210px;display:block;margin:0 auto 10px;border-radius:8px}
-.bank{font-size:13px;color:#4b5563}
-code{background:#f1f2f4;padding:1px 6px;border-radius:4px;font-size:12px}
-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
-td{padding:4px 0;border-top:1px solid #eef0f2;vertical-align:top}
-td:last-child{text-align:right;white-space:nowrap}
-a{color:#0b63d6}
-button{font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;
-       border:1px solid #0b63d6;background:#0b63d6;color:#fff;cursor:pointer}
-button.ghost{background:#fff;color:#0b63d6}
-button:disabled{opacity:.5;cursor:default}
-.row{display:flex;gap:8px;margin-top:12px}
-.warn{background:#fff7e6;border:1px solid #f0d8a8;color:#6b4e00;
-      border-radius:8px;padding:10px;font-size:12px;margin:8px 0}
-.empty{color:#6b7280;font-size:13px}
-.flash{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;
-       background:#16181d;color:#fff;padding:10px 18px;border-radius:999px;
-       font-size:13px;display:none}
-"""
-
-SCRIPT = """
-async function post(url, button, doneLabel) {
-  button.disabled = true;
-  try {
-    const r = await fetch(url, {method: 'POST'});
-    const b = await r.json();
-    flash(b.message || '');
-    if (b.ok) { button.textContent = doneLabel; setTimeout(() => location.reload(), 900); }
-    else { button.disabled = false; }
-  } catch (e) { flash(String(e)); button.disabled = false; }
-}
-function flash(text) {
-  const el = document.getElementById('flash');
-  el.textContent = text; el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 3000);
-}
-"""
-
-
-def _orders_table(orders: list[dict]) -> str:
-    rows = []
-    for order in orders:
-        link = order.get("affiliate_url") or order.get("source_url") or ""
-        anchor = (f'<a href="{esc(link)}" target="_blank" rel="noreferrer">'
-                  f'{esc(t("btn_open_order"))}</a>') if link else ""
-        rows.append(
-            "<tr>"
-            f"<td><code>{esc(order['order_id'])}</code><br>{anchor}</td>"
-            f"<td>{esc(t('order_commission'))} {vnd(order['approved_commission'])}"
-            f"<br><b>{esc(t('order_cashback'))} {vnd(order['cashback_amount'])}</b></td>"
-            "</tr>"
-        )
-    return f"<table>{''.join(rows)}</table>" if rows else ""
-
-
-def _ready_card(entry, orders: list[dict]) -> str:
-    qr = entry.qr_url()
-    if qr:
-        visual = f'<img class=qr src="{esc(qr)}" alt="QR">'
-    else:
-        visual = f'<div class=warn>{esc(t("no_qr_warning", bank=entry.bank_name))}</div>'
-    ids = ",".join(entry.order_ids)
-    return (
-        "<div class=card>"
-        f"<div class=who>{esc(entry.display_name or entry.customer_id)}</div>"
-        f"<div class=amt>{vnd(entry.amount)}</div>"
-        f"{visual}"
-        f"<div class=bank>{esc(entry.bank_name)} &middot; {esc(entry.bank_account)}"
-        f"<br>{esc(entry.account_holder)}"
-        f"<br><code>{esc(entry.reference)}</code></div>"
-        f"{_orders_table(orders)}"
-        "<div class=row>"
-        f"<button onclick=\"post('/paid/{esc(entry.customer_id)}?orders={esc(ids)}',"
-        f"this,'{esc(t('btn_paid'))}')\">{esc(t('btn_paid'))}</button>"
-        "</div>"
-        "</div>"
-    )
-
-
-def _short_card(entry, orders: list[dict]) -> str:
-    missing = payouts.MIN_PAYOUT_VND - entry.amount
-    return (
-        "<div class=card>"
-        f"<div class=who>{esc(entry.display_name or entry.customer_id)}</div>"
-        f"<div class=amt>{vnd(entry.amount)}</div>"
-        f"<div class=bank>{esc(t('col_short', amount=vnd(missing)))}"
-        f"<br>{esc(entry.bank_name)} &middot; {esc(entry.bank_account)}</div>"
-        f"{_orders_table(orders)}"
-        "</div>"
-    )
-
-
-def _no_bank_card(entry, orders: list[dict]) -> str:
-    return (
-        "<div class=card>"
-        f"<div class=who>{esc(entry.display_name or entry.customer_id)}</div>"
-        f"<div class=amt>{vnd(entry.amount)}</div>"
-        f"{_orders_table(orders)}"
-        "<div class=row>"
-        f"<button onclick=\"post('/ask-bank/{esc(entry.customer_id)}',this,"
-        f"'{esc(t('btn_asked'))}')\">{esc(t('btn_ask_bank'))}</button>"
-        "</div>"
-        "</div>"
-    )
-
-
-def _pipeline_card(row: dict, rate: float) -> str:
-    estimate = row.get("estimated_commission") or 0
-    link = row.get("affiliate_url") or row.get("source_url") or ""
-    anchor = (f'<a href="{esc(link)}" target="_blank" rel="noreferrer">'
-              f'{esc(t("btn_open_order"))}</a>') if link else ""
-    return (
-        "<div class=card>"
-        f"<div class=who>{esc(row.get('display_name') or row.get('customer_id'))}</div>"
-        f"<div class=amt>{vnd(round_dong(estimate * rate))}</div>"
-        f"<div class=bank>{esc(row.get('product') or '')}"
-        f"<br>{esc(t('order_value'))} {vnd(row.get('order_value'))}"
-        f" &middot; {esc(t('order_commission'))} {vnd(estimate)}</div>"
-        f"<table><tr><td><code>{esc(row['order_id'])}</code><br>{anchor}</td>"
-        f"<td>{esc(row.get('recorded_at') or '')[:10]}</td></tr></table>"
-        "</div>"
-    )
-
-
-def render(data: dict, rate: float = 0.80) -> str:
-    ready, short, no_bank = data["ready"], data["short"], data["no_bank"]
-    orders = data["orders"]
-
-    def section(title, hint, entries, card) -> str:
-        if not entries:
-            return ""
-        cards = "".join(card(e, orders.get(e.customer_id, [])) for e in entries)
-        return (f"<h2>{esc(title)}</h2><p class=hint>{esc(hint)}</p>"
-                f"<div class=grid>{cards}</div>")
-
-    pipeline = data.get("pipeline") or []
-    pipeline_html = ""
-    if pipeline:
-        cards = "".join(_pipeline_card(r, rate) for r in pipeline)
-        pipeline_html = (
-            f"<h2>{esc(t('section_pipeline'))}</h2>"
-            f"<p class=hint>{esc(t('section_pipeline_hint'))}</p>"
-            f"<div class=grid>{cards}</div>")
-
-    body = (
-        section(t("section_ready"), t("section_ready_hint"), ready, _ready_card)
-        + section(t("section_no_bank"), t("section_no_bank_hint"),
-                  no_bank, _no_bank_card)
-        + section(t("section_waiting", threshold=vnd(payouts.MIN_PAYOUT_VND)),
-                  t("section_waiting_hint"), short, _short_card)
-        + pipeline_html
-    )
-    if not body:
-        body = f"<p class=empty>{esc(t('nothing_at_all'))}</p>"
-
-    return (
-        "<!doctype html><meta charset=utf-8>"
-        "<meta name=viewport content='width=device-width,initial-scale=1'>"
-        f"<title>{esc(t('title'))}</title><style>{STYLE}</style>"
-        f"<h1>{esc(t('title'))}</h1>"
-        f"<p class=sub>{esc(t('subtitle', time=datetime.now().strftime('%H:%M %d/%m/%Y')))}</p>"
-        "<div class=tiles>"
-        f"<div class=tile><b>{len(ready)}</b><span>{esc(t('summary_ready'))}</span></div>"
-        f"<div class=tile><b>{len(short)}</b><span>{esc(t('summary_waiting'))}</span></div>"
-        f"<div class=tile><b>{len(no_bank)}</b><span>{esc(t('summary_no_bank'))}</span></div>"
-        f"<div class=tile><b>{len(data.get('pipeline') or [])}</b>"
-        f"<span>{esc(t('summary_pipeline'))}</span></div>"
-        f"<div class=tile><b>{vnd(data['total'])}</b>"
-        f"<span>{esc(t('summary_total'))}</span></div>"
-        "</div>"
-        f"{body}"
-        "<div id=flash class=flash></div>"
-        f"<script>{SCRIPT}</script>"
-    )
+    ready, blocked = payouts.split_by_bank_details(owed)
+    pipeline_commission = sum(r["estimated_commission"] or 0 for r in pipeline)
+    return {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "rate": rate,
+        "ready": [_payable_json(p, detail[p.customer_id]) for p in ready],
+        "no_bank": [_payable_json(p, detail[p.customer_id]) for p in blocked],
+        "pipeline": pipeline,
+        "totals": {
+            "owed": sum(p.amount for p in owed),
+            "owed_customers": len(owed),
+            "ready": sum(p.amount for p in ready),
+            "no_bank": sum(p.amount for p in blocked),
+            "pipeline": round_dong(pipeline_commission * rate),
+            "pipeline_orders": len(pipeline),
+        },
+    }
 
 
 # ----------------------------------------------------------------------
 # Actions
 # ----------------------------------------------------------------------
-
-SAFE_ID = re.compile(r"^[A-Za-z0-9]+$")
-
 
 def ask_for_bank(cfg: Config, customer_id: str) -> dict:
     """Have the bot ask this customer for their account, privately.
@@ -400,6 +235,17 @@ def mark_paid(cfg: Config, customer_id: str, order_ids: list[str]) -> dict:
 # Serving
 # ----------------------------------------------------------------------
 
+_MISSING_BUILD = (
+    "<!doctype html><meta charset=utf-8><title>Giao dien chua build</title>"
+    "<body style=\"font:15px/1.6 system-ui;padding:40px;max-width:640px\">"
+    "<h1 style=\"font-size:19px\">Giao dien chua duoc build</h1>"
+    "<p>Chay mot lan:</p>"
+    "<pre style=\"background:#f1f2f4;padding:12px;border-radius:8px\">"
+    "cd web\nnpm install\nnpm run build</pre>"
+    "<p>API van chay: <a href=\"/api/payouts\">/api/payouts</a></p>"
+)
+
+
 class _Handler(BaseHTTPRequestHandler):
     cfg: Config
 
@@ -416,34 +262,84 @@ class _Handler(BaseHTTPRequestHandler):
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             pass
 
-    def do_GET(self):
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
-        if path != "/":
-            return self._send(404, b"not found", "text/plain")
-        page = render(snapshot(self.cfg.db_path),
-                      rate=self.cfg.advertised_cashback_rate)
-        self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
-
-    def do_POST(self):
-        raw, _, query = self.path.partition("?")
-        parts = raw.strip("/").split("/")
-        params = urllib.parse.parse_qs(query)
-
-        if len(parts) == 2 and parts[0] == "ask-bank":
-            result = ask_for_bank(self.cfg, parts[1])
-        elif len(parts) == 2 and parts[0] == "paid":
-            ids = (params.get("orders", [""])[0] or "").split(",")
-            result = mark_paid(self.cfg, parts[1], [i for i in ids if i])
-        else:
-            result = {"ok": False, "message": "unknown action"}
-
-        self._send(200, json.dumps(result, ensure_ascii=False).encode("utf-8"),
+    def _json(self, payload: dict, status: int = 200):
+        self._send(status,
+                   json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
+
+    # -- GET ------------------------------------------------------------
+    def do_GET(self):
+        path = urllib.parse.urlparse(self.path).path
+
+        if path == "/api/payouts":
+            return self._json(
+                snapshot(self.cfg.db_path, self.cfg.advertised_cashback_rate))
+        if path == "/api/labels":
+            return self._json(labels())
+        if path.startswith("/api/"):
+            return self._json({"ok": False, "message": "unknown endpoint"}, 404)
+
+        return self._serve_static(path)
+
+    def _serve_static(self, path: str):
+        """The built app, with unknown paths falling back to index.
+
+        A single-page app owns its own routing, so a deep link has to
+        return index.html rather than 404.
+        """
+        index = STATIC_DIR / "index.html"
+        if not index.exists():
+            return self._send(200, _MISSING_BUILD.encode("utf-8"),
+                              "text/html; charset=utf-8")
+
+        target = index
+        if path not in ("/", "", "/index.html"):
+            # Resolve inside STATIC_DIR or not at all. A path that climbs
+            # out with .. is how a local server serves the rest of the disk.
+            candidate = (STATIC_DIR / path.lstrip("/")).resolve()
+            try:
+                candidate.relative_to(STATIC_DIR.resolve())
+            except ValueError:
+                candidate = index
+            if candidate.is_file():
+                target = candidate
+
+        kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if kind.startswith("text/") or kind == "application/javascript":
+            kind += "; charset=utf-8"
+        self._send(200, target.read_bytes(), kind)
+
+    # -- POST -----------------------------------------------------------
+    def do_POST(self):
+        path = urllib.parse.urlparse(self.path).path
+        parts = path.strip("/").split("/")
+
+        # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
+        if len(parts) == 4 and parts[:2] == ["api", "customers"]:
+            customer_id, action = parts[2], parts[3]
+            if action == "ask-bank":
+                return self._json(ask_for_bank(self.cfg, customer_id))
+            if action == "paid":
+                ids = self._body().get("order_ids")
+                if not isinstance(ids, list):
+                    return self._json({"ok": False, "message": "bad body"}, 400)
+                return self._json(
+                    mark_paid(self.cfg, customer_id, [str(i) for i in ids]))
+        return self._json({"ok": False, "message": "unknown action"}, 404)
+
+    def _body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not length:
+                return {}
+            return json.loads(self.rfile.read(length).decode("utf-8")) or {}
+        except (ValueError, TypeError, UnicodeDecodeError):
+            return {}
 
 
 def serve(cfg: Config, port: int = 8899) -> None:
     handler = type("DashboardHandler", (_Handler,), {"cfg": cfg})
-    # Loopback only. This page shows bank account numbers.
+    # Loopback only. This serves bank account numbers.
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"Dashboard on http://127.0.0.1:{port}")
     print("Loopback only -- it shows bank details. Press Ctrl+C to stop.")

@@ -303,13 +303,17 @@ class TestTheCustomerCanAskWhereTheirMoneyIs:
         assert "6.484" in text                  # 70% of the estimate
         assert "Shopee duyệt" in text
 
-    def test_below_the_threshold_it_names_the_shortfall(self, db):
+    def test_a_small_approved_balance_is_shown_as_owed_not_as_short(self, db):
+        """6,484 used to be reported as 43,516 short of a minimum."""
         send(db, "hi")
         with ledger.connect(db) as conn:
+            ledger.set_bank_details(conn, "C0001", "VCB", "0123456789", "A")
             ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
                              estimated_commission=9_263)
             ledger.mark_approved(conn, "O1", 9_263, 6_484)
-        assert "43.516" in self._balance(db)     # 50,000 - 6,484
+        text = self._balance(db)
+        assert "6.484" in text
+        assert "43.516" not in text
 
     def test_a_payable_balance_says_the_money_is_coming(self, db):
         send(db, "hi")
@@ -318,7 +322,7 @@ class TestTheCustomerCanAskWhereTheirMoneyIs:
             ledger.add_order(conn, "O1", "C0001", None, order_value=900_000,
                              estimated_commission=90_000)
             ledger.mark_approved(conn, "O1", 90_000, 63_000)
-        assert "đủ ngưỡng" in self._balance(db)
+        assert "chờ mình chuyển" in self._balance(db)
 
     def test_a_payable_balance_with_no_account_asks_for_one(self, db):
         send(db, "hi")
@@ -339,9 +343,12 @@ class TestTheCustomerCanAskWhereTheirMoneyIs:
         assert all(reply.chat_id != "g1" for reply in replies)
 
 
-class TestTheThresholdIsDisclosedBeforeItBites:
-    """Stating it only after the fact is how a cashback group gets a
-    reputation for not paying."""
+class TestNoMinimumIsMentionedAnywhere:
+    """The minimum is gone, so no message may still describe one.
+
+    A leftover sentence about gathering 50,000 would be worse than the
+    rule ever was: a condition that is written down but not enforced.
+    """
 
     def _messages(self):
         import json
@@ -349,9 +356,11 @@ class TestTheThresholdIsDisclosedBeforeItBites:
         return json.loads((PROJECT_ROOT / "resources" / "messages.vi.json")
                           .read_text(encoding="utf-8"))
 
-    @pytest.mark.parametrize("key", ["policy", "terms"])
-    def test_the_explainer_pages_state_it(self, key):
-        assert "{payout_threshold_line}" in self._messages()[key]
+    @pytest.mark.parametrize("word", ["50.000", "ngưỡng", "{threshold}"])
+    def test_no_message_still_describes_a_minimum(self, word):
+        blob = " ".join(v for k, v in self._messages().items()
+                        if not k.startswith("_"))
+        assert word not in blob
 
     def test_a_percentage_is_paired_with_a_worked_example(self, db):
         """"80% of commission" is not a number anyone can convert into

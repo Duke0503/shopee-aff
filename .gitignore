@@ -33,3 +33,6 @@ _bmad-output/
 # Generated payout pages
 payouts.html
 dashboard-preview.html
+
+# React console: deps are installed, the build output is committed
+web/node_modules/

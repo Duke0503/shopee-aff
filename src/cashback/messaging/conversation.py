@@ -228,15 +228,13 @@ def handle(
         "rate": f"{cashback_rate:.0%}",
         "reduced": f"{reduced:.0%}",
         "days": payout_window,
-        "threshold": _vnd(payouts.MIN_PAYOUT_VND),
         # A percentage of a commission is not a number anyone can convert
         # into money in their head. One worked example at a typical rate
         # does what the percentage cannot.
         "example": _vnd(round_dong(
             EXAMPLE_ORDER_VND * EXAMPLE_RATE * cashback_rate)),
     }
-    common["payout_threshold_line"] = messages.render(
-        "payout_threshold_line", **common)
+
     common["tax_clause"] = (
         "" if reduced >= cashback_rate
         else messages.render("tax_clause_short", **common)
@@ -292,9 +290,6 @@ def handle(
                 status = messages.render("balance_need_bank")
             elif balance.is_payable:
                 status = messages.render("balance_ready")
-            elif balance.approved:
-                status = messages.render(
-                    "balance_short", short=_vnd(balance.short_by), **common)
             elif balance.awaiting:
                 # Nothing approved yet: there is no shortfall to report,
                 # only a wait. Saying "short by 50,000 of 50,000" reads as
@@ -681,39 +676,29 @@ def notify_order_changes(
                 days=payout_window,
             )
         elif status == ledger.APPROVED:
-            # What follows the amount depends on two things at once, and
-            # getting it wrong is the one mistake here that loses customers
-            # in bulk: this message used to say "transferring to your
-            # account" on every approval, including the ones far below the
-            # payout threshold. The customer then watched their bank app
-            # for a week. Promising a transfer that will not happen reads
-            # exactly like being cheated.
+            # What follows the amount says the balance and either reads
+            # the account back or asks for one. It must not name a date:
+            # when a balance is transferred is the operator's call, and
+            # the customer hears about it when it actually happens, from
+            # order_paid. Promising a day that then slips is how a
+            # cashback group earns a reputation for not paying.
             #
-            # The account number is also asked for HERE and nowhere
-            # earlier -- and only once the balance can actually be paid.
-            # Asking a stranger for bank details to send a sum that is not
-            # payable yet is indistinguishable from a scam.
+            # The account number is asked for HERE and nowhere earlier.
+            # Before an approval there is no money, and asking a stranger
+            # for bank details to pay a sum that does not exist yet is
+            # indistinguishable from a scam.
             with ledger.connect(db_path) as balance_conn:
                 balance = payouts.balance_for(
                     balance_conn, row["customer_id"], cashback_rate)
-            note_args = {
-                "total": _vnd(balance.approved),
-                "short": _vnd(balance.short_by),
-                "threshold": _vnd(payouts.MIN_PAYOUT_VND),
-            }
-            if balance.is_payable and row["bank_account"]:
+            note_args = {"total": _vnd(balance.approved)}
+            if row["bank_account"]:
                 note_args["bank"] = (
                     f'{row["bank_name"]} - {row["bank_account"]} - '
                     f'{row["account_holder"]}')
                 note = messages.render("payout_note_ready", **note_args)
-            elif balance.is_payable:
-                note = messages.render(
-                    "payout_note_ready_need_bank", **note_args)
-            elif row["bank_account"]:
-                note = messages.render("payout_note_short", **note_args)
             else:
                 note = messages.render(
-                    "payout_note_short_need_bank", **note_args)
+                    "payout_note_ready_need_bank", **note_args)
             text = messages.render(
                 "order_approved", order_id=row["order_id"], identity=identity,
                 cashback=_vnd(row["cashback_amount"] or 0),

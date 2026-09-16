@@ -1,15 +1,26 @@
-"""The end-of-day page, and the two buttons on it.
+"""The payout console: the JSON it serves, and the two actions on it.
 
-The page itself is a convenience. The buttons are not: one sends a real
+The JSON is a contract with the browser, so its shape is pinned here
+rather than left to whatever the React app happens to read today. The
+actions are not a contract, they are consequences: one sends a real
 message to a real person, the other records that money left the account.
+
+The HTTP layer is tested too. It was not, and it is the only part of
+this system that parses input from outside the process.
 """
 
 from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.request
 
 import pytest
 
 from cashback.ledger import repository as ledger
 from cashback.web import dashboard
+
+RATE = 0.80
 
 
 def _approved(conn, order_id: str, customer_id: str, cashback: int,
@@ -35,97 +46,13 @@ def populated(conn, db):
                         zalo_user_id="u2", private_chat_id="u2")
     _approved(conn, "O3", "C0002", 88_000)
 
-    ledger.add_customer(conn, "C0003", display_name="Con Thieu",
+    # Well under the old 50,000 threshold. It is payable now.
+    ledger.add_customer(conn, "C0003", display_name="Rat It Tien",
                         zalo_user_id="u3", private_chat_id="u3")
     ledger.set_bank_details(conn, "C0003", "TCB", "9876543210", "TRAN B")
     _approved(conn, "O4", "C0003", 6_131)
     conn.commit()
     return db
-
-
-class TestSnapshot:
-    def test_it_sorts_people_into_the_three_buckets(self, populated):
-        data = dashboard.snapshot(populated)
-        assert [p.customer_id for p in data["ready"]] == ["C0001"]
-        assert [p.customer_id for p in data["no_bank"]] == ["C0002"]
-        assert [p.customer_id for p in data["short"]] == ["C0003"]
-
-    def test_the_total_counts_everyone_owed(self, populated):
-        # 61,000 ready + 88,000 with no bank + 6,131 still short
-        assert dashboard.snapshot(populated)["total"] == 155_131
-
-    def test_orders_come_with_the_link_that_earned_them(self, populated):
-        orders = dashboard.snapshot(populated)["orders"]["C0001"]
-        assert len(orders) == 2
-        with_link = [o for o in orders if o["affiliate_url"]]
-        assert with_link[0]["affiliate_url"] == "https://s.shopee.vn/aff1"
-
-
-class TestRendering:
-    def test_a_ready_customer_gets_a_qr_and_their_amount(self, populated):
-        page = dashboard.render(dashboard.snapshot(populated))
-        assert "img.vietqr.io" in page
-        assert "61.000d" in page
-
-    def test_the_affiliate_link_is_clickable_for_checking(self, populated):
-        page = dashboard.render(dashboard.snapshot(populated))
-        assert "https://s.shopee.vn/aff1" in page
-
-    def test_someone_without_bank_details_gets_the_ask_button(self, populated):
-        page = dashboard.render(dashboard.snapshot(populated))
-        assert "/ask-bank/C0002" in page
-
-    def test_an_empty_ledger_says_so_rather_than_rendering_nothing(self, db):
-        page = dashboard.render(dashboard.snapshot(db))
-        assert dashboard.t("nothing_at_all") in page
-
-    def test_customer_names_are_escaped(self, conn, db):
-        ledger.add_customer(conn, "C0009", display_name="<script>x</script>",
-                            private_chat_id="u9")
-        ledger.set_bank_details(conn, "C0009", "VCB", "1", "A")
-        _approved(conn, "O9", "C0009", 60_000)
-        conn.commit()
-        page = dashboard.render(dashboard.snapshot(db))
-        assert "<script>x</script>" not in page
-        assert "&lt;script&gt;" in page
-
-
-class TestMarkPaid:
-    def test_it_records_the_transfer(self, populated, conn):
-        result = dashboard.mark_paid(
-            _cfg(populated), "C0001", ["O1", "O2"])
-        assert result["ok"] is True
-        assert dashboard.snapshot(populated)["ready"] == []
-
-    def test_paying_twice_is_refused(self, populated):
-        cfg = _cfg(populated)
-        dashboard.mark_paid(cfg, "C0001", ["O1", "O2"])
-        again = dashboard.mark_paid(cfg, "C0001", ["O1", "O2"])
-        assert again["ok"] is False
-
-    def test_an_injected_id_is_rejected(self, populated):
-        result = dashboard.mark_paid(_cfg(populated), "C0001'; DROP TABLE--", [])
-        assert result["ok"] is False
-
-    def test_order_ids_are_filtered_too(self, populated):
-        result = dashboard.mark_paid(
-            _cfg(populated), "C0001", ["O1'; DELETE FROM orders--"])
-        assert result["ok"] is False
-        assert dashboard.snapshot(populated)["ready"]     # nothing was touched
-
-
-class TestAskForBank:
-    def test_a_customer_with_no_private_chat_is_refused(self, conn, db):
-        ledger.add_customer(conn, "C0007", display_name="No Chat")
-        conn.commit()
-        result = dashboard.ask_for_bank(_cfg(db), "C0007")
-        assert result["ok"] is False
-
-    def test_an_unknown_customer_is_refused(self, db):
-        assert dashboard.ask_for_bank(_cfg(db), "C9999")["ok"] is False
-
-    def test_an_injected_id_is_rejected(self, db):
-        assert dashboard.ask_for_bank(_cfg(db), "../../etc")["ok"] is False
 
 
 def _cfg(db_path):
@@ -136,11 +63,73 @@ def _cfg(db_path):
     return cfg
 
 
-class TestThePipelineIsVisible:
-    """A page showing only what is payable is blank on most days.
+class TestThereIsNoMinimumAnyMore:
+    """A 50,000 VND floor used to hold small balances back.
 
-    Three real orders worth 12,287 VND were in flight and the page said
-    nothing, which reads as "nothing is happening".
+    It was a rule the customer could not see or influence, and it made
+    every message about money explain a policy instead of a payment.
+    When a balance is sent is now the operator's decision alone.
+    """
+
+    def test_a_balance_of_six_thousand_is_ready_to_pay(self, populated):
+        ready = dashboard.snapshot(populated, RATE)["ready"]
+        assert "C0003" in [p["customer_id"] for p in ready]
+
+    def test_the_only_thing_that_blocks_a_transfer_is_a_missing_account(
+            self, populated):
+        data = dashboard.snapshot(populated, RATE)
+        assert [p["customer_id"] for p in data["no_bank"]] == ["C0002"]
+        assert all(p["has_bank"] for p in data["ready"])
+
+    def test_no_figure_is_a_distance_from_a_threshold(self, populated):
+        blob = json.dumps(dashboard.snapshot(populated, RATE))
+        assert "short" not in blob
+        assert "threshold" not in blob
+
+
+class TestTheSnapshotShape:
+    def test_totals_add_up_to_what_is_owed(self, populated):
+        totals = dashboard.snapshot(populated, RATE)["totals"]
+        # 61,000 (C0001) + 88,000 (C0002) + 6,131 (C0003)
+        assert totals["owed"] == 155_131
+        assert totals["ready"] + totals["no_bank"] == totals["owed"]
+        assert totals["owed_customers"] == 3
+
+    def test_a_payable_carries_its_orders_and_their_links(self, populated):
+        ready = dashboard.snapshot(populated, RATE)["ready"]
+        entry = next(p for p in ready if p["customer_id"] == "C0001")
+        assert len(entry["orders"]) == 2
+        assert any(o["affiliate_url"] == "https://s.shopee.vn/aff1"
+                   for o in entry["orders"])
+
+    def test_a_payable_carries_a_qr_and_a_reference(self, populated):
+        entry = next(p for p in dashboard.snapshot(populated, RATE)["ready"]
+                     if p["customer_id"] == "C0001")
+        assert "img.vietqr.io" in entry["qr_url"]
+        assert entry["reference"].endswith("C0001")
+
+    def test_it_is_plain_json_not_dataclasses(self, populated):
+        """The browser is the only consumer, so nothing may need repr()."""
+        json.dumps(dashboard.snapshot(populated, RATE))
+
+    def test_an_unmatched_bank_name_yields_no_qr_rather_than_a_guess(
+            self, conn, db):
+        ledger.add_customer(conn, "C0008", display_name="Ngan Hang La",
+                            private_chat_id="u8")
+        ledger.set_bank_details(conn, "C0008", "Ngan hang khong ton tai",
+                                "111", "A")
+        _approved(conn, "O8", "C0008", 30_000)
+        conn.commit()
+        entry = dashboard.snapshot(db, RATE)["ready"][0]
+        assert entry["qr_url"] is None
+        assert entry["bank_account"] == "111"    # shown for a manual transfer
+
+
+class TestThePipelineIsVisible:
+    """A console showing only what is payable is blank on most days.
+
+    Three real orders worth 12,287 VND of commission were in flight and
+    the page said nothing, which reads as "nothing is happening".
     """
 
     @pytest.fixture
@@ -164,24 +153,147 @@ class TestThePipelineIsVisible:
         return db
 
     def test_awaiting_orders_appear(self, awaiting):
-        data = dashboard.snapshot(awaiting)
-        assert len(data["pipeline"]) == 1
-        assert data["pipeline_total"] == 5_522
+        assert len(dashboard.snapshot(awaiting, RATE)["pipeline"]) == 1
 
-    def test_the_page_names_the_product(self, awaiting):
-        page = dashboard.render(dashboard.snapshot(awaiting))
-        assert "Tui Trang Diem" in page
+    def test_the_figure_shown_is_the_customers_share_not_the_commission(
+            self, awaiting):
+        row = dashboard.snapshot(awaiting, RATE)["pipeline"][0]
+        assert row["estimated_commission"] == 5_522
+        assert row["cashback"] == 4_418          # 80%, halves upward
 
-    def test_the_link_is_there_to_check_against_shopee(self, awaiting):
-        page = dashboard.render(dashboard.snapshot(awaiting))
-        assert "https://s.shopee.vn/aff1" in page
+    def test_it_names_the_product_and_carries_the_link(self, awaiting):
+        row = dashboard.snapshot(awaiting, RATE)["pipeline"][0]
+        assert "Tui Trang Diem" in row["product"]
+        assert row["affiliate_url"] == "https://s.shopee.vn/aff1"
 
-    def test_it_is_not_counted_as_owed(self, awaiting):
+    def test_it_is_never_counted_as_owed(self, awaiting):
         """Nothing here is payable. The owed total must stay zero."""
-        data = dashboard.snapshot(awaiting)
-        assert data["total"] == 0
-        assert data["ready"] == []
+        totals = dashboard.snapshot(awaiting, RATE)["totals"]
+        assert totals["owed"] == 0
+        assert totals["pipeline"] == 4_418
 
-    def test_the_page_says_the_figure_is_an_estimate(self, awaiting):
-        page = dashboard.render(dashboard.snapshot(awaiting))
-        assert dashboard.t("section_pipeline_hint") in page
+
+class TestMarkPaid:
+    def test_it_records_the_transfer(self, populated):
+        result = dashboard.mark_paid(_cfg(populated), "C0001", ["O1", "O2"])
+        assert result["ok"] is True
+        assert "C0001" not in [
+            p["customer_id"]
+            for p in dashboard.snapshot(populated, RATE)["ready"]]
+
+    def test_paying_twice_is_refused(self, populated):
+        cfg = _cfg(populated)
+        dashboard.mark_paid(cfg, "C0001", ["O1", "O2"])
+        assert dashboard.mark_paid(cfg, "C0001", ["O1", "O2"])["ok"] is False
+
+    def test_an_injected_id_is_rejected(self, populated):
+        result = dashboard.mark_paid(_cfg(populated), "C0001'; DROP TABLE--", [])
+        assert result["ok"] is False
+
+    def test_order_ids_are_filtered_too(self, populated):
+        result = dashboard.mark_paid(
+            _cfg(populated), "C0001", ["O1'; DELETE FROM orders--"])
+        assert result["ok"] is False
+        assert dashboard.snapshot(populated, RATE)["ready"]   # nothing touched
+
+
+class TestAskForBank:
+    def test_a_customer_with_no_private_chat_is_refused(self, conn, db):
+        ledger.add_customer(conn, "C0007", display_name="No Chat")
+        conn.commit()
+        assert dashboard.ask_for_bank(_cfg(db), "C0007")["ok"] is False
+
+    def test_an_unknown_customer_is_refused(self, db):
+        assert dashboard.ask_for_bank(_cfg(db), "C9999")["ok"] is False
+
+    def test_an_injected_id_is_rejected(self, db):
+        assert dashboard.ask_for_bank(_cfg(db), "../../etc")["ok"] is False
+
+
+class TestEveryLabelUsedExists:
+    """A missing label prints its own key at the operator.
+
+    The rewrite dropped four of them, and a failed transfer answered
+    with the literal text "paid_failed", which says nothing.
+    """
+
+    def test_python_side_labels_are_all_defined(self):
+        import re
+        from pathlib import Path
+
+        source = Path(dashboard.__file__).read_text(encoding="utf-8")
+        used = set(re.findall(r'\bt\(\s*"([a-z0-9_]+)"', source))
+        missing = used - set(dashboard.labels())
+        assert not missing, f"missing from dashboard.vi.json: {sorted(missing)}"
+
+
+class TestOverHTTP:
+    """The only part of this system that parses input from outside.
+
+    It binds to loopback and has no authentication, which is defensible
+    only while it stays on loopback -- so the guards that do exist are
+    the ones that matter: no path escapes the static directory, and no
+    action route accepts an id the system did not issue.
+    """
+
+    @pytest.fixture
+    def server(self, populated):
+        srv = dashboard.serve_in_background(_cfg(populated), port=0)
+        yield f"http://127.0.0.1:{srv.server_address[1]}"
+        srv.shutdown()
+        srv.server_close()
+
+    def _get(self, url: str):
+        with urllib.request.urlopen(url, timeout=5) as response:
+            return response.status, response.read()
+
+    def _post(self, url: str, body: dict):
+        request = urllib.request.Request(
+            url, data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.loads(response.read())
+
+    def test_the_snapshot_is_served_as_json(self, server):
+        status, body = self._get(f"{server}/api/payouts")
+        assert status == 200
+        assert json.loads(body)["totals"]["owed"] == 155_131
+
+    def test_labels_are_served_from_the_same_file_the_bot_reads(self, server):
+        _, body = self._get(f"{server}/api/labels")
+        assert json.loads(body)["title"] == dashboard.labels()["title"]
+
+    def test_an_unknown_api_route_is_a_404_not_the_app(self, server):
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            self._get(f"{server}/api/nope")
+        assert caught.value.code == 404
+
+    def test_a_path_climbing_out_of_static_cannot_read_the_disk(self, server):
+        """It falls back to the app rather than serving .env."""
+        _, body = self._get(f"{server}/../../../.env")
+        assert b"ZALO" not in body and b"TOKEN" not in body
+
+    def test_marking_paid_over_http_settles_the_orders(self, server, populated):
+        result = self._post(f"{server}/api/customers/C0001/paid",
+                            {"order_ids": ["O1", "O2"]})
+        assert result["ok"] is True
+        assert "C0001" not in [
+            p["customer_id"]
+            for p in dashboard.snapshot(populated, RATE)["ready"]]
+
+    def test_a_body_that_is_not_a_list_of_ids_is_refused(self, server):
+        request = urllib.request.Request(
+            f"{server}/api/customers/C0001/paid",
+            data=b'{"order_ids": "O1"}',
+            headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request, timeout=5)
+        assert caught.value.code == 400
+
+    def test_a_malformed_body_does_not_crash_the_handler(self, server):
+        request = urllib.request.Request(
+            f"{server}/api/customers/C0001/paid", data=b"not json at all",
+            headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request, timeout=5)
+        assert caught.value.code == 400

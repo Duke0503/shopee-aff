@@ -28,17 +28,23 @@ def paying_customer(conn):
     return "C0001"
 
 
-class TestThreshold:
-    """Small balances wait. They are owed either way."""
+class TestGroupingAndReadiness:
+    """One transfer settles one person's whole balance.
 
-    def test_the_threshold_is_what_the_operator_chose(self):
-        assert payouts.MIN_PAYOUT_VND == 50_000
+    There is no minimum: a balance of 6,131 VND is as payable as one of
+    600,000. The only thing that holds a transfer back is a missing
+    account number, and that is not something the operator can fix
+    alone -- the customer has to send it.
+    """
 
-    def test_a_small_balance_is_not_ready(self, conn, paying_customer):
+    def test_there_is_no_minimum_left_to_import(self):
+        assert not hasattr(payouts, "MIN_PAYOUT_VND")
+
+    def test_a_small_balance_is_ready(self, conn, paying_customer):
         _approved(conn, "O1", paying_customer, 6_131)
-        ready, waiting = payouts.split_by_threshold(payouts.collect(conn))
-        assert ready == []
-        assert waiting[0].amount == 6_131
+        ready, blocked = payouts.split_by_bank_details(payouts.collect(conn))
+        assert blocked == []
+        assert ready[0].amount == 6_131
 
     def test_orders_accumulate_per_customer(self, conn, paying_customer):
         for i, amount in enumerate([20_000, 20_000, 15_000]):
@@ -47,7 +53,6 @@ class TestThreshold:
         assert len(owed) == 1                  # one person, not three rows
         assert owed[0].amount == 55_000
         assert len(owed[0].order_ids) == 3
-        assert owed[0].is_payable
 
     def test_two_customers_are_never_combined(self, conn, paying_customer):
         ledger.add_customer(conn, "C0002", display_name="Someone Else")
@@ -59,11 +64,13 @@ class TestThreshold:
         assert owed["C0002"].amount == 10_000
 
     def test_without_bank_details_it_is_never_ready(self, conn):
+        """The one remaining blocker, and it is the customer's to clear."""
         ledger.add_customer(conn, "C0009", display_name="No Bank")
         _approved(conn, "O1", "C0009", 90_000)
-        ready, waiting = payouts.split_by_threshold(payouts.collect(conn))
+        ready, blocked = payouts.split_by_bank_details(payouts.collect(conn))
         assert ready == []
-        assert waiting[0].has_bank_details is False
+        assert blocked[0].has_bank_details is False
+        assert blocked[0].amount == 90_000      # still owed, still counted
 
 
 class TestOnlyApprovedMoneyIsListed:
