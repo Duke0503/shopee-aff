@@ -56,17 +56,17 @@ flowchart TD
         CLI["Operator CLI (cashback tool)"]
     end
 
-    ZC <-->|Long-polling / REST| MSG
+    ZC <-->|Long-polling or REST| MSG
     MSG -->|Enqueues Request| WQ
-    MSG <-->|Read / Write| LDG
-    WQ -->|Submits Batches (sub_id)| BR
+    MSG <-->|Read and Write| LDG
+    WQ -->|Submits Batches by sub_id| BR
     BR <-->|Native Automation| EXT
     EXT <-->|Real User Session| SP
-    SP -->|Conversions / Commission Reports| BR
+    SP -->|Commission Reports| BR
     BR -->|Reconciliation Pipeline| LDG
-    WP <-->|Customer Auth & Order State| WEB
+    WP <-->|Customer Auth and Orders| WEB
     WEB <-->|Queries Data| LDG
-    CLI <-->|Ops & Auditing| LDG
+    CLI <-->|Ops and Auditing| LDG
     ADM <-->|Payout Approvals| WEB
     WEB -->|VietQR Generation| VQR
 ```
