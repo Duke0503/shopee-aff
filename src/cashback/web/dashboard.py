@@ -55,15 +55,9 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 # action route is not a typo, it is an attempt.
 SAFE_ID = re.compile(r"^[A-Za-z0-9]+$")
 
-_labels: dict[str, str] | None = None
-
-
 def labels() -> dict[str, str]:
-    global _labels
-    if _labels is None:
-        raw = json.loads((PROJECT_ROOT / LABELS_FILE).read_text(encoding="utf-8"))
-        _labels = {k: v for k, v in raw.items() if not k.startswith("_")}
-    return _labels
+    raw = json.loads((PROJECT_ROOT / LABELS_FILE).read_text(encoding="utf-8"))
+    return {k: v for k, v in raw.items() if not k.startswith("_")}
 
 
 def site_figures(cfg: Config) -> dict:
