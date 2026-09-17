@@ -37,15 +37,6 @@ export function Home() {
                 <LinkGenerator />
               </Reveal>
 
-              {/* Reassurance pills */}
-              <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-muted-foreground">
-                {[1, 2, 3].map((n) => (
-                  <li key={n} className="flex items-center gap-1.5">
-                    <Icon.confirm className="text-success size-4 shrink-0" />
-                    <span>{t(`home_reassure_${n}`)}</span>
-                  </li>
-                ))}
-              </ul>
             </section>
           </div>
         </div>
