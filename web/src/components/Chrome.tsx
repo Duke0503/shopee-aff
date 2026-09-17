@@ -1,7 +1,9 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/lib/icons"
 import { Mascot } from "@/components/Mascot"
 import { useT } from "@/lib/labels"
+import { fetchMe, logout } from "@/lib/api"
 import { navigate, type Route } from "@/routes"
 
 /**
@@ -13,6 +15,22 @@ import { navigate, type Route } from "@/routes"
  */
 export function Header({ current }: { current: Route }) {
   const t = useT()
+  const queryClient = useQueryClient()
+
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+    retry: false,
+  })
+
+  const signOut = useMutation({
+    mutationFn: logout,
+    onSuccess: () => {
+      queryClient.setQueryData(["me"], null)
+      navigate("home")
+    },
+  })
+
   return (
     <header className="bg-background/85 sticky top-0 z-20 border-b backdrop-blur"
             style={{ top: "env(safe-area-inset-top, 0px)" }}>
@@ -31,10 +49,21 @@ export function Header({ current }: { current: Route }) {
               {t("nav_orders")}
             </Button>
           )}
-          {current !== "login" && (
-            <Button size="sm" onClick={() => navigate("login")}>
-              <Icon.signIn /> {t("nav_login")}
+          {me ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => signOut.mutate()}
+              disabled={signOut.isPending}
+            >
+              <Icon.signOut /> {t("logout")}
             </Button>
+          ) : (
+            current !== "login" && (
+              <Button size="sm" onClick={() => navigate("login")}>
+                <Icon.signIn /> {t("nav_login")}
+              </Button>
+            )
           )}
         </nav>
       </div>

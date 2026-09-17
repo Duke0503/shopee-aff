@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Footer, Header } from "@/components/Chrome"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Mascot } from "@/components/Mascot"
 import { Reveal } from "@/components/Reveal"
 import { ChangePassword } from "@/features/ChangePassword"
 import { OrderList } from "@/features/OrderList"
-import { fetchMe, logout } from "@/lib/api"
+import { fetchMe } from "@/lib/api"
 import { Icon } from "@/lib/icons"
 import { vnd } from "@/lib/format"
 import { useT } from "@/lib/labels"
@@ -39,18 +39,12 @@ function greetingKey(): string {
 
 export function CustomerView() {
   const t = useT()
-  const queryClient = useQueryClient()
   const [accountOpen, setAccountOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
     retry: false,
-  })
-
-  const signOut = useMutation({
-    mutationFn: logout,
-    onSuccess: () => queryClient.setQueryData(["me"], null),
   })
 
   if (isLoading) {
@@ -92,25 +86,15 @@ export function CustomerView() {
       <Header current="orders" />
 
       <main className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold sm:text-xl">
-              {t(greetingKey(), {
-                name: data.display_name || data.customer_id,
-              })}
-            </h1>
-            <p className="text-muted-foreground font-mono text-xs">
-              {data.customer_id}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => signOut.mutate()}
-            disabled={signOut.isPending}
-          >
-            <Icon.signOut /> {t("logout")}
-          </Button>
+        <div className="mb-5">
+          <h1 className="truncate text-lg font-bold sm:text-xl">
+            {t(greetingKey(), {
+              name: data.display_name || data.customer_id,
+            })}
+          </h1>
+          <p className="text-muted-foreground font-mono text-xs">
+            {data.customer_id}
+          </p>
         </div>
 
         {/* -- the answer ------------------------------------------- */}

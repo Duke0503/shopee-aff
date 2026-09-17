@@ -241,6 +241,10 @@ def _handlers() -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     args = build_parser().parse_args(argv)
     # Logging is set up before any command runs, so a failure during a
     # long-running one leaves a file behind rather than only scrollback.

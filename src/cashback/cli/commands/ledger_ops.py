@@ -47,7 +47,7 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
     # counted as owed -- but printing "nothing awaiting payout" while real
     # orders are in flight reads as "nothing is happening", which is how
     # an operator concludes the bot has stopped working.
-    pipeline = dashboard.snapshot(cfg.db_path)
+    pipeline = dashboard.snapshot(cfg.db_path, cfg.advertised_cashback_rate)
 
     if not owed and not pipeline["pipeline"]:
         print("Nothing awaiting payout, and nothing in flight.")
@@ -76,22 +76,21 @@ def cmd_payouts(cfg: Config, args: argparse.Namespace) -> int:
                   f" {_vnd(entry.amount):>14}   owed, no bank details yet")
 
     if pipeline["pipeline"]:
-        from ...core.policy import round_dong
-
         rows = pipeline["pipeline"]
         print()
         print(f"AWAITING SHOPEE  ({len(rows)} order(s) -- NOT payable, "
               f"figures are estimates)")
         print()
         for row in rows:
-            share = round_dong(
-                (row["estimated_commission"] or 0) * cfg.cashback_rate)
+            # The snapshot has already applied the rate; applying it
+            # again here is how the console and the CLI end up quoting
+            # the same order differently.
             print(f"  {row['customer_id']:<8} "
                   f"{(row['product'] or row['order_id'])[:30]:<30}"
-                  f" {_vnd(share):>12}")
+                  f" {_vnd(row['cashback']):>12}")
         print()
         print(f"  estimated total to customers: "
-              f"{_vnd(round_dong(pipeline['pipeline_total'] * cfg.cashback_rate))}")
+              f"{_vnd(pipeline['totals']['pipeline'])}")
 
     if args.qr:
         return _write_qr_page(ready, blocked)

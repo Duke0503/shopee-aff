@@ -1,38 +1,103 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-.venv/
-*.egg-info/
+*$py.class
 
-# Secrets and local state
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment secrets and local configurations
 .env
+.env.local
+.env.*.local
+*.key
+*.pem
 extension/background/base_url.js
 
-# Data
+# SQLite databases & local data state
 *.db
+*.db-journal
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
+cashback.db
 
-# Runtime output
+# Runtime output, logs & dumps
 *.log
 logs/
-var/
+*.flows
+gw3.flows
 
-# The dedicated browser profile: a full Chrome profile, including a live
+# The dedicated browser profile: a full Chrome/Edge profile, including a live
 # Shopee session. Never commit it.
 .browser-profile/
 
-# Scratch output from `cashback probe`
+# Scratch & temporary output from `cashback probe` or local debugging
 probe.json
+scratch/
 
-# Tooling
-_bmad-output/
+# Testing & linting artifacts
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
 
-# Generated payout pages
+# Node & Frontend dependencies
+node_modules/
+web/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+web/.pnpm-debug.log*
+
+# Generated payout pages & debug exports
 payouts.html
 dashboard-preview.html
 
-# React console: deps are installed, the build output is committed
-web/node_modules/
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Tooling and AI assistant caches
+_bmad-output/
+_bmad/custom/config.user.toml
