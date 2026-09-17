@@ -36,7 +36,7 @@ export function Header({ current }: { current: Route }) {
             className="flex items-center gap-2 font-semibold min-w-0"
           >
             <Mascot className="size-8 shrink-0" />
-            <span className="truncate text-base font-bold sm:text-base">
+            <span className="hidden font-bold sm:inline sm:text-base">
               {t("brand")}
             </span>
           </button>
