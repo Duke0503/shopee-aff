@@ -7,6 +7,8 @@ import { Mascot } from "@/components/Mascot"
 import { Reveal } from "@/components/Reveal"
 import { useT } from "@/lib/labels"
 import { navigate } from "@/routes"
+import { LinkGenerator } from "@/features/LinkGenerator"
+import { ZaloCommunityBanner } from "@/features/ZaloCommunityBanner"
 
 /**
  * The page a link from a Zalo group actually opens.
@@ -99,13 +101,25 @@ export function Home() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
-        {/* -- the objection nobody types ------------------------------ */}
-        <section className="py-10">
-          <h2 className="text-xl font-bold sm:text-2xl">{t("home_trust_title")}</h2>
-          <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
-            {t("home_trust_lead")}
-          </p>
+        <div className="mx-auto max-w-[1100px] px-4 sm:px-6 space-y-4">
+          <section className="pt-8 pb-4">
+            <Reveal delay={40}>
+              <LinkGenerator />
+            </Reveal>
+          </section>
+
+          <section className="py-4">
+            <Reveal delay={60}>
+              <ZaloCommunityBanner />
+            </Reveal>
+          </section>
+
+          {/* -- the objection nobody types ------------------------------ */}
+          <section className="py-8">
+            <h2 className="text-xl font-bold sm:text-2xl">{t("home_trust_title")}</h2>
+            <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+              {t("home_trust_lead")}
+            </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <Feature
               icon={Icon.order}

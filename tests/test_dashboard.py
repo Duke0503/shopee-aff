@@ -451,3 +451,59 @@ class TestTheFrontendHasNoWordingOfItsOwn:
                 if "var(--" in line and "--ring" not in line:
                     offenders.append(f"{path.name}:{number}")
         assert not offenders, f"raw colour in a component: {offenders}"
+
+
+class TestShopeeEndpointsOverHTTP:
+    @pytest.fixture
+    def server(self, populated):
+        srv = dashboard.serve_in_background(_cfg(populated), port=0)
+        yield f"http://127.0.0.1:{srv.server_address[1]}", populated
+        srv.shutdown()
+        srv.server_close()
+
+    def test_preview_invalid_url_returns_400(self, server):
+        base, _ = server
+        req = urllib.request.Request(
+            f"{base}/api/shopee/preview",
+            data=json.dumps({"url": "https://google.com"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(req, timeout=5)
+        assert caught.value.code == 400
+
+    def test_convert_requires_customer_id(self, server):
+        base, _ = server
+        req = urllib.request.Request(
+            f"{base}/api/shopee/convert",
+            data=json.dumps({"url": "https://s.shopee.vn/test123"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(req, timeout=5)
+        assert caught.value.code == 400
+
+    def test_convert_and_link_status(self, server):
+        base, db = server
+        req = urllib.request.Request(
+            f"{base}/api/shopee/convert",
+            data=json.dumps({
+                "url": "https://s.shopee.vn/test999",
+                "customer_id": "C0001",
+            }).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        assert data["ok"] is True
+        assert "request_id" in data
+
+        # Check status endpoint
+        status_req = urllib.request.Request(f"{base}/api/shopee/link-status?request_id={data['request_id']}")
+        with urllib.request.urlopen(status_req, timeout=5) as resp:
+            status_data = json.loads(resp.read())
+        assert status_data["ok"] is True
+        assert status_data["ready"] is False

@@ -449,6 +449,8 @@ class _Handler(BaseHTTPRequestHandler):
             # than wording, so not in the labels file -- and deliberately
             # not read from /api/payouts, which never leaves loopback.
             return self._json(site_figures(self.cfg))
+        if path == "/api/shopee/link-status":
+            return self._shopee_link_status()
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
@@ -504,6 +506,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._update_bank()
         if path == "/api/me/bank/erase":
             return self._erase_bank()
+        if path == "/api/shopee/preview":
+            return self._shopee_preview()
+        if path == "/api/shopee/convert":
+            return self._shopee_convert()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -613,6 +619,126 @@ class _Handler(BaseHTTPRequestHandler):
             audit.record(audit.BANK_ERASED, customer_id=customer_id, source="web")
             conn.commit()
         return self._json({"ok": True, "message": "ok"})
+
+    def _shopee_preview(self):
+        from ..shopee.commission import lookup
+        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL
+
+        body = self._body()
+        raw_url = str(body.get("url") or "").strip()
+        match = ANY_SHOPEE_URL.search(raw_url)
+        if not match:
+            return self._json({"ok": False, "message": "invalid_url"}, 400)
+        url = match.group(0)
+
+        try:
+            est = lookup(url, third_party=self.cfg.third_party_fallback)
+        except Exception as exc:
+            return self._json({"ok": False, "message": str(exc)}, 500)
+
+        if not est or est.price <= 0:
+            return self._json({"ok": True, "found": False})
+
+        rate = self.cfg.advertised_cashback_rate
+        cb = est.cashback(rate)
+        return self._json({
+            "ok": True,
+            "found": True,
+            "name": est.name,
+            "price": est.price,
+            "price_formatted": _vnd(est.price),
+            "shopee_rate": est.shopee_rate,
+            "shopee_part": est.shopee_part,
+            "shopee_part_formatted": _vnd(est.shopee_part),
+            "seller_rate": est.seller_rate,
+            "seller_part": est.seller_part,
+            "seller_part_formatted": _vnd(est.seller_part),
+            "commission": est.commission,
+            "commission_formatted": _vnd(est.commission),
+            "is_capped": est.is_capped,
+            "cashback": cb,
+            "cashback_formatted": _vnd(cb),
+            "rate_percent": f"{rate:.0%}",
+        })
+
+    def _shopee_convert(self):
+        from ..core.identifiers import new_request_id
+        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL
+        from ..core import audit
+
+        body = self._body()
+        raw_url = str(body.get("url") or "").strip()
+        match = ANY_SHOPEE_URL.search(raw_url)
+        if not match:
+            return self._json({"ok": False, "error": "invalid_url"}, 400)
+        url = match.group(0)
+
+        customer_id = self._session_customer() or str(body.get("customer_id") or "").strip().upper()
+        if not customer_id:
+            return self._json({"ok": False, "error": "need_customer_id"}, 400)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            cust = ledger.get_customer(conn, customer_id)
+            if not cust:
+                return self._json({"ok": False, "error": "customer_not_found"}, 404)
+
+            existing = ledger.find_reusable_request(
+                conn, customer_id, url, resend_within_days=self.cfg.link_attribution_days)
+            if existing is not None and existing["affiliate_url"]:
+                return self._json({
+                    "ok": True,
+                    "ready": True,
+                    "affiliate_url": existing["affiliate_url"],
+                    "request_id": existing["request_id"],
+                })
+
+            request_id = existing["request_id"] if existing else new_request_id()
+            if not existing:
+                ledger.record_link_request(
+                    conn,
+                    request_id=request_id,
+                    customer_id=customer_id,
+                    source_url=url,
+                    affiliate_url=None,
+                    estimated_commission=None,
+                    channel="web",
+                )
+                audit.record(audit.LINK_REQUESTED, customer_id=customer_id,
+                             request_id=request_id, url=url, channel="web")
+                conn.commit()
+
+            req_row = conn.execute(
+                "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
+            ).fetchone()
+            if req_row and req_row["affiliate_url"]:
+                return self._json({
+                    "ok": True,
+                    "ready": True,
+                    "affiliate_url": req_row["affiliate_url"],
+                    "request_id": request_id,
+                })
+
+            return self._json({
+                "ok": True,
+                "ready": False,
+                "request_id": request_id,
+            })
+
+    def _shopee_link_status(self):
+        query = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(query)
+        request_id = (params.get("request_id") or [""])[0]
+        if not request_id:
+            return self._json({"ok": False, "message": "missing request_id"}, 400)
+        with ledger.connect(self.cfg.db_path) as conn:
+            row = conn.execute(
+                "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
+            ).fetchone()
+        if not row:
+            return self._json({"ok": False, "message": "not_found"}, 404)
+        if row["affiliate_url"]:
+            return self._json({"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]})
+        return self._json({"ok": True, "ready": False})
 
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 
