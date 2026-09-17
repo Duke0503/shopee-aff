@@ -281,13 +281,34 @@ def handle(
             return [Reply(private, messages.render("bank_deleted"))]
 
         if command in COMMAND_RULES:
-            return [Reply(public, messages.render("rules", **common))]
+            if in_group and public != private:
+                return [
+                    Reply(public, messages.render(
+                        "group_inbox_notify",
+                        name=f" {msg.sender_name}" if msg.sender_name else "")),
+                    Reply(private, messages.render("rules", **common)),
+                ]
+            return [Reply(private, messages.render("rules", **common))]
 
         if command in COMMAND_POLICY:
-            return [Reply(public, messages.render("policy", **common))]
+            if in_group and public != private:
+                return [
+                    Reply(public, messages.render(
+                        "group_inbox_notify",
+                        name=f" {msg.sender_name}" if msg.sender_name else "")),
+                    Reply(private, messages.render("policy", **common)),
+                ]
+            return [Reply(private, messages.render("policy", **common))]
 
         if command in COMMAND_TERMS:
-            return [Reply(public, messages.render("terms", **common))]
+            if in_group and public != private:
+                return [
+                    Reply(public, messages.render(
+                        "group_inbox_notify",
+                        name=f" {msg.sender_name}" if msg.sender_name else "")),
+                    Reply(private, messages.render("terms", **common)),
+                ]
+            return [Reply(private, messages.render("terms", **common))]
 
         if command in COMMAND_ID:
             return [Reply(private, messages.render(
@@ -449,23 +470,32 @@ def handle(
             # beats the old behaviour, which was to treat it as chatter and
             # answer with something unrelated.
             if command and command not in KNOWN_COMMANDS:
-                return [Reply(public, messages.render(
+                if in_group and public != private:
+                    return [
+                        Reply(public, messages.render(
+                            "group_inbox_notify",
+                            name=f" {msg.sender_name}" if msg.sender_name else "")),
+                        Reply(private, messages.render(
+                            "unknown_command", command=command)),
+                    ]
+                return [Reply(private, messages.render(
                     "unknown_command", command=command))]
 
-            greeting = messages.render(
-                "welcome",
-                name=f" {msg.sender_name}" if msg.sender_name else "",
-                **common,
-            )
             if in_group:
-                out = [Reply(public, greeting)]
-                # Zalo on desktop offers no way to open a chat with a bot,
-                # so someone on a PC could never reach it first. Messaging
-                # them the moment they are seen creates the conversation on
-                # their side, on every device they use.
-                if first_contact and private != public:
-                    out.append(Reply(private, messages.render("first_touch", **common)))
+                out = [Reply(public, messages.render(
+                    "group_inbox_notify",
+                    name=f" {msg.sender_name}" if msg.sender_name else ""))]
+                if private != public:
+                    out.append(Reply(
+                        private,
+                        messages.render(
+                            "first_touch" if first_contact else "welcome",
+                            name=f" {msg.sender_name}" if msg.sender_name else "",
+                            **common,
+                        ),
+                    ))
                 return out
+
             if first_contact:
                 return [Reply(private, messages.render("first_touch", **common))]
             # Anything else from someone already known: one short nudge.

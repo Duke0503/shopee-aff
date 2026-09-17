@@ -140,8 +140,26 @@ class TestReplyRouting:
 
     def test_first_contact_in_a_group_opens_a_private_chat_too(self, db):
         replies = send(db, "hi", group=True)
-        assert any(r.chat_id == "g1" for r in replies)      # public greeting
+        assert any(r.chat_id == "g1" for r in replies)      # public notification
         assert any(r.chat_id == "u1" for r in replies)      # private opener
+
+    def test_group_message_notifies_inbox_and_keeps_group_clean(self, db):
+        replies = send(db, "hi", group=True, name="Phi Vu")
+        public_reply = next(r.text for r in replies if r.chat_id == "g1")
+        private_reply = next(r.text for r in replies if r.chat_id == "u1")
+
+        assert "nhắn tin riêng" in public_reply.lower() or "kiểm tra tin nhắn" in public_reply.lower()
+        assert "Phi Vu" in public_reply
+        assert "/huongdan để xem" not in public_reply
+        assert "Bot DP Shopee Affiliate" in private_reply
+
+    def test_commands_in_group_route_details_to_private(self, db):
+        for cmd in ("/huongdan", "/coche", "/dieukien"):
+            replies = send(db, cmd, group=True, name="Phi Vu")
+            public_reply = next(r.text for r in replies if r.chat_id == "g1")
+            private_reply = next(r.text for r in replies if r.chat_id == "u1")
+            assert "nhắn tin riêng" in public_reply.lower()
+            assert len(private_reply) > 100
 
 
 class TestPlatformLimits:
