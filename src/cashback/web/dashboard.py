@@ -403,6 +403,10 @@ class _Handler(BaseHTTPRequestHandler):
     # -- helpers --------------------------------------------------------
     @property
     def from_loopback(self) -> bool:
+        # A request arriving from the public internet through Cloudflare
+        # carries CF-Connecting-IP and CF-Ray headers added by Cloudflare Edge.
+        if self.headers.get("CF-Connecting-IP") or self.headers.get("CF-Ray"):
+            return False
         return (self.client_address[0] or "") in LOOPBACK
 
     def _session_customer(self) -> str | None:
@@ -415,10 +419,6 @@ class _Handler(BaseHTTPRequestHandler):
         return customer_id
 
     def _set_session(self, token: str, clear: bool = False):
-        # HttpOnly so a script on the page cannot read it, SameSite=Strict
-        # so another site cannot ride it. Not Secure: this runs over plain
-        # http on loopback today, and setting it there means the cookie is
-        # silently dropped. Turn it on with the domain.
         parts = [
             f"{SESSION_COOKIE}={token}",
             "Path=/",
@@ -426,6 +426,11 @@ class _Handler(BaseHTTPRequestHandler):
             "SameSite=Strict",
             "Max-Age=0" if clear else f"Max-Age={accounts.SESSION_DAYS * 86400}",
         ]
+        # Set Secure flag when accessed over HTTPS (direct or through Cloudflare edge)
+        proto = self.headers.get("X-Forwarded-Proto") or ""
+        cf_visitor = self.headers.get("CF-Visitor") or ""
+        if proto.lower() == "https" or '"https"' in cf_visitor:
+            parts.append("Secure")
         self._extra_headers = [("Set-Cookie", "; ".join(parts))]
 
     # -- GET ------------------------------------------------------------

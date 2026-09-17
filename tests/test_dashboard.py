@@ -260,6 +260,15 @@ class TestOverHTTP:
         assert status == 200
         assert json.loads(body)["totals"]["owed"] == 155_131
 
+    def test_payouts_refuses_external_proxied_requests(self, server):
+        request = urllib.request.Request(
+            f"{server}/api/payouts",
+            headers={"CF-Connecting-IP": "203.0.113.195"})
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            with urllib.request.urlopen(request, timeout=5):
+                pass
+        assert caught.value.code == 403
+
     def test_labels_are_served_from_the_same_file_the_bot_reads(self, server):
         _, body = self._get(f"{server}/api/labels")
         assert json.loads(body)["title"] == dashboard.labels()["title"]
