@@ -108,7 +108,7 @@ export function CustomerView() {
             </div>
             <Button
               size="sm"
-              className="shrink-0 font-semibold"
+              className="w-full shrink-0 font-semibold sm:w-auto"
               onClick={() => setBankModalOpen(true)}
             >
               <Icon.bank className="mr-1.5 size-3.5" />
@@ -125,7 +125,7 @@ export function CustomerView() {
               <div className="text-muted-foreground text-sm">
                 {t("me_headline_label")}
               </div>
-              <div className="tnum mt-1 text-4xl leading-none font-bold sm:text-5xl">
+              <div className="tnum mt-1 text-3xl leading-none font-bold sm:text-4xl lg:text-5xl">
                 {vnd(balance.approved)}
               </div>
               {balance.approved > 0 ? (

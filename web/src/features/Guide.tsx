@@ -31,10 +31,10 @@ export function Guide() {
         </div>
 
         <Tabs defaultValue="steps" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="steps">{t("guide_tab_steps")}</TabsTrigger>
-            <TabsTrigger value="policy">{t("guide_tab_policy")}</TabsTrigger>
-            <TabsTrigger value="terms">{t("guide_tab_terms")}</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+            <TabsTrigger value="steps" className="text-xs py-2 px-1 text-center whitespace-normal sm:text-sm">{t("guide_tab_steps")}</TabsTrigger>
+            <TabsTrigger value="policy" className="text-xs py-2 px-1 text-center whitespace-normal sm:text-sm">{t("guide_tab_policy")}</TabsTrigger>
+            <TabsTrigger value="terms" className="text-xs py-2 px-1 text-center whitespace-normal sm:text-sm">{t("guide_tab_terms")}</TabsTrigger>
           </TabsList>
 
           {/* TAB 1: STEPS */}
@@ -70,7 +70,7 @@ export function Guide() {
             </Reveal>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3 pt-4">
-              <Button size="lg" onClick={() => navigate("orders")}>
+              <Button size="lg" className="w-full sm:w-auto" onClick={() => navigate("orders")}>
                 <Icon.order className="mr-1.5" /> {t("home_cta_check")}
               </Button>
             </div>

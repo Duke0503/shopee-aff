@@ -34,7 +34,7 @@ export function OrderProgress({ status }: { status: MyOrder["status"] }) {
   const reached = REACHED[status]
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 sm:overflow-visible">
       {STEPS.map((key, index) => {
         const step = index + 1
         const done = step <= reached

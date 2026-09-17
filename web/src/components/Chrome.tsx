@@ -29,13 +29,13 @@ export function Header({ current }: { current: Route }) {
       <div className="mx-auto flex h-14 max-w-[1100px] items-center justify-between gap-3 px-4 sm:px-6">
         <button
           onClick={() => navigate("home")}
-          className="flex items-center gap-2 font-semibold"
+          className="flex items-center gap-1.5 font-semibold min-w-0 sm:gap-2"
         >
-          <Mascot className="size-8 shrink-0" />
-          <span className="truncate">{t("brand")}</span>
+          <Mascot className="size-7 shrink-0 sm:size-8" />
+          <span className="truncate text-sm sm:text-base">{t("brand")}</span>
         </button>
 
-        <nav className="flex items-center gap-1 sm:gap-2">
+        <nav className="flex items-center gap-1 shrink-0 sm:gap-2">
           {current !== "guide" && (
             <Button variant="ghost" size="sm" onClick={() => navigate("guide")}>
               <Icon.guide className="size-3.5 sm:mr-1" />
@@ -45,7 +45,8 @@ export function Header({ current }: { current: Route }) {
           )}
           {current !== "orders" && (
             <Button variant="ghost" size="sm" onClick={() => navigate("orders")}>
-              {t("nav_orders")}
+              <span className="hidden sm:inline">{t("nav_orders")}</span>
+              <span className="sm:hidden">{t("nav_orders_short")}</span>
             </Button>
           )}
           {me ? (

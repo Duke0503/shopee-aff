@@ -12,6 +12,7 @@ Selectors live in selectors.py. Nothing here hard-codes a class name.
 from __future__ import annotations
 
 import json
+import time
 from collections import defaultdict
 
 from ..shopee.browser_bridge import Bridge, Job
@@ -123,11 +124,21 @@ _CLEAR_TEMPLATE = """
 
 
 def _js(bridge: Bridge, code: str, timeout: float = 60) -> dict:
-    value = bridge.submit(
-        Job(connector=CONNECTOR, action="execute_script", params={"code": code}),
-        timeout=timeout,
-    )
-    return (value or {}).get("result") or {}
+    try:
+        value = bridge.submit(
+            Job(connector=CONNECTOR, action="execute_script", params={"code": code}),
+            timeout=timeout,
+        )
+        return (value or {}).get("result") or {}
+    except RuntimeError as exc:
+        if "navigated or closed" in str(exc).lower():
+            time.sleep(1.5)
+            value = bridge.submit(
+                Job(connector=CONNECTOR, action="execute_script", params={"code": code}),
+                timeout=timeout,
+            )
+            return (value or {}).get("result") or {}
+        raise
 
 
 def _pause(bridge: Bridge, ms: int) -> None:

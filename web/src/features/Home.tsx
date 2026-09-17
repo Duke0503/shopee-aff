@@ -47,11 +47,11 @@ export function Home() {
                 {t("home_hero_lead")}
               </p>
 
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Button size="lg" onClick={() => navigate("orders")}>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Button size="lg" className="w-full sm:w-auto" onClick={() => navigate("orders")}>
                   <Icon.order /> {t("home_cta_check")}
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate("login")}>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto" onClick={() => navigate("login")}>
                   <Icon.signIn /> {t("nav_login")}
                 </Button>
               </div>

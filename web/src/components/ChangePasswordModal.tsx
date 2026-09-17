@@ -98,11 +98,12 @@ export function ChangePasswordModal({
             </p>
           )}
 
-          <div className="mt-5 flex items-center justify-end gap-2 pt-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
             >
               {t("btn_cancel")}
@@ -110,6 +111,7 @@ export function ChangePasswordModal({
             <Button
               type="submit"
               size="sm"
+              className="w-full sm:w-auto"
               disabled={submit.isPending || !current || replacement.length < 8}
             >
               {submit.isPending ? (

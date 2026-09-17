@@ -56,14 +56,14 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
         <button
           type="button"
           onClick={() => setDropdownOpen((prev) => !prev)}
-          className="hover:bg-secondary/70 flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2"
+          className="hover:bg-secondary/70 flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 sm:gap-2 sm:px-2.5 sm:text-sm"
           aria-expanded={dropdownOpen}
           aria-haspopup="true"
         >
           <div className="bg-primary/10 text-primary grid size-6 place-items-center rounded-full text-xs font-bold">
             <Icon.user className="size-3.5" />
           </div>
-          <span className="max-w-[110px] truncate sm:max-w-[150px]">
+          <span className="max-w-[80px] truncate sm:max-w-[150px]">
             {me.display_name || me.customer_id}
           </span>
           <Icon.expand
@@ -74,7 +74,7 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
         </button>
 
         {dropdownOpen && (
-          <div className="bg-card border-border/80 absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-xl border p-3 shadow-xl sm:w-80">
+          <div className="bg-card border-border/80 absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-xs origin-top-right rounded-xl border p-3 shadow-xl sm:w-80">
             {/* User Profile info */}
             <div className="flex items-center gap-3 border-b pb-3">
               <Mascot className="size-10 shrink-0" mood="happy" />

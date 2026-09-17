@@ -29,6 +29,9 @@ async function _find_tab(id, hosts, url, { recover_existing = true } = {}) {
   if (owned[id] != null) {
     try {
       const tab = await chrome.tabs.get(owned[id]);
+      if (tab.url && !hosts.some(h => tab.url.includes(h))) {
+        throw new Error('Tab host mismatch');
+      }
       await init_tab(tab.id);
       return tab;
     } catch {

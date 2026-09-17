@@ -129,7 +129,7 @@ export function BankModal({
         <form onSubmit={handleSubmit} className="mt-3 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="bankName">{t("bank_select_label")}</Label>
-            <div className="flex flex-wrap gap-1.5 pb-1">
+            <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pb-1 sm:max-h-none">
               {POPULAR_BANKS.map((b) => (
                 <button
                   type="button"
@@ -197,11 +197,12 @@ export function BankModal({
             </div>
           )}
 
-          <div className="mt-5 flex items-center justify-end gap-2 pt-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
             >
               {t("btn_cancel")}
@@ -209,6 +210,7 @@ export function BankModal({
             <Button
               type="submit"
               size="sm"
+              className="w-full sm:w-auto"
               disabled={mutation.isPending}
             >
               {mutation.isPending ? (
