@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { IconChip } from "@/components/ui/icon-chip"
 import { Mascot } from "@/components/Mascot"
 import { Reveal } from "@/components/Reveal"
-import { ChangePassword } from "@/features/ChangePassword"
+import { BankModal } from "@/components/BankModal"
 import { OrderList } from "@/features/OrderList"
 import { fetchMe } from "@/lib/api"
 import { Icon } from "@/lib/icons"
@@ -39,7 +39,7 @@ function greetingKey(): string {
 
 export function CustomerView() {
   const t = useT()
-  const [accountOpen, setAccountOpen] = useState(false)
+  const [bankModalOpen, setBankModalOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
@@ -96,6 +96,26 @@ export function CustomerView() {
             {data.customer_id}
           </p>
         </div>
+
+        {/* -- bank alert if not set -------------------------------- */}
+        {!data.has_bank && (
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+            <div className="flex items-center gap-3">
+              <Icon.warning className="text-warning size-5 shrink-0" />
+              <p className="text-xs sm:text-sm text-foreground font-medium">
+                {t("bank_banner_warning")}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0 font-semibold"
+              onClick={() => setBankModalOpen(true)}
+            >
+              <Icon.bank className="mr-1.5 size-3.5" />
+              {t("bank_action_add")}
+            </Button>
+          </div>
+        )}
 
         {/* -- the answer ------------------------------------------- */}
         <Reveal>
@@ -165,52 +185,45 @@ export function CustomerView() {
           </Card>
         )}
 
-        {/* -- account, out of the way until wanted ------------------ */}
-        <section className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold">{t("me_account_title")}</h2>
-          <Card className="p-4">
+        {/* -- bank summary card ------------------------------------ */}
+        <div className="mt-10 rounded-xl border bg-card p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <IconChip icon={Icon.bank} tone="neutral" size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="text-muted-foreground text-xs">
-                  {t("me_bank")}
+              <IconChip icon={Icon.bank} tone={data.has_bank ? "success" : "warning"} size="sm" />
+              <div className="min-w-0">
+                <div className="text-muted-foreground text-xs font-medium">
+                  {t("profile_bank_section")}
                 </div>
-                {data.bank_account_tail ? (
-                  <div className="truncate text-sm font-medium">
-                    {data.bank_name} &middot;{" "}
-                    <span className="tnum">{data.bank_account_tail}</span>
+                {data.has_bank ? (
+                  <div className="mt-0.5 truncate text-sm font-semibold">
+                    {data.bank_name} &middot; <span className="font-mono font-normal">···{data.bank_account_tail}</span>{" "}
+                    {data.account_holder && <span className="text-muted-foreground font-normal text-xs uppercase">({data.account_holder})</span>}
                   </div>
                 ) : (
-                  <p className="text-warning mt-0.5 text-xs">
-                    {t("me_bank_none")}
+                  <p className="text-warning mt-0.5 text-xs font-medium">
+                    {t("profile_bank_not_set")}
                   </p>
                 )}
               </div>
             </div>
-
             <Button
-              variant="ghost"
+              variant={data.has_bank ? "outline" : "default"}
               size="sm"
-              className="mt-3 w-full"
-              onClick={() => setAccountOpen((open) => !open)}
+              className="shrink-0 text-xs font-medium"
+              onClick={() => setBankModalOpen(true)}
             >
-              <Icon.expand
-                className={
-                  accountOpen
-                    ? "rotate-180 transition-transform"
-                    : "transition-transform"
-                }
-              />
-              {accountOpen ? t("me_account_close") : t("me_account_open")}
+              <Icon.edit className="mr-1.5 size-3.5" />
+              {data.has_bank ? t("bank_action_edit") : t("bank_action_add")}
             </Button>
-          </Card>
+          </div>
+        </div>
 
-          {accountOpen && (
-            <div className="mt-3 max-w-md">
-              <ChangePassword />
-            </div>
-          )}
-        </section>
+        <BankModal
+          open={bankModalOpen}
+          onOpenChange={setBankModalOpen}
+          initialBankName={data.bank_name}
+          initialHolder={data.account_holder}
+        />
       </main>
 
       <Footer />

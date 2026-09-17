@@ -267,6 +267,8 @@ def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
         "bank_name": (customer["bank_name"] if customer else "") or "",
         "bank_account_tail": _tail(
             customer["bank_account"] if customer else ""),
+        "account_holder": (customer["account_holder"] if customer else "") or "",
+        "has_bank": bool(customer and customer["bank_account"] and customer["bank_name"]),
         "rate": rate,
         "balance": {
             "approved": balance.approved,
@@ -493,6 +495,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._logout()
         if path == "/api/auth/password":
             return self._change_password()
+        if path == "/api/me/bank":
+            return self._update_bank()
+        if path == "/api/me/bank/erase":
+            return self._erase_bank()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -550,6 +556,58 @@ class _Handler(BaseHTTPRequestHandler):
                 str(body.get("replacement") or ""))
             conn.commit()
         return self._json({"ok": ok, "message": reason}, 200 if ok else 400)
+
+    def _update_bank(self):
+        from ..core import audit
+
+        customer_id = self._session_customer()
+        if customer_id is None:
+            return self._json({"ok": False, "message": "not_signed_in"}, 401)
+        body = self._body()
+        bank_name = str(body.get("bank_name") or "").strip()
+        bank_account = str(body.get("bank_account") or "").strip()
+        account_holder = str(body.get("account_holder") or "").strip().upper()
+
+        clean_account = re.sub(r"[\s\-]", "", bank_account)
+
+        if not bank_name:
+            return self._json({"ok": False, "message": "missing_bank_name"}, 400)
+        if not (4 <= len(clean_account) <= 30 and clean_account.isalnum()):
+            return self._json({"ok": False, "message": "invalid_bank_account"}, 400)
+        if len(account_holder) < 2:
+            return self._json({"ok": False, "message": "missing_account_holder"}, 400)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            ledger.set_bank_details(
+                conn, customer_id, bank_name, clean_account, account_holder
+            )
+            audit.record(
+                audit.BANK_CHANGED,
+                customer_id=customer_id,
+                bank=bank_name,
+                account=audit.fingerprint(clean_account),
+                source="web",
+            )
+            conn.commit()
+        return self._json({
+            "ok": True,
+            "bank_name": bank_name,
+            "bank_account_tail": _tail(clean_account),
+            "account_holder": account_holder,
+            "has_bank": True,
+        })
+
+    def _erase_bank(self):
+        from ..core import audit
+
+        customer_id = self._session_customer()
+        if customer_id is None:
+            return self._json({"ok": False, "message": "not_signed_in"}, 401)
+        with ledger.connect(self.cfg.db_path) as conn:
+            ledger.erase_bank_details(conn, customer_id)
+            audit.record(audit.BANK_ERASED, customer_id=customer_id, source="web")
+            conn.commit()
+        return self._json({"ok": True, "message": "ok"})
 
     def _body(self) -> dict:
         try:

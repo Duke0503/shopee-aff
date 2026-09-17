@@ -24,10 +24,12 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Banknote,
+  BookOpen,
   Check,
   ChevronDown,
   Clock,
   Copy,
+  CreditCard,
   ExternalLink,
   Eye,
   EyeOff,
@@ -38,9 +40,13 @@ import {
   LockKeyhole,
   LogOut,
   Package,
+  Pencil,
   RefreshCw,
   Send,
+  ShieldCheck,
+  User,
   Wallet,
+  X,
   XCircle,
 } from "lucide-react"
 
@@ -55,7 +61,10 @@ export const Icon = {
   // Things
   order: Package,
   bank: Landmark,
+  card: CreditCard,
   reference: Copy,
+  user: User,
+  guide: BookOpen,
 
   // Doing something
   confirm: Check,
@@ -65,6 +74,8 @@ export const Icon = {
   sort: ArrowUpDown,
   open: ExternalLink,
   copy: Copy,
+  edit: Pencil,
+  close: X,
   signOut: LogOut,
 
   // Signing in
@@ -72,6 +83,7 @@ export const Icon = {
   password: KeyRound,
   reveal: Eye,
   conceal: EyeOff,
+  shield: ShieldCheck,
 
   // States
   warning: AlertTriangle,

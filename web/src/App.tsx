@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PayoutCard } from "@/features/PayoutCard"
 import { PipelineTable } from "@/features/PipelineTable"
 import { CustomerView } from "@/features/CustomerView"
+import { Guide } from "@/features/Guide"
 import { Home } from "@/features/Home"
 import { Login } from "@/features/Login"
 import { fetchLabels, fetchSite, fetchSnapshot } from "@/lib/api"
@@ -58,6 +59,7 @@ export default function App() {
         />
       )}
       {route === "orders" && <CustomerView />}
+      {route === "guide" && <Guide />}
       {route === "admin" && <Console />}
     </LabelProvider>
   )

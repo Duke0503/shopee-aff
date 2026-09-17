@@ -111,6 +111,8 @@ export interface Me {
   display_name: string
   bank_name: string
   bank_account_tail: string
+  account_holder: string
+  has_bank: boolean
   rate: number
   balance: {
     approved: number
@@ -137,6 +139,11 @@ export const logout = () => post("/api/auth/logout")
 
 export const changePassword = (current: string, replacement: string) =>
   post("/api/auth/password", { current, replacement })
+
+export const updateBank = (bank_name: string, bank_account: string, account_holder: string) =>
+  post("/api/me/bank", { bank_name, bank_account, account_holder })
+
+export const eraseBank = () => post("/api/me/bank/erase")
 
 /** Figures the public pages quote. Policy, not wording. */
 export interface Site {

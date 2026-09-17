@@ -14,13 +14,14 @@ import { useEffect, useState } from "react"
  * links still have to feel like links -- so navigation goes through
  * history.pushState and a subscription, not a page reload.
  */
-export type Route = "home" | "login" | "orders" | "admin"
+export type Route = "home" | "login" | "orders" | "admin" | "guide"
 
 const PATHS: Record<string, Route> = {
   "/": "home",
   "/login": "login",
   "/orders": "orders",
   "/admin": "admin",
+  "/guide": "guide",
 }
 
 export function routeFor(pathname: string): Route {
@@ -60,4 +61,5 @@ export const TITLE_KEY: Record<Route, string> = {
   login: "login_title",
   orders: "me_title",
   admin: "title",
+  guide: "nav_guide",
 }

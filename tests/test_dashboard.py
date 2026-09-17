@@ -17,6 +17,7 @@ import urllib.request
 
 import pytest
 
+from cashback.core import accounts
 from cashback.ledger import repository as ledger
 from cashback.web import dashboard
 
@@ -297,6 +298,74 @@ class TestOverHTTP:
         with pytest.raises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(request, timeout=5)
         assert caught.value.code == 400
+
+
+class TestCustomerBankOverHTTP:
+    @pytest.fixture
+    def server_with_auth(self, populated):
+        with ledger.connect(populated) as conn:
+            pwd = accounts.issue_password(conn, "C0001")
+            res = accounts.login(conn, "C0001", pwd)
+            conn.commit()
+        srv = dashboard.serve_in_background(_cfg(populated), port=0)
+        yield f"http://127.0.0.1:{srv.server_address[1]}", res.token, populated
+        srv.shutdown()
+        srv.server_close()
+
+    def test_bank_update_requires_auth(self, server_with_auth):
+        base, _, _ = server_with_auth
+        req = urllib.request.Request(
+            f"{base}/api/me/bank",
+            data=json.dumps({"bank_name": "VCB", "bank_account": "12345678", "account_holder": "A"}).encode(),
+            headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(req, timeout=5)
+        assert caught.value.code == 401
+
+    def test_bank_update_succeeds_with_auth(self, server_with_auth):
+        base, token, db = server_with_auth
+        req = urllib.request.Request(
+            f"{base}/api/me/bank",
+            data=json.dumps({
+                "bank_name": "Techcombank",
+                "bank_account": "1903-123456-789",
+                "account_holder": "NGUYEN VAN A"
+            }).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Cookie": f"cashback_session={token}",
+            },
+            method="POST")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        assert data["ok"] is True
+        assert data["bank_name"] == "Techcombank"
+        assert data["bank_account_tail"] == "***6789"
+
+        with ledger.connect(db) as conn:
+            cust = ledger.get_customer(conn, "C0001")
+            assert cust["bank_name"] == "Techcombank"
+            assert cust["bank_account"] == "1903123456789"
+            assert cust["account_holder"] == "NGUYEN VAN A"
+
+    def test_bank_erase_removes_details(self, server_with_auth):
+        base, token, db = server_with_auth
+        req = urllib.request.Request(
+            f"{base}/api/me/bank/erase",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Cookie": f"cashback_session={token}",
+            },
+            method="POST")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        assert data["ok"] is True
+
+        with ledger.connect(db) as conn:
+            cust = ledger.get_customer(conn, "C0001")
+            assert cust["bank_name"] is None
+            assert cust["bank_account"] is None
 
 
 class TestTheFrontendHasNoWordingOfItsOwn:

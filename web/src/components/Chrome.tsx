@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/lib/icons"
 import { Mascot } from "@/components/Mascot"
+import { UserProfileMenu } from "@/components/UserProfileMenu"
 import { useT } from "@/lib/labels"
-import { fetchMe, logout } from "@/lib/api"
+import { fetchMe } from "@/lib/api"
 import { navigate, type Route } from "@/routes"
 
 /**
@@ -15,20 +16,11 @@ import { navigate, type Route } from "@/routes"
  */
 export function Header({ current }: { current: Route }) {
   const t = useT()
-  const queryClient = useQueryClient()
 
   const { data: me } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
     retry: false,
-  })
-
-  const signOut = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      queryClient.setQueryData(["me"], null)
-      navigate("home")
-    },
   })
 
   return (
@@ -43,21 +35,21 @@ export function Header({ current }: { current: Route }) {
           <span className="truncate">{t("brand")}</span>
         </button>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 sm:gap-2">
+          {current !== "guide" && (
+            <Button variant="ghost" size="sm" onClick={() => navigate("guide")}>
+              <Icon.guide className="size-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">{t("nav_guide")}</span>
+              <span className="sm:hidden">{t("nav_guide_short")}</span>
+            </Button>
+          )}
           {current !== "orders" && (
             <Button variant="ghost" size="sm" onClick={() => navigate("orders")}>
               {t("nav_orders")}
             </Button>
           )}
           {me ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => signOut.mutate()}
-              disabled={signOut.isPending}
-            >
-              <Icon.signOut /> {t("logout")}
-            </Button>
+            <UserProfileMenu me={me} />
           ) : (
             current !== "login" && (
               <Button size="sm" onClick={() => navigate("login")}>
