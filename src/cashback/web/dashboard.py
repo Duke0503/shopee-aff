@@ -569,9 +569,9 @@ class _Handler(BaseHTTPRequestHandler):
         if customer_id is None:
             return self._json({"ok": False, "message": "not_signed_in"}, 401)
         body = self._body()
-        bank_name = str(body.get("bank_name") or "").strip()
-        bank_account = str(body.get("bank_account") or "").strip()
-        account_holder = str(body.get("account_holder") or "").strip().upper()
+        bank_name = str(body.get("bank_name") or "").strip()[:60]
+        bank_account = str(body.get("bank_account") or "").strip()[:35]
+        account_holder = str(body.get("account_holder") or "").strip().upper()[:80]
 
         clean_account = re.sub(r"[\s\-]", "", bank_account)
 
@@ -614,10 +614,12 @@ class _Handler(BaseHTTPRequestHandler):
             conn.commit()
         return self._json({"ok": True, "message": "ok"})
 
+    MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
+
     def _body(self) -> dict:
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            if not length:
+            if not length or length > self.MAX_BODY_BYTES:
                 return {}
             return json.loads(self.rfile.read(length).decode("utf-8")) or {}
         except (ValueError, TypeError, UnicodeDecodeError):
