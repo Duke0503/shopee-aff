@@ -141,7 +141,7 @@ export function LinkGenerator() {
   }
 
   return (
-    <Card className="overflow-hidden border-2 p-6 shadow-sm sm:p-8">
+    <Card className="overflow-hidden border-2 p-4 sm:p-6 md:p-8 shadow-sm max-w-full min-w-0">
       <div className="flex items-center gap-3">
         <div className="bg-primary/10 text-primary grid size-10 place-items-center rounded-xl">
           <Icon.link className="size-5" />
