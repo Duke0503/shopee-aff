@@ -157,13 +157,13 @@ export function LinkGenerator() {
       </div>
 
       <form onSubmit={handleCheck} className="mt-6">
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder={t("link_gen_placeholder")}
-              className="h-12 text-sm sm:text-base pr-10"
+              className="h-12 sm:h-12 text-sm sm:text-base pr-10 rounded-xl"
             />
             {url && (
               <button
@@ -184,7 +184,7 @@ export function LinkGenerator() {
             type="submit"
             size="lg"
             disabled={!url.trim() || loadingPreview}
-            className="h-12 w-full sm:w-auto"
+            className="h-12 sm:h-12 w-full sm:w-auto rounded-xl px-6 font-semibold"
           >
             {loadingPreview ? (
               <>
@@ -256,20 +256,20 @@ export function LinkGenerator() {
                     {t("link_gen_need_id_alert")}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                     <div className="flex-1">
                       <Input
                         value={customerId}
                         onChange={(e) => setCustomerId(e.target.value)}
                         placeholder={t("link_gen_id_placeholder")}
-                        className="h-10 uppercase font-mono"
+                        className="h-11 sm:h-11 uppercase font-mono rounded-lg"
                       />
                     </div>
                     <Button
                       variant="outline"
                       type="button"
                       onClick={() => window.open(ZALO_GROUP_URL, "_blank")}
-                      className="h-10 gap-2 shrink-0"
+                      className="h-11 sm:h-11 gap-2 shrink-0 rounded-lg font-medium"
                     >
                       <Icon.chat className="size-4 text-primary" />
                       {t("link_gen_btn_join_zalo")}
