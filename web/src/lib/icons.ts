@@ -33,6 +33,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  House,
   Inbox,
   KeyRound,
   Landmark,
@@ -59,6 +60,7 @@ export const Icon = {
   rejected: XCircle,
 
   // Things
+  home: House,
   order: Package,
   bank: Landmark,
   card: CreditCard,

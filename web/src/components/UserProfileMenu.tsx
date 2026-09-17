@@ -63,7 +63,7 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
           <div className="bg-primary/10 text-primary grid size-6 place-items-center rounded-full text-xs font-bold">
             <Icon.user className="size-3.5" />
           </div>
-          <span className="max-w-[80px] truncate sm:max-w-[150px]">
+          <span className="max-w-[120px] truncate sm:max-w-[160px]">
             {me.display_name || me.customer_id}
           </span>
           <Icon.expand
