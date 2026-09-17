@@ -10,6 +10,7 @@ acknowledge an update, so a redelivery cannot be ruled out.
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import unicodedata
@@ -57,6 +58,7 @@ COMMAND_BALANCE = ("/sodu", "/tien", "/kiemtra")
 # controls this Zalo account. See core/accounts.py.
 COMMAND_ID = ("/id", "/ma", "/taikhoancuatoi")
 COMMAND_PASSWORD = ("/matkhau", "/password", "/quenmatkhau")
+COMMAND_ORDERS = ("/donhang", "/don", "/orders", "/lichsu")
 
 # In a group the text arrives with the mention glued to the front, as in
 # "@Bot DP Shopee Affiliate /huongdan". The bot's display name contains
@@ -68,7 +70,7 @@ COMMAND_TOKEN = re.compile(r"(?:^|\s)(/[a-z0-9_]+)", re.IGNORECASE)
 KNOWN_COMMANDS = (
     COMMAND_RULES + COMMAND_POLICY + COMMAND_FORGET
     + COMMAND_TERMS + COMMAND_BANK + COMMAND_BALANCE
-    + COMMAND_ID + COMMAND_PASSWORD
+    + COMMAND_ID + COMMAND_PASSWORD + COMMAND_ORDERS
 )
 
 # A worked example for the greeting: a mid-sized order at a commission
@@ -337,6 +339,88 @@ def handle(
                 status_line=status,
             ))]
 
+        if command in COMMAND_ORDERS:
+            rows = conn.execute(
+                "SELECT o.order_id, o.status, o.order_value,"
+                "       o.estimated_commission, o.approved_commission,"
+                "       o.cashback_amount, o.rejection_reason,"
+                "       r.affiliate_url, r.source_url, r.estimate_detail"
+                "  FROM orders o"
+                "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
+                " WHERE o.customer_id = ?"
+                " ORDER BY COALESCE(o.recorded_at, o.approved_at, o.updated_at) DESC"
+                " LIMIT 3",
+                (customer_id,),
+            ).fetchall()
+            if not rows:
+                return [Reply(private, messages.render("orders_empty"))]
+
+            order_items = []
+            for row in rows:
+                prod_name, _, _ = _order_identity(row)
+                if not prod_name:
+                    prod_name = messages.render(
+                        "order_fallback_name", order_id=row["order_id"])
+
+                status = row["status"]
+                if status == ledger.AWAITING_APPROVAL:
+                    est = row["estimated_commission"]
+                    cashback_str = (
+                        _vnd(round_dong((est or 0) * cashback_rate))
+                        if est
+                        else messages.render("cashback_unknown")
+                    )
+                    block = messages.render(
+                        "order_item_awaiting",
+                        product=prod_name,
+                        cashback=cashback_str,
+                        order_id=row["order_id"],
+                    )
+                elif status == ledger.APPROVED:
+                    cb = row["cashback_amount"]
+                    cashback_str = (
+                        _vnd(cb) if cb else messages.render("cashback_unknown")
+                    )
+                    block = messages.render(
+                        "order_item_approved",
+                        product=prod_name,
+                        cashback=cashback_str,
+                        order_id=row["order_id"],
+                    )
+                elif status == ledger.PAID:
+                    cb = row["cashback_amount"]
+                    cashback_str = (
+                        _vnd(cb) if cb else messages.render("cashback_unknown")
+                    )
+                    block = messages.render(
+                        "order_item_paid",
+                        product=prod_name,
+                        cashback=cashback_str,
+                        order_id=row["order_id"],
+                    )
+                elif status == ledger.REJECTED:
+                    reason = (
+                        f" ({row['rejection_reason']})"
+                        if row["rejection_reason"]
+                        else ""
+                    )
+                    block = messages.render(
+                        "order_item_rejected",
+                        product=prod_name,
+                        reason=reason,
+                        order_id=row["order_id"],
+                    )
+                else:
+                    block = f"- {prod_name}: {row['order_id']} ({status})"
+                order_items.append(block)
+
+            summary = "\n\n".join(order_items)
+            return [Reply(private, messages.render(
+                "orders_summary",
+                orders=summary,
+                customer_id=customer_id,
+            ))]
+
         if command in COMMAND_BANK:
             saved = customer["bank_account"]
             if saved:
@@ -583,11 +667,18 @@ def _order_identity(row) -> tuple[str, str]:
     name = ""
     detail = row["estimate_detail"] if "estimate_detail" in row.keys() else None
     if detail:
-        from ..shopee.commission import Estimate
+        try:
+            parsed = json.loads(detail)
+            if isinstance(parsed, dict) and parsed.get("name"):
+                name = _short(parsed["name"], 44)
+        except (ValueError, TypeError):
+            pass
+        if not name:
+            from ..shopee.commission import Estimate
 
-        estimate = Estimate.from_json(detail)
-        if estimate:
-            name = _short(estimate.name, 44)
+            estimate = Estimate.from_json(detail)
+            if estimate:
+                name = _short(estimate.name, 44)
     link = ""
     for key in ("affiliate_url", "source_url"):
         if key in row.keys() and row[key]:

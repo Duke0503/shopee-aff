@@ -185,38 +185,34 @@ export function CustomerView() {
           </Card>
         )}
 
-        {/* -- bank summary card ------------------------------------ */}
-        <div className="mt-10 rounded-xl border bg-card p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <IconChip icon={Icon.bank} tone={data.has_bank ? "success" : "warning"} size="sm" />
-              <div className="min-w-0">
-                <div className="text-muted-foreground text-xs font-medium">
-                  {t("profile_bank_section")}
-                </div>
-                {data.has_bank ? (
+        {/* -- bank summary card (only when bank is configured) --------- */}
+        {data.has_bank && (
+          <div className="mt-10 rounded-xl border bg-card p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <IconChip icon={Icon.bank} tone="success" size="sm" />
+                <div className="min-w-0">
+                  <div className="text-muted-foreground text-xs font-medium">
+                    {t("profile_bank_section")}
+                  </div>
                   <div className="mt-0.5 truncate text-sm font-semibold">
                     {data.bank_name} &middot; <span className="font-mono font-normal">···{data.bank_account_tail}</span>{" "}
                     {data.account_holder && <span className="text-muted-foreground font-normal text-xs uppercase">({data.account_holder})</span>}
                   </div>
-                ) : (
-                  <p className="text-warning mt-0.5 text-xs font-medium">
-                    {t("profile_bank_not_set")}
-                  </p>
-                )}
+                </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 text-xs font-medium"
+                onClick={() => setBankModalOpen(true)}
+              >
+                <Icon.edit className="mr-1.5 size-3.5" />
+                {t("bank_action_edit")}
+              </Button>
             </div>
-            <Button
-              variant={data.has_bank ? "outline" : "default"}
-              size="sm"
-              className="shrink-0 text-xs font-medium"
-              onClick={() => setBankModalOpen(true)}
-            >
-              <Icon.edit className="mr-1.5 size-3.5" />
-              {data.has_bank ? t("bank_action_edit") : t("bank_action_add")}
-            </Button>
           </div>
-        </div>
+        )}
 
         <BankModal
           open={bankModalOpen}

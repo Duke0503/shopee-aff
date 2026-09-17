@@ -343,6 +343,52 @@ class TestTheCustomerCanAskWhereTheirMoneyIs:
         assert all(reply.chat_id != "g1" for reply in replies)
 
 
+class TestTheCustomerCanCheckRecentOrders:
+    def _orders(self, db: Path, cmd: str = "/donhang") -> str:
+        return first_text(send(db, cmd))
+
+    def test_empty_orders_shows_guide(self, db):
+        send(db, "hi")
+        text = self._orders(db)
+        assert "chưa có đơn hàng nào" in text.lower()
+        assert "gửi link" in text.lower()
+
+    def test_awaiting_and_approved_orders_listed(self, db):
+        send(db, "hi")
+        with ledger.connect(db) as conn:
+            ledger.record_link_request(
+                conn, "R1", "C0001", "https://shopee.vn/p1", None, 10_000, "zalo")
+            conn.execute(
+                "UPDATE link_requests SET estimate_detail=? WHERE request_id=?",
+                ('{"name": "Ao Thun Nam Shopee", "price": 100000, "commission": 10000}', "R1"))
+            ledger.add_order(conn, "O1", "C0001", "R1", order_value=100_000,
+                             estimated_commission=10_000)
+            ledger.add_order(conn, "O2", "C0001", None, order_value=200_000,
+                             estimated_commission=20_000)
+            ledger.mark_approved(conn, "O2", 20_000, 14_000)
+
+        text = self._orders(db)
+        assert "Ao Thun Nam" in text
+        assert "7.000" in text  # 70% of 10_000 for O1
+        assert "14.000" in text  # O2 approved cashback
+        assert "Chờ Shopee duyệt" in text
+        assert "Đã duyệt" in text
+        assert "trang web" in text.lower()
+
+    def test_orders_command_is_always_private(self, db):
+        send(db, "hi", group=True)
+        with ledger.connect(db) as conn:
+            ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
+                             estimated_commission=10_000)
+        replies = send(db, "/donhang", group=True)
+        assert all(reply.chat_id != "g1" for reply in replies)
+
+    @pytest.mark.parametrize("cmd", ["/donhang", "/don", "/orders", "/lichsu", "don hang", "donhang", "lich su"])
+    def test_command_aliases(self, db, cmd):
+        send(db, "hi")
+        assert convo.find_command(cmd) in convo.COMMAND_ORDERS
+
+
 class TestNoMinimumIsMentionedAnywhere:
     """The minimum is gone, so no message may still describe one.
 
