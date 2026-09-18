@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import socket
 import threading
 import urllib.parse
 from datetime import datetime
@@ -345,7 +346,7 @@ SESSION_COOKIE = "cashback_session"
 # The operator routes never leave this machine. Checked per request
 # rather than trusted to the bind address, because the bind address is
 # one config change away from being wrong.
-LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+LOOPBACK = {"127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1"}
 
 
 def _cookies(header: str | None) -> dict[str, str]:
@@ -375,6 +376,7 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
     _extra_headers: list[tuple[str, str]] = []
+    _head_only: bool = False
 
     def _send(self, status: int, body: bytes, content_type: str):
         try:
@@ -385,9 +387,17 @@ class _Handler(BaseHTTPRequestHandler):
                 self.send_header(name, value)
             self._extra_headers = []
             self.end_headers()
-            self.wfile.write(body)
+            if not self._head_only:
+                self.wfile.write(body)
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             pass
+
+    def do_HEAD(self):
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def _json(self, payload: dict, status: int = 200):
         self._send(status,
@@ -401,7 +411,10 @@ class _Handler(BaseHTTPRequestHandler):
         # carries CF-Connecting-IP and CF-Ray headers added by Cloudflare Edge.
         if self.headers.get("CF-Connecting-IP") or self.headers.get("CF-Ray"):
             return False
-        return (self.client_address[0] or "") in LOOPBACK
+        addr = (self.client_address[0] or "").lower()
+        if addr.startswith("::ffff:"):
+            addr = addr[7:]
+        return addr in LOOPBACK or (self.client_address[0] or "") in LOOPBACK
 
     def _session_customer(self) -> str | None:
         token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
@@ -565,10 +578,10 @@ class _Handler(BaseHTTPRequestHandler):
     def _update_bank(self):
         from ..core import audit
 
+        body = self._body()
         customer_id = self._session_customer()
         if customer_id is None:
             return self._json({"ok": False, "message": "not_signed_in"}, 401)
-        body = self._body()
         bank_name = str(body.get("bank_name") or "").strip()[:60]
         bank_account = str(body.get("bank_account") or "").strip()[:35]
         account_holder = str(body.get("account_holder") or "").strip().upper()[:80]
@@ -737,21 +750,51 @@ class _Handler(BaseHTTPRequestHandler):
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 
     def _body(self) -> dict:
+        if hasattr(self, "_cached_body"):
+            return self._cached_body
         try:
             length = int(self.headers.get("Content-Length") or 0)
             if not length or length > self.MAX_BODY_BYTES:
-                return {}
-            return json.loads(self.rfile.read(length).decode("utf-8")) or {}
+                self._cached_body = {}
+                return self._cached_body
+            self._cached_body = json.loads(self.rfile.read(length).decode("utf-8")) or {}
+            return self._cached_body
         except (ValueError, TypeError, UnicodeDecodeError):
-            return {}
+            self._cached_body = {}
+            return self._cached_body
+
+
+class DualStackServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that listens on both IPv6 and IPv4 loopback/all."""
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except (AttributeError, OSError):
+            pass
+        super().server_bind()
+
+
+def _create_server(port: int, handler) -> ThreadingHTTPServer | None:
+    try:
+        return DualStackServer(("::", port), handler)
+    except Exception:
+        try:
+            return ThreadingHTTPServer(("0.0.0.0", port), handler)
+        except Exception:
+            return None
 
 
 def serve(cfg: Config, port: int = 8899) -> None:
     handler = type("DashboardHandler", (_Handler,), {"cfg": cfg})
-    # Loopback only. This serves bank account numbers.
-    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    server = _create_server(port, handler) or ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"Dashboard on http://127.0.0.1:{port}")
-    print("Loopback only -- it shows bank details. Press Ctrl+C to stop.")
+    if port not in (0, 80):
+        p80 = _create_server(80, handler)
+        if p80 is not None:
+            threading.Thread(target=p80.serve_forever, daemon=True).start()
+            print("Also listening on port 80 for Cloudflare Tunnel")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -762,6 +805,13 @@ def serve(cfg: Config, port: int = 8899) -> None:
 
 def serve_in_background(cfg: Config, port: int = 8899) -> ThreadingHTTPServer:
     handler = type("DashboardHandler", (_Handler,), {"cfg": cfg})
-    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    server = _create_server(port, handler) or ThreadingHTTPServer(("127.0.0.1", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    # Also bind to port 80 if available so Cloudflare Tunnel pointing to localhost:80 works
+    if port not in (0, 80):
+        p80 = _create_server(80, handler)
+        if p80 is not None:
+            threading.Thread(target=p80.serve_forever, daemon=True).start()
+
     return server

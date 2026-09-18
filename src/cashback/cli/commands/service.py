@@ -178,13 +178,13 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
 
     if not args.no_browser:
         print("Waiting for the extension...")
-        if not worker.wait_for_extension(bridge, args.connect_timeout):
-            server.shutdown()
-            print("\nExtension never checked in. Load it at chrome://extensions,")
-            print("open affiliate.shopee.vn, then try again.")
-            print("(Use --no-browser to run the Zalo side alone.)")
-            return 1
-        print("Extension connected.")
+        if worker.wait_for_extension(bridge, 5):
+            print("Extension connected.")
+        else:
+            print("\nExtension has not checked in yet. Carrying on without it:")
+            print("  - Web & dashboard active on port 8899 and port 80")
+            print("  - Zalo replies active")
+            print("  - Links will generate as soon as browser opens")
 
     settings = BatchSettings(
         window_seconds=args.window or cfg.batch_window_seconds,
