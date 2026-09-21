@@ -44,7 +44,7 @@ export function EmptyDash({
   value,
   type = "text",
   className,
-  dashClassName = "text-muted-foreground/40 font-mono select-none font-normal tracking-tight",
+  dashClassName = "text-muted-foreground/40 font-mono select-none font-normal tracking-tight text-xs",
   dash = "--",
   prefix,
   suffix,

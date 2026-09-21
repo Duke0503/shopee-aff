@@ -28,6 +28,7 @@ import { CustomerHoverCard } from "@/features/Admin/components/CustomerHoverCard
 import { BuyerHoverCard } from "@/features/Admin/components/BuyerHoverCard"
 import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
+import { CodeBadge } from "@/features/Admin/components/CodeBadge"
 
 function ProductThumbnail({ src, alt }: { src?: string | null; alt: string }) {
   const [error, setError] = React.useState(false)
@@ -135,9 +136,9 @@ export function ProductsView() {
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-xs">
           <TableRow>
-            <TableHead className="min-w-[200px]">
+            <TableHead className="min-w-[220px]">
               <SortableHeader
-                title="Sản Phẩm / Mã Shopee"
+                title="Sản Phẩm"
                 column="name"
                 currentSortBy={sortBy}
                 currentSortOrder={sortOrder}
@@ -145,6 +146,7 @@ export function ProductsView() {
                 defaultOrder="asc"
               />
             </TableHead>
+            <TableHead className="whitespace-nowrap">Mã Shopee</TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
                 title="Giá Bán"
@@ -215,34 +217,37 @@ export function ProductsView() {
 
             return (
               <TableRow key={p.item_id}>
-                <TableCell className="min-w-[280px] max-w-[360px]">
-                  <div className="flex items-center gap-3">
+                {/* Sản Phẩm */}
+                <TableCell className="min-w-[220px] max-w-[320px]">
+                  <div className="flex items-center gap-2.5">
                     <ProductThumbnail src={p.image_url} alt={p.name} />
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-foreground truncate text-sm" title={p.name}>
+                      <div className="font-semibold text-foreground truncate text-xs" title={p.name}>
                         {p.name}
-                      </div>
-                      <div className="font-mono text-[11px] text-muted-foreground">
-                        ID: {p.item_id}
                       </div>
                     </div>
                   </div>
                 </TableCell>
 
-                <TableCell className="text-right font-medium text-foreground whitespace-nowrap">
+                {/* Mã Shopee */}
+                <TableCell className="whitespace-nowrap">
+                  <CodeBadge code={p.item_id} label="SP:" />
+                </TableCell>
+
+                <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={p.price_formatted} />
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                <TableCell className="text-right text-xs font-mono font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
                   <div><EmptyDash value={p.commission_formatted} /></div>
                   {p.rate_percent && p.commission_formatted && p.commission_formatted !== "0đ" && (
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[10px] text-muted-foreground font-sans">
                       ({p.rate_percent})
                     </span>
                   )}
                 </TableCell>
 
-                <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                   <EmptyDash value={p.cashback_formatted} />
                 </TableCell>
 

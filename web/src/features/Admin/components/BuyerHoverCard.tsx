@@ -97,12 +97,12 @@ export function BuyerHoverCard({ buyers }: BuyerHoverCardProps) {
             key={buyer.customer_id}
             onMouseEnter={(e) => handleMouseEnter(buyer, e)}
             onMouseLeave={handleMouseLeave}
-            className="group relative inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 transition-all hover:border-emerald-500 hover:bg-emerald-500/20"
+            className="group relative inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-all hover:border-emerald-500 hover:bg-emerald-500/20 whitespace-nowrap shrink-0"
           >
-            <ShoppingBag className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-            <span className="max-w-[100px] truncate">{name}</span>
+            <ShoppingBag className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span className="max-w-[130px] truncate leading-tight">{name}</span>
             {count > 1 && (
-              <span className="rounded-full bg-emerald-600/20 px-1.5 py-0.2 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+              <span className="rounded-full bg-emerald-600/20 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap leading-none shrink-0">
                 {count} đơn
               </span>
             )}

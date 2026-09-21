@@ -46,14 +46,14 @@ export function CustomerHoverCard({ requesters }: CustomerHoverCardProps) {
             key={r.customer_id}
             onMouseEnter={(e) => handleMouseEnter(r, e)}
             onMouseLeave={handleMouseLeave}
-            className="group relative inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border/80 bg-secondary/50 px-2 py-1 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-secondary"
+            className="group relative inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/80 bg-secondary/50 px-2 py-1 text-[11px] font-medium text-foreground transition-all hover:border-primary/50 hover:bg-secondary whitespace-nowrap shrink-0"
           >
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+            <div className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
               {name.slice(0, 1).toUpperCase()}
             </div>
-            <span className="max-w-[100px] truncate">{name}</span>
+            <span className="max-w-[120px] truncate leading-tight">{name}</span>
             {r.request_count > 1 && (
-              <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+              <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap leading-none shrink-0">
                 x{r.request_count}
               </span>
             )}

@@ -31,6 +31,7 @@ import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
 import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { UserDetailDialog } from "@/features/Admin/components/UserDetailDialog"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
+import { CodeBadge } from "@/features/Admin/components/CodeBadge"
 
 export function UsersView() {
   const [page, setPage] = React.useState(1)
@@ -175,7 +176,7 @@ export function UsersView() {
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-xs">
             <TableRow>
-              <TableHead className="min-w-[170px]">
+              <TableHead className="min-w-[150px]">
                 <SortableHeader
                   title="Khách Hàng"
                   column="name"
@@ -185,7 +186,16 @@ export function UsersView() {
                   defaultOrder="asc"
                 />
               </TableHead>
-              <TableHead className="whitespace-nowrap">Ngân Hàng Nhận Tiền</TableHead>
+              <TableHead className="whitespace-nowrap">
+                <SortableHeader
+                  title="Mã KH / Zalo"
+                  column="customer_id"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead className="min-w-[180px]">Ngân Hàng Nhận Tiền</TableHead>
               <TableHead className="whitespace-nowrap">
                 <SortableHeader
                   title="Ngày Tham Gia"
@@ -274,41 +284,57 @@ export function UsersView() {
 
               return (
                 <TableRow key={u.customer_id} className="hover:bg-muted/30 transition-colors">
-                  <TableCell>
+                  {/* Khách Hàng (Tên & SP đã hỏi) */}
+                  <TableCell className="min-w-[150px]">
                     <div
                       onClick={() => setSelectedUser(u)}
                       onMouseEnter={(e) => handleMouseEnter(u, e)}
                       onMouseLeave={handleMouseLeave}
                       className="group cursor-pointer"
                     >
-                      <div className="flex items-center gap-1.5 font-semibold text-foreground group-hover:text-primary transition-colors">
-                        <span>{u.display_name || u.customer_id}</span>
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs group-hover:text-primary transition-colors">
+                        <span className="truncate max-w-[140px]">{u.display_name || u.customer_id}</span>
                         {hasRequests && (
-                          <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] text-primary" title="Hover để xem sản phẩm đã hỏi">
+                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary shrink-0 leading-none" title="Hover để xem sản phẩm đã hỏi">
                             {u.recent_requests!.length} SP
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        ID: <span className="font-mono">{u.customer_id}</span>
-                        {u.zalo_user_id && ` · Zalo: ${u.zalo_user_id.slice(0, 10)}...`}
-                      </div>
                     </div>
                   </TableCell>
 
-                  <TableCell>
+                  {/* Mã KH & Zalo ID */}
+                  <TableCell className="whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
+                      <CodeBadge code={u.customer_id} label="Mã:" />
+                      {u.zalo_user_id && (
+                        <CodeBadge
+                          code={u.zalo_user_id}
+                          label="Zalo:"
+                          truncateLength={10}
+                          title={`Zalo UID: ${u.zalo_user_id}`}
+                        />
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Ngân Hàng Nhận Tiền */}
+                  <TableCell className="min-w-[180px]">
                     {hasBank ? (
-                      <div className="text-xs">
-                        <div className="flex items-center gap-1 font-medium text-foreground">
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-1.5 font-medium text-foreground">
                           <CreditCard className="h-3.5 w-3.5 text-primary shrink-0" />
-                          <span className="truncate max-w-[130px]">{u.bank_name}</span>
+                          <span className="font-semibold text-xs text-foreground truncate max-w-[120px]">{u.bank_name}</span>
+                          {u.account_holder && (
+                            <span className="text-[10px] text-muted-foreground truncate uppercase">
+                              ({u.account_holder})
+                            </span>
+                          )}
                         </div>
-                        <div className="font-mono text-[11px] text-muted-foreground truncate max-w-[150px]">
-                          {u.bank_account} {u.account_holder ? `(${u.account_holder})` : ""}
-                        </div>
+                        <CodeBadge code={u.bank_account} label="STK:" />
                       </div>
                     ) : (
-                      <Badge variant="warning" className="text-[10px]">
+                      <Badge variant="warning" className="text-[10px] px-1.5 py-0.5">
                         <AlertTriangle className="mr-1 h-3 w-3" /> Chưa liên kết
                       </Badge>
                     )}
@@ -316,8 +342,8 @@ export function UsersView() {
 
                   {/* Ngày Tham Gia */}
                   <TableCell className="whitespace-nowrap">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5 opacity-70" />
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+                      <Calendar className="h-3 w-3 opacity-70 shrink-0" />
                       <span>{u.created_at ? shortDate(u.created_at) : "—"}</span>
                     </div>
                   </TableCell>
@@ -325,47 +351,47 @@ export function UsersView() {
                   {/* Hỏi Bot Cuối */}
                   <TableCell className="whitespace-nowrap">
                     {u.last_bot_activity ? (
-                      <div className="flex items-center gap-1 text-xs text-foreground">
-                        <Bot className="h-3.5 w-3.5 text-blue-500" />
+                      <div className="flex items-center gap-1 text-[11px] text-foreground font-mono">
+                        <Bot className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                         <span>{shortDate(u.last_bot_activity)}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Chưa hỏi bot</span>
+                      <EmptyDash value={null} />
                     )}
                   </TableCell>
 
                   {/* Vào Web Cuối */}
                   <TableCell className="whitespace-nowrap">
                     {u.last_login_at ? (
-                      <div className="flex items-center gap-1 text-xs text-foreground">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <div className="flex items-center gap-1 text-[11px] text-foreground font-mono">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <span>{shortDate(u.last_login_at)}</span>
-                        <span className="ml-1 text-[10px] text-muted-foreground font-mono">({u.login_count || 0} lần)</span>
+                        <span className="ml-1 text-[10px] text-muted-foreground font-sans">({u.login_count || 0} lần)</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Chưa đăng nhập</span>
+                      <span className="text-[11px] text-muted-foreground font-sans">Chưa đăng nhập</span>
                     )}
                   </TableCell>
 
                   {/* Số Đơn */}
-                  <TableCell className="text-center whitespace-nowrap">
-                    <EmptyDash value={u.order_count} className="font-semibold text-foreground" />
+                  <TableCell className="text-center whitespace-nowrap text-xs">
+                    <EmptyDash value={u.order_count} className="font-semibold text-foreground text-xs" />
                   </TableCell>
 
                   {/* Tổng Tiền Aff */}
-                  <TableCell className="text-right whitespace-nowrap">
-                    <EmptyDash value={u.total_cashback} type="currency" className="font-semibold text-blue-600 dark:text-blue-400" />
+                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
+                    <EmptyDash value={u.total_cashback} type="currency" className="font-semibold text-blue-600 dark:text-blue-400 text-xs" />
                   </TableCell>
 
                   {/* Chờ Duyệt */}
-                  <TableCell className="text-right whitespace-nowrap">
-                    <EmptyDash value={u.awaiting_amount} type="currency" className="font-medium text-amber-600 dark:text-amber-400" />
+                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
+                    <EmptyDash value={u.awaiting_amount} type="currency" className="font-medium text-amber-600 dark:text-amber-400 text-xs" />
                   </TableCell>
 
                   {/* Có Thể Nhận */}
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
                     {canPayout ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-bold">
+                      <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-bold text-xs">
                         {vnd(u.ready_amount || 0)}
                       </span>
                     ) : (
@@ -374,8 +400,8 @@ export function UsersView() {
                   </TableCell>
 
                   {/* Đã Chuyển */}
-                  <TableCell className="text-right whitespace-nowrap">
-                    <EmptyDash value={u.paid_amount} type="currency" className="font-medium text-foreground" />
+                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
+                    <EmptyDash value={u.paid_amount} type="currency" className="font-medium text-foreground text-xs" />
                   </TableCell>
 
                   {/* Chi Tiết / Chuyển Khoản Button */}

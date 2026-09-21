@@ -27,6 +27,7 @@ import {
 } from "@/lib/api"
 import { vnd, shortDate } from "@/lib/format"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
+import { CodeBadge } from "@/features/Admin/components/CodeBadge"
 import {
   User,
   CreditCard,
@@ -192,7 +193,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         const sb = STATUS_BADGE[o.status] || STATUS_BADGE.awaiting_approval
                         return (
                           <TableRow key={o.order_id}>
-                            <TableCell className="font-mono text-[11px]">{o.order_id}</TableCell>
+                            <TableCell><CodeBadge code={o.order_id} variant="purple" /></TableCell>
                             <TableCell className="text-xs max-w-[200px] truncate" title={o.product}>{o.product}</TableCell>
                             <TableCell className="text-xs text-right"><EmptyDash value={o.order_value} type="currency" /></TableCell>
                             <TableCell className="text-xs text-right font-medium text-emerald-600"><EmptyDash value={o.cashback_amount} type="currency" className="text-emerald-600 font-medium" /></TableCell>
@@ -259,10 +260,11 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         <CreditCard className="h-5 w-5" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-foreground">
-                          {user.bank_name} · <span className="font-mono">{user.bank_account}</span>
+                        <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                          <span>{user.bank_name}</span>
+                          <CodeBadge code={user.bank_account} variant="primary" />
                         </div>
-                        <div className="text-[11px] text-muted-foreground uppercase font-medium">
+                        <div className="text-[11px] text-muted-foreground uppercase font-medium mt-0.5">
                           Chủ TK: {user.account_holder || user.display_name}
                         </div>
                       </div>
@@ -410,7 +412,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         <TableRow key={t.id}>
                           <TableCell className="text-xs whitespace-nowrap">{shortDate(t.created_at)}</TableCell>
                           <TableCell className="text-xs text-right font-semibold text-emerald-600">{vnd(t.amount)}</TableCell>
-                          <TableCell className="font-mono text-[11px]">{t.transfer_code || "—"}</TableCell>
+                          <TableCell>{t.transfer_code ? <CodeBadge code={t.transfer_code} variant="default" /> : "—"}</TableCell>
                           <TableCell>
                             {t.proof_image ? (
                               <button
@@ -440,15 +442,34 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                 <Card className="p-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <ProfileRow icon={<User className="h-3.5 w-3.5" />} label="Tên hiển thị" value={user?.display_name || "—"} />
-                    <ProfileRow icon={<User className="h-3.5 w-3.5" />} label="Customer ID" value={user?.customer_id || "—"} mono />
-                    <ProfileRow icon={<User className="h-3.5 w-3.5" />} label="Zalo ID" value={user?.zalo_user_id || "—"} mono />
+                    <ProfileRow
+                      icon={<User className="h-3.5 w-3.5" />}
+                      label="Mã Khách Hàng (Customer ID)"
+                      value={user?.customer_id ? <CodeBadge code={user.customer_id} variant="blue" /> : "—"}
+                    />
+                    <ProfileRow
+                      icon={<User className="h-3.5 w-3.5" />}
+                      label="Zalo User ID"
+                      value={user?.zalo_user_id ? <CodeBadge code={user.zalo_user_id} /> : "—"}
+                    />
                     <ProfileRow icon={<Calendar className="h-3.5 w-3.5" />} label="Ngày tham gia" value={user?.created_at ? shortDate(user.created_at) : "—"} />
                     <ProfileRow icon={<Clock className="h-3.5 w-3.5" />} label="Đăng nhập web cuối" value={user?.last_login_at ? shortDate(user.last_login_at) : "Chưa"} />
                     <ProfileRow icon={<Clock className="h-3.5 w-3.5" />} label="Hỏi bot cuối" value={user?.last_bot_activity ? shortDate(user.last_bot_activity) : "Chưa"} />
                     {user?.bank_name && (
                       <>
                         <ProfileRow icon={<CreditCard className="h-3.5 w-3.5" />} label="Ngân hàng" value={user.bank_name} />
-                        <ProfileRow icon={<CreditCard className="h-3.5 w-3.5" />} label="Số TK" value={`${user.bank_account || "—"} (${user.account_holder || "—"})`} mono />
+                        <ProfileRow
+                          icon={<CreditCard className="h-3.5 w-3.5" />}
+                          label="Số Tài Khoản"
+                          value={
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <CodeBadge code={user.bank_account || ""} variant="primary" />
+                              {user.account_holder && (
+                                <span className="text-[11px] text-muted-foreground uppercase font-medium">({user.account_holder})</span>
+                              )}
+                            </div>
+                          }
+                        />
                       </>
                     )}
                     <ProfileRow icon={<ShoppingBag className="h-3.5 w-3.5" />} label="Tổng đơn hàng" value={String(detail.stats.total_orders)} />
@@ -505,13 +526,13 @@ function StatCard({ label, value, color }: { label: string; value: number | stri
   )
 }
 
-function ProfileRow({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: string; mono?: boolean }) {
+function ProfileRow({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/20 p-2.5">
       <span className="text-muted-foreground shrink-0 mt-0.5">{icon}</span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[10px] text-muted-foreground">{label}</div>
-        <div className={`text-xs font-medium text-foreground truncate ${mono ? "font-mono" : ""}`} title={value}>{value}</div>
+        <div className={`text-xs font-medium text-foreground truncate ${mono ? "font-mono" : ""}`}>{value}</div>
       </div>
     </div>
   )

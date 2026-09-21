@@ -31,6 +31,7 @@ import { PaginationBar } from "@/features/Admin/components/PaginationBar"
 import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
 import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
+import { CodeBadge } from "@/features/Admin/components/CodeBadge"
 
 export function OrdersView() {
   const queryClient = useQueryClient()
@@ -227,9 +228,18 @@ export function OrdersView() {
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-xs">
           <TableRow>
-            <TableHead className="min-w-[180px]">
+            <TableHead className="whitespace-nowrap">
               <SortableHeader
-                title="Mã Đơn / Khách Hàng"
+                title="Mã Đơn Hàng"
+                column="order_id"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSort={handleSort}
+              />
+            </TableHead>
+            <TableHead className="min-w-[150px]">
+              <SortableHeader
+                title="Khách Hàng"
                 column="customer"
                 currentSortBy={sortBy}
                 currentSortOrder={sortOrder}
@@ -297,15 +307,16 @@ export function OrdersView() {
 
             return (
               <TableRow key={o.order_id}>
-                <TableCell>
-                  <div className="font-mono font-semibold text-foreground">
-                    {o.order_id}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {o.customer_name ? (
-                      <span className="font-medium text-foreground">{o.customer_name}</span>
-                    ) : null}
-                    <span className="font-mono"> ({o.customer_id})</span>
+                {/* Mã Đơn Hàng */}
+                <TableCell className="whitespace-nowrap">
+                  <CodeBadge code={o.order_id} label="Đơn:" />
+                </TableCell>
+
+                {/* Khách Hàng */}
+                <TableCell className="min-w-[150px]">
+                  <div className="space-y-0.5">
+                    <div className="font-semibold text-foreground text-xs">{o.customer_name || o.customer_id}</div>
+                    <CodeBadge code={o.customer_id} label="KH:" />
                   </div>
                 </TableCell>
 
@@ -337,21 +348,21 @@ export function OrdersView() {
                   </div>
                 </TableCell>
 
-                <TableCell className="text-right font-medium text-foreground whitespace-nowrap">
+                <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={o.order_value} type="currency" />
                 </TableCell>
 
-                <TableCell className="text-right font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                <TableCell className="text-right text-xs font-mono font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
                   <EmptyDash value={commission} type="currency" />
                 </TableCell>
 
-                <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                   <EmptyDash value={cashback} type="currency" />
                 </TableCell>
 
                 <TableCell className="whitespace-nowrap">{renderStatus(o.status)}</TableCell>
 
-                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                <TableCell className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
                   {shortDate(o.recorded_at || o.approved_at)}
                 </TableCell>
 

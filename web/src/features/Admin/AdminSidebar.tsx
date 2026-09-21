@@ -102,9 +102,6 @@ export function AdminSidebar({
                 <span className="text-sm font-bold tracking-tight text-foreground">
                   Hoàn Tiền DP
                 </span>
-                <span className="rounded-sm bg-primary/15 px-1 py-0.2 text-[10px] font-bold text-primary">
-                  PRO
-                </span>
               </div>
               <p className="text-[11px] text-muted-foreground">Admin Portal</p>
             </div>
