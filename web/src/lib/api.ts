@@ -211,6 +211,37 @@ export interface ChannelMetric {
   total_commission: number
 }
 
+export interface UserSegment {
+  segment_id: string
+  name: string
+  description: string
+  badge: string
+  badge_variant: "amber" | "blue" | "emerald" | "slate" | "purple"
+  icon: string
+  users_count: number
+  orders_count: number
+  total_gmv: number
+  total_commission: number
+  conversion_rate: number
+  avg_order_value: number
+  action_hint: string
+}
+
+export interface CommunityFunnel {
+  group_members: number
+  total_users: number
+  new_group_members: number
+  new_users: number
+  buyers_count: number
+  repeat_buyers_count: number
+  single_buyers_count: number
+  orders_count: number
+  conversion_rate: number
+  repeat_rate: number
+  avg_orders_per_buyer: number
+  segments: UserSegment[]
+}
+
 export interface AdminMetrics {
   period: string
   is_admin: boolean
@@ -237,6 +268,7 @@ export interface AdminMetrics {
   top_customers: TopCustomer[]
   top_products: TopProduct[]
   channels?: ChannelMetric[]
+  community_funnel?: CommunityFunnel
   financials: {
     gross_commission: number | null
     shopee_fee?: number | null

@@ -1013,98 +1013,194 @@ class _Handler(BaseHTTPRequestHandler):
 
             top_products = sorted(product_map.values(), key=lambda x: x["total_commission"], reverse=True)[:5]
 
-            # Channel Acquisition & Behavior Analytics
-            act_date_filter = "1=1"
+            # Community & Customer Funnel Analytics
+            total_group_members = conn.execute(
+                "SELECT COUNT(DISTINCT customer_id) FROM activity_logs WHERE action = 'group_join'"
+            ).fetchone()[0]
+            
+            user_date_filter = "1=1"
             if period == "today":
-                act_date_filter = "date(created_at) = date('now')"
+                user_date_filter = "date(created_at) = date('now')"
             elif period == "7d":
-                act_date_filter = "created_at >= datetime('now', '-7 days')"
+                user_date_filter = "date(created_at) >= date('now', '-7 days')"
             elif period == "30d":
-                act_date_filter = "created_at >= datetime('now', '-30 days')"
+                user_date_filter = "date(created_at) >= date('now', '-30 days')"
             elif period == "month":
-                act_date_filter = "strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+                user_date_filter = "strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
 
-            def _query_channel(actions, name, description, icon, status_badge):
+            new_group_members = conn.execute(
+                f"SELECT COUNT(DISTINCT customer_id) FROM activity_logs WHERE action = 'group_join' AND ({user_date_filter})"
+            ).fetchone()[0]
+            new_users = conn.execute(
+                f"SELECT COUNT(*) FROM customers WHERE role = 'user' AND ({user_date_filter})"
+            ).fetchone()[0]
+
+            # Customer order map in current period (strictly non-rejected)
+            orders_by_cust = conn.execute(f"""
+                SELECT customer_id, COUNT(order_id) as cnt, COALESCE(SUM(order_value), 0) as gmv,
+                       COALESCE(SUM(COALESCE(approved_commission, estimated_commission, 0)), 0) as comm
+                FROM orders
+                WHERE {date_filter} AND status != 'rejected'
+                GROUP BY customer_id
+            """).fetchall()
+            cust_order_map = {r['customer_id']: dict(r) for r in orders_by_cust}
+
+            buyers_all = set(cust_order_map.keys())
+            buyers_cnt = len(buyers_all)
+            repeat_buyers = [c for c, d in cust_order_map.items() if d['cnt'] >= 2]
+            single_buyers = [c for c, d in cust_order_map.items() if d['cnt'] == 1]
+            repeat_cnt = len(repeat_buyers)
+            single_cnt = len(single_buyers)
+
+            conversion_rate = round((buyers_cnt / total_group_members) * 100, 1) if total_group_members > 0 else 0.0
+            repeat_rate = round((repeat_cnt / buyers_cnt) * 100, 1) if buyers_cnt > 0 else 0.0
+            avg_orders = round(orders_count / buyers_cnt, 1) if buyers_cnt > 0 else 0.0
+
+            group_member_ids = set(r[0] for r in conn.execute("SELECT DISTINCT customer_id FROM activity_logs WHERE action = 'group_join'").fetchall() if r[0])
+            engaged_ids = set(r[0] for r in conn.execute(
+                f"SELECT DISTINCT customer_id FROM activity_logs WHERE action IN ('group_message', 'bot_dm', 'web_link') AND ({user_date_filter})"
+            ).fetchall() if r[0])
+            all_user_ids = set(r[0] for r in conn.execute("SELECT customer_id FROM customers WHERE role = 'user'").fetchall() if r[0]) | group_member_ids
+
+            potential_ids = list(engaged_ids - buyers_all)
+            silent_ids = list(all_user_ids - buyers_all - set(potential_ids))
+
+            repeat_orders = sum(cust_order_map[c]['cnt'] for c in repeat_buyers)
+            repeat_gmv = sum(cust_order_map[c]['gmv'] for c in repeat_buyers)
+            repeat_comm = sum(cust_order_map[c]['comm'] for c in repeat_buyers)
+
+            single_orders = sum(cust_order_map[c]['cnt'] for c in single_buyers)
+            single_gmv = sum(cust_order_map[c]['gmv'] for c in single_buyers)
+            single_comm = sum(cust_order_map[c]['comm'] for c in single_buyers)
+
+            segments = [
+                {
+                    "segment_id": "repeat_buyers",
+                    "name": "Khách Hàng Thân Thiết (Mua Lại)",
+                    "description": "Thành viên đã mua từ 2 đơn hàng trở lên trong nhóm",
+                    "badge": "Khách VIP ⭐",
+                    "badge_variant": "amber",
+                    "icon": "Flame",
+                    "users_count": repeat_cnt,
+                    "orders_count": repeat_orders,
+                    "total_gmv": repeat_gmv,
+                    "total_commission": round_dong(repeat_comm),
+                    "conversion_rate": 100.0 if repeat_cnt > 0 else 0.0,
+                    "avg_order_value": round_dong(repeat_gmv / repeat_orders) if repeat_orders > 0 else 0,
+                    "action_hint": "Thành viên trung thành, thường xuyên săn sale qua bot",
+                },
+                {
+                    "segment_id": "first_buyers",
+                    "name": "Khách Mua Lần Đầu",
+                    "description": "Thành viên mới trải nghiệm hoàn tiền lần đầu thành công",
+                    "badge": "Mới kích hoạt 🛍️",
+                    "badge_variant": "blue",
+                    "icon": "ShoppingBag",
+                    "users_count": single_cnt,
+                    "orders_count": single_orders,
+                    "total_gmv": single_gmv,
+                    "total_commission": round_dong(single_comm),
+                    "conversion_rate": 100.0 if single_cnt > 0 else 0.0,
+                    "avg_order_value": round_dong(single_gmv / single_orders) if single_orders > 0 else 0,
+                    "action_hint": "Cần gửi deal hot định kỳ để kích hoạt mua lần 2",
+                },
+                {
+                    "segment_id": "engaged_potentials",
+                    "name": "Thành Viên Tương Tác (Chưa Mua)",
+                    "description": "Đã chat nhóm hoặc nhắn riêng bot lấy link nhưng chưa có đơn",
+                    "badge": "Tiềm năng cao 🔥",
+                    "badge_variant": "emerald",
+                    "icon": "MessageSquare",
+                    "users_count": len(potential_ids),
+                    "orders_count": 0,
+                    "total_gmv": 0,
+                    "total_commission": 0,
+                    "conversion_rate": 0.0,
+                    "avg_order_value": 0,
+                    "action_hint": "Đã quan tâm sản phẩm, cần kích thích bằng mã giảm giá",
+                },
+                {
+                    "segment_id": "new_silent",
+                    "name": "Thành Viên Mới (Chưa Tương Tác)",
+                    "description": "Mới vào group Zalo, đang dạo xem và chưa phát sinh hoạt động",
+                    "badge": "Người mới 🌿",
+                    "badge_variant": "slate",
+                    "icon": "Users",
+                    "users_count": len(silent_ids),
+                    "orders_count": 0,
+                    "total_gmv": 0,
+                    "total_commission": 0,
+                    "conversion_rate": 0.0,
+                    "avg_order_value": 0,
+                    "action_hint": "Cần tin nhắn chào mừng kèm hướng dẫn dán link nhận hoàn tiền",
+                },
+            ]
+
+            community_funnel = {
+                "group_members": total_group_members,
+                "total_users": total_users,
+                "new_group_members": new_group_members,
+                "new_users": new_users,
+                "buyers_count": buyers_cnt,
+                "repeat_buyers_count": repeat_cnt,
+                "single_buyers_count": single_cnt,
+                "orders_count": orders_count,
+                "conversion_rate": conversion_rate,
+                "repeat_rate": repeat_rate,
+                "avg_orders_per_buyer": avg_orders,
+                "segments": segments,
+            }
+
+            # Touchpoint Analytics (Group, Chat Bot 1-1, Web)
+            def _query_touchpoint(actions, name, description, icon, status_badge):
                 placeholders = ','.join(['?'] * len(actions))
                 user_rows = conn.execute(
-                    f"SELECT DISTINCT customer_id FROM activity_logs WHERE action IN ({placeholders}) AND {act_date_filter}",
+                    f"SELECT DISTINCT customer_id FROM activity_logs WHERE action IN ({placeholders}) AND ({user_date_filter})",
                     actions
                 ).fetchall()
-                channel_users = [r[0] for r in user_rows if r[0]]
+                t_users = [r[0] for r in user_rows if r[0]]
                 total_events = conn.execute(
-                    f"SELECT COUNT(*) FROM activity_logs WHERE action IN ({placeholders}) AND {act_date_filter}",
+                    f"SELECT COUNT(*) FROM activity_logs WHERE action IN ({placeholders}) AND ({user_date_filter})",
                     actions
                 ).fetchone()[0]
 
-                if not channel_users:
-                    return {
-                        "channel_id": actions[0],
-                        "name": name,
-                        "description": description,
-                        "icon": icon,
-                        "status_badge": status_badge,
-                        "unique_users": 0,
-                        "total_events": total_events,
-                        "converted_users": 0,
-                        "conversion_rate": 0.0,
-                        "orders_count": 0,
-                        "total_gmv": 0,
-                        "total_commission": 0,
-                    }
-
-                u_placeholders = ','.join(['?'] * len(channel_users))
-                orders_data = conn.execute(
-                    f"""
-                    SELECT COUNT(DISTINCT customer_id) as conv_users,
-                           COUNT(order_id) as orders_count,
-                           COALESCE(SUM(order_value), 0) as total_gmv,
-                           COALESCE(SUM(CASE WHEN status != 'rejected' THEN COALESCE(approved_commission, estimated_commission, 0) ELSE 0 END), 0) as total_comm
-                      FROM orders
-                     WHERE customer_id IN ({u_placeholders})
-                    """,
-                    channel_users
-                ).fetchone()
-
-                conv_users = orders_data[0]
-                conv_rate = round((conv_users / len(channel_users)) * 100, 1) if len(channel_users) > 0 else 0.0
                 return {
                     "channel_id": actions[0],
                     "name": name,
                     "description": description,
                     "icon": icon,
                     "status_badge": status_badge,
-                    "unique_users": len(channel_users),
+                    "unique_users": len(t_users),
                     "total_events": total_events,
-                    "converted_users": conv_users,
-                    "conversion_rate": conv_rate,
-                    "orders_count": orders_data[1],
-                    "total_gmv": orders_data[2],
-                    "total_commission": round_dong(orders_data[3]),
+                    "orders_count": 0,
+                    "total_gmv": 0,
+                    "total_commission": 0,
+                    "conversion_rate": 0.0,
                 }
 
             channels = [
-                _query_channel(
+                _query_touchpoint(
                     ["group_join"],
                     "Thành viên mới vào Group Zalo",
                     "Khách mới bấm tham gia nhóm cộng đồng săn sale",
                     "Users",
                     "Nguồn tăng trưởng 🚀"
                 ),
-                _query_channel(
+                _query_touchpoint(
                     ["group_message"],
                     "Nhắn tin tương tác trong Group",
                     "Chat, hỏi mã giảm giá & gửi link công khai trong nhóm",
                     "MessageSquare",
                     "Tương tác cộng đồng 🔥"
                 ),
-                _query_channel(
+                _query_touchpoint(
                     ["bot_dm"],
                     "Nhắn tin riêng 1-1 cho Bot",
                     "Inbox trực tiếp cho Bot Zalo để nhận link kín đáo",
                     "Bot",
                     "Tỷ lệ chốt đơn cao 💎"
                 ),
-                _query_channel(
+                _query_touchpoint(
                     ["login", "web_link", "web_use"],
                     "Khách truy cập & dùng Website",
                     "Đăng nhập web, dán link rút gọn & cập nhật STK ngân hàng",
@@ -1142,6 +1238,7 @@ class _Handler(BaseHTTPRequestHandler):
             "top_customers": top_customers,
             "top_products": top_products,
             "channels": channels,
+            "community_funnel": community_funnel,
             "financials": {
                 "gross_commission": round_dong(gross_commission) if is_admin else None,
                 "shopee_fee": shopee_fee if is_admin else None,

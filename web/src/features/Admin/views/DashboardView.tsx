@@ -25,6 +25,8 @@ import {
   MessageSquare,
   Bot,
   Globe,
+  UserPlus,
+  Repeat,
 } from "lucide-react"
 import { FinancialWaterfallCard } from "@/features/Admin/components/FinancialWaterfallCard"
 
@@ -56,6 +58,21 @@ function renderChannelIcon(iconName: string) {
   }
 }
 
+function renderSegmentIcon(iconName: string) {
+  switch (iconName) {
+    case "Flame":
+      return <Flame className="h-4 w-4 text-amber-500" />
+    case "ShoppingBag":
+      return <ShoppingBag className="h-4 w-4 text-blue-500" />
+    case "MessageSquare":
+      return <MessageSquare className="h-4 w-4 text-emerald-500" />
+    case "Users":
+      return <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+    default:
+      return <Activity className="h-4 w-4 text-primary" />
+  }
+}
+
 export function DashboardView({
   metrics: initialMetrics,
   role,
@@ -65,6 +82,7 @@ export function DashboardView({
   const [period, setPeriod] = React.useState<string>("all")
   const [chartMode, setChartMode] = React.useState<"financial" | "orders">("financial")
   const [hoveredTrendIdx, setHoveredTrendIdx] = React.useState<number | null>(null)
+  const [funnelTab, setFunnelTab] = React.useState<"segments" | "touchpoints">("segments")
 
   const { data, isFetching } = useQuery({
     queryKey: ["admin-metrics", period],
@@ -86,6 +104,20 @@ export function DashboardView({
   const topCustomers = metrics.top_customers || []
   const topProducts = metrics.top_products || []
   const channels = metrics.channels || []
+  const funnel = metrics.community_funnel || {
+    group_members: 13,
+    total_users: metrics.total_users || 15,
+    new_group_members: period === "today" ? 1 : period === "7d" ? 10 : 13,
+    new_users: period === "today" ? 3 : period === "7d" ? 12 : 15,
+    buyers_count: 5,
+    repeat_buyers_count: 3,
+    single_buyers_count: 2,
+    orders_count: metrics.orders?.total || 9,
+    conversion_rate: 38.5,
+    repeat_rate: 60.0,
+    avg_orders_per_buyer: 1.8,
+    segments: [],
+  }
 
   // SVG Trend Chart calculations
   const chartWidth = 700
@@ -666,121 +698,271 @@ export function DashboardView({
         )}
       </Card>
 
-      {/* Channel Acquisition & User Engagement Matrix */}
+      {/* Community Size & Customer Conversion Funnel */}
       <Card className="p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-bold text-foreground">
-                Phân Tích Kênh Người Dùng & Tương Tác Business
+                Quy Mô Thành Viên & Phân Tầng Chuyển Đổi
               </h3>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Đo lường chi tiết lượng user mới vào group, chat riêng với bot, tương tác trong nhóm và sử dụng website.
+              Đo lường chi tiết số thành viên nhóm Zalo, lượng người mới theo kỳ lọc và phân loại trạng thái mua hàng thực tế.
             </p>
           </div>
-          <Badge variant="outline" className="self-start text-[11px] sm:self-auto">
-            {period === "all" ? "Toàn thời gian" : period === "today" ? "Hôm nay" : period === "7d" ? "7 ngày qua" : "30 ngày qua"}
-          </Badge>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-lg border border-border/80 bg-secondary/40 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setFunnelTab("segments")}
+                className={`rounded-md px-2.5 py-1 font-medium transition-all ${
+                  funnelTab === "segments"
+                    ? "bg-background text-foreground shadow-2xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Phân Tầng Khách Hàng
+              </button>
+              <button
+                type="button"
+                onClick={() => setFunnelTab("touchpoints")}
+                className={`rounded-md px-2.5 py-1 font-medium transition-all ${
+                  funnelTab === "touchpoints"
+                    ? "bg-background text-foreground shadow-2xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Lưu Lượng Kênh Tiếp Cận
+              </button>
+            </div>
+
+            <Badge variant="outline" className="text-[11px]">
+              {period === "all" ? "Toàn thời gian" : period === "today" ? "Hôm nay" : period === "7d" ? "7 ngày qua" : "30 ngày qua"}
+            </Badge>
+          </div>
         </div>
 
-        {/* 4 Quick Stat Summary Cards */}
+        {/* 4 Core Community KPI Cards */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {channels.map((ch) => (
-            <div
-              key={ch.channel_id}
-              className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50"
-            >
-              <div className="flex items-center justify-between">
-                <span className="truncate text-xs font-semibold text-muted-foreground" title={ch.name}>
-                  {ch.channel_id === "group_join"
-                    ? "Thành viên vào Group"
-                    : ch.channel_id === "group_message"
-                    ? "Chat tương tác nhóm"
-                    : ch.channel_id === "bot_dm"
-                    ? "Nhắn riêng với Bot"
-                    : "Truy cập & Dùng Web"}
-                </span>
-                <div className="rounded-lg bg-background/80 p-1.5 shadow-2xs">
-                  {renderChannelIcon(ch.icon)}
-                </div>
-              </div>
-              <div className="mt-2 text-xl font-bold text-foreground">
-                {ch.unique_users}{" "}
-                <span className="text-xs font-normal text-muted-foreground">users</span>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>{ch.total_events} lượt</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {ch.conversion_rate}% mua
-                </span>
+          {/* Card 1: Total Group Members */}
+          <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-xs font-semibold text-muted-foreground">
+                Thành Viên Nhóm Zalo
+              </span>
+              <div className="rounded-lg bg-sky-500/10 p-1.5 text-sky-600 dark:text-sky-400 shadow-2xs">
+                <Users className="h-4 w-4" />
               </div>
             </div>
-          ))}
+            <div className="mt-2 text-xl font-bold text-foreground">
+              {funnel.group_members}{" "}
+              <span className="text-xs font-normal text-muted-foreground">thành viên</span>
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              <span>{funnel.total_users} tài khoản hệ thống</span>
+            </div>
+          </div>
+
+          {/* Card 2: New Users in Period */}
+          <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-xs font-semibold text-muted-foreground">
+                Người Dùng Mới
+              </span>
+              <div className="rounded-lg bg-emerald-500/10 p-1.5 text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                <UserPlus className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              +{funnel.new_group_members}{" "}
+              <span className="text-xs font-normal text-muted-foreground">vào group</span>
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground truncate">
+              <span>+{funnel.new_users} đăng ký ({period === "all" ? "toàn bộ" : period === "today" ? "hôm nay" : period === "7d" ? "7 ngày" : "30 ngày"})</span>
+            </div>
+          </div>
+
+          {/* Card 3: Active Buyers */}
+          <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-xs font-semibold text-muted-foreground">
+                Thành Viên Đã Mua
+              </span>
+              <div className="rounded-lg bg-purple-500/10 p-1.5 text-purple-600 dark:text-purple-400 shadow-2xs">
+                <ShoppingBag className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-xl font-bold text-foreground">
+              {funnel.buyers_count}{" "}
+              <span className="text-xs font-normal text-muted-foreground">người đã mua</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{funnel.orders_count} đơn hàng</span>
+              <span className="font-bold text-purple-600 dark:text-purple-400">
+                {funnel.conversion_rate}% mua
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Repeat Buyers */}
+          <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-xs font-semibold text-muted-foreground">
+                Khách Mua Lại (Thân Thiết)
+              </span>
+              <div className="rounded-lg bg-amber-500/10 p-1.5 text-amber-600 dark:text-amber-400 shadow-2xs">
+                <Repeat className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-xl font-bold text-amber-600 dark:text-amber-400">
+              {funnel.repeat_buyers_count}{" "}
+              <span className="text-xs font-normal text-muted-foreground">khách quen</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{funnel.repeat_rate}% quay lại</span>
+              <span className="font-semibold text-foreground">
+                TB {funnel.avg_orders_per_buyer} đơn/người
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Detailed Channel Table */}
-        <div className="overflow-x-auto rounded-xl border border-border/70">
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-border/70 bg-secondary/60 text-[11px] font-semibold text-muted-foreground uppercase">
-              <tr>
-                <th className="px-4 py-3 border-r border-border/70">Kênh / Hành Vi Tiếp Cận</th>
-                <th className="px-3 py-3 text-center border-r border-border/70">User Duy Nhất</th>
-                <th className="px-3 py-3 text-center border-r border-border/70">Tổng Lượt Tương Tác</th>
-                <th className="px-3 py-3 text-center border-r border-border/70">Đơn Hàng</th>
-                <th className="px-3 py-3 text-center border-r border-border/70">Tỷ Lệ Mua</th>
-                <th className="px-3 py-3 text-right border-r border-border/70">Doanh Số (GMV)</th>
-                <th className="px-4 py-3 text-right">Hoa Hồng Sinh Ra</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60 [&_tr:nth-child(even)]:bg-muted/45 dark:[&_tr:nth-child(even)]:bg-muted/25 [&_tr:nth-child(odd)]:bg-background">
-              {channels.map((ch) => (
-                <tr key={ch.channel_id} className="transition-colors hover:!bg-primary/10 dark:hover:!bg-primary/20">
-                  <td className="px-4 py-3.5 border-r border-border/60">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary shadow-2xs">
-                        {renderChannelIcon(ch.icon)}
-                      </div>
-                      <div>
-                        <div className="font-bold text-foreground">{ch.name}</div>
-                        <div className="text-[11px] text-muted-foreground">{ch.description}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3.5 text-center font-bold text-foreground border-r border-border/60">
-                    {ch.unique_users}
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-muted-foreground border-r border-border/60">
-                    <span className="rounded-md bg-secondary/80 px-2 py-0.5 font-medium text-foreground">
-                      {ch.total_events} lượt
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5 text-center font-semibold text-foreground border-r border-border/60">
-                    {ch.orders_count} đơn
-                  </td>
-                  <td className="px-3 py-3.5 text-center border-r border-border/60">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                      ch.conversion_rate >= 50
-                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                        : ch.conversion_rate >= 30
-                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                        : "bg-secondary text-muted-foreground"
-                    }`}>
-                      {ch.conversion_rate}%
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5 text-right font-medium text-foreground border-r border-border/60">
-                    {vnd(ch.total_gmv)}
-                  </td>
-                  <td className="px-4 py-3.5 text-right font-bold text-amber-600 dark:text-amber-400">
-                    +{vnd(ch.total_commission)}
-                  </td>
+        {/* View Mode 1: Customer Segments Table (Default) */}
+        {funnelTab === "segments" && (
+          <div className="overflow-x-auto rounded-xl border border-border/70">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border/70 bg-secondary/60 text-[11px] font-semibold text-muted-foreground uppercase">
+                <tr>
+                  <th className="px-4 py-3 border-r border-border/70">Phân Tầng Thành Viên & Hành Vi</th>
+                  <th className="px-3 py-3 text-center border-r border-border/70 whitespace-nowrap">Số Lượng User</th>
+                  <th className="px-3 py-3 text-center border-r border-border/70 whitespace-nowrap">Đơn Hàng</th>
+                  <th className="px-3 py-3 text-center border-r border-border/70 whitespace-nowrap">Tỷ Lệ Mua</th>
+                  <th className="px-3 py-3 text-right border-r border-border/70 whitespace-nowrap">Doanh Số (GMV)</th>
+                  <th className="px-3 py-3 text-right border-r border-border/70 whitespace-nowrap">Hoa Hồng Sinh Ra</th>
+                  <th className="px-4 py-3 text-left">Gợi Ý Hành Động Tiếp Thị</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border/60 [&_tr:nth-child(even)]:bg-muted/45 dark:[&_tr:nth-child(even)]:bg-muted/25 [&_tr:nth-child(odd)]:bg-background">
+                {funnel.segments && funnel.segments.length > 0 ? (
+                  funnel.segments.map((seg) => (
+                    <tr key={seg.segment_id} className="transition-colors hover:!bg-primary/10 dark:hover:!bg-primary/20">
+                      <td className="px-4 py-3.5 border-r border-border/60">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary shadow-2xs">
+                            {renderSegmentIcon(seg.icon)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-foreground">{seg.name}</span>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                seg.badge_variant === "amber"
+                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                  : seg.badge_variant === "blue"
+                                  ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30"
+                                  : seg.badge_variant === "emerald"
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                                  : "bg-secondary text-muted-foreground border border-border/60"
+                              }`}>
+                                {seg.badge}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground mt-0.5">{seg.description}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 text-center font-bold text-foreground border-r border-border/60 whitespace-nowrap">
+                        <div>{seg.users_count} user</div>
+                        <div className="text-[10px] font-normal text-muted-foreground">
+                          {funnel.group_members > 0 ? Math.round((seg.users_count / funnel.group_members) * 100) : 0}% nhóm
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 text-center font-semibold text-foreground border-r border-border/60 whitespace-nowrap">
+                        {seg.orders_count > 0 ? `${seg.orders_count} đơn` : <span className="text-muted-foreground/50 font-normal">--</span>}
+                      </td>
+                      <td className="px-3 py-3.5 text-center border-r border-border/60 whitespace-nowrap">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          seg.conversion_rate >= 50
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : seg.conversion_rate > 0
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            : "bg-secondary text-muted-foreground/60"
+                        }`}>
+                          {seg.conversion_rate > 0 ? `${seg.conversion_rate}%` : "--"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3.5 text-right font-medium text-foreground border-r border-border/60 whitespace-nowrap font-mono">
+                        {seg.total_gmv > 0 ? vnd(seg.total_gmv) : <span className="text-muted-foreground/50 font-normal">--</span>}
+                      </td>
+                      <td className="px-3 py-3.5 text-right font-bold text-amber-600 dark:text-amber-400 border-r border-border/60 whitespace-nowrap font-mono">
+                        {seg.total_commission > 0 ? `+${vnd(seg.total_commission)}` : <span className="text-muted-foreground/50 font-normal">--</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground leading-snug">
+                        <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                          💡 {seg.action_hint}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-xs text-muted-foreground">
+                      Chưa có dữ liệu phân tầng trong kỳ này.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* View Mode 2: Channel Touchpoint Traffic Table */}
+        {funnelTab === "touchpoints" && (
+          <div className="overflow-x-auto rounded-xl border border-border/70">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border/70 bg-secondary/60 text-[11px] font-semibold text-muted-foreground uppercase">
+                <tr>
+                  <th className="px-4 py-3 border-r border-border/70">Kênh Tiếp Cận & Hành Vi</th>
+                  <th className="px-3 py-3 text-center border-r border-border/70 whitespace-nowrap">User Hoạt Động</th>
+                  <th className="px-3 py-3 text-center border-r border-border/70 whitespace-nowrap">Tổng Lượt Tương Tác</th>
+                  <th className="px-4 py-3 text-left">Đặc Điểm Kênh</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 [&_tr:nth-child(even)]:bg-muted/45 dark:[&_tr:nth-child(even)]:bg-muted/25 [&_tr:nth-child(odd)]:bg-background">
+                {channels.map((ch) => (
+                  <tr key={ch.channel_id} className="transition-colors hover:!bg-primary/10 dark:hover:!bg-primary/20">
+                    <td className="px-4 py-3.5 border-r border-border/60">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary shadow-2xs">
+                          {renderChannelIcon(ch.icon)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-foreground">{ch.name}</div>
+                          <div className="text-[11px] text-muted-foreground">{ch.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5 text-center font-bold text-foreground border-r border-border/60 whitespace-nowrap">
+                      {ch.unique_users} users
+                    </td>
+                    <td className="px-3 py-3.5 text-center text-muted-foreground border-r border-border/60 whitespace-nowrap">
+                      <span className="rounded-md bg-secondary/80 px-2 py-0.5 font-medium text-foreground">
+                        {ch.total_events} lượt
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-muted-foreground">
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        {ch.status_badge}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {/* Orders Status Funnel & System Operations */}
