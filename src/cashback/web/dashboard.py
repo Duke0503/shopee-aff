@@ -675,6 +675,10 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._record_group_info()
+        if path == "/api/activity/sync-group-members":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._sync_group_members()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -2060,6 +2064,68 @@ class _Handler(BaseHTTPRequestHandler):
             """, (group_id, group_name, total_members))
             conn.commit()
         return self._json({"ok": True, "group_id": group_id, "group_name": group_name, "total_members": total_members})
+
+    def _sync_group_members(self):
+        body = self._body()
+        group_id = str(body.get("group_id") or "2417491944968337600").strip()
+        group_name = str(body.get("group_name") or "Hoàn Tiền Shopee").strip()
+        members = body.get("members") or []
+        if not group_id or not members:
+            return self._json({"ok": False, "message": "missing_data"}, 400)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS group_info (
+                    group_id        TEXT PRIMARY KEY,
+                    group_name      TEXT NOT NULL,
+                    total_members   INTEGER NOT NULL,
+                    updated_at      TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                INSERT OR REPLACE INTO group_info (group_id, group_name, total_members, updated_at)
+                VALUES (?, ?, ?, datetime('now'))
+            """, (group_id, group_name, len(members) + 1))
+
+            synced_count = 0
+            for m in members:
+                uid = str(m.get("uid") or "").strip()
+                name = str(m.get("name") or "").strip()
+                if not uid:
+                    continue
+
+                existing = conn.execute(
+                    "SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?",
+                    (uid, uid)
+                ).fetchone()
+
+                if not existing:
+                    conn.execute("""
+                        INSERT INTO customers (customer_id, zalo_user_id, display_name, role, status, created_at)
+                        VALUES (?, ?, ?, 'user', 'active', datetime('now'))
+                    """, (uid, uid, name or f"Thành viên {uid[-4:]}"))
+                    synced_count += 1
+                elif name:
+                    conn.execute("""
+                        UPDATE customers 
+                        SET display_name = COALESCE(NULLIF(display_name, ''), ?),
+                            zalo_user_id = COALESCE(NULLIF(zalo_user_id, ''), ?)
+                        WHERE customer_id = ?
+                    """, (name, uid, existing[0]))
+
+                act_exist = conn.execute(
+                    "SELECT id FROM activity_logs WHERE customer_id = ? AND action = 'group_join'",
+                    (uid,)
+                ).fetchone()
+                if not act_exist:
+                    conn.execute("""
+                        INSERT INTO activity_logs (customer_id, action, path, detail, created_at)
+                        VALUES (?, 'group_join', ?, ?, datetime('now'))
+                    """, (uid, f"zalo_group_{group_id}", json.dumps({"groupId": group_id, "groupName": group_name, "sync": True}, ensure_ascii=False)))
+
+            conn.commit()
+
+        return self._json({"ok": True, "synced_count": synced_count, "total": len(members)})
 
     def _shopee_preview(self):
         from ..shopee.commission import lookup

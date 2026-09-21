@@ -812,15 +812,47 @@ function extractTextAndUrls(data) {
             total_members: totalMembers,
           }),
         }).catch(() => {});
+
+        // Bóc tách danh sách UID thành viên trong nhóm và đồng bộ vào hệ thống khách hàng
+        const uids = (gInfo.memVerList || []).map((item) => item.split("_")[0]);
+        if (uids.length > 0) {
+          const members = [];
+          for (const uid of uids) {
+            if (uid === ownId) continue;
+            try {
+              const uInfo = await api.getUserInfo(uid);
+              const name =
+                uInfo?.changed_profiles?.[uid]?.zaloName ||
+                uInfo?.displayName ||
+                uInfo?.name ||
+                ("Thành viên " + uid.slice(-4));
+              members.push({ uid, name });
+            } catch (_) {
+              members.push({ uid, name: "Thành viên " + uid.slice(-4) });
+            }
+          }
+
+          // Đồng bộ vào cơ sở dữ liệu khách hàng
+          await fetch(`${config.MAIN_API_URL}/api/activity/sync-group-members`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              group_id: targetGid,
+              group_name: groupName,
+              members,
+            }),
+          }).catch(() => {});
+          console.log(`[Group Sync] Đã đồng bộ chi tiết ${members.length} thành viên vào danh sách khách hàng`);
+        }
       }
     } catch (err) {
       console.warn(`[syncGroupInfo Warning]:`, err.message);
     }
   }
 
-  // Chạy đồng bộ nhóm ngay khi khởi động và định kỳ mỗi 60s
+  // Chạy đồng bộ nhóm ngay khi khởi động và định kỳ mỗi 5 phút
   syncGroupInfo();
-  setInterval(syncGroupInfo, 60000);
+  setInterval(syncGroupInfo, 5 * 60 * 1000);
 
   server.listen(config.PORT, () => {
     console.log(`[HTTP Server] Notification API đang chạy tại http://localhost:${config.PORT}`);
