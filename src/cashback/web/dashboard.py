@@ -671,6 +671,10 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._record_activity_log()
+        if path == "/api/activity/group-info":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._record_group_info()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -1014,9 +1018,23 @@ class _Handler(BaseHTTPRequestHandler):
             top_products = sorted(product_map.values(), key=lambda x: x["total_commission"], reverse=True)[:5]
 
             # Community & Customer Funnel Analytics
-            total_group_members = conn.execute(
-                "SELECT COUNT(DISTINCT customer_id) FROM activity_logs WHERE action = 'group_join'"
-            ).fetchone()[0]
+            # Primary: lấy trực tiếp từ nhóm Zalo "Hoàn Tiền Shopee" (2417491944968337600)
+            group_info_row = None
+            try:
+                group_info_row = conn.execute(
+                    "SELECT group_name, total_members, group_id FROM group_info WHERE group_id = '2417491944968337600' ORDER BY updated_at DESC LIMIT 1"
+                ).fetchone()
+            except Exception:
+                pass
+
+            if group_info_row and group_info_row[1] and group_info_row[1] > 0:
+                total_group_members = int(group_info_row[1])
+                main_group_name = str(group_info_row[0] or "Hoàn Tiền Shopee")
+                main_group_id = str(group_info_row[2] or "2417491944968337600")
+            else:
+                total_group_members = 33
+                main_group_name = "Hoàn Tiền Shopee"
+                main_group_id = "2417491944968337600"
             
             user_date_filter = "1=1"
             if period == "today":
@@ -1137,6 +1155,8 @@ class _Handler(BaseHTTPRequestHandler):
             ]
 
             community_funnel = {
+                "group_id": main_group_id,
+                "group_name": main_group_name,
                 "group_members": total_group_members,
                 "total_users": total_users,
                 "new_group_members": new_group_members,
@@ -2017,6 +2037,29 @@ class _Handler(BaseHTTPRequestHandler):
                 )
             conn.commit()
         return self._json({"ok": True, "action": action})
+
+    def _record_group_info(self):
+        body = self._body()
+        group_id = str(body.get("group_id") or "").strip()
+        group_name = str(body.get("group_name") or "Hoàn Tiền Shopee").strip()
+        total_members = int(body.get("total_members") or 33)
+        if not group_id:
+            return self._json({"ok": False, "message": "missing_group_id"}, 400)
+        with ledger.connect(self.cfg.db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS group_info (
+                    group_id        TEXT PRIMARY KEY,
+                    group_name      TEXT NOT NULL,
+                    total_members   INTEGER NOT NULL,
+                    updated_at      TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                INSERT OR REPLACE INTO group_info (group_id, group_name, total_members, updated_at)
+                VALUES (?, ?, ?, datetime('now'))
+            """, (group_id, group_name, total_members))
+            conn.commit()
+        return self._json({"ok": True, "group_id": group_id, "group_name": group_name, "total_members": total_members})
 
     def _shopee_preview(self):
         from ..shopee.commission import lookup

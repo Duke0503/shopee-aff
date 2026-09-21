@@ -105,15 +105,17 @@ export function DashboardView({
   const topProducts = metrics.top_products || []
   const channels = metrics.channels || []
   const funnel = metrics.community_funnel || {
-    group_members: 13,
+    group_id: "2417491944968337600",
+    group_name: "Hoàn Tiền Shopee",
+    group_members: 33,
     total_users: metrics.total_users || 15,
-    new_group_members: period === "today" ? 1 : period === "7d" ? 10 : 13,
+    new_group_members: period === "today" ? 1 : period === "7d" ? 10 : 33,
     new_users: period === "today" ? 3 : period === "7d" ? 12 : 15,
     buyers_count: 5,
     repeat_buyers_count: 3,
     single_buyers_count: 2,
     orders_count: metrics.orders?.total || 9,
-    conversion_rate: 38.5,
+    conversion_rate: 15.2,
     repeat_rate: 60.0,
     avg_orders_per_buyer: 1.8,
     segments: [],
@@ -750,8 +752,8 @@ export function DashboardView({
           {/* Card 1: Total Group Members */}
           <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 transition-colors hover:bg-secondary/50">
             <div className="flex items-center justify-between">
-              <span className="truncate text-xs font-semibold text-muted-foreground">
-                Thành Viên Nhóm Zalo
+              <span className="truncate text-xs font-semibold text-muted-foreground" title={funnel.group_name ? `Nhóm: ${funnel.group_name}` : "Thành Viên Nhóm Zalo"}>
+                {funnel.group_name ? `Nhóm: ${funnel.group_name}` : "Thành Viên Nhóm Zalo"}
               </span>
               <div className="rounded-lg bg-sky-500/10 p-1.5 text-sky-600 dark:text-sky-400 shadow-2xs">
                 <Users className="h-4 w-4" />
@@ -761,8 +763,9 @@ export function DashboardView({
               {funnel.group_members}{" "}
               <span className="text-xs font-normal text-muted-foreground">thành viên</span>
             </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              <span>{funnel.total_users} tài khoản hệ thống</span>
+            <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>Nhóm Zalo chính ({funnel.total_users} user web)</span>
             </div>
           </div>
 

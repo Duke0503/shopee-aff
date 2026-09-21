@@ -228,6 +228,8 @@ export interface UserSegment {
 }
 
 export interface CommunityFunnel {
+  group_id?: string
+  group_name?: string
   group_members: number
   total_users: number
   new_group_members: number

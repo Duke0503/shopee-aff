@@ -3,8 +3,8 @@ export const config = {
   GROUP_TEST_ID: "9181140731214988069", // Dev Internal DP
   GROUP_MAIN_ID: "2417491944968337600", // Hoàn Tiền Shopee (Cộng Đồng Hoàn Tiền DP)
 
-  // Nhóm đang hoạt động: Dừng ở bước chuyển giao, hiện tại chỉ chạy ở nhóm TEST!
-  ACTIVE_GROUP_ID: "9181140731214988069",
+  // Nhóm đang hoạt động: Chuyển sang nhóm chính Hoàn Tiền Shopee!
+  ACTIVE_GROUP_ID: "2417491944968337600",
 
   // Danh sách UID Quản trị viên toàn hệ thống (Minh Đức & Xuân Phước)
   // Khi gửi link hoặc lệnh, bot sẽ không tag tên mà chỉ phản hồi nội dung

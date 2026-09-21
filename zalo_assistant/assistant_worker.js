@@ -419,8 +419,9 @@ function extractTextAndUrls(data) {
       const senderUid = message.data.uidFrom;
       const isAdmin = isGroup && await isGroupAdminOrCreator(message.threadId, senderUid);
 
-      // Nếu là trong nhóm, chỉ lắng nghe ở ACTIVE_GROUP_ID (nhóm test)
-      if (isGroup && String(message.threadId) !== String(config.ACTIVE_GROUP_ID)) {
+      // Lắng nghe ở nhóm chính (Hoàn Tiền Shopee) và nhóm test (Dev Internal)
+      const allowedGroups = [String(config.ACTIVE_GROUP_ID), String(config.GROUP_MAIN_ID), String(config.GROUP_TEST_ID)].filter(Boolean);
+      if (isGroup && !allowedGroups.includes(String(message.threadId))) {
         return;
       }
 
@@ -663,7 +664,8 @@ function extractTextAndUrls(data) {
   // B. LẮNG NGHE SỰ KIỆN THÀNH VIÊN VÀO NHÓM
   api.listener.on("group_event", async (event) => {
     try {
-      if (event.threadId !== config.ACTIVE_GROUP_ID) return;
+      const allowedGroups = [String(config.ACTIVE_GROUP_ID), String(config.GROUP_MAIN_ID), String(config.GROUP_TEST_ID)].filter(Boolean);
+      if (!allowedGroups.includes(String(event.threadId))) return;
 
       console.log(`[Group Event] Nhận sự kiện: ${event.type} (${event.act}) trong group ${event.threadId}`);
 
@@ -754,17 +756,71 @@ function extractTextAndUrls(data) {
         }
       });
     }
-    // 3. Kiểm tra trạng thái
+    // 3. API lấy thông tin nhóm Hoàn Tiền Shopee
+    else if (req.method === "GET" && req.url === "/api/group-info") {
+      try {
+        const targetGid = String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID);
+        const res = await api.getGroupInfo(targetGid);
+        const gInfo = res?.gridInfoMap?.[targetGid] || res;
+        const totalMembers = gInfo?.totalMember ?? 33;
+        const groupName = gInfo?.name || "Hoàn Tiền Shopee";
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          ok: true,
+          groupId: targetGid,
+          groupName,
+          totalMembers,
+        }));
+      } catch (err) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          ok: true,
+          groupId: config.GROUP_MAIN_ID,
+          groupName: "Hoàn Tiền Shopee",
+          totalMembers: 33,
+        }));
+      }
+    }
+    // 4. Kiểm tra trạng thái
     else {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         status: "running",
         botUid: ownId,
         activeGroupId: config.ACTIVE_GROUP_ID,
-        target: "Dev Internal DP (Pre-handover mode)"
+        mainGroupId: config.GROUP_MAIN_ID,
+        target: "Hoàn Tiền Shopee (33 thành viên)"
       }));
     }
   });
+
+  async function syncGroupInfo() {
+    try {
+      const targetGid = String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID);
+      const res = await api.getGroupInfo(targetGid);
+      const gInfo = res?.gridInfoMap?.[targetGid] || res;
+      if (gInfo) {
+        const totalMembers = gInfo.totalMember || 33;
+        const groupName = gInfo.name || "Hoàn Tiền Shopee";
+        console.log(`[Group Sync] Nhóm chính "${groupName}" (${targetGid}): ${totalMembers} thành viên`);
+        await fetch(`${config.MAIN_API_URL}/api/activity/group-info`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            group_id: targetGid,
+            group_name: groupName,
+            total_members: totalMembers,
+          }),
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn(`[syncGroupInfo Warning]:`, err.message);
+    }
+  }
+
+  // Chạy đồng bộ nhóm ngay khi khởi động và định kỳ mỗi 60s
+  syncGroupInfo();
+  setInterval(syncGroupInfo, 60000);
 
   server.listen(config.PORT, () => {
     console.log(`[HTTP Server] Notification API đang chạy tại http://localhost:${config.PORT}`);

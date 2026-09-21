@@ -212,6 +212,13 @@ CREATE TABLE IF NOT EXISTS payment_transfers (
 );
 CREATE INDEX IF NOT EXISTS idx_transfer_customer ON payment_transfers(customer_id);
 CREATE INDEX IF NOT EXISTS idx_transfer_time ON payment_transfers(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS group_info (
+    group_id        TEXT PRIMARY KEY,
+    group_name      TEXT NOT NULL,
+    total_members   INTEGER NOT NULL,
+    updated_at      TEXT NOT NULL
+);
 """
 
 
