@@ -94,7 +94,7 @@ class TestPayouts:
         """The snapshot already applied the rate. Applying it twice is
         how the console and the CLI quote the same order differently."""
         out = self._run(busy, capsys)
-        assert "4,418" in out            # 80% of 5,522, halves upward
+        assert "3,933" in out            # 80% of net 4,916 (5,522 * 0.8902 * 0.80)
 
     def test_an_empty_ledger_says_so_rather_than_crashing(self, db, capsys):
         ledger_ops.cmd_payouts(_cfg(db), argparse.Namespace(qr=False))

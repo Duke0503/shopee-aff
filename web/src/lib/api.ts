@@ -330,6 +330,8 @@ export interface AdminEmployee {
 
 export interface OrderFinancialBreakdown {
   gross_commission: number
+  shopee_rate?: number
+  seller_rate?: number
   shopee_part: number
   seller_part: number
   service_fee: number
@@ -356,6 +358,8 @@ export interface AdminOrder {
   source_url: string | null
   affiliate_url: string | null
   product: string
+  item_id?: string | null
+  image_url?: string | null
   financial_breakdown?: OrderFinancialBreakdown
 }
 
@@ -388,9 +392,16 @@ export interface ProductBuyer {
 
 export interface AdminProduct {
   item_id: string
+  shop_id?: string | null
   name: string
   price: number
   price_formatted: string
+  shopee_rate?: number | null
+  seller_rate?: number | null
+  shopee_part?: number | null
+  shopee_part_formatted?: string | null
+  seller_part?: number | null
+  seller_part_formatted?: string | null
   total_commission: number
   commission_formatted: string
   cashback: number

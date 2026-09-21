@@ -240,7 +240,7 @@ def handle(
         # into money in their head. One worked example at a typical rate
         # does what the percentage cannot.
         "example": _vnd(round_dong(
-            EXAMPLE_ORDER_VND * EXAMPLE_RATE * 0.9 * cashback_rate)),
+            EXAMPLE_ORDER_VND * EXAMPLE_RATE * (1 - 0.10 - 0.0098) * cashback_rate)),
     }
 
     common["tax_clause"] = (
@@ -386,8 +386,9 @@ def handle(
                 status = row["status"]
                 if status == ledger.AWAITING_APPROVAL:
                     est = row["estimated_commission"]
+                    net_est = round_dong((est or 0) * (1 - 0.10 - 0.0098))
                     cashback_str = (
-                        _vnd(round_dong((est or 0) * cashback_rate))
+                        _vnd(round_dong(net_est * cashback_rate))
                         if est
                         else messages.render("cashback_unknown")
                     )
@@ -635,7 +636,8 @@ def deliver_ready_links(
                 "cap_line", cap=_vnd(CAP)
             ) if estimate.is_capped else ""
             raw_comm = estimate.commission
-            cb = round_dong(raw_comm * cashback_rate)
+            net_comm = round_dong(raw_comm * (1 - 0.10 - 0.0098))
+            cb = round_dong(net_comm * cashback_rate)
             text = messages.render(
                 "link_ready",
                 link=row["affiliate_url"],
@@ -817,11 +819,12 @@ def notify_order_changes(
         _, _, identity = _order_identity(row)
         if status == ledger.AWAITING_APPROVAL:
             estimate = row["estimated_commission"]
+            net_est = round_dong((estimate or 0) * (1 - 0.10 - 0.0098))
             text = messages.render(
                 "order_recorded",
                 order_id=row["order_id"],
                 identity=identity,
-                cashback=_vnd(round_dong((estimate or 0) * cashback_rate))
+                cashback=_vnd(round_dong(net_est * cashback_rate))
                 if estimate else messages.render("cashback_unknown"),
                 days=payout_window,
             )

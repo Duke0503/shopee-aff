@@ -285,7 +285,7 @@ export function DashboardView({
                   >
                     <Percent className="mr-0.5 h-2.5 w-2.5" /> Biên lãi {fin.estimated_net_margin ?? fin.real_net_margin ?? kpis.net_margin}%
                   </Badge>
-                  <span className="truncate">Sau thuế, phí sàn & hoàn khách</span>
+                  <span className="truncate">20% trên thực nhận Shopee</span>
                 </div>
               </div>
             </Card>

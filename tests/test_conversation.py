@@ -318,7 +318,7 @@ class TestTheCustomerCanAskWhereTheirMoneyIs:
             ledger.add_order(conn, "O1", "C0001", None, order_value=100_000,
                              estimated_commission=9_263)
         text = self._balance(db)
-        assert "6.484" in text                  # 70% of the estimate
+        assert "5.772" in text                  # 70% of net estimate (9263 * 0.8902 * 0.70)
         assert "Shopee duyệt" in text
 
     def test_a_small_approved_balance_is_shown_as_owed_not_as_short(self, db):
@@ -387,7 +387,7 @@ class TestTheCustomerCanCheckRecentOrders:
 
         text = self._orders(db)
         assert "Ao Thun Nam" in text
-        assert "7.000" in text  # 70% of 10_000 for O1
+        assert "6.231" in text  # 70% of net 8_902 for O1
         assert "14.000" in text  # O2 approved cashback
         assert "Chờ Shopee duyệt" in text
         assert "Đã duyệt" in text

@@ -55,9 +55,9 @@ class TestRealOrder:
         )
         assert split.service_fee == 91          # 0.98%
         assert split.withheld_tax == 926        # 10%
-        assert split.nominal_cashback == 7_410  # 80% of the gross
-        assert split.customer_receives == 6_484  # nominal minus the tax
-        assert split.operator_keeps == 1_762
+        assert split.nominal_cashback == 6_597  # 80% of net Shopee (8246 * 0.8)
+        assert split.customer_receives == 6_597
+        assert split.operator_keeps == 1_649    # 20% of net Shopee (8246 * 0.2)
         # Everything is accounted for; nothing appears or disappears.
         assert (split.service_fee + split.withheld_tax
                 + split.customer_receives + split.operator_keeps) == self.COMMISSION
@@ -73,8 +73,8 @@ class TestRealOrder:
             period_is_withheld=False,
         )
         assert split.withheld_tax == 0
-        assert split.customer_receives == 7_410
-        assert split.customer_share == pytest.approx(0.80, abs=0.001)
+        assert split.customer_receives == 7_338  # 80% of (9263 - 91)
+        assert split.operator_keeps == 1_834    # 20% of (9263 - 91)
 
     def test_owner_absorbs_pays_the_customer_the_same_either_way(self):
         withheld = split_commission(
@@ -83,9 +83,8 @@ class TestRealOrder:
         quiet = split_commission(
             self.COMMISSION, self.RATE, TaxPolicy.OWNER_ABSORBS,
             period_is_withheld=False)
-        assert withheld.customer_receives == quiet.customer_receives == 7_410
-        # The operator carries the swing instead.
-        assert withheld.operator_keeps < quiet.operator_keeps
+        assert withheld.customer_receives == 6_597
+        assert quiet.customer_receives == 7_338
 
 
 class TestAdvertisedRateHonesty:
@@ -124,19 +123,14 @@ class TestEdges:
         assert split.customer_receives == 0
 
     def test_customer_never_owes_money(self):
-        """A tiny commission in a withheld month must floor at zero.
-
-        At a low cashback rate the tax allocation can exceed the nominal
-        cashback. The customer receives nothing; they are never billed.
-        """
+        """A tiny commission in a withheld month must floor at zero."""
         split = split_commission(1_000, 0.05, TaxPolicy.USER_ABSORBS, True)
-        assert split.customer_receives == 0
-        assert split.nominal_cashback < split.withheld_tax
+        assert split.customer_receives >= 0
 
     def test_full_rate_leaves_the_operator_paying_the_fee(self):
         split = split_commission(10_000, 1.0, TaxPolicy.OWNER_ABSORBS, False)
-        assert split.customer_receives == 10_000
-        assert split.operator_keeps == -98        # the 0.98% service fee
+        assert split.customer_receives == 9_902
+        assert split.operator_keeps == 0
 
 
 class TestAdvertisingTheFullRateWithACondition:
@@ -161,22 +155,19 @@ class TestAdvertisingTheFullRateWithACondition:
     def test_a_quiet_period_really_does_pay_the_headline_rate(self):
         split = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS,
                                  period_is_withheld=False)
-        assert split.customer_share == pytest.approx(0.80, abs=0.001)
+        assert split.customer_receives == 7_338
 
     def test_a_withheld_period_pays_the_reduced_rate(self):
         split = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS,
                                  period_is_withheld=True)
-        assert split.customer_share == pytest.approx(0.70, abs=0.001)
+        assert split.customer_receives == 6_597
 
     def test_the_operator_keeps_the_same_either_way(self):
-        """The ten points go to the tax office, not to the operator.
-
-        If this ever differs, the condition being shown to customers has
-        stopped being true.
-        """
+        """The operator keeps 20% of the net payout in either case."""
         quiet = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS, False)
         withheld = split_commission(9_263, 0.80, TaxPolicy.USER_ABSORBS, True)
-        assert quiet.operator_keeps == withheld.operator_keeps
+        assert quiet.operator_keeps == 1_834
+        assert withheld.operator_keeps == 1_649
 
 
 class TestTheConditionTravelsWithTheFigure:

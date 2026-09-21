@@ -185,7 +185,8 @@ def balance_for(conn: sqlite3.Connection, customer_id: str,
             balance.approved += row["cashback_amount"] or 0
             balance.approved_orders += 1
         elif row["status"] == "awaiting_approval":
-            balance.awaiting += round_dong(
-                (row["estimated_commission"] or 0) * cashback_rate)
+            est_comm = row["estimated_commission"] or 0
+            net_comm = round_dong(est_comm * (1 - 0.10 - 0.0098))
+            balance.awaiting += round_dong(net_comm * cashback_rate)
             balance.awaiting_orders += 1
     return balance

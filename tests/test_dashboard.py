@@ -160,7 +160,7 @@ class TestThePipelineIsVisible:
             self, awaiting):
         row = dashboard.snapshot(awaiting, RATE)["pipeline"][0]
         assert row["estimated_commission"] == 5_522
-        assert row["cashback"] == 4_418          # 80%, halves upward
+        assert row["cashback"] == 3_933          # 80% of net (5,522 * 0.8902 * 0.80)
 
     def test_it_names_the_product_and_carries_the_link(self, awaiting):
         row = dashboard.snapshot(awaiting, RATE)["pipeline"][0]
@@ -171,7 +171,7 @@ class TestThePipelineIsVisible:
         """Nothing here is payable. The owed total must stay zero."""
         totals = dashboard.snapshot(awaiting, RATE)["totals"]
         assert totals["owed"] == 0
-        assert totals["pipeline"] == 4_418
+        assert totals["pipeline"] == 3_933
 
 
 class TestMarkPaid:

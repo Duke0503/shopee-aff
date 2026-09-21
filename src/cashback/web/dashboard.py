@@ -155,7 +155,9 @@ def _pipeline(conn, rate: float) -> list[dict]:
     for row in rows:
         item = dict(row)
         item["product"] = _product_name(item.pop("estimate_detail", None))
-        item["cashback"] = round_dong((item["estimated_commission"] or 0) * rate)
+        est_comm = item.get("estimated_commission") or 0
+        net_comm = round_dong(est_comm * (1 - 0.10 - 0.0098))
+        item["cashback"] = round_dong(net_comm * rate)
         out.append(item)
     return out
 
@@ -188,6 +190,9 @@ def _calculate_order_financials(
         except Exception:
             detail = {}
 
+    shopee_rate = float(detail.get("shopee_rate") or 0.0)
+    seller_rate = float(detail.get("seller_rate") or 0.0)
+
     shopee_part = 0
     seller_part = 0
     if "shopee_part" in detail and "seller_part" in detail:
@@ -213,15 +218,17 @@ def _calculate_order_financials(
         seller_part = gross - shopee_part
 
     if cashback_amount is None:
-        cb = round_dong(gross * advertised_rate) if status != "rejected" else 0
+        cb = round_dong(net_shopee * advertised_rate) if status != "rejected" else 0
     else:
         cb = cashback_amount
 
     admin_profit = (net_shopee - cb) if status != "rejected" else 0
-    admin_margin = round((admin_profit / gross) * 100, 1) if gross > 0 else 0.0
+    admin_margin = round((admin_profit / net_shopee) * 100, 1) if net_shopee > 0 else 20.0
 
     return {
         "gross_commission": gross,
+        "shopee_rate": shopee_rate,
+        "seller_rate": seller_rate,
         "shopee_part": shopee_part,
         "seller_part": seller_part,
         "service_fee": service_fee,
@@ -260,7 +267,7 @@ def snapshot(db_path: Path, rate: float = 0.80) -> dict:
         pipeline = _pipeline(conn, rate)
 
     ready, blocked = payouts.split_by_bank_details(owed)
-    pipeline_commission = sum(r["estimated_commission"] or 0 for r in pipeline)
+    pipeline_total_cashback = sum(r["cashback"] for r in pipeline)
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "rate": rate,
@@ -272,7 +279,7 @@ def snapshot(db_path: Path, rate: float = 0.80) -> dict:
             "owed_customers": len(owed),
             "ready": sum(p.amount for p in ready),
             "no_bank": sum(p.amount for p in blocked),
-            "pipeline": round_dong(pipeline_commission * rate),
+            "pipeline": pipeline_total_cashback,
             "pipeline_orders": len(pipeline),
         },
     }
@@ -313,8 +320,9 @@ def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
         # An awaiting order has no settled figure, so show the estimate
         # of the customer's share and let the view label it as one.
         if item["cashback_amount"] is None:
-            item["cashback"] = round_dong(
-                (item["estimated_commission"] or 0) * rate)
+            est_comm = item.get("estimated_commission") or 0
+            net_comm = round_dong(est_comm * (1 - 0.10 - 0.0098))
+            item["cashback"] = round_dong(net_comm * rate)
             item["is_estimate"] = True
         else:
             item["cashback"] = item["cashback_amount"]
@@ -863,10 +871,13 @@ class _Handler(BaseHTTPRequestHandler):
                 f"SELECT COALESCE(SUM(COALESCE(cashback_amount, 0)), 0) FROM orders WHERE {date_filter} AND status = 'approved' AND paid_at IS NULL"
             ).fetchone()[0]
 
-            cashback_pipeline = conn.execute(
+            pipeline_gross = conn.execute(
                 f"SELECT COALESCE(SUM(COALESCE(estimated_commission, 0)), 0) FROM orders WHERE {date_filter} AND status = 'awaiting_approval'"
             ).fetchone()[0]
-            cashback_pipeline = round_dong(cashback_pipeline * self.cfg.advertised_cashback_rate)
+            pipeline_fee = round_dong(pipeline_gross * 0.0098)
+            pipeline_tax = round_dong(pipeline_gross * 0.10)
+            pipeline_net = pipeline_gross - pipeline_fee - pipeline_tax
+            cashback_pipeline = round_dong(pipeline_net * self.cfg.advertised_cashback_rate)
 
             cached_products = 0
             try:
@@ -886,10 +897,10 @@ class _Handler(BaseHTTPRequestHandler):
             settled_count = approved_count + paid_count + rejected_count
             approval_rate = round(((approved_count + paid_count) / settled_count) * 100, 1) if settled_count > 0 else 100.0
 
-            # Phân tách rõ ràng tiền hoàn khách:
+            # Phân tách rõ ràng tiền hoàn khách (80% của THỰC NHẬN từ Shopee):
             # 1. cashback_paid: Số tiền đã hoàn (thực tế đã chuyển khoản)
             # 2. cashback_ready: Số tiền chờ chi trả (đơn đã duyệt, chờ chuyển khoản)
-            # 3. cashback_pipeline: Số tiền dự tính sẽ hoàn (đơn đang chờ duyệt)
+            # 3. cashback_pipeline: Số tiền dự tính sẽ hoàn (đơn đang chờ duyệt: 80% thực nhận)
             # 4. total_cashback_all: Tổng tiền hoàn tất cả (đã hoàn + chờ hoàn + dự tính)
             total_cashback_all = cashback_paid + cashback_ready + cashback_pipeline
             total_cashback_committed = cashback_paid + cashback_ready
@@ -903,7 +914,7 @@ class _Handler(BaseHTTPRequestHandler):
 
             # Lợi nhuận dự tính: Thực nhận Shopee trừ đi TOÀN BỘ tiền sẽ chia cho khách (đã hoàn + chờ hoàn + dự tính)
             estimated_net_profit = round_dong(net_from_shopee - total_cashback_all)
-            estimated_net_margin = round((estimated_net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 0.0
+            estimated_net_margin = round((estimated_net_profit / net_from_shopee) * 100, 1) if net_from_shopee > 0 else 20.0
 
             # Lợi nhuận đã chốt / thực thu (từ các đơn đã duyệt thành công)
             approved_gross = conn.execute(
@@ -913,7 +924,7 @@ class _Handler(BaseHTTPRequestHandler):
             approved_tax = round_dong(approved_gross * 0.10)
             approved_net = approved_gross - approved_fee - approved_tax
             realized_net_profit = round_dong(approved_net - total_cashback_committed)
-            realized_net_margin = round((realized_net_profit / approved_gross) * 100, 1) if approved_gross > 0 else 0.0
+            realized_net_margin = round((realized_net_profit / approved_net) * 100, 1) if approved_net > 0 else 0.0
 
             # Lợi nhuận danh nghĩa (trên giấy, trước thuế & phí sàn)
             paper_profit = round_dong(gross_commission - total_cashback_all)
@@ -925,7 +936,7 @@ class _Handler(BaseHTTPRequestHandler):
                        COUNT(*) as orders_count,
                        COALESCE(SUM(order_value), 0) as gmv,
                        COALESCE(SUM(CASE WHEN status != 'rejected' THEN COALESCE(approved_commission, estimated_commission, 0) ELSE 0 END), 0) as commission,
-                       COALESCE(SUM(CASE WHEN status != 'rejected' THEN round(COALESCE(cashback_amount, estimated_commission * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as cashback
+                       COALESCE(SUM(CASE WHEN status != 'rejected' THEN round(COALESCE(cashback_amount, (estimated_commission - round(estimated_commission * 0.1098)) * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as cashback
                   FROM orders
                  WHERE {date_filter}
                  GROUP BY day
@@ -934,10 +945,10 @@ class _Handler(BaseHTTPRequestHandler):
             trends = []
             for tr in trend_rows:
                 tr_comm = tr["commission"]
-                tr_cash = tr["cashback"]
                 tr_fee = round_dong(tr_comm * 0.0098)
                 tr_tax = round_dong(tr_comm * 0.10)
                 tr_net = tr_comm - tr_fee - tr_tax
+                tr_cash = tr["cashback"] if tr["cashback"] > 0 else round_dong(tr_net * self.cfg.advertised_cashback_rate)
                 tr_profit = tr_net - tr_cash
                 trends.append({
                     "day": tr["day"],
@@ -958,7 +969,7 @@ class _Handler(BaseHTTPRequestHandler):
                        COUNT(o.order_id) as total_orders,
                        COALESCE(SUM(o.order_value), 0) as total_gmv,
                        COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN COALESCE(o.approved_commission, o.estimated_commission, 0) ELSE 0 END), 0) as total_commission,
-                       COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN round(COALESCE(o.cashback_amount, o.estimated_commission * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as total_cashback
+                       COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN round(COALESCE(o.cashback_amount, (o.estimated_commission - round(o.estimated_commission * 0.1098)) * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as total_cashback
                   FROM orders o
                   JOIN customers c ON c.customer_id = o.customer_id
                  WHERE {cust_date_filter}
@@ -996,8 +1007,9 @@ class _Handler(BaseHTTPRequestHandler):
                 item["total_gmv"] += pr["order_value"] or 0
                 if pr["status"] != "rejected":
                     comm = pr["approved_commission"] or pr["estimated_commission"] or 0
+                    net_comm = round_dong(comm * (1 - 0.10 - 0.0098))
                     item["total_commission"] += comm
-                    item["total_cashback"] += round_dong(comm * self.cfg.advertised_cashback_rate)
+                    item["total_cashback"] += round_dong(net_comm * self.cfg.advertised_cashback_rate)
 
             top_products = sorted(product_map.values(), key=lambda x: x["total_commission"], reverse=True)[:5]
 
@@ -1214,8 +1226,8 @@ class _Handler(BaseHTTPRequestHandler):
                 f"SELECT c.customer_id, c.display_name, c.zalo_user_id, c.bank_name, c.bank_account, "
                 f"       c.account_holder, c.created_at, c.last_login_at, c.login_count, c.status, "
                 f"       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.customer_id) as order_count, "
-                f"       (SELECT COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN ROUND(COALESCE(o.cashback_amount, o.estimated_commission * {rate})) ELSE 0 END), 0) FROM orders o WHERE o.customer_id = c.customer_id) as total_cashback, "
-                f"       (SELECT COALESCE(SUM(ROUND(COALESCE(o.cashback_amount, o.estimated_commission * {rate}))), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'awaiting_approval') as awaiting_amount, "
+                f"       (SELECT COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN ROUND(COALESCE(o.cashback_amount, (o.estimated_commission - ROUND(o.estimated_commission * 0.1098)) * {rate})) ELSE 0 END), 0) FROM orders o WHERE o.customer_id = c.customer_id) as total_cashback, "
+                f"       (SELECT COALESCE(SUM(ROUND(COALESCE(o.cashback_amount, (o.estimated_commission - ROUND(o.estimated_commission * 0.1098)) * {rate}))), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'awaiting_approval') as awaiting_amount, "
                 f"       (SELECT COALESCE(SUM(COALESCE(o.cashback_amount, 0)), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'approved' AND o.paid_at IS NULL) as ready_amount, "
                 f"       (SELECT COALESCE(SUM(COALESCE(o.cashback_amount, 0)), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'paid') as paid_amount, "
                 f"       (SELECT MAX(created_at) FROM ( "
@@ -1468,14 +1480,40 @@ class _Handler(BaseHTTPRequestHandler):
             ).fetchall()
             orders = []
             rate = self.cfg.advertised_cashback_rate
+            from ..shopee.dashboard_lookup import parse_url
             for r in rows:
                 item = dict(r)
                 est_raw = item.pop("estimate_detail", None)
                 item["product"] = _product_name(est_raw)
+                image_url = None
+                item_id = None
+                if est_raw:
+                    try:
+                        d = json.loads(est_raw)
+                        image_url = d.get("image_url")
+                        item_id = d.get("item_id")
+                    except Exception:
+                        pass
+                if not item_id and (item.get("source_url") or item.get("affiliate_url")):
+                    parsed = parse_url(item.get("source_url") or "") or parse_url(item.get("affiliate_url") or "")
+                    if parsed:
+                        _, _, parsed_item_id = parsed
+                        item_id = parsed_item_id
+                if item_id:
+                    item["item_id"] = str(item_id)
+                    cache_row = conn.execute("SELECT image_url, name FROM products_cache WHERE item_id = ?", (str(item_id),)).fetchone()
+                    if cache_row:
+                        if not image_url:
+                            image_url = cache_row["image_url"]
+                        if not item["product"]:
+                            item["product"] = cache_row["name"]
+                item["image_url"] = image_url
+
                 comm = item.get("approved_commission") or item.get("estimated_commission") or 0
                 cb = item.get("cashback_amount")
                 if cb is None and item.get("status") != "rejected":
-                    cb = round_dong(comm * rate)
+                    net_comm = round_dong(comm * (1 - 0.10 - 0.0098))
+                    cb = round_dong(net_comm * rate)
                     item["cashback_amount"] = cb
                 item["financial_breakdown"] = _calculate_order_financials(
                     comm, est_raw, cb, item.get("status", ""), rate
@@ -1520,6 +1558,8 @@ class _Handler(BaseHTTPRequestHandler):
         sort_columns = {
             "price": "p.price",
             "commission": "p.total_commission",
+            "shopee_rate": "p.shopee_rate",
+            "seller_rate": "p.seller_rate",
             "cashback": "p.cashback",
             "requests": "p.request_count",
             "request_count": "p.request_count",
@@ -1530,7 +1570,7 @@ class _Handler(BaseHTTPRequestHandler):
         }
         if sort_by in sort_columns:
             col_expr = sort_columns[sort_by]
-            if sort_order == "ASC" and sort_by in ("price", "commission", "cashback"):
+            if sort_order == "ASC" and sort_by in ("price", "commission", "cashback", "shopee_rate", "seller_rate"):
                 order_sql = f"CASE WHEN {col_expr} IS NULL THEN 1 ELSE 0 END, {col_expr} ASC"
             else:
                 order_sql = f"{col_expr} {sort_order}"
@@ -1543,8 +1583,10 @@ class _Handler(BaseHTTPRequestHandler):
             with ledger.connect(self.cfg.db_path) as conn:
                 total = conn.execute(f"SELECT COUNT(*) FROM products_cache WHERE {where_sql}", params).fetchone()[0]
                 rows = conn.execute(
-                    f"SELECT p.item_id, p.name, p.price, p.price_formatted, p.total_commission, "
-                    f"       p.commission_formatted, p.cashback, p.cashback_formatted, p.rate_percent, "
+                    f"SELECT p.item_id, p.shop_id, p.name, p.price, p.price_formatted, "
+                    f"       p.shopee_rate, p.seller_rate, p.shopee_part, p.shopee_part_formatted, "
+                    f"       p.seller_part, p.seller_part_formatted, "
+                    f"       p.total_commission, p.commission_formatted, p.cashback, p.cashback_formatted, p.rate_percent, "
                     f"       p.affiliate_url, p.canonical_url, p.request_count, p.updated_at, p.image_url, "
                     f"       (SELECT COUNT(o.order_id) FROM orders o "
                     f"          LEFT JOIN link_requests r ON r.request_id = o.request_id "
@@ -1578,7 +1620,7 @@ class _Handler(BaseHTTPRequestHandler):
                             SELECT o.order_id, o.customer_id, c.display_name, c.zalo_user_id,
                                    c.bank_name, c.bank_account, c.account_holder,
                                    o.order_value, o.approved_commission, o.estimated_commission,
-                                   COALESCE(o.cashback_amount, ROUND(COALESCE(o.approved_commission, o.estimated_commission, 0) * {self.cfg.advertised_cashback_rate})) as cashback_amount, o.status,
+                                   COALESCE(o.cashback_amount, ROUND((COALESCE(o.approved_commission, o.estimated_commission, 0) - ROUND(COALESCE(o.approved_commission, o.estimated_commission, 0) * 0.1098)) * {self.cfg.advertised_cashback_rate})) as cashback_amount, o.status,
                                    COALESCE(o.recorded_at, o.approved_at) as order_date
                               FROM orders o
                               LEFT JOIN customers c ON c.customer_id = o.customer_id
@@ -1733,7 +1775,8 @@ class _Handler(BaseHTTPRequestHandler):
                 comm = o.get("approved_commission") or o.get("estimated_commission") or 0
                 cb = o.get("cashback_amount")
                 if cb is None and o.get("status") != "rejected":
-                    cb = round_dong(comm * rate)
+                    net_comm = round_dong(comm * (1 - 0.10 - 0.0098))
+                    cb = round_dong(net_comm * rate)
                     o["cashback_amount"] = cb
                 o["financial_breakdown"] = _calculate_order_financials(
                     comm, est_raw, cb, o.get("status", ""), rate
@@ -1905,7 +1948,8 @@ class _Handler(BaseHTTPRequestHandler):
 
         rate = self.cfg.advertised_cashback_rate
         raw_commission = est.commission
-        cb = round_dong(raw_commission * rate)
+        net_commission = round_dong(raw_commission * (1 - 0.10 - 0.0098))
+        cb = round_dong(net_commission * rate)
 
         # Upsert into products_cache if item_id can be extracted
         parsed = parse_url(target_url)
@@ -1975,7 +2019,7 @@ class _Handler(BaseHTTPRequestHandler):
         customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
         display_name = str(body.get("display_name") or "").strip()
         if not customer_id:
-            customer_id = "C0001"
+            return self._json({"ok": False, "error": "customer_id_required"}, 400)
 
         with ledger.connect(self.cfg.db_path) as conn:
             cust = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
@@ -2179,7 +2223,8 @@ class _Handler(BaseHTTPRequestHandler):
 
                 if est and est.price > 0:
                     raw_comm = est.commission
-                    cb = round_dong(raw_comm * rate)
+                    net_comm = round_dong(raw_comm * (1 - 0.10 - 0.0098))
+                    cb = round_dong(net_comm * rate)
                     new_cached = ledger.upsert_product_cache(
                         conn,
                         item_id=item_id,
@@ -2275,7 +2320,8 @@ class _Handler(BaseHTTPRequestHandler):
                     est = lookup(target_url, third_party=self.cfg.third_party_fallback)
                     if est and est.price > 0:
                         raw_comm = est.commission
-                        cb = round_dong(raw_comm * rate)
+                        net_comm = round_dong(raw_comm * (1 - 0.10 - 0.0098))
+                        cb = round_dong(net_comm * rate)
                         ledger.upsert_product_cache(
                             conn,
                             item_id=row["item_id"],

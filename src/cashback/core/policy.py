@@ -118,14 +118,11 @@ def split_commission(
 
     fee = round(approved_commission * SERVICE_FEE_RATE)
     tax = round(approved_commission * WITHHOLDING_TAX_RATE) if period_is_withheld else 0
-    nominal = round(approved_commission * cashback_rate)
-
-    if tax_policy is TaxPolicy.USER_ABSORBS:
-        receives = max(0, nominal - tax)
-    else:
-        receives = nominal
-
-    keeps = approved_commission - fee - tax - receives
+    net_shopee = approved_commission - fee - tax
+    # Khách nhận 80% của số tiền THỰC NHẬN từ Shopee (sau khi trừ phí sàn & thuế)
+    receives = round_dong(net_shopee * cashback_rate)
+    keeps = net_shopee - receives
+    nominal = receives
     return Split(approved_commission, fee, tax, nominal, receives, keeps)
 
 

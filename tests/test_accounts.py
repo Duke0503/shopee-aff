@@ -188,7 +188,7 @@ class TestWhatACustomerCanSee:
         data = dashboard.my_orders(with_orders, "C0001", 0.80)
         pending = next(o for o in data["orders"] if o["order_id"] == "O1")
         assert pending["is_estimate"] is True
-        assert pending["cashback"] == 7_410     # 80% of the estimate
+        assert pending["cashback"] == 6_597     # 80% of net estimate (9263 * 0.8902 * 0.80)
 
     def test_a_settled_order_shows_the_real_figure(self, with_orders):
         data = dashboard.my_orders(with_orders, "C0001", 0.80)

@@ -41,7 +41,7 @@ export function OrderFinancialCard({ order, trigger }: OrderFinancialCardProps) 
           Math.round((order.approved_commission || order.estimated_commission || 0) * 0.0098) -
           Math.round((order.approved_commission || order.estimated_commission || 0) * 0.10) -
           (order.cashback_amount || 0),
-    admin_margin: 9.0,
+    admin_margin: 20.0,
   }
 
   const isRejected = order.status === "rejected"
@@ -143,15 +143,15 @@ export function OrderFinancialCard({ order, trigger }: OrderFinancialCardProps) 
               <div className="pl-4 space-y-1 text-[10px] text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <Building2 className="h-3 w-3" /> Sàn Shopee trả (Base):
+                    <Building2 className="h-3 w-3 text-orange-600 dark:text-orange-400" /> Sàn Shopee{fin.shopee_rate ? ` (${fin.shopee_rate}%)` : ""}:
                   </span>
-                  <span className="font-mono">{vnd(fin.shopee_part)}</span>
+                  <span className="font-mono text-orange-600 dark:text-orange-400 font-medium">{vnd(fin.shopee_part)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <Store className="h-3 w-3" /> Shop/Người bán trả (Xtra):
+                    <Store className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Shop thưởng{fin.seller_rate ? ` (${fin.seller_rate}%)` : ""}:
                   </span>
-                  <span className="font-mono">{vnd(fin.seller_part)}</span>
+                  <span className="font-mono text-indigo-600 dark:text-indigo-400 font-medium">{vnd(fin.seller_part)}</span>
                 </div>
               </div>
             </div>
@@ -183,7 +183,7 @@ export function OrderFinancialCard({ order, trigger }: OrderFinancialCardProps) 
             {/* Step 4: Customer Cashback */}
             <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 font-medium text-primary">
               <span className="flex items-center gap-1.5">
-                <Gift className="h-3.5 w-3.5" /> 4. Hoàn tiền cho khách:
+                <Gift className="h-3.5 w-3.5" /> 4. Hoàn tiền khách (80% thực nhận):
               </span>
               <span className="font-mono font-bold">-{vnd(fin.cashback_amount)}</span>
             </div>
@@ -192,14 +192,14 @@ export function OrderFinancialCard({ order, trigger }: OrderFinancialCardProps) 
             <div className="mt-1 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/10 p-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1">
-                  <DollarSign className="h-4 w-4 text-emerald-600" /> 5. Lợi nhuận thực tế (Admin):
+                  <DollarSign className="h-4 w-4 text-emerald-600" /> 5. Lợi nhuận dự tính Admin (20%):
                 </span>
                 <span className="font-mono text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
                   {isRejected ? "0 ₫" : vnd(fin.admin_profit)}
                 </span>
               </div>
               <div className="mt-1 flex items-center justify-between text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
-                <span>Tỷ suất lợi nhuận thực:</span>
+                <span>Tỷ suất trên thực nhận:</span>
                 <span className="font-mono font-semibold">
                   {isRejected ? "0%" : `${fin.admin_margin}%`}
                 </span>
@@ -211,7 +211,7 @@ export function OrderFinancialCard({ order, trigger }: OrderFinancialCardProps) 
           <div className="mt-2.5 text-[10px] text-muted-foreground leading-snug border-t border-border/40 pt-2 flex items-start gap-1">
             <HelpCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 mt-0.5" />
             <span>
-              Lợi nhuận ròng đút túi sau khi Shopee đã khấu trừ đủ 10% thuế TNCN và 0.98% phí sàn, và trừ số tiền hoàn lại cho người mua.
+              Lợi nhuận ròng Admin (20% của Thực nhận) sau khi Shopee khấu trừ 10% thuế TNCN và 0.98% phí sàn, và chia 80% cho khách.
             </span>
           </div>
         </div>

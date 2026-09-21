@@ -33,6 +33,7 @@ import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
 import { CodeBadge } from "@/features/Admin/components/CodeBadge"
 import { OrderFinancialCard } from "@/features/Admin/components/OrderFinancialCard"
+import { ProductThumbnail } from "@/features/Admin/components/ProductThumbnail"
 
 export function OrdersView() {
   const queryClient = useQueryClient()
@@ -248,7 +249,7 @@ export function OrdersView() {
                 defaultOrder="asc"
               />
             </TableHead>
-            <TableHead className="min-w-[180px]">Sản Phẩm</TableHead>
+            <TableHead className="min-w-[220px]">Sản Phẩm</TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
                 title="Giá Trị Đơn"
@@ -332,31 +333,43 @@ export function OrdersView() {
                   </div>
                 </TableCell>
 
-                <TableCell className="max-w-[220px]">
-                  <div className="line-clamp-2 text-xs font-medium text-foreground" title={o.product}>
-                    {o.product || "Đơn hàng Shopee"}
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 text-[11px]">
-                    {o.source_url && (
-                      <a
-                        href={o.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                      >
-                        Shopee <ExternalLink className="ml-0.5 h-3 w-3" />
-                      </a>
-                    )}
-                    {o.affiliate_url && (
-                      <a
-                        href={o.affiliate_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-primary hover:underline"
-                      >
-                        Link Aff <ExternalLink className="ml-0.5 h-3 w-3" />
-                      </a>
-                    )}
+                <TableCell className="min-w-[220px] max-w-[320px]">
+                  <div className="flex items-start gap-2.5">
+                    <ProductThumbnail
+                      imageUrl={o.image_url}
+                      productName={o.product}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-2 text-xs font-medium text-foreground leading-snug" title={o.product}>
+                        {o.product || "Đơn hàng Shopee"}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {o.item_id && (
+                          <CodeBadge code={o.item_id} label="SP:" variant="purple" />
+                        )}
+                        {o.source_url && (
+                          <a
+                            href={o.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-muted-foreground hover:text-foreground text-[10px]"
+                          >
+                            Shopee <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
+                          </a>
+                        )}
+                        {o.affiliate_url && (
+                          <a
+                            href={o.affiliate_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-primary hover:underline text-[10px]"
+                          >
+                            Link Aff <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
 
@@ -364,8 +377,22 @@ export function OrdersView() {
                   <EmptyDash value={o.order_value} type="currency" />
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                  <EmptyDash value={commission} type="currency" className="text-amber-600 dark:text-amber-400 font-semibold" />
+                <TableCell className="text-right whitespace-nowrap">
+                  <div className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">
+                    <EmptyDash value={commission} type="currency" className="text-amber-600 dark:text-amber-400 font-semibold" />
+                  </div>
+                  {fin && !isRejected && (fin.shopee_part > 0 || fin.seller_part > 0) && (
+                    <div className="mt-0.5 flex flex-col items-end gap-0.5 text-[10px] font-mono leading-tight">
+                      <span className="text-orange-600 dark:text-orange-400" title={`Hoa hồng sàn Shopee: ${fin.shopee_rate ?? 0}%`}>
+                        Sàn ({fin.shopee_rate ?? 0}%): {vnd(fin.shopee_part)}
+                      </span>
+                      {fin.seller_part > 0 && (
+                        <span className="text-indigo-600 dark:text-indigo-400" title={`Hoa hồng Shop thưởng: ${fin.seller_rate ?? 0}%`}>
+                          Shop ({fin.seller_rate ?? 0}%): {vnd(fin.seller_part)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
 
                 <TableCell className="text-right text-[11px] font-mono whitespace-nowrap">

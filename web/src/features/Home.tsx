@@ -157,7 +157,8 @@ function CashbackCalculator() {
   ]
 
   const grossCommission = Math.round(orderValue * 0.08)
-  const cashback = Math.round(grossCommission * 0.8)
+  const netCommission = Math.round(grossCommission * (1 - 0.10 - 0.0098))
+  const cashback = Math.round(netCommission * 0.8)
 
   return (
     <Card className="luxury-panel h-full p-5 sm:p-7 flex flex-col justify-between border border-border/80 shadow-md">
@@ -202,6 +203,10 @@ function CashbackCalculator() {
           <div className="flex items-center justify-between border-t border-border/40 pt-2">
             <span className="text-muted-foreground">{t("bento_calc_commission_label")}</span>
             <span className="font-semibold text-foreground font-mono">{vnd(grossCommission)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-border/40 pt-2">
+            <span className="text-muted-foreground">Thực nhận Shopee (-10.98%):</span>
+            <span className="font-semibold text-foreground font-mono">{vnd(netCommission)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
             <span className="font-bold text-foreground text-xs sm:text-sm">{t("bento_calc_cashback_val")}</span>

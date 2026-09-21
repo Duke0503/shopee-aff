@@ -30,11 +30,11 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
 
   // Lợi nhuận dự tính = Thực nhận Shopee - Toàn bộ tiền hoàn (Đã hoàn + Chờ hoàn + Dự tính sẽ hoàn)
   const estimatedProfit = fin.estimated_net_profit ?? (netShopee - totalCashback)
-  const estimatedMargin = fin.estimated_net_margin ?? (gross > 0 ? Math.round((estimatedProfit / gross) * 1000) / 10 : 9.0)
+  const estimatedMargin = fin.estimated_net_margin ?? (netShopee > 0 ? Math.round((estimatedProfit / netShopee) * 1000) / 10 : 20.0)
 
   // Lợi nhuận thực thu = Đã duyệt/nhận trừ đi các khoản đã hoàn hoặc chờ hoàn
   const realizedProfit = fin.realized_net_profit || 0
-  const realizedMargin = fin.realized_net_margin || 0
+  const realizedMargin = fin.realized_net_margin ?? (realizedProfit > 0 ? 20.0 : 0.0)
 
   const paperProfit = fin.paper_profit ?? (gross - totalCashback)
   const paperMargin = fin.paper_margin ?? (gross > 0 ? Math.round((paperProfit / gross) * 1000) / 10 : 20.0)
@@ -172,7 +172,7 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
             </div>
           </div>
           <div className="mt-2 text-[10px] text-muted-foreground border-t border-sky-500/20 pt-1.5">
-            ~80% tiền chia cho khách
+            80% thực nhận chia khách
           </div>
         </div>
 
@@ -186,14 +186,14 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
               <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5 font-medium">
-              Sau thuế phí & trừ hoàn
+              20% Thực Nhận của Admin
             </div>
             <div className="mt-2 text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
               {vnd(estimatedProfit)}
             </div>
           </div>
           <div className="mt-2 text-[10px] text-emerald-800/80 dark:text-emerald-200/80 border-t border-emerald-500/30 pt-1.5 flex items-center justify-between font-medium">
-            <span>Biên lãi:</span>
+            <span>Biên lãi (trên thực nhận):</span>
             <span className="font-mono font-bold">{estimatedMargin}%</span>
           </div>
         </div>
@@ -204,10 +204,10 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
         <div className="flex items-start gap-2 text-muted-foreground">
           <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
           <div className="leading-snug text-[11px]">
-            <strong className="text-foreground">Công thức tính minh bạch: </strong>
-            Thực Nhận Shopee (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span>) − Số Tiền Đã Hoàn (<span className="font-mono font-medium text-foreground">{vnd(cashbackPaid)}</span>) − Dự Tính Sẽ Hoàn (<span className="font-mono font-medium text-foreground">{vnd(cashbackPipeline)}</span>) = 
+            <strong className="text-foreground">Công thức tính minh bạch (Quy tắc 8:2): </strong>
+            Shopee thanh toán Thực Nhận (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span> sau khi trừ 10% thuế TNCN và 0.98% phí sàn). Khách nhận trọn vẹn 80% (<span className="font-mono font-medium text-foreground">{vnd(totalCashback)}</span>). Admin giữ trọn vẹn 20% = 
             <strong className="text-emerald-600 dark:text-emerald-400"> Lợi Nhuận Dự Tính ({vnd(estimatedProfit)} ~ {estimatedMargin}%)</strong>.
-            {" "}Lợi nhuận trên giấy trước thuế sàn là <span className="font-mono font-semibold text-foreground">{vnd(paperProfit)} ({paperMargin}%)</span>. Shopee tự động khấu trừ 10% thuế TNCN và 0.98% phí sàn. Khi Shopee duyệt đơn, lợi nhuận chuyển sang Thực Thu (đã chốt: <span className="font-mono font-medium text-foreground">{vnd(realizedProfit)} ({realizedMargin}%)</span>).
+            {" "}Lợi nhuận trên giấy trước thuế sàn là <span className="font-mono font-semibold text-foreground">{vnd(paperProfit)} ({paperMargin}%)</span>. Khi Shopee duyệt đơn, lợi nhuận chuyển sang Thực Thu (đã chốt: <span className="font-mono font-medium text-foreground">{vnd(realizedProfit)} ({realizedMargin}%)</span>).
           </div>
         </div>
       </div>

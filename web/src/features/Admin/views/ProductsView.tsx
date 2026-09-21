@@ -13,14 +13,13 @@ import {
   TableCell,
 } from "@/components/ui/table"
 import { fetchAdminProducts } from "@/lib/api"
-import { shortDate } from "@/lib/format"
+import { shortDate, vnd } from "@/lib/format"
 import {
   Search,
   ExternalLink,
   Copy,
   Check,
   Flame,
-  Package,
 } from "lucide-react"
 import { PaginationBar } from "@/features/Admin/components/PaginationBar"
 import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
@@ -29,28 +28,7 @@ import { BuyerHoverCard } from "@/features/Admin/components/BuyerHoverCard"
 import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
 import { CodeBadge } from "@/features/Admin/components/CodeBadge"
-
-function ProductThumbnail({ src, alt }: { src?: string | null; alt: string }) {
-  const [error, setError] = React.useState(false)
-
-  if (!src || error) {
-    return (
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground border border-border/50">
-        <Package className="h-5 w-5 opacity-60" />
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="h-11 w-11 shrink-0 rounded-lg object-cover border border-border/60 shadow-xs"
-      loading="lazy"
-      onError={() => setError(true)}
-    />
-  )
-}
+import { ProductThumbnail } from "@/features/Admin/components/ProductThumbnail"
 
 export function ProductsView() {
   const [page, setPage] = React.useState(1)
@@ -157,9 +135,29 @@ export function ProductsView() {
                 align="right"
               />
             </TableHead>
+            <TableHead className="text-right whitespace-nowrap text-orange-600 dark:text-orange-400">
+              <SortableHeader
+                title="Hoa Hồng Sàn"
+                column="shopee_rate"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSort={handleSort}
+                align="right"
+              />
+            </TableHead>
+            <TableHead className="text-right whitespace-nowrap text-indigo-600 dark:text-indigo-400">
+              <SortableHeader
+                title="Hoa Hồng Shop"
+                column="seller_rate"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSort={handleSort}
+                align="right"
+              />
+            </TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
-                title="Hoa Hồng Shopee"
+                title="Tổng Hoa Hồng"
                 column="commission"
                 currentSortBy={sortBy}
                 currentSortOrder={sortOrder}
@@ -234,21 +232,53 @@ export function ProductsView() {
                   <CodeBadge code={p.item_id} label="SP:" />
                 </TableCell>
 
+                {/* Giá Bán */}
                 <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={p.price_formatted} />
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                  <div><EmptyDash value={p.commission_formatted} /></div>
-                  {p.rate_percent && p.commission_formatted && p.commission_formatted !== "0đ" && (
-                    <span className="text-[10px] text-muted-foreground font-sans">
-                      ({p.rate_percent})
-                    </span>
-                  )}
+                {/* Hoa Hồng Sàn (Shopee) */}
+                <TableCell className="text-right text-xs font-mono whitespace-nowrap">
+                  <div className="font-semibold text-orange-600 dark:text-orange-400">
+                    {p.shopee_rate ? `${p.shopee_rate}%` : "--"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    <EmptyDash value={p.shopee_part_formatted || (p.shopee_part ? vnd(p.shopee_part) : null)} />
+                  </div>
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                  <EmptyDash value={p.cashback_formatted} />
+                {/* Hoa Hồng Shop */}
+                <TableCell className="text-right text-xs font-mono whitespace-nowrap">
+                  <div className="font-semibold text-indigo-600 dark:text-indigo-400">
+                    {p.seller_rate && p.seller_rate > 0 ? `${p.seller_rate}%` : "--"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {p.seller_rate && p.seller_rate > 0 ? (
+                      p.seller_part_formatted || (p.seller_part ? vnd(p.seller_part) : "--")
+                    ) : (
+                      <span className="text-muted-foreground/50">0đ</span>
+                    )}
+                  </div>
+                </TableCell>
+
+                {/* Tổng Hoa Hồng (Gộp) */}
+                <TableCell className="text-right text-xs font-mono whitespace-nowrap">
+                  <div className="font-bold text-amber-600 dark:text-amber-400">
+                    <EmptyDash value={p.commission_formatted} />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-sans">
+                    (Gộp 100%)
+                  </span>
+                </TableCell>
+
+                {/* Hoàn Tiền Khách */}
+                <TableCell className="text-right text-xs font-mono whitespace-nowrap">
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                    <EmptyDash value={p.cashback_formatted} />
+                  </div>
+                  <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-sans">
+                    80% thực nhận
+                  </span>
                 </TableCell>
 
                 {/* Lượt Hỏi */}
