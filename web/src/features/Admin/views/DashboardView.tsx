@@ -725,19 +725,19 @@ export function DashboardView({
           <table className="w-full text-left text-xs">
             <thead className="border-b border-border/70 bg-secondary/60 text-[11px] font-semibold text-muted-foreground uppercase">
               <tr>
-                <th className="px-4 py-3">Kênh / Hành Vi Tiếp Cận</th>
-                <th className="px-3 py-3 text-center">User Duy Nhất</th>
-                <th className="px-3 py-3 text-center">Tổng Lượt Tương Tác</th>
-                <th className="px-3 py-3 text-center">Đơn Hàng</th>
-                <th className="px-3 py-3 text-center">Tỷ Lệ Mua</th>
-                <th className="px-3 py-3 text-right">Doanh Số (GMV)</th>
+                <th className="px-4 py-3 border-r border-border/70">Kênh / Hành Vi Tiếp Cận</th>
+                <th className="px-3 py-3 text-center border-r border-border/70">User Duy Nhất</th>
+                <th className="px-3 py-3 text-center border-r border-border/70">Tổng Lượt Tương Tác</th>
+                <th className="px-3 py-3 text-center border-r border-border/70">Đơn Hàng</th>
+                <th className="px-3 py-3 text-center border-r border-border/70">Tỷ Lệ Mua</th>
+                <th className="px-3 py-3 text-right border-r border-border/70">Doanh Số (GMV)</th>
                 <th className="px-4 py-3 text-right">Hoa Hồng Sinh Ra</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 [&_tr:nth-child(even)]:bg-muted/45 dark:[&_tr:nth-child(even)]:bg-muted/25 [&_tr:nth-child(odd)]:bg-background">
               {channels.map((ch) => (
                 <tr key={ch.channel_id} className="transition-colors hover:!bg-primary/10 dark:hover:!bg-primary/20">
-                  <td className="px-4 py-3.5">
+                  <td className="px-4 py-3.5 border-r border-border/60">
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary shadow-2xs">
                         {renderChannelIcon(ch.icon)}
@@ -748,18 +748,18 @@ export function DashboardView({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3.5 text-center font-bold text-foreground">
+                  <td className="px-3 py-3.5 text-center font-bold text-foreground border-r border-border/60">
                     {ch.unique_users}
                   </td>
-                  <td className="px-3 py-3.5 text-center text-muted-foreground">
+                  <td className="px-3 py-3.5 text-center text-muted-foreground border-r border-border/60">
                     <span className="rounded-md bg-secondary/80 px-2 py-0.5 font-medium text-foreground">
                       {ch.total_events} lượt
                     </span>
                   </td>
-                  <td className="px-3 py-3.5 text-center font-semibold text-foreground">
+                  <td className="px-3 py-3.5 text-center font-semibold text-foreground border-r border-border/60">
                     {ch.orders_count} đơn
                   </td>
-                  <td className="px-3 py-3.5 text-center">
+                  <td className="px-3 py-3.5 text-center border-r border-border/60">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
                       ch.conversion_rate >= 50
                         ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
@@ -770,7 +770,7 @@ export function DashboardView({
                       {ch.conversion_rate}%
                     </span>
                   </td>
-                  <td className="px-3 py-3.5 text-right font-medium text-foreground">
+                  <td className="px-3 py-3.5 text-right font-medium text-foreground border-r border-border/60">
                     {vnd(ch.total_gmv)}
                   </td>
                   <td className="px-4 py-3.5 text-right font-bold text-amber-600 dark:text-amber-400">

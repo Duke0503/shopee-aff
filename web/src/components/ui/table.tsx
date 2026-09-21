@@ -15,7 +15,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 const TableHeader = ({ className, ...p }: React.ComponentProps<"thead">) => (
   <thead
     className={cn(
-      "border-b border-border bg-muted/70 dark:bg-muted/40 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider",
+      "border-b border-border bg-muted/80 dark:bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider",
       className
     )}
     {...p}
@@ -27,7 +27,7 @@ const TableBody = ({ className, ...p }: React.ComponentProps<"tbody">) => (
     className={cn(
       "[&_tr:last-child]:border-0",
       // Sọc ngang xen kẽ (Zebra striping) rõ ràng cho tất cả các bảng
-      "[&_tr:nth-child(even)]:bg-muted/50 dark:[&_tr:nth-child(even)]:bg-muted/25",
+      "[&_tr:nth-child(even)]:bg-muted/60 dark:[&_tr:nth-child(even)]:bg-muted/30",
       "[&_tr:nth-child(odd)]:bg-background",
       className
     )}
@@ -48,7 +48,7 @@ const TableRow = ({ className, ...p }: React.ComponentProps<"tr">) => (
 const TableHead = ({ className, ...p }: React.ComponentProps<"th">) => (
   <th
     className={cn(
-      "text-muted-foreground h-9 px-3 text-left align-middle text-xs font-semibold whitespace-nowrap",
+      "text-muted-foreground h-9 px-3 text-left align-middle text-xs font-bold whitespace-nowrap border-r border-border/80 last:border-r-0",
       className,
     )}
     {...p}
@@ -56,7 +56,13 @@ const TableHead = ({ className, ...p }: React.ComponentProps<"th">) => (
 )
 
 const TableCell = ({ className, ...p }: React.ComponentProps<"td">) => (
-  <td className={cn("px-3 py-2.5 align-middle", className)} {...p} />
+  <td
+    className={cn(
+      "px-3 py-2.5 align-middle border-r border-border/70 last:border-r-0",
+      className
+    )}
+    {...p}
+  />
 )
 
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell }
