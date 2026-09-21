@@ -445,12 +445,13 @@ function extractTextAndUrls(data) {
         return;
       }
 
-      // 2. Kiểm tra các lệnh
-      const lower = text.toLowerCase().trim();
+      // 2. Kiểm tra các lệnh (BẮT BUỘC PHẢI CÓ DẤU / HOẶC ! ĐẰNG TRƯỚC ĐỂ KHÔNG BẮT NHẦM TIN NHẮN THÔNG THƯỜNG)
+      const cmdMatch = text.match(/(?:^|\s)([\/!][a-zA-Z0-9_]+)/);
+      const cmd = cmdMatch ? cmdMatch[1].toLowerCase() : "";
 
-      const isIdCmd = /^(?:\/id|\!id|id|\/ma|\!ma|mã|ma|lấy id|lay id|mã id|mã khách hàng|ma khach hang|\/taikhoan|\!taikhoan|tài khoản|tai khoan)$/i.test(lower) || lower.startsWith("/id") || lower.startsWith("!id");
-      const isPassCmd = /^(?:\/matkhau|\!matkhau|\/pass|\!pass|\/password|\!password|matkhau|mật khẩu|mat khau|pass|password|lấy mật khẩu|lay mat khau|quên mật khẩu|quen mat khau)$/i.test(lower) || lower.startsWith("/matkhau") || lower.startsWith("!matkhau");
-      const isBalanceCmd = /^(?:\/sodu|\!sodu|sodu|số dư|so du|tiền hoàn|tien hoan|\/kiemtra|\!kiemtra)$/i.test(lower) || lower.startsWith("/sodu");
+      const isIdCmd = cmd === "/id" || cmd === "!id" || cmd === "/ma" || cmd === "!ma";
+      const isPassCmd = cmd === "/matkhau" || cmd === "!matkhau" || cmd === "/pass" || cmd === "!pass" || cmd === "/password" || cmd === "!password";
+      const isBalanceCmd = cmd === "/sodu" || cmd === "!sodu";
 
       // Xử lý lệnh lấy ID / Mật khẩu / Số dư
       if (isIdCmd || isPassCmd || isBalanceCmd) {
@@ -617,10 +618,10 @@ function extractTextAndUrls(data) {
         }
       }
 
-      if (lower === "!ping" || lower === "/ping") {
+      if (cmd === "!ping" || cmd === "/ping") {
         const reply = `Pong! 🏓 Bot Normie đang hoạt động ổn định 24/7 tại nhóm Dev Internal DP.`;
         await api.sendMessage(reply, message.threadId, message.type);
-      } else if (lower === "!help" || lower === "/huongdan" || lower === "/help") {
+      } else if (cmd === "!help" || cmd === "/huongdan" || cmd === "/help") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
 
@@ -683,7 +684,7 @@ function extractTextAndUrls(data) {
           message.threadId,
           message.type
         );
-      } else if (lower === "/web" || lower === "!web") {
+      } else if (cmd === "/web" || cmd === "!web") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
         const reply =
@@ -716,7 +717,7 @@ function extractTextAndUrls(data) {
           message.threadId,
           message.type
         );
-      } else if (lower === "!chinhsach" || lower === "/chinhsach") {
+      } else if (cmd === "!chinhsach" || cmd === "/chinhsach") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
 
@@ -764,7 +765,7 @@ function extractTextAndUrls(data) {
           message.threadId,
           message.type
         );
-      } else if (lower === "/topdeal" || lower === "/hot") {
+      } else if (cmd === "/topdeal" || cmd === "/hot" || cmd === "!topdeal" || cmd === "!hot") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
         try {
@@ -791,7 +792,7 @@ function extractTextAndUrls(data) {
         } catch (err) {
           console.error("[Top Deal Error]:", err.message);
         }
-      } else if (lower === "/refreshcache") {
+      } else if (cmd === "/refreshcache") {
         if (!isAdmin) return;
         try {
           const refRes = await fetch(`${config.MAIN_API_URL}/api/shopee/cache/refresh-hot`, {
@@ -808,7 +809,7 @@ function extractTextAndUrls(data) {
         } catch (err) {
           console.error("[Refresh Cache Error]:", err.message);
         }
-      } else if (lower === "!test-welcome") {
+      } else if (cmd === "!test-welcome") {
         await sendGroupWelcome(message.threadId, { id: senderUid, dName: senderName }, "Dev Internal DP");
         if (config.ENABLE_PRIVATE_WELCOME) {
           await sendPrivateWelcome({ id: senderUid, dName: senderName });
