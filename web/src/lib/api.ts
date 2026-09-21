@@ -246,8 +246,14 @@ export interface AdminMetrics {
     cashback_ready: number | null
     cashback_pipeline: number | null
     total_cashback: number | null
+    total_cashback_all?: number | null
+    total_cashback_committed?: number | null
     net_profit: number | null
     actual_net_profit?: number | null
+    estimated_net_profit?: number | null
+    estimated_net_margin?: number | null
+    realized_net_profit?: number | null
+    realized_net_margin?: number | null
     real_net_margin?: number | null
     paper_profit?: number | null
     paper_margin?: number | null

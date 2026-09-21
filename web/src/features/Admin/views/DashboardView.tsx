@@ -243,49 +243,49 @@ export function DashboardView({
             <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Hoàn Tiền Cho Khách
+                  Tổng Tiền Hoàn Khách
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Gift className="h-5 w-5" />
                 </div>
               </div>
               <div className="mt-3">
-                <div className="text-2xl font-bold tracking-tight text-foreground">
-                  {vnd(fin.total_cashback || 0)}
+                <div className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                  {vnd(fin.total_cashback_all ?? fin.total_cashback ?? 0)}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   <Badge variant="success" className="text-[10px]">
-                    Đã trả {vnd(fin.cashback_paid || 0)}
+                    Đã hoàn: {vnd(fin.cashback_paid || 0)}
                   </Badge>
                   <span className="text-[11px]">
-                    Chờ: {vnd(fin.cashback_ready || 0)}
+                    Dự tính: <strong className="font-mono text-foreground">{vnd(fin.cashback_pipeline || 0)}</strong>
                   </span>
                 </div>
               </div>
             </Card>
 
-            {/* Card 3: Actual Net Admin Profit */}
+            {/* Card 3: Estimated Net Admin Profit */}
             <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Lợi Nhuận Thực Tế (Admin)
+                  Lợi Nhuận Dự Tính (Admin)
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
                   <DollarSign className="h-5 w-5" />
                 </div>
               </div>
               <div className="mt-3">
-                <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-                  {vnd(fin.actual_net_profit ?? fin.net_profit ?? 0)}
+                <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+                  {vnd(fin.estimated_net_profit ?? fin.actual_net_profit ?? fin.net_profit ?? 0)}
                 </div>
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Badge
                     variant="default"
                     className="bg-emerald-500/15 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
                   >
-                    <Percent className="mr-0.5 h-2.5 w-2.5" /> Thực nhận {fin.real_net_margin ?? kpis.net_margin}%
+                    <Percent className="mr-0.5 h-2.5 w-2.5" /> Biên lãi {fin.estimated_net_margin ?? fin.real_net_margin ?? kpis.net_margin}%
                   </Badge>
-                  <span>Sau 10% thuế & 0.98% phí sàn</span>
+                  <span className="truncate">Sau thuế, phí sàn & hoàn khách</span>
                 </div>
               </div>
             </Card>

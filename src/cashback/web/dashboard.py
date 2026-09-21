@@ -886,6 +886,12 @@ class _Handler(BaseHTTPRequestHandler):
             settled_count = approved_count + paid_count + rejected_count
             approval_rate = round(((approved_count + paid_count) / settled_count) * 100, 1) if settled_count > 0 else 100.0
 
+            # Phân tách rõ ràng tiền hoàn khách:
+            # 1. cashback_paid: Số tiền đã hoàn (thực tế đã chuyển khoản)
+            # 2. cashback_ready: Số tiền chờ chi trả (đơn đã duyệt, chờ chuyển khoản)
+            # 3. cashback_pipeline: Số tiền dự tính sẽ hoàn (đơn đang chờ duyệt)
+            # 4. total_cashback_all: Tổng tiền hoàn tất cả (đã hoàn + chờ hoàn + dự tính)
+            total_cashback_all = cashback_paid + cashback_ready + cashback_pipeline
             total_cashback_committed = cashback_paid + cashback_ready
             
             # Shopee deductions:
@@ -895,12 +901,22 @@ class _Handler(BaseHTTPRequestHandler):
             tax_withheld = round_dong(gross_commission * 0.10)
             net_from_shopee = round_dong(gross_commission - shopee_fee - tax_withheld)
 
-            # Lợi nhuận thực tế: Tiền thực tế Shopee trả về tài khoản trừ đi tiền hoàn cho khách
-            actual_net_profit = round_dong(net_from_shopee - total_cashback_committed)
-            real_net_margin = round((actual_net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 0.0
+            # Lợi nhuận dự tính: Thực nhận Shopee trừ đi TOÀN BỘ tiền sẽ chia cho khách (đã hoàn + chờ hoàn + dự tính)
+            estimated_net_profit = round_dong(net_from_shopee - total_cashback_all)
+            estimated_net_margin = round((estimated_net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 0.0
 
-            # Lợi nhuận danh nghĩa (trước thuế & phí sàn)
-            paper_profit = round_dong(gross_commission - total_cashback_committed)
+            # Lợi nhuận đã chốt / thực thu (từ các đơn đã duyệt thành công)
+            approved_gross = conn.execute(
+                f"SELECT COALESCE(SUM(COALESCE(approved_commission, 0)), 0) FROM orders WHERE {date_filter} AND status IN ('approved', 'paid')"
+            ).fetchone()[0]
+            approved_fee = round_dong(approved_gross * 0.0098)
+            approved_tax = round_dong(approved_gross * 0.10)
+            approved_net = approved_gross - approved_fee - approved_tax
+            realized_net_profit = round_dong(approved_net - total_cashback_committed)
+            realized_net_margin = round((realized_net_profit / approved_gross) * 100, 1) if approved_gross > 0 else 0.0
+
+            # Lợi nhuận danh nghĩa (trên giấy, trước thuế & phí sàn)
+            paper_profit = round_dong(gross_commission - total_cashback_all)
             paper_margin = round((paper_profit / gross_commission) * 100, 1) if gross_commission > 0 else 20.0
 
             # Daily Trends
@@ -1103,8 +1119,9 @@ class _Handler(BaseHTTPRequestHandler):
                 "aov": aov,
                 "avg_commission": avg_commission,
                 "approval_rate": approval_rate,
-                "net_margin": real_net_margin,
-                "real_net_margin": real_net_margin,
+                "net_margin": estimated_net_margin,
+                "real_net_margin": realized_net_margin,
+                "estimated_net_margin": estimated_net_margin,
                 "paper_margin": paper_margin,
             },
             "cached_products": cached_products,
@@ -1121,10 +1138,16 @@ class _Handler(BaseHTTPRequestHandler):
                 "cashback_paid": cashback_paid if is_admin else None,
                 "cashback_ready": cashback_ready if is_admin else None,
                 "cashback_pipeline": cashback_pipeline if is_admin else None,
-                "total_cashback": total_cashback_committed if is_admin else None,
-                "net_profit": actual_net_profit if is_admin else None,
-                "actual_net_profit": actual_net_profit if is_admin else None,
-                "real_net_margin": real_net_margin if is_admin else None,
+                "total_cashback": total_cashback_all if is_admin else None,
+                "total_cashback_all": total_cashback_all if is_admin else None,
+                "total_cashback_committed": total_cashback_committed if is_admin else None,
+                "net_profit": estimated_net_profit if is_admin else None,
+                "actual_net_profit": estimated_net_profit if is_admin else None,
+                "estimated_net_profit": estimated_net_profit if is_admin else None,
+                "estimated_net_margin": estimated_net_margin if is_admin else None,
+                "realized_net_profit": realized_net_profit if is_admin else None,
+                "realized_net_margin": realized_net_margin if is_admin else None,
+                "real_net_margin": estimated_net_margin if is_admin else None,
                 "paper_profit": paper_profit if is_admin else None,
                 "paper_margin": paper_margin if is_admin else None,
             } if is_admin else None,
