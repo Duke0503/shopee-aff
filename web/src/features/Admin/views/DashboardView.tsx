@@ -26,6 +26,7 @@ import {
   Bot,
   Globe,
 } from "lucide-react"
+import { FinancialWaterfallCard } from "@/features/Admin/components/FinancialWaterfallCard"
 
 interface DashboardViewProps {
   metrics: AdminMetrics
@@ -263,11 +264,11 @@ export function DashboardView({
               </div>
             </Card>
 
-            {/* Card 3: Net Admin Profit */}
+            {/* Card 3: Actual Net Admin Profit */}
             <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Lợi Nhuận Ròng (Admin)
+                  Lợi Nhuận Thực Tế (Admin)
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
                   <DollarSign className="h-5 w-5" />
@@ -275,16 +276,16 @@ export function DashboardView({
               </div>
               <div className="mt-3">
                 <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-                  {vnd(fin.net_profit || 0)}
+                  {vnd(fin.actual_net_profit ?? fin.net_profit ?? 0)}
                 </div>
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Badge
                     variant="default"
                     className="bg-emerald-500/15 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
                   >
-                    <Percent className="mr-0.5 h-2.5 w-2.5" /> Margin {kpis.net_margin}%
+                    <Percent className="mr-0.5 h-2.5 w-2.5" /> Thực nhận {fin.real_net_margin ?? kpis.net_margin}%
                   </Badge>
-                  <span>Doanh thu thuần giữ lại</span>
+                  <span>Sau 10% thuế & 0.98% phí sàn</span>
                 </div>
               </div>
             </Card>
@@ -386,6 +387,11 @@ export function DashboardView({
           </>
         )}
       </div>
+
+      {/* Financial Waterfall P&L Card */}
+      {isAdmin && fin && (
+        <FinancialWaterfallCard financials={fin} kpis={kpis} />
+      )}
 
       {/* Daily Performance Trend Chart */}
       <Card className="p-5">

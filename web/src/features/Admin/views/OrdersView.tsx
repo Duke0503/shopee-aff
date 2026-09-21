@@ -17,7 +17,7 @@ import {
   markAdminOrderPaid,
   type AdminOrder,
 } from "@/lib/api"
-import { shortDate } from "@/lib/format"
+import { shortDate, vnd } from "@/lib/format"
 import {
   Search,
   ExternalLink,
@@ -32,6 +32,7 @@ import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
 import { SortableHeader } from "@/features/Admin/components/SortableHeader"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
 import { CodeBadge } from "@/features/Admin/components/CodeBadge"
+import { OrderFinancialCard } from "@/features/Admin/components/OrderFinancialCard"
 
 export function OrdersView() {
   const queryClient = useQueryClient()
@@ -247,7 +248,7 @@ export function OrdersView() {
                 defaultOrder="asc"
               />
             </TableHead>
-            <TableHead className="min-w-[200px]">Sản Phẩm</TableHead>
+            <TableHead className="min-w-[180px]">Sản Phẩm</TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
                 title="Giá Trị Đơn"
@@ -260,13 +261,19 @@ export function OrdersView() {
             </TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
-                title="Hoa Hồng Shopee"
+                title="Hoa Hồng Gộp"
                 column="commission"
                 currentSortBy={sortBy}
                 currentSortOrder={sortOrder}
                 onSort={handleSort}
                 align="right"
               />
+            </TableHead>
+            <TableHead className="text-right whitespace-nowrap text-muted-foreground" title="Thuế TNCN 10% + Phí sàn 0.98%">
+              Thuế & Phí
+            </TableHead>
+            <TableHead className="text-right whitespace-nowrap text-blue-600 dark:text-blue-400" title="Tiền Shopee thực chi trả về tài khoản sau thuế & phí">
+              Thực Nhận Sàn
             </TableHead>
             <TableHead className="text-right whitespace-nowrap">
               <SortableHeader
@@ -277,6 +284,9 @@ export function OrdersView() {
                 onSort={handleSort}
                 align="right"
               />
+            </TableHead>
+            <TableHead className="text-right whitespace-nowrap text-emerald-600 dark:text-emerald-400" title="Lợi nhuận thực tế đút túi của bạn (Thực nhận sàn - Hoàn tiền khách)">
+              Lợi Nhuận Mình
             </TableHead>
             <TableHead className="whitespace-nowrap">
               <SortableHeader
@@ -302,25 +312,27 @@ export function OrdersView() {
         <TableBody>
           {orders.map((o) => {
             const canPay = o.status === "approved" && !o.paid_at
-            const commission = o.approved_commission || o.estimated_commission
+            const fin = o.financial_breakdown
+            const commission = fin?.gross_commission ?? (o.approved_commission || o.estimated_commission)
             const cashback = o.cashback_amount
+            const isRejected = o.status === "rejected"
 
             return (
               <TableRow key={o.order_id}>
                 {/* Mã Đơn Hàng */}
                 <TableCell className="whitespace-nowrap">
-                  <CodeBadge code={o.order_id} label="Đơn:" />
+                  <CodeBadge code={o.order_id} label="Đơn:" variant="purple" />
                 </TableCell>
 
                 {/* Khách Hàng */}
-                <TableCell className="min-w-[150px]">
+                <TableCell className="min-w-[140px]">
                   <div className="space-y-0.5">
                     <div className="font-semibold text-foreground text-xs">{o.customer_name || o.customer_id}</div>
-                    <CodeBadge code={o.customer_id} label="KH:" />
+                    <CodeBadge code={o.customer_id} label="KH:" variant="blue" />
                   </div>
                 </TableCell>
 
-                <TableCell className="max-w-[280px]">
+                <TableCell className="max-w-[220px]">
                   <div className="line-clamp-2 text-xs font-medium text-foreground" title={o.product}>
                     {o.product || "Đơn hàng Shopee"}
                   </div>
@@ -352,12 +364,34 @@ export function OrdersView() {
                   <EmptyDash value={o.order_value} type="currency" />
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                  <EmptyDash value={commission} type="currency" />
+                <TableCell className="text-right text-xs font-mono font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                  <EmptyDash value={commission} type="currency" className="text-amber-600 dark:text-amber-400 font-semibold" />
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                <TableCell className="text-right text-[11px] font-mono whitespace-nowrap">
+                  {fin && !isRejected && (fin.service_fee + fin.tax_amount > 0) ? (
+                    <span className="text-destructive font-medium" title={`Thuế TNCN: -${vnd(fin.tax_amount)} | Phí sàn: -${vnd(fin.service_fee)}`}>
+                      -{vnd(fin.service_fee + fin.tax_amount)}
+                    </span>
+                  ) : (
+                    <EmptyDash value={null} />
+                  )}
+                </TableCell>
+
+                <TableCell className="text-right text-xs font-mono font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                  {fin && !isRejected ? (
+                    <span>{vnd(fin.net_shopee)}</span>
+                  ) : (
+                    <EmptyDash value={null} />
+                  )}
+                </TableCell>
+
+                <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={cashback} type="currency" />
+                </TableCell>
+
+                <TableCell className="text-right whitespace-nowrap">
+                  <OrderFinancialCard order={o} />
                 </TableCell>
 
                 <TableCell className="whitespace-nowrap">{renderStatus(o.status)}</TableCell>

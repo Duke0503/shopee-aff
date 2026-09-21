@@ -169,6 +169,70 @@ def _product_name(detail: str | None) -> str:
     return estimate.name if estimate else ""
 
 
+def _calculate_order_financials(
+    comm: int | None,
+    estimate_raw: str | None,
+    cashback_amount: int | None,
+    status: str,
+    advertised_rate: float,
+) -> dict:
+    gross = comm or 0
+    service_fee = round_dong(gross * 0.0098)
+    tax_amount = round_dong(gross * 0.10)
+    net_shopee = gross - service_fee - tax_amount
+
+    detail = {}
+    if estimate_raw:
+        try:
+            detail = json.loads(estimate_raw)
+        except Exception:
+            detail = {}
+
+    shopee_part = 0
+    seller_part = 0
+    if "shopee_part" in detail and "seller_part" in detail:
+        est_comm = detail.get("commission") or (detail.get("shopee_part", 0) + detail.get("seller_part", 0))
+        if est_comm > 0:
+            ratio = detail.get("shopee_part", 0) / est_comm
+            shopee_part = round_dong(gross * ratio)
+            seller_part = gross - shopee_part
+        else:
+            shopee_part = round_dong(gross * 0.4)
+            seller_part = gross - shopee_part
+    elif "shopee_rate" in detail and "seller_rate" in detail:
+        tot_rate = (detail.get("shopee_rate") or 0) + (detail.get("seller_rate") or 0)
+        if tot_rate > 0:
+            ratio = (detail.get("shopee_rate") or 0) / tot_rate
+            shopee_part = round_dong(gross * ratio)
+            seller_part = gross - shopee_part
+        else:
+            shopee_part = round_dong(gross * 0.4)
+            seller_part = gross - shopee_part
+    else:
+        shopee_part = round_dong(gross * 0.4)
+        seller_part = gross - shopee_part
+
+    if cashback_amount is None:
+        cb = round_dong(gross * advertised_rate) if status != "rejected" else 0
+    else:
+        cb = cashback_amount
+
+    admin_profit = (net_shopee - cb) if status != "rejected" else 0
+    admin_margin = round((admin_profit / gross) * 100, 1) if gross > 0 else 0.0
+
+    return {
+        "gross_commission": gross,
+        "shopee_part": shopee_part,
+        "seller_part": seller_part,
+        "service_fee": service_fee,
+        "tax_amount": tax_amount,
+        "net_shopee": net_shopee,
+        "cashback_amount": cb,
+        "admin_profit": admin_profit,
+        "admin_margin": admin_margin,
+    }
+
+
 def _payable_json(entry, orders: list[dict]) -> dict:
     return {
         "customer_id": entry.customer_id,
@@ -823,8 +887,21 @@ class _Handler(BaseHTTPRequestHandler):
             approval_rate = round(((approved_count + paid_count) / settled_count) * 100, 1) if settled_count > 0 else 100.0
 
             total_cashback_committed = cashback_paid + cashback_ready
-            net_profit = round_dong(gross_commission - total_cashback_committed)
-            net_margin = round((net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 20.0
+            
+            # Shopee deductions:
+            # - Phí dịch vụ sàn Shopee: 0.98%
+            # - Thuế TNCN khấu trừ tại nguồn: 10%
+            shopee_fee = round_dong(gross_commission * 0.0098)
+            tax_withheld = round_dong(gross_commission * 0.10)
+            net_from_shopee = round_dong(gross_commission - shopee_fee - tax_withheld)
+
+            # Lợi nhuận thực tế: Tiền thực tế Shopee trả về tài khoản trừ đi tiền hoàn cho khách
+            actual_net_profit = round_dong(net_from_shopee - total_cashback_committed)
+            real_net_margin = round((actual_net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 0.0
+
+            # Lợi nhuận danh nghĩa (trước thuế & phí sàn)
+            paper_profit = round_dong(gross_commission - total_cashback_committed)
+            paper_margin = round((paper_profit / gross_commission) * 100, 1) if gross_commission > 0 else 20.0
 
             # Daily Trends
             trend_rows = conn.execute(f"""
@@ -842,13 +919,20 @@ class _Handler(BaseHTTPRequestHandler):
             for tr in trend_rows:
                 tr_comm = tr["commission"]
                 tr_cash = tr["cashback"]
+                tr_fee = round_dong(tr_comm * 0.0098)
+                tr_tax = round_dong(tr_comm * 0.10)
+                tr_net = tr_comm - tr_fee - tr_tax
+                tr_profit = tr_net - tr_cash
                 trends.append({
                     "day": tr["day"],
                     "orders_count": tr["orders_count"],
                     "gmv": tr["gmv"],
                     "commission": round_dong(tr_comm),
+                    "fee": tr_fee,
+                    "tax": tr_tax,
+                    "net_shopee": tr_net,
                     "cashback": round_dong(tr_cash),
-                    "net_profit": round_dong(tr_comm - tr_cash),
+                    "net_profit": round_dong(tr_profit),
                 })
 
             # Top 5 Customers
@@ -1019,7 +1103,9 @@ class _Handler(BaseHTTPRequestHandler):
                 "aov": aov,
                 "avg_commission": avg_commission,
                 "approval_rate": approval_rate,
-                "net_margin": net_margin,
+                "net_margin": real_net_margin,
+                "real_net_margin": real_net_margin,
+                "paper_margin": paper_margin,
             },
             "cached_products": cached_products,
             "total_logs": total_logs,
@@ -1029,11 +1115,18 @@ class _Handler(BaseHTTPRequestHandler):
             "channels": channels,
             "financials": {
                 "gross_commission": round_dong(gross_commission) if is_admin else None,
+                "shopee_fee": shopee_fee if is_admin else None,
+                "tax_withheld": tax_withheld if is_admin else None,
+                "net_from_shopee": net_from_shopee if is_admin else None,
                 "cashback_paid": cashback_paid if is_admin else None,
                 "cashback_ready": cashback_ready if is_admin else None,
                 "cashback_pipeline": cashback_pipeline if is_admin else None,
                 "total_cashback": total_cashback_committed if is_admin else None,
-                "net_profit": net_profit if is_admin else None,
+                "net_profit": actual_net_profit if is_admin else None,
+                "actual_net_profit": actual_net_profit if is_admin else None,
+                "real_net_margin": real_net_margin if is_admin else None,
+                "paper_profit": paper_profit if is_admin else None,
+                "paper_margin": paper_margin if is_admin else None,
             } if is_admin else None,
         }
         return self._json({"ok": True, "metrics": metrics})
@@ -1354,10 +1447,16 @@ class _Handler(BaseHTTPRequestHandler):
             rate = self.cfg.advertised_cashback_rate
             for r in rows:
                 item = dict(r)
-                item["product"] = _product_name(item.pop("estimate_detail", None))
-                if item.get("cashback_amount") is None and item.get("status") != "rejected":
-                    comm = item.get("approved_commission") or item.get("estimated_commission") or 0
-                    item["cashback_amount"] = round(comm * rate)
+                est_raw = item.pop("estimate_detail", None)
+                item["product"] = _product_name(est_raw)
+                comm = item.get("approved_commission") or item.get("estimated_commission") or 0
+                cb = item.get("cashback_amount")
+                if cb is None and item.get("status") != "rejected":
+                    cb = round_dong(comm * rate)
+                    item["cashback_amount"] = cb
+                item["financial_breakdown"] = _calculate_order_financials(
+                    comm, est_raw, cb, item.get("status", ""), rate
+                )
                 orders.append(item)
 
         total_pages = math.ceil(total / limit) if limit > 0 else 1
@@ -1589,7 +1688,7 @@ class _Handler(BaseHTTPRequestHandler):
                 SELECT o.order_id, o.customer_id, o.request_id, o.order_value,
                        o.estimated_commission, o.approved_commission, o.cashback_amount,
                        o.status, o.rejection_reason, o.recorded_at, o.approved_at, o.paid_at,
-                       r.source_url, r.affiliate_url,
+                       r.source_url, r.affiliate_url, r.estimate_detail,
                        COALESCE(
                            (SELECT p.name FROM products_cache p WHERE r.source_url LIKE '%' || p.item_id || '%' LIMIT 1),
                            'Sản phẩm Shopee'
@@ -1599,12 +1698,24 @@ class _Handler(BaseHTTPRequestHandler):
                  WHERE o.customer_id = ?
                  ORDER BY COALESCE(o.recorded_at, o.approved_at, o.updated_at) DESC
             """, (customer_id,)).fetchall()
-            orders = [dict(r) for r in orders_rows]
+            orders = []
             rate = self.cfg.advertised_cashback_rate
-            for o in orders:
-                if o.get("cashback_amount") is None and o.get("status") != "rejected":
-                    comm = o.get("approved_commission") or o.get("estimated_commission") or 0
-                    o["cashback_amount"] = round(comm * rate)
+            for r in orders_rows:
+                o = dict(r)
+                est_raw = o.pop("estimate_detail", None)
+                if not o.get("product") or o["product"] == "Sản phẩm Shopee":
+                    p_name = _product_name(est_raw)
+                    if p_name:
+                        o["product"] = p_name
+                comm = o.get("approved_commission") or o.get("estimated_commission") or 0
+                cb = o.get("cashback_amount")
+                if cb is None and o.get("status") != "rejected":
+                    cb = round_dong(comm * rate)
+                    o["cashback_amount"] = cb
+                o["financial_breakdown"] = _calculate_order_financials(
+                    comm, est_raw, cb, o.get("status", ""), rate
+                )
+                orders.append(o)
 
             # Link requests
             req_rows = conn.execute("""
@@ -1645,6 +1756,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "total_orders": len(orders),
                 "total_requests": len(requests),
                 "total_transferred": sum(t.get("amount") or 0 for t in transfers),
+                "total_admin_profit": sum((o.get("financial_breakdown", {}).get("admin_profit") or 0) for o in orders if o.get("status") != "rejected"),
             }
 
             user_data["order_count"] = stats["total_orders"]

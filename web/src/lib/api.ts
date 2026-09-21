@@ -169,6 +169,9 @@ export interface TrendPoint {
   orders_count: number
   gmv: number
   commission: number
+  fee?: number
+  tax?: number
+  net_shopee?: number
   cashback: number
   net_profit: number
 }
@@ -236,11 +239,18 @@ export interface AdminMetrics {
   channels?: ChannelMetric[]
   financials: {
     gross_commission: number | null
+    shopee_fee?: number | null
+    tax_withheld?: number | null
+    net_from_shopee?: number | null
     cashback_paid: number | null
     cashback_ready: number | null
     cashback_pipeline: number | null
     total_cashback: number | null
     net_profit: number | null
+    actual_net_profit?: number | null
+    real_net_margin?: number | null
+    paper_profit?: number | null
+    paper_margin?: number | null
   } | null
 }
 
@@ -297,6 +307,8 @@ export interface UserDetailData {
     awaiting_amount: number
     total_orders: number
     total_requests: number
+    total_transferred?: number
+    total_admin_profit?: number
   }
 }
 
@@ -308,6 +320,18 @@ export interface AdminEmployee {
   created_at: string
   last_login_at: string | null
   login_count: number
+}
+
+export interface OrderFinancialBreakdown {
+  gross_commission: number
+  shopee_part: number
+  seller_part: number
+  service_fee: number
+  tax_amount: number
+  net_shopee: number
+  cashback_amount: number
+  admin_profit: number
+  admin_margin: number
 }
 
 export interface AdminOrder {
@@ -326,6 +350,7 @@ export interface AdminOrder {
   source_url: string | null
   affiliate_url: string | null
   product: string
+  financial_breakdown?: OrderFinancialBreakdown
 }
 
 export interface ProductRequester {

@@ -28,6 +28,7 @@ import {
 import { vnd, shortDate } from "@/lib/format"
 import { EmptyDash } from "@/features/Admin/components/EmptyDash"
 import { CodeBadge } from "@/features/Admin/components/CodeBadge"
+import { OrderFinancialCard } from "@/features/Admin/components/OrderFinancialCard"
 import {
   User,
   CreditCard,
@@ -184,6 +185,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         <TableHead className="text-xs">Sản Phẩm</TableHead>
                         <TableHead className="text-xs text-right">Giá Trị</TableHead>
                         <TableHead className="text-xs text-right">Hoàn Tiền</TableHead>
+                        <TableHead className="text-xs text-right text-emerald-600">Lợi Nhuận Mình</TableHead>
                         <TableHead className="text-xs text-center">Trạng Thái</TableHead>
                         <TableHead className="text-xs">Ngày</TableHead>
                       </TableRow>
@@ -194,9 +196,12 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         return (
                           <TableRow key={o.order_id}>
                             <TableCell><CodeBadge code={o.order_id} variant="purple" /></TableCell>
-                            <TableCell className="text-xs max-w-[200px] truncate" title={o.product}>{o.product}</TableCell>
+                            <TableCell className="text-xs max-w-[180px] truncate" title={o.product}>{o.product}</TableCell>
                             <TableCell className="text-xs text-right"><EmptyDash value={o.order_value} type="currency" /></TableCell>
-                            <TableCell className="text-xs text-right font-medium text-emerald-600"><EmptyDash value={o.cashback_amount} type="currency" className="text-emerald-600 font-medium" /></TableCell>
+                            <TableCell className="text-xs text-right font-medium text-foreground"><EmptyDash value={o.cashback_amount} type="currency" /></TableCell>
+                            <TableCell className="text-xs text-right whitespace-nowrap">
+                              <OrderFinancialCard order={o} />
+                            </TableCell>
                             <TableCell className="text-center">
                               <Badge variant={sb.variant} className="text-[10px] gap-1">{sb.icon} {sb.label}</Badge>
                             </TableCell>
