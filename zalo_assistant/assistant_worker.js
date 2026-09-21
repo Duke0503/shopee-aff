@@ -446,7 +446,177 @@ function extractTextAndUrls(data) {
       }
 
       // 2. Kiểm tra các lệnh
-      const lower = text.toLowerCase();
+      const lower = text.toLowerCase().trim();
+
+      const isIdCmd = /^(?:\/id|\!id|id|\/ma|\!ma|mã|ma|lấy id|lay id|mã id|mã khách hàng|ma khach hang|\/taikhoan|\!taikhoan|tài khoản|tai khoan)$/i.test(lower) || lower.startsWith("/id") || lower.startsWith("!id");
+      const isPassCmd = /^(?:\/matkhau|\!matkhau|\/pass|\!pass|\/password|\!password|matkhau|mật khẩu|mat khau|pass|password|lấy mật khẩu|lay mat khau|quên mật khẩu|quen mat khau)$/i.test(lower) || lower.startsWith("/matkhau") || lower.startsWith("!matkhau");
+      const isBalanceCmd = /^(?:\/sodu|\!sodu|sodu|số dư|so du|tiền hoàn|tien hoan|\/kiemtra|\!kiemtra)$/i.test(lower) || lower.startsWith("/sodu");
+
+      // Xử lý lệnh lấy ID / Mật khẩu / Số dư
+      if (isIdCmd || isPassCmd || isBalanceCmd) {
+        // TRƯỜNG HỢP 1: Người dùng gõ trong NHÓM CHUNG -> Bot tag nhắc nhắn riêng để bảo mật
+        if (isGroup) {
+          const tagText = senderUid && !isAdmin ? `@${senderName}` : "";
+          const tagPrefix = tagText ? `${tagText}\n` : "";
+          const reply =
+            tagPrefix +
+            `🔒 Để bảo mật thông tin tài khoản và mật khẩu cá nhân, bạn hãy bấm vào ảnh đại diện của mình và NHẮN TIN RIÊNG (inbox 1-1) cho mình nhé:\n\n` +
+            `👉 Gõ "/id" để nhận Mã Khách Hàng riêng của bạn\n` +
+            `👉 Gõ "/matkhau" để nhận mật khẩu đăng nhập website https://hoantiendp.com\n\n` +
+            `⚠️ Tuyệt đối không lấy mật khẩu ở nhóm chung để tránh lộ tài khoản nha!`;
+
+          const mentions = tagText
+            ? [{ uid: String(senderUid), pos: 0, len: tagText.length }]
+            : undefined;
+
+          const boldTargets = [
+            "NHẮN TIN RIÊNG",
+            "/id",
+            "/matkhau",
+            "https://hoantiendp.com",
+            "Tuyệt đối không lấy mật khẩu ở nhóm chung",
+          ];
+          const styles = [];
+          for (const target of boldTargets) {
+            const start = reply.indexOf(target);
+            if (start !== -1) styles.push({ start, len: target.length, st: "b" });
+          }
+          styles.sort((a, b) => a.start - b.start);
+
+          await api.sendMessage(
+            {
+              msg: reply,
+              mentions: mentions,
+              styles: styles.length > 0 ? styles : undefined,
+            },
+            message.threadId,
+            message.type
+          );
+
+          // Chủ động gửi 1 tin nhắn vào inbox riêng cho khách để tiện trao đổi
+          try {
+            if (senderUid) {
+              if (isPassCmd) {
+                await api.sendMessage(
+                  `Chào ${senderName} 👋! Mình thấy bạn vừa hỏi mật khẩu trong nhóm. Để đảm bảo an toàn, bạn hãy gửi lệnh /matkhau ngay tại khung chat riêng này với mình để nhận mật khẩu đăng nhập website https://hoantiendp.com nhé! 🔒`,
+                  String(senderUid),
+                  ThreadType.User
+                );
+              } else {
+                const authRes = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_id" }),
+                }).then((r) => r.json()).catch(() => null);
+
+                const custId = authRes?.customer_id || String(senderUid);
+                await api.sendMessage(
+                  `✨ MÃ KHÁCH HÀNG (ID) CỦA BẠN ✨\n\n` +
+                  `👤 Tên Zalo: ${senderName}\n` +
+                  `🆔 Mã Khách Hàng: ${custId}\n` +
+                  `🌐 Website tra cứu: https://hoantiendp.com\n\n` +
+                  `💡 Bạn dùng Mã ID này để dán vào website khi tạo link hoàn tiền.\n` +
+                  `🔑 Để lấy mật khẩu đăng nhập website cài đặt STK ngân hàng nhận tiền hoàn, bạn gõ tiếp: /matkhau`,
+                  String(senderUid),
+                  ThreadType.User
+                );
+              }
+            }
+          } catch (_) {}
+          return;
+        }
+
+        // TRƯỜNG HỢP 2: Người dùng nhắn tin RIÊNG (DM 1-1) với Bot
+        if (isIdCmd) {
+          try {
+            const authRes = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_id" }),
+            }).then((r) => r.json()).catch(() => null);
+
+            const custId = authRes?.customer_id || String(senderUid);
+            const reply =
+              `✨ THÔNG TIN MÃ KHÁCH HÀNG CỦA BẠN ✨\n\n` +
+              `👤 Tên Zalo: ${senderName}\n` +
+              `🆔 Mã Khách Hàng (ID): ${custId}\n` +
+              `🌐 Website tra cứu: https://hoantiendp.com\n\n` +
+              `📌 HƯỚNG DẪN SỬ DỤNG:\n` +
+              `1️⃣ Khi dán link sản phẩm Shopee trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n` +
+              `2️⃣ Để đăng nhập website cài đặt Số Tài Khoản Ngân Hàng nhận tiền hoàn, bạn gõ lệnh:\n` +
+              `👉 /matkhau (Bot sẽ cấp mật khẩu đăng nhập bảo mật cho bạn)`;
+
+            await api.sendMessage(reply, message.threadId, message.type);
+          } catch (err) {
+            await api.sendMessage(`Mã Khách Hàng của bạn là: ${senderUid}`, message.threadId, message.type);
+          }
+          return;
+        }
+
+        if (isPassCmd) {
+          try {
+            const authRes = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "issue_password" }),
+            }).then((r) => r.json()).catch(() => null);
+
+            if (authRes && authRes.ok && authRes.password) {
+              const custId = authRes.customer_id;
+              const pwd = authRes.password;
+              const reply =
+                `🔐 MẬT KHẨU ĐĂNG NHẬP WEBSITE 🔐\n\n` +
+                `🆔 Tên đăng nhập (Mã ID): ${custId}\n` +
+                `🔑 Mật khẩu: ${pwd}\n` +
+                `🌐 Link đăng nhập: https://hoantiendp.com/login\n\n` +
+                `👉 HƯỚNG DẪN TIẾP THEO:\n` +
+                `1. Truy cập https://hoantiendp.com/login và đăng nhập bằng Mã ID + Mật khẩu trên.\n` +
+                `2. Bấm vào tên bạn ở góc trên cùng → Chọn "Cài đặt tài khoản ngân hàng" để điền STK nhận chuyển khoản hoàn tiền 80% tự động.\n` +
+                `3. Bạn có thể đổi lại mật khẩu cá nhân bất kỳ lúc nào trên website.\n\n` +
+                `⚠️ Lưu ý bảo mật: Mỗi lần bạn gõ /matkhau, hệ thống sẽ cấp một mật khẩu mới để bảo vệ an toàn cho tài khoản của bạn.`;
+
+              await api.sendMessage(reply, message.threadId, message.type);
+            } else {
+              await api.sendMessage(`⚠️ Chưa thể tạo mật khẩu lúc này, bạn vui lòng thử lại sau 10 giây nhé!`, message.threadId, message.type);
+            }
+          } catch (err) {
+            console.error("[Issue Password Error]:", err);
+          }
+          return;
+        }
+
+        if (isBalanceCmd) {
+          try {
+            const balRes = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_balance" }),
+            }).then((r) => r.json()).catch(() => null);
+
+            if (balRes && balRes.ok) {
+              const formatVND = (num) => (num || 0).toLocaleString("vi-VN") + "đ";
+              const bankStatus = balRes.has_bank
+                ? `✅ Đã cài đặt STK (${balRes.bank_name} - ···${balRes.bank_account_tail})`
+                : `⚠️ Chưa cài đặt STK ngân hàng (Đăng nhập web để cài đặt nhé)`;
+
+              const reply =
+                `💰 SỐ DƯ TIỀN HOÀN CỦA BẠN 💰\n\n` +
+                `👤 Khách hàng: ${balRes.display_name} (${balRes.customer_id})\n` +
+                `💵 Đã tích lũy sẵn sàng nhận: ${formatVND(balRes.approved)}\n` +
+                `⏳ Đang chờ Shopee đối soát: ${formatVND(balRes.awaiting)}\n` +
+                `🎉 Đã chuyển khoản về ví: ${formatVND(balRes.paid)}\n` +
+                `🏦 Trạng thái ngân hàng: ${bankStatus}\n\n` +
+                `🌐 Xem chi tiết từng đơn hàng tại: https://hoantiendp.com`;
+
+              await api.sendMessage(reply, message.threadId, message.type);
+            }
+          } catch (err) {
+            console.error("[Get Balance Error]:", err);
+          }
+          return;
+        }
+      }
+
       if (lower === "!ping" || lower === "/ping") {
         const reply = `Pong! 🏓 Bot Normie đang hoạt động ổn định 24/7 tại nhóm Dev Internal DP.`;
         await api.sendMessage(reply, message.threadId, message.type);
@@ -460,11 +630,15 @@ function extractTextAndUrls(data) {
           `1️⃣ Gửi link sản phẩm Shopee bạn muốn mua vào nhóm hoặc inbox riêng cho mình.\n` +
           `2️⃣ Nhận lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n` +
           `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên Shopee.\n` +
-          `4️⃣ Truy cập https://hoantiendp.com để kiểm tra đơn và cập nhật số tài khoản ngân hàng nhận tiền hoàn (đơn sẽ tự động cập nhật sau khi Shopee Affiliate ghi nhận).\n` +
-          `5️⃣ Tiền hoàn sẽ được tự động chuyển về số tài khoản của bạn sau khi Shopee hoàn tất đối soát.\n\n` +
+          `4️⃣ Nhắn tin riêng cho Bot gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
+          `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi Shopee hoàn tất đối soát.\n\n` +
           `📌 Các lệnh hỗ trợ:\n` +
+          `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
+          `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
+          `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
-          `• /web: Website tra cứu đơn & cập nhật STK ngân hàng`;
+          `• /web: Website tra cứu đơn & cập nhật STK ngân hàng\n\n` +
+          `💡 Lưu ý: Vui lòng nhắn tin riêng cho Bot khi gõ /id và /matkhau để bảo mật tài khoản!`;
 
         const mentions = tagText
           ? [
@@ -483,9 +657,9 @@ function extractTextAndUrls(data) {
           "đặt hàng trực tiếp trên Shopee",
           "https://hoantiendp.com",
           "cập nhật số tài khoản ngân hàng",
-          "Shopee Affiliate ghi nhận",
-          "tự động chuyển về số tài khoản",
-          "sau khi Shopee hoàn tất đối soát",
+          "/id",
+          "/matkhau",
+          "/sodu",
           "/chinhsach",
           "/web",
         ];

@@ -679,6 +679,10 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._sync_group_members()
+        if path == "/api/bot/customer-auth":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._bot_customer_auth()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -2126,6 +2130,67 @@ class _Handler(BaseHTTPRequestHandler):
             conn.commit()
 
         return self._json({"ok": True, "synced_count": synced_count, "total": len(members)})
+
+    def _bot_customer_auth(self):
+        body = self._body()
+        uid = str(body.get("uid") or "").strip()
+        name = str(body.get("name") or "").strip()
+        action = str(body.get("action") or "get_id").strip()
+        if not uid:
+            return self._json({"ok": False, "message": "missing_uid"}, 400)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            row = conn.execute(
+                "SELECT * FROM customers WHERE customer_id = ? OR zalo_user_id = ?",
+                (uid, uid)
+            ).fetchone()
+            if not row:
+                conn.execute("""
+                    INSERT INTO customers (customer_id, zalo_user_id, display_name, role, status, created_at)
+                    VALUES (?, ?, ?, 'user', 'active', datetime('now'))
+                """, (uid, uid, name or f"Thành viên {uid[-4:]}"))
+                row = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (uid,)).fetchone()
+            elif name and not row["display_name"]:
+                conn.execute("UPDATE customers SET display_name = ? WHERE customer_id = ?", (name, row["customer_id"]))
+                row = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (row["customer_id"],)).fetchone()
+
+            cust_id = row["customer_id"]
+            display_name = row["display_name"] or name or f"Thành viên {cust_id[-4:]}"
+
+            if action == "issue_password":
+                from ..core import accounts
+                pwd = accounts.issue_password(conn, cust_id)
+                conn.commit()
+                return self._json({
+                    "ok": True,
+                    "customer_id": cust_id,
+                    "display_name": display_name,
+                    "password": pwd,
+                })
+
+            if action == "get_balance":
+                from ..core import payouts
+                rate = self.cfg.advertised_cashback_rate
+                bal = payouts.balance_for(conn, cust_id, rate)
+                return self._json({
+                    "ok": True,
+                    "customer_id": cust_id,
+                    "display_name": display_name,
+                    "approved": bal.approved,
+                    "awaiting": bal.awaiting,
+                    "paid": bal.paid,
+                    "has_bank": bool(row["bank_account"]),
+                    "bank_name": row["bank_name"],
+                    "bank_account_tail": (row["bank_account"] or "")[-4:] if row["bank_account"] else None,
+                })
+
+            return self._json({
+                "ok": True,
+                "customer_id": cust_id,
+                "display_name": display_name,
+                "has_password": bool(row["password_hash"]),
+                "has_bank": bool(row["bank_account"]),
+            })
 
     def _shopee_preview(self):
         from ..shopee.commission import lookup

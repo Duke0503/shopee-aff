@@ -69,6 +69,45 @@ export function Guide() {
               </div>
             </Reveal>
 
+            {/* Box hướng dẫn lấy ID & Mật khẩu */}
+            <Reveal delay={20}>
+              <Card className="p-5 sm:p-6 border-primary/30 bg-primary/5">
+                <div className="flex items-start gap-3.5">
+                  <div className="bg-primary/15 text-primary grid size-10 place-items-center rounded-xl shrink-0">
+                    <Icon.password className="size-5" />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <h3 className="font-bold text-base sm:text-lg text-foreground">
+                      🔑 Hướng dẫn lấy Mã Khách Hàng (ID) & Mật khẩu qua Bot Zalo
+                    </h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+                      Để bảo mật thông tin cá nhân và tránh lộ mật khẩu trong nhóm chung, các lệnh tra cứu tài khoản được thực hiện qua <strong>tin nhắn riêng (inbox 1-1) với Bot</strong>:
+                    </p>
+                    <div className="grid gap-2.5 sm:grid-cols-3 pt-2 text-xs">
+                      <div className="rounded-lg border bg-card p-3 space-y-1">
+                        <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">/id</span>
+                        <div className="font-medium text-foreground">Lấy Mã Khách Hàng</div>
+                        <div className="text-muted-foreground text-[11px]">Dùng để nhập trên website khi tạo link hoàn tiền hoặc đăng nhập.</div>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 space-y-1">
+                        <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">/matkhau</span>
+                        <div className="font-medium text-foreground">Nhận Mật Khẩu Web</div>
+                        <div className="text-muted-foreground text-[11px]">Bot sẽ cấp mật khẩu riêng để đăng nhập https://hoantiendp.com.</div>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 space-y-1">
+                        <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">/sodu</span>
+                        <div className="font-medium text-foreground">Kiểm Tra Tiền Hoàn</div>
+                        <div className="text-muted-foreground text-[11px]">Xem nhanh số tiền hoàn đã sẵn sàng rút và đơn chờ đối soát.</div>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] italic pt-1">
+                      💡 Mẹo: Nếu bạn vô tình gõ lệnh trong nhóm Zalo chung, Bot sẽ tự động nhắc bạn bấm vào avatar Bot để nhắn tin riêng, đảm bảo tài khoản của bạn luôn được bảo vệ tối đa!
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </Reveal>
+
             <div className="mt-6 flex flex-wrap justify-center gap-3 pt-4">
               <Button size="lg" className="w-full sm:w-auto" onClick={() => navigate("orders")}>
                 <Icon.order className="mr-1.5" /> {t("home_cta_check")}

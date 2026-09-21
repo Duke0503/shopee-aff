@@ -18,16 +18,16 @@ export const config = {
   MAIN_API_URL: "http://localhost:8899",
 
   // Default customer ID dùng khi khách chưa có mã
-  DEFAULT_CUSTOMER_ID: "C0001",
+  DEFAULT_CUSTOMER_ID: "default_bot",
 
   // Tạm tắt chế độ tự động nhắn tin riêng 1-1 cho người mới vào (khi cần mở lại chỉ cần đổi thành true)
   ENABLE_PRIVATE_WELCOME: false,
 
   // Mẫu câu chào mừng trong nhóm (Spintax tự nhiên, linh hoạt gửi vào nhóm hoặc inbox + web tra cứu đơn)
   GROUP_WELCOME_TEMPLATES: [
-    "Hello {tag}! Rất vui được đón tiếp bạn đến với {groupName} ✨\n👉 Chuẩn bị mua gì trên Shopee, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🌐 Theo dõi chi tiết các đơn đã mua & số tiền hoàn tại: https://hoantiendp.com (đơn cập nhật sau khi Shopee Affiliate ghi nhận nhé)",
-    "Chào mừng {tag} đã gia nhập {groupName}! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🌐 Tra cứu đơn hàng và theo dõi tiền hoàn minh bạch tại website: https://hoantiendp.com",
-    "Chào mừng thành viên mới {tag}! 🚀\n👉 Để nhận hoàn tiền 80% Shopee, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🌐 Xem và quản lý lịch sử đơn hàng tại website: https://hoantiendp.com",
+    "Hello {tag}! Rất vui được đón tiếp bạn đến với {groupName} ✨\n👉 Chuẩn bị mua gì trên Shopee, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
+    "Chào mừng {tag} đã gia nhập {groupName}! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
+    "Chào mừng thành viên mới {tag}! 🚀\n👉 Để nhận hoàn tiền 80% Shopee, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
   ],
 
   // Mẫu câu nhắn tin riêng (Private DM 1-1)
