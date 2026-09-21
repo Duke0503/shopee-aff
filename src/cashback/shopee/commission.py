@@ -53,6 +53,7 @@ class Estimate:
     is_capped: bool
     name: str
     source: str
+    image_url: str = ""
 
     @property
     def earns_nothing(self) -> bool:
@@ -79,7 +80,7 @@ class Estimate:
 
 
 def _build(price: int, shopee_rate: float, seller_rate: float,
-           name: str, source: str) -> Estimate:
+           name: str, source: str, image_url: str = "") -> Estimate:
     """Apply the cap once, in one place, whichever source supplied the rates."""
     raw_shopee = price * shopee_rate / 100
     capped = raw_shopee > SHOPEE_COMMISSION_CAP_VND
@@ -96,6 +97,7 @@ def _build(price: int, shopee_rate: float, seller_rate: float,
         is_capped=capped,
         name=name,
         source=source,
+        image_url=image_url,
     )
 
 
@@ -131,6 +133,6 @@ def lookup(url: str, bridge=None, third_party: bool = True) -> Estimate | None:
         other = None
     if other and other.price > 0:
         return _build(other.price, other.shopee_rate, other.seller_rate,
-                      other.name, SOURCE_THIRD_PARTY)
+                      other.name, SOURCE_THIRD_PARTY, image_url=other.image_url)
 
     return None

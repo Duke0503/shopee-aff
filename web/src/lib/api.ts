@@ -109,6 +109,12 @@ export interface MyOrder {
 export interface Me {
   customer_id: string
   display_name: string
+  role?: "admin" | "employee" | "user"
+  is_admin?: boolean
+  is_employee?: boolean
+  is_staff?: boolean
+  last_login_at?: string | null
+  login_count?: number
   bank_name: string
   bank_account_tail: string
   account_holder: string
@@ -153,3 +159,358 @@ export interface Site {
 }
 
 export const fetchSite = () => get<Site>("/api/site")
+
+// ---------------------------------------------------------------------
+// Admin & Employee API
+// ---------------------------------------------------------------------
+
+export interface TrendPoint {
+  day: string
+  orders_count: number
+  gmv: number
+  commission: number
+  cashback: number
+  net_profit: number
+}
+
+export interface TopCustomer {
+  customer_id: string
+  display_name: string | null
+  zalo_user_id: string | null
+  total_orders: number
+  total_gmv: number
+  total_commission: number
+  total_cashback: number
+}
+
+export interface TopProduct {
+  name: string
+  orders_count: number
+  total_gmv: number
+  total_commission: number
+  total_cashback: number
+  affiliate_url: string | null
+  source_url: string | null
+}
+
+export interface ChannelMetric {
+  channel_id: string
+  name: string
+  description: string
+  icon: string
+  status_badge: string
+  unique_users: number
+  total_events: number
+  converted_users: number
+  conversion_rate: number
+  orders_count: number
+  total_gmv: number
+  total_commission: number
+}
+
+export interface AdminMetrics {
+  period: string
+  is_admin: boolean
+  total_users: number
+  total_employees: number
+  active_24h: number
+  orders: {
+    total: number
+    awaiting: number
+    approved: number
+    paid: number
+    rejected: number
+  }
+  kpis: {
+    total_gmv: number
+    aov: number
+    avg_commission: number
+    approval_rate: number
+    net_margin: number
+  }
+  cached_products: number
+  total_logs: number
+  trends: TrendPoint[]
+  top_customers: TopCustomer[]
+  top_products: TopProduct[]
+  channels?: ChannelMetric[]
+  financials: {
+    gross_commission: number | null
+    cashback_paid: number | null
+    cashback_ready: number | null
+    cashback_pipeline: number | null
+    total_cashback: number | null
+    net_profit: number | null
+  } | null
+}
+
+export interface AdminUser {
+  customer_id: string
+  display_name: string | null
+  zalo_user_id: string | null
+  bank_name: string | null
+  bank_account: string | null
+  account_holder: string | null
+  created_at: string
+  last_login_at: string | null
+  login_count: number
+  status: string
+  order_count: number
+  paid_amount: number
+  ready_amount: number
+  total_cashback: number
+  awaiting_amount: number
+  last_bot_activity: string | null
+  recent_requests?: {
+    name: string
+    created_at: string
+    affiliate_url?: string
+  }[]
+}
+
+export interface UserTransfer {
+  id: number
+  customer_id: string
+  amount: number
+  transfer_code: string | null
+  note: string | null
+  proof_image: string | null
+  created_at: string
+  created_by: string | null
+}
+
+export interface UserDetailData {
+  user: AdminUser & { password_hash?: string }
+  orders: AdminOrder[]
+  link_requests: {
+    request_id: string
+    source_url: string
+    affiliate_url: string | null
+    created_at: string
+    name: string | null
+  }[]
+  transfers: UserTransfer[]
+  stats: {
+    total_cashback: number
+    paid_amount: number
+    ready_amount: number
+    awaiting_amount: number
+    total_orders: number
+    total_requests: number
+  }
+}
+
+export interface AdminEmployee {
+  customer_id: string
+  display_name: string | null
+  role: "admin" | "employee"
+  status: "active" | "disabled"
+  created_at: string
+  last_login_at: string | null
+  login_count: number
+}
+
+export interface AdminOrder {
+  order_id: string
+  customer_id: string
+  customer_name: string | null
+  status: "awaiting_approval" | "approved" | "rejected" | "paid"
+  order_value: number | null
+  estimated_commission: number | null
+  approved_commission: number | null
+  cashback_amount: number | null
+  recorded_at: string | null
+  approved_at: string | null
+  paid_at: string | null
+  rejection_reason: string | null
+  source_url: string | null
+  affiliate_url: string | null
+  product: string
+}
+
+export interface ProductRequester {
+  customer_id: string
+  display_name: string | null
+  zalo_user_id: string | null
+  bank_name: string | null
+  bank_account: string | null
+  account_holder: string | null
+  last_requested_at: string
+  request_count: number
+}
+
+export interface ProductBuyer {
+  order_id: string
+  customer_id: string
+  display_name: string | null
+  zalo_user_id: string | null
+  bank_name: string | null
+  bank_account: string | null
+  account_holder: string | null
+  order_value: number | null
+  approved_commission: number | null
+  estimated_commission: number | null
+  cashback_amount: number | null
+  status: string
+  order_date: string | null
+}
+
+export interface AdminProduct {
+  item_id: string
+  name: string
+  price: number
+  price_formatted: string
+  total_commission: number
+  commission_formatted: string
+  cashback: number
+  cashback_formatted: string
+  rate_percent: string
+  affiliate_url: string
+  canonical_url: string
+  image_url?: string | null
+  request_count: number
+  updated_at: string
+  requesters?: ProductRequester[]
+  buyers?: ProductBuyer[]
+  order_count?: number
+  total_bought_gmv?: number
+}
+
+export interface AdminLog {
+  log_id: number
+  customer_id: string
+  display_name: string | null
+  action: string
+  path: string | null
+  detail: string | null
+  created_at: string
+}
+
+export interface PaginationMeta {
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+export const fetchAdminMetrics = (period: string = "all") =>
+  get<{ ok: boolean; metrics: AdminMetrics }>(`/api/admin/metrics?period=${period}`)
+
+export const fetchAdminUsers = (params?: {
+  page?: number
+  limit?: number
+  search?: string
+  bank?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+}) => {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set("page", String(params.page))
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.search) qs.set("search", params.search)
+  if (params?.bank && params.bank !== "all") qs.set("bank", params.bank)
+  if (params?.sort_by) qs.set("sort_by", params.sort_by)
+  if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  const q = qs.toString() ? `?${qs.toString()}` : ""
+  return get<{ ok: boolean; users: AdminUser[]; pagination?: PaginationMeta }>(`/api/admin/users${q}`)
+}
+
+export const fetchAdminEmployees = (params?: {
+  page?: number
+  limit?: number
+  search?: string
+  role?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+}) => {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set("page", String(params.page))
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.search) qs.set("search", params.search)
+  if (params?.role && params.role !== "all") qs.set("role", params.role)
+  if (params?.sort_by) qs.set("sort_by", params.sort_by)
+  if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  const q = qs.toString() ? `?${qs.toString()}` : ""
+  return get<{ ok: boolean; employees: AdminEmployee[]; pagination?: PaginationMeta }>(`/api/admin/employees${q}`)
+}
+
+export const createAdminEmployee = (data: { username: string; password: string; display_name: string; role: "admin" | "employee" }) =>
+  post("/api/admin/employees", data)
+export const updateAdminEmployee = (data: { customer_id: string; role?: string; status?: string; new_password?: string }) =>
+  post("/api/admin/employees/update", data)
+
+export const fetchAdminOrders = (params?: {
+  page?: number
+  limit?: number
+  search?: string
+  status?: string
+  customer_id?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+}) => {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set("page", String(params.page))
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.search) qs.set("search", params.search)
+  if (params?.status && params.status !== "all") qs.set("status", params.status)
+  if (params?.customer_id) qs.set("customer_id", params.customer_id)
+  if (params?.sort_by) qs.set("sort_by", params.sort_by)
+  if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  const q = qs.toString() ? `?${qs.toString()}` : ""
+  return get<{ ok: boolean; orders: AdminOrder[]; pagination?: PaginationMeta }>(`/api/admin/orders${q}`)
+}
+
+export const markAdminOrderPaid = (customer_id: string, order_ids: string[]) =>
+  post("/api/admin/orders/mark-paid", { customer_id, order_ids })
+
+export const fetchAdminProducts = (params?: {
+  page?: number
+  limit?: number
+  search?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+}) => {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set("page", String(params.page))
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.search) qs.set("search", params.search)
+  if (params?.sort_by) qs.set("sort_by", params.sort_by)
+  if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  const q = qs.toString() ? `?${qs.toString()}` : ""
+  return get<{ ok: boolean; products: AdminProduct[]; pagination?: PaginationMeta }>(`/api/admin/products${q}`)
+}
+
+export const fetchAdminLogs = (params?: {
+  page?: number
+  limit?: number
+  search?: string
+  action?: string
+  sort_by?: string
+  sort_order?: "asc" | "desc"
+}) => {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set("page", String(params.page))
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.search) qs.set("search", params.search)
+  if (params?.action && params.action !== "all") qs.set("action", params.action)
+  if (params?.sort_by) qs.set("sort_by", params.sort_by)
+  if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  const q = qs.toString() ? `?${qs.toString()}` : ""
+  return get<{ ok: boolean; logs: AdminLog[]; pagination?: PaginationMeta }>(`/api/admin/logs${q}`)
+}
+
+export const adminLogin = (username: string, password: string) =>
+  post("/api/admin/login", { username, password })
+export const adminLogout = () => post("/api/admin/logout")
+
+export const fetchAdminUserDetail = (customerId: string) =>
+  get<{ ok: boolean } & UserDetailData>(`/api/admin/users/${encodeURIComponent(customerId)}`)
+
+export const recordAdminTransfer = (data: {
+  customer_id: string
+  amount: number
+  transfer_code?: string
+  note?: string
+  proof_image?: string
+}) => post("/api/admin/transfers", data)
+

@@ -85,7 +85,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
         </div>
 
         <Reveal delay={60}>
-          <Card>
+          <Card className="luxury-panel border border-border/80 shadow-md">
             <CardContent className="pt-5">
               <form
                 className="space-y-5"

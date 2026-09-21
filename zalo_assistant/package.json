@@ -1,0 +1,16 @@
+{
+  "name": "zalo-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Zalo Assistant Selfbot Worker for Group Automation and Notifications",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "login": "node login.js"
+  },
+  "dependencies": {
+    "image-size": "^2.0.4",
+    "qrcode-terminal": "^0.12.0",
+    "zca-js": "^2.2.0"
+  }
+}

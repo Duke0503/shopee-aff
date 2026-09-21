@@ -101,3 +101,9 @@ desktop.ini
 # Tooling and AI assistant caches
 _bmad-output/
 _bmad/custom/config.user.toml
+
+# Zalo Bot secrets & runtime state
+zalo_assistant/credentials.json
+zalo_assistant/qr.png
+credentials.json
+qr.png

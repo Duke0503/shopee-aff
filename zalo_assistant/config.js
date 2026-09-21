@@ -1,0 +1,55 @@
+export const config = {
+  // Nhóm thử nghiệm và nhóm thật
+  GROUP_TEST_ID: "9181140731214988069", // Dev Internal DP
+  GROUP_MAIN_ID: "2417491944968337600", // Hoàn Tiền Shopee (Cộng Đồng Hoàn Tiền DP)
+
+  // Nhóm đang hoạt động: Dừng ở bước chuyển giao, hiện tại chỉ chạy ở nhóm TEST!
+  ACTIVE_GROUP_ID: "9181140731214988069",
+
+  // Danh sách UID Quản trị viên toàn hệ thống (Minh Đức & Xuân Phước)
+  // Khi gửi link hoặc lệnh, bot sẽ không tag tên mà chỉ phản hồi nội dung
+  GLOBAL_ADMIN_UIDS: [
+    "6356806862452292219", // Minh Đức (Chủ nhóm chính)
+    "7835381167015183856", // Xuân Phước (Phó nhóm chính / Tạo nhóm test)
+  ],
+
+  // Cổng HTTP API nội bộ để nhận thông báo từ hệ thống chính
+  PORT: 8891,
+  MAIN_API_URL: "http://localhost:8899",
+
+  // Default customer ID dùng khi khách chưa có mã
+  DEFAULT_CUSTOMER_ID: "C0001",
+
+  // Tạm tắt chế độ tự động nhắn tin riêng 1-1 cho người mới vào (khi cần mở lại chỉ cần đổi thành true)
+  ENABLE_PRIVATE_WELCOME: false,
+
+  // Mẫu câu chào mừng trong nhóm (Spintax tự nhiên, linh hoạt gửi vào nhóm hoặc inbox + web tra cứu đơn)
+  GROUP_WELCOME_TEMPLATES: [
+    "Hello {tag}! Rất vui được đón tiếp bạn đến với {groupName} ✨\n👉 Chuẩn bị mua gì trên Shopee, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🌐 Theo dõi chi tiết các đơn đã mua & số tiền hoàn tại: https://hoantiendp.com (đơn cập nhật sau khi Shopee Affiliate ghi nhận nhé)",
+    "Chào mừng {tag} đã gia nhập {groupName}! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🌐 Tra cứu đơn hàng và theo dõi tiền hoàn minh bạch tại website: https://hoantiendp.com",
+    "Chào mừng thành viên mới {tag}! 🚀\n👉 Để nhận hoàn tiền 80% Shopee, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🌐 Xem và quản lý lịch sử đơn hàng tại website: https://hoantiendp.com",
+  ],
+
+  // Mẫu câu nhắn tin riêng (Private DM 1-1)
+  PRIVATE_WELCOME_TEMPLATES: [
+    `Chào {name}! Mình là Bot hỗ trợ của Cộng Đồng Hoàn Tiền DP 🤖\n\n` +
+    `💡 Cách nhận hoàn tiền 80% cực kỳ đơn giản:\n` +
+    `1. Copy link sản phẩm Shopee bạn muốn mua.\n` +
+    `2. Gửi link vào đây cho mình (hoặc gửi thẳng vào nhóm).\n` +
+    `3. Mình sẽ gửi lại link mua hàng đã kích hoạt hoàn tiền 80%.\n` +
+    `4. Đặt hàng xong, bạn có thể truy cập website để xem chi tiết đơn hàng và số tiền hoàn:\n` +
+    `🌐 Website: https://hoantiendp.com\n\n` +
+    `👉 Bạn có thể gõ /chinhsach hoặc /huongdan để xem chi tiết chính sách đối soát nhé!`,
+
+    `Hi {name} ơi! Chào mừng bạn đến với nhóm Hoàn Tiền DP 🎁\n\n` +
+    `Mình là trợ lý tự động giúp bạn nhận lại 80% hoa hồng Shopee cho mỗi đơn mua.\n` +
+    `Mỗi khi chuẩn bị mua gì trên Shopee, bạn cứ gửi link sản phẩm qua đây, mình gửi lại link hoàn tiền cho bạn ngay trong 3 giây nhé!\n\n` +
+    `🌐 Sau khi mua xong, bạn vào https://hoantiendp.com để xem danh sách đơn hàng và theo dõi tiến độ hoàn tiền cực kỳ rõ ràng và minh bạch nhé!`
+  ],
+
+  // Delay ngẫu nhiên để an toàn chống quét spam
+  DELAY_GROUP_MIN_MS: 3000,
+  DELAY_GROUP_MAX_MS: 6000,
+  DELAY_PRIVATE_MIN_MS: 6000,
+  DELAY_PRIVATE_MAX_MS: 12000,
+};

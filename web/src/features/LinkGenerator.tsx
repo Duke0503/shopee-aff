@@ -1,10 +1,10 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Icon } from "@/lib/icons"
 import { useT } from "@/lib/labels"
+import { cn } from "@/lib/utils"
 
 interface PreviewData {
   found: boolean
@@ -141,29 +141,24 @@ export function LinkGenerator() {
   }
 
   return (
-    <Card className="overflow-hidden border-2 p-4 sm:p-6 md:p-8 shadow-sm max-w-full min-w-0">
-      <div className="flex items-center gap-3">
-        <div className="bg-primary/10 text-primary grid size-10 place-items-center rounded-xl">
-          <Icon.link className="size-5" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-            {t("link_gen_title")}
-          </h2>
-          <p className="text-muted-foreground mt-0.5 text-xs sm:text-sm">
-            {t("link_gen_lead")}
-          </p>
-        </div>
-      </div>
+    <div className="w-full max-w-2xl mx-auto">
+      {/* Raycast / Linear Style Command Capsule */}
+      <form onSubmit={handleCheck} className="relative group">
+        <div className="command-bar relative flex items-center gap-2 rounded-2xl p-2 sm:p-2.5 transition-all duration-200 focus-within:ring-2 focus-within:ring-foreground/15 focus-within:border-foreground/40 bg-card/90 backdrop-blur-md">
+          <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0 transition-colors">
+            <Icon.link className="size-4.5" />
+          </div>
 
-      <form onSubmit={handleCheck} className="mt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Input
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder={t("link_gen_placeholder")}
-              className="h-12 sm:h-12 text-sm sm:text-base pr-10 rounded-xl"
+              placeholder={t("link_gen_cmd_placeholder")}
+              className={cn(
+                "w-full bg-transparent text-sm sm:text-base text-foreground placeholder:text-muted-foreground/70 outline-none border-none py-1.5 pl-1 font-normal tracking-tight",
+                url ? "pr-8 sm:pr-9" : "pr-1",
+              )}
             />
             {url && (
               <button
@@ -174,117 +169,119 @@ export function LinkGenerator() {
                   setNotFound(false)
                   setAffiliateUrl("")
                 }}
-                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 p-1"
+                className="absolute right-1 sm:right-1.5 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded-full bg-muted/80 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-all shrink-0"
+                aria-label="Clear link"
               >
-                <Icon.close className="size-4" />
+                <Icon.close className="size-3.5" />
               </button>
             )}
           </div>
+
           <Button
             type="submit"
-            size="lg"
             disabled={!url.trim() || loadingPreview}
-            className="h-12 sm:h-12 w-full sm:w-auto rounded-xl px-6 font-semibold"
+            className="h-10 sm:h-11 rounded-xl px-4 sm:px-5 font-semibold text-xs sm:text-sm shrink-0 shadow-xs gap-1.5 active:scale-[0.98]"
           >
             {loadingPreview ? (
               <>
-                <Icon.busy className="size-4 animate-spin" />
-                {t("link_gen_checking")}
+                <Icon.busy className="size-3.5 animate-spin" />
+                <span>{t("link_gen_checking")}</span>
               </>
             ) : (
               <>
-                <Icon.order className="size-4" />
-                {t("link_gen_btn_check")}
+                <span>{t("link_gen_cmd_btn")}</span>
+                <span className="hidden sm:inline-block font-mono text-[11px] opacity-70 bg-primary-foreground/15 px-1.5 py-0.5 rounded text-primary-foreground">
+                  ↵
+                </span>
               </>
             )}
           </Button>
         </div>
       </form>
 
+      {/* Not found state */}
       {notFound && (
-        <div className="bg-destructive/10 text-destructive mt-4 flex items-center gap-2.5 rounded-lg p-3.5 text-sm">
-          <Icon.warning className="size-4 shrink-0" />
+        <div className="mt-3.5 flex items-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/10 p-3.5 text-xs sm:text-sm text-destructive animate-in fade-in slide-in-from-top-2 duration-200">
+          <Icon.warning className="size-4.5 shrink-0" />
           <span>{t("link_gen_not_found")}</span>
         </div>
       )}
 
+      {/* Unfolded Financial Receipt Slip (Preview) */}
       {preview && (
-        <div className="mt-6 space-y-5 rounded-xl border bg-muted/20 p-5">
-          <div className="space-y-1.5">
-            <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border/90 bg-card p-5 sm:p-6 shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-3 duration-300 space-y-4.5">
+          {/* Product Information */}
+          <div className="space-y-1.5 border-b border-border/50 pb-4">
+            <div className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
               {t("link_gen_product_label")}
             </div>
-            <div className="text-base font-semibold leading-snug line-clamp-2">
+            <div className="text-base font-semibold leading-snug line-clamp-2 text-foreground">
               {preview.name}
             </div>
-            <div className="text-sm font-medium">
-              <span className="text-muted-foreground">{t("link_gen_price_label")}: </span>
-              <span>{preview.price_formatted}</span>
+            <div className="text-sm font-medium pt-0.5 flex items-center gap-2">
+              <span className="text-muted-foreground">{t("link_gen_price_label")}:</span>
+              <span className="font-semibold text-foreground font-mono">{preview.price_formatted}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-y py-3 text-xs sm:text-sm">
-            <div>
-              <div className="text-muted-foreground">{t("link_gen_shopee_rate")} {preview.shopee_rate}%</div>
-              <div className="font-semibold text-foreground">
-                {preview.shopee_part_formatted} {preview.is_capped ? t("link_gen_capped") : ""}
+          {/* Financial Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1 text-xs sm:text-sm">
+            <div className="rounded-xl bg-muted/40 border border-border/40 p-3 flex flex-col justify-between">
+              <div className="text-muted-foreground text-xs">{t("link_gen_commission_est")}</div>
+              <div className="font-semibold text-foreground mt-1 font-mono text-base sm:text-lg">
+                {preview.commission_formatted}
               </div>
             </div>
-            <div>
-              <div className="text-muted-foreground">{t("link_gen_seller_rate")} {preview.seller_rate}%</div>
-              <div className="font-semibold text-foreground">
-                {preview.seller_part_formatted}
+            <div className="rounded-xl bg-success-soft/30 border border-success/30 p-3 flex flex-col justify-between">
+              <div className="text-foreground text-xs font-semibold">{t("link_gen_cashback_est")}</div>
+              <div className="text-success text-xl sm:text-2xl font-bold font-mono tracking-tight mt-0.5">
+                {preview.cashback_formatted}
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1">
-            <div className="text-muted-foreground text-sm font-medium">
-              {t("link_gen_cashback_est")}:
-            </div>
-            <div className="text-success text-2xl sm:text-3xl font-bold">
-              {preview.cashback_formatted}
-            </div>
-          </div>
+          {/* Transparent Settlement Disclaimer */}
+          <p className="text-muted-foreground text-[11px] leading-relaxed italic">
+            {t("link_gen_disclaimer")}
+          </p>
 
+          {/* Actions / Conversion */}
           {!affiliateUrl && (
-            <div className="border-t pt-5 space-y-4">
+            <div className="pt-2 space-y-3.5">
               {!me && (
-                <div className="rounded-lg border bg-card p-4 space-y-3">
-                  <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+                  <div className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                     <Icon.warning className="size-4 text-warning" />
-                    {t("link_gen_need_id_alert")}
+                    <span>{t("link_gen_need_id_alert")}</span>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                    <div className="flex-1">
-                      <Input
-                        value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
-                        placeholder={t("link_gen_id_placeholder")}
-                        className="h-11 sm:h-11 uppercase font-mono rounded-lg"
-                      />
-                    </div>
+                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                    <Input
+                      value={customerId}
+                      onChange={(e) => setCustomerId(e.target.value)}
+                      placeholder={t("link_gen_id_placeholder")}
+                      className="h-10 uppercase font-mono rounded-lg bg-background/90 text-xs sm:text-sm"
+                    />
                     <Button
                       variant="outline"
                       type="button"
                       onClick={() => window.open(ZALO_GROUP_URL, "_blank")}
-                      className="h-11 sm:h-11 gap-2 shrink-0 rounded-lg font-medium"
+                      className="h-10 gap-2 shrink-0 rounded-lg text-xs font-medium"
                     >
-                      <Icon.chat className="size-4 text-primary" />
-                      {t("link_gen_btn_join_zalo")}
+                      <Icon.chat className="size-3.5 text-primary" />
+                      <span>{t("link_gen_btn_join_zalo")}</span>
                     </Button>
                   </div>
-                  <div className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
                     {t("link_gen_id_help")}
-                  </div>
+                  </p>
                 </div>
               )}
 
               {errorText && (
-                <div className="text-destructive text-sm flex items-center gap-1.5 font-medium">
-                  <Icon.warning className="size-4" />
-                  {errorText}
+                <div className="text-destructive text-xs sm:text-sm flex items-center gap-2 font-medium bg-destructive/10 border border-destructive/20 p-3 rounded-lg">
+                  <Icon.warning className="size-4 shrink-0" />
+                  <span>{errorText}</span>
                 </div>
               )}
 
@@ -292,22 +289,22 @@ export function LinkGenerator() {
                 onClick={handleCreate}
                 disabled={converting || (!activeCustomerId && !me)}
                 size="lg"
-                className="w-full h-12 text-base font-semibold"
+                className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold rounded-xl shadow-xs"
               >
                 {converting ? (
                   <>
                     <Icon.busy className="size-4 animate-spin" />
-                    {t("link_gen_creating")}
+                    <span>{t("link_gen_creating")}</span>
                   </>
                 ) : (
                   <>
                     <Icon.open className="size-4" />
-                    {t("link_gen_btn_create")}
+                    <span>{t("link_gen_btn_create")}</span>
                   </>
                 )}
               </Button>
               {converting && (
-                <p className="text-muted-foreground text-xs text-center">
+                <p className="text-muted-foreground text-xs text-center animate-pulse">
                   {t("link_gen_waiting")}
                 </p>
               )}
@@ -315,52 +312,52 @@ export function LinkGenerator() {
           )}
 
           {affiliateUrl && (
-            <div className="border-t pt-5 space-y-4">
-              <div className="rounded-lg bg-success/10 border border-success/20 p-4 space-y-3">
-                <div className="text-success font-semibold text-sm flex items-center gap-2">
-                  <Icon.confirm className="size-5" />
-                  {t("link_gen_ready_title")}
+            <div className="pt-2 space-y-3.5">
+              <div className="rounded-xl bg-success/10 border border-success/30 p-4 space-y-3">
+                <div className="text-success font-semibold text-xs sm:text-sm flex items-center gap-2">
+                  <Icon.confirm className="size-4.5" />
+                  <span>{t("link_gen_ready_title")}</span>
                 </div>
 
-                <div className="bg-card border rounded-md p-2.5 font-mono text-xs break-all text-muted-foreground">
+                <div className="bg-background/90 border border-border/80 rounded-lg p-2.5 font-mono text-xs break-all text-muted-foreground select-all">
                   {affiliateUrl}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <Button
                     onClick={handleCopy}
                     variant="outline"
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 h-10 rounded-lg text-xs sm:text-sm font-medium"
                   >
                     {copied ? <Icon.confirm className="size-4 text-success" /> : <Icon.copy className="size-4" />}
-                    {copied ? t("link_gen_copied") : t("link_gen_copy")}
+                    <span>{copied ? t("link_gen_copied") : t("link_gen_copy")}</span>
                   </Button>
                   <Button
                     onClick={() => window.open(affiliateUrl, "_blank")}
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 h-10 rounded-lg text-xs sm:text-sm font-semibold"
                   >
                     <Icon.open className="size-4" />
-                    {t("link_gen_buy_now")}
+                    <span>{t("link_gen_buy_now")}</span>
                   </Button>
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-card p-4 space-y-2 text-xs">
+              <div className="rounded-xl border border-border/70 bg-muted/10 p-3.5 space-y-2 text-xs">
                 <div className="font-semibold text-foreground">
                   {t("link_gen_guide_title")}
                 </div>
-                <ul className="space-y-1.5 text-muted-foreground">
+                <ul className="space-y-1.5 text-muted-foreground text-[11px] sm:text-xs">
                   <li className="flex items-center gap-2">
-                    <span className="size-1 rounded-full bg-primary" />
-                    {t("link_gen_guide_1")}
+                    <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                    <span>{t("link_gen_guide_1")}</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-1 rounded-full bg-primary" />
-                    {t("link_gen_guide_2")}
+                    <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                    <span>{t("link_gen_guide_2")}</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-1 rounded-full bg-primary" />
-                    {t("link_gen_guide_3")}
+                    <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                    <span>{t("link_gen_guide_3")}</span>
                   </li>
                 </ul>
               </div>
@@ -368,6 +365,6 @@ export function LinkGenerator() {
           )}
         </div>
       )}
-    </Card>
+    </div>
   )
 }

@@ -25,7 +25,9 @@ const PATHS: Record<string, Route> = {
 }
 
 export function routeFor(pathname: string): Route {
-  return PATHS[pathname.replace(/\/+$/, "") || "/"] ?? "home"
+  const clean = pathname.replace(/\/+$/, "") || "/"
+  if (clean === "/admin" || clean.startsWith("/admin/")) return "admin"
+  return PATHS[clean] ?? "home"
 }
 
 export function pathFor(route: Route): string {

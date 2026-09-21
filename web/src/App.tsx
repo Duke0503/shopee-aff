@@ -1,21 +1,23 @@
-import { useQuery } from "@tanstack/react-query"
-import { Icon } from "@/lib/icons"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { IconChip, type Tone } from "@/components/ui/icon-chip"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PayoutCard } from "@/features/PayoutCard"
-import { PipelineTable } from "@/features/PipelineTable"
-import { CustomerView } from "@/features/CustomerView"
-import { Guide } from "@/features/Guide"
+import * as React from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Home } from "@/features/Home"
-import { Login } from "@/features/Login"
-import { fetchLabels, fetchSite, fetchSnapshot } from "@/lib/api"
-import { configure, shortDate, vnd } from "@/lib/format"
-import { useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
-import { LabelProvider, useT } from "@/lib/labels"
+import { fetchLabels, fetchSite } from "@/lib/api"
+import { configure } from "@/lib/format"
+import { LabelProvider } from "@/lib/labels"
 import { TITLE_KEY, navigate, useRoute } from "@/routes"
+
+const CustomerView = React.lazy(() =>
+  import("@/features/CustomerView").then((m) => ({ default: m.CustomerView }))
+)
+const Guide = React.lazy(() =>
+  import("@/features/Guide").then((m) => ({ default: m.Guide }))
+)
+const Login = React.lazy(() =>
+  import("@/features/Login").then((m) => ({ default: m.Login }))
+)
+const Console = React.lazy(() =>
+  import("@/features/Console").then((m) => ({ default: m.Console }))
+)
 
 export default function App() {
   const labels = useQuery({
@@ -38,7 +40,7 @@ export default function App() {
 
   const brand = labels.data?.brand ?? ""
   const screen = labels.data?.[TITLE_KEY[route]] ?? ""
-  useEffect(() => {
+  React.useEffect(() => {
     if (!brand) return
     document.title =
       screen && screen !== brand ? `${screen} · ${brand}` : brand
@@ -49,202 +51,20 @@ export default function App() {
       value={labels.data ?? {}}
       defaults={site.data ? { ...site.data } : {}}
     >
-      {route === "home" && <Home />}
-      {route === "login" && (
-        <Login
-          onSignedIn={() => {
-            queryClient.invalidateQueries({ queryKey: ["me"] })
-            navigate("orders")
-          }}
-        />
-      )}
-      {route === "orders" && <CustomerView />}
-      {route === "guide" && <Guide />}
-      {route === "admin" && <Console />}
-    </LabelProvider>
-  )
-}
-
-function Tile({
-  icon,
-  tone,
-  label,
-  value,
-  note,
-}: {
-  icon: React.ComponentProps<typeof IconChip>["icon"]
-  tone: Tone
-  label: string
-  value: string
-  note?: string
-}) {
-  return (
-    <Card className="flex items-start gap-3 p-3.5">
-      <IconChip icon={icon} tone={tone} size="sm" />
-      <div className="min-w-0">
-        <div className="text-muted-foreground text-xs">{label}</div>
-        <div className="tnum mt-0.5 text-xl font-bold sm:text-2xl">{value}</div>
-        {note && <div className="text-muted-foreground text-[11px]">{note}</div>}
-      </div>
-    </Card>
-  )
-}
-
-function Console() {
-  const t = useT()
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ["payouts"],
-    queryFn: fetchSnapshot,
-  })
-
-  if (isLoading) {
-    return <Shell><p className="text-muted-foreground text-sm">{t("loading")}</p></Shell>
-  }
-  if (error || !data) {
-    return (
-      <Shell>
-        <p className="text-destructive text-sm">
-          {t("load_failed", { reason: String(error) })}
-        </p>
-      </Shell>
-    )
-  }
-
-  const { totals } = data
-  const empty =
-    !data.ready.length && !data.no_bank.length && !data.pipeline.length
-
-  return (
-    <Shell
-      subtitle={t("subtitle", { time: shortDate(data.generated_at) })}
-      onRefresh={() => refetch()}
-      refreshing={isFetching}
-    >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          icon={Icon.owed}
-          tone="primary"
-          label={t("summary_owed")}
-          value={vnd(totals.owed)}
-          note={t("summary_customers", { count: totals.owed_customers })}
-        />
-        <Tile
-          icon={Icon.payable}
-          tone="success"
-          label={t("summary_ready")}
-          value={vnd(totals.ready)}
-          note={t("summary_customers", { count: data.ready.length })}
-        />
-        <Tile
-          icon={Icon.bank}
-          tone="danger"
-          label={t("summary_no_bank")}
-          value={vnd(totals.no_bank)}
-          note={t("summary_customers", { count: data.no_bank.length })}
-        />
-        <Tile
-          icon={Icon.pending}
-          tone="warning"
-          label={t("summary_pipeline")}
-          value={vnd(totals.pipeline)}
-          note={t("summary_orders", { count: totals.pipeline_orders })}
-        />
-      </div>
-
-      {empty ? (
-        <p className="text-muted-foreground mt-8 text-sm">{t("nothing_at_all")}</p>
-      ) : (
-        <Tabs defaultValue="ready" className="mt-6">
-          <TabsList>
-            <TabsTrigger value="ready">
-              {t("tab_ready")} ({data.ready.length})
-            </TabsTrigger>
-            <TabsTrigger value="no_bank">
-              {t("tab_no_bank")} ({data.no_bank.length})
-            </TabsTrigger>
-            <TabsTrigger value="pipeline">
-              {t("tab_pipeline")} ({data.pipeline.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="ready">
-            <Hint text={t("section_ready_hint")} />
-            <CardGrid entries={data.ready} empty={t("nothing_ready")} />
-          </TabsContent>
-
-          <TabsContent value="no_bank">
-            <Hint text={t("section_no_bank_hint")} />
-            <CardGrid entries={data.no_bank} empty={t("nothing_no_bank")} />
-          </TabsContent>
-
-          <TabsContent value="pipeline">
-            <Hint text={t("section_pipeline_hint")} />
-            {data.pipeline.length ? (
-              <PipelineTable rows={data.pipeline} />
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                {t("nothing_pipeline")}
-              </p>
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
-    </Shell>
-  )
-}
-
-function Hint({ text }: { text: string }) {
-  return <p className="text-muted-foreground mb-3 text-xs">{text}</p>
-}
-
-function CardGrid({
-  entries,
-  empty,
-}: {
-  entries: React.ComponentProps<typeof PayoutCard>["entry"][]
-  empty: string
-}) {
-  if (!entries.length) {
-    return <p className="text-muted-foreground text-sm">{empty}</p>
-  }
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {entries.map((entry) => (
-        <PayoutCard key={entry.customer_id} entry={entry} />
-      ))}
-    </div>
-  )
-}
-
-function Shell({
-  children,
-  subtitle,
-  onRefresh,
-  refreshing,
-}: {
-  children: React.ReactNode
-  subtitle?: string
-  onRefresh?: () => void
-  refreshing?: boolean
-}) {
-  const t = useT()
-  return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold sm:text-xl">{t("title")}</h1>
-          {subtitle && (
-            <p className="text-muted-foreground text-xs">{subtitle}</p>
-          )}
-        </div>
-        {onRefresh && (
-          <Button variant="outline" size="sm" onClick={onRefresh}>
-            <Icon.refresh className={refreshing ? "animate-spin" : ""} />
-            {t("refresh")}
-          </Button>
+      <React.Suspense fallback={null}>
+        {route === "home" && <Home />}
+        {route === "login" && (
+          <Login
+            onSignedIn={() => {
+              queryClient.invalidateQueries({ queryKey: ["me"] })
+              navigate("orders")
+            }}
+          />
         )}
-      </header>
-      {children}
-    </div>
+        {route === "orders" && <CustomerView />}
+        {route === "guide" && <Guide />}
+        {route === "admin" && <Console />}
+      </React.Suspense>
+    </LabelProvider>
   )
 }

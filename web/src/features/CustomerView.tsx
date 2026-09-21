@@ -119,13 +119,14 @@ export function CustomerView() {
 
         {/* -- the answer ------------------------------------------- */}
         <Reveal>
-        <Card className="hero-wash overflow-hidden p-5 sm:p-6">
+        <Card className="luxury-panel relative overflow-hidden p-5 sm:p-7 border border-border/80 shadow-md">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-muted-foreground text-sm">
+              <div className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">
                 {t("me_headline_label")}
               </div>
-              <div className="tnum mt-1 text-3xl leading-none font-bold sm:text-4xl lg:text-5xl">
+              <div className="tnum mt-1.5 text-3xl leading-none font-bold sm:text-4xl lg:text-5xl text-success tracking-tight">
                 {vnd(balance.approved)}
               </div>
               {balance.approved > 0 ? (
@@ -146,7 +147,7 @@ export function CustomerView() {
             />
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t pt-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
             <Secondary
               icon={Icon.pending}
               tone="warning"

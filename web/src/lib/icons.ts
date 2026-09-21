@@ -52,6 +52,7 @@ import {
   Wallet,
   X,
   XCircle,
+  Zap,
 } from "lucide-react"
 
 export const Icon = {
@@ -73,6 +74,7 @@ export const Icon = {
   qr: QrCode,
   link: Link2,
   chat: MessageCircle,
+  flash: Zap,
 
   // Doing something
   confirm: Check,

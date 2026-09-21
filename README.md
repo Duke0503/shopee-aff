@@ -90,6 +90,7 @@ The platform enforces three non-negotiable financial rules in code (`core/policy
 4. **Commission Cap Compliance:** Adheres strictly to Shopee's VND 40,000 cap per order for direct Shopee commissions, while correctly processing uncapped seller-bonus (XTRA) commissions:
    $$\text{Total Commission} = \min(\text{Price} \times \text{Rate}_{\text{Shopee}}, 40{,}000) + (\text{Price} \times \text{Rate}_{\text{Seller}})$$
 5. **Round-Half-Up Financial Rounding:** Employs precise half-up rounding (`round_dong()`) rather than Python's default round-to-even (Banker's rounding) to guarantee parity with financial institutions.
+6. **Transparent Net 80/20 Commission Split:** Computes customer cashback as 80% of net commission received after Shopee's 10% withholding tax ($\text{Cashback} = \text{Gross} \times 90\% \times 80\% = 72\%$), displaying clean and unambiguous net figures across web and chat channels.
 
 ---
 

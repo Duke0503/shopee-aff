@@ -224,9 +224,19 @@ def login(conn: sqlite3.Connection, name: str, password: str) -> LoginResult:
         (_hash_token(token), customer_id, _stamp(_now()),
          _stamp(_now() + timedelta(days=SESSION_DAYS))),
     )
+    now_iso = _stamp(_now())
     conn.execute(
-        "UPDATE customers SET failed_logins=0, locked_until=NULL"
-        " WHERE customer_id=?", (customer_id,))
+        "UPDATE customers SET failed_logins=0, locked_until=NULL,"
+        " last_login_at=?, login_count=COALESCE(login_count, 0) + 1"
+        " WHERE customer_id=?", (now_iso, customer_id))
+    try:
+        conn.execute(
+            "INSERT INTO activity_logs (customer_id, action, path, created_at)"
+            " VALUES (?, 'login', '/api/auth/login', ?)",
+            (customer_id, now_iso),
+        )
+    except Exception:
+        pass
     return LoginResult(True, "ok", token=token, customer_id=customer_id)
 
 

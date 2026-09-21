@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/lib/icons"
-import { Mascot } from "@/components/Mascot"
+import { BrandLogo } from "@/components/BrandLogo"
 import { UserProfileMenu } from "@/components/UserProfileMenu"
 import { useT } from "@/lib/labels"
 import { fetchMe } from "@/lib/api"
@@ -27,18 +27,20 @@ export function Header({ current }: { current: Route }) {
   return (
     <>
       <header
-        className="bg-background/85 sticky top-0 z-20 border-b backdrop-blur"
+        className="bg-background/80 sticky top-0 z-20 border-b border-border/80 backdrop-blur-md transition-all"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
         <div className="mx-auto flex h-14 max-w-[1100px] items-center justify-between gap-3 px-4 sm:px-6">
           <button
             onClick={() => navigate("home")}
-            className="flex items-center gap-2 font-semibold min-w-0"
+            className="flex items-center gap-2.5 font-semibold min-w-0 cursor-pointer text-left"
           >
-            <Mascot className="size-8 shrink-0" />
-            <span className="hidden font-bold sm:inline sm:text-base">
-              {t("brand")}
-            </span>
+            <BrandLogo />
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-bold sm:inline text-sm sm:text-base tracking-tight text-foreground truncate">
+                {t("brand")}
+              </span>
+            </div>
           </button>
 
           {/* Desktop navigation */}

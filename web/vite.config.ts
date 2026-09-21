@@ -12,6 +12,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "../src/cashback/web/static"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-table": ["@tanstack/react-table"],
+          "vendor-radix": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-tabs",
+          ],
+          "vendor-qr": ["qrcode"],
+        },
+      },
+    },
   },
   server: {
     // `npm run dev` talks to the real bot process for live data.

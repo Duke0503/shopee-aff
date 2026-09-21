@@ -114,6 +114,33 @@ CREATE TABLE IF NOT EXISTS reconciliation_runs (
     needs_review  INTEGER NOT NULL DEFAULT 0,
     error         TEXT
 );
+
+CREATE TABLE IF NOT EXISTS products_cache (
+    item_id               TEXT PRIMARY KEY,
+    shop_id               TEXT,
+    name                  TEXT,
+    price                 INTEGER,
+    price_formatted       TEXT,
+    shopee_rate           REAL,
+    seller_rate           REAL,
+    shopee_part           INTEGER,
+    shopee_part_formatted TEXT,
+    seller_part           INTEGER,
+    seller_part_formatted TEXT,
+    total_commission      INTEGER,
+    commission_formatted  TEXT,
+    is_capped             INTEGER DEFAULT 0,
+    cashback              INTEGER,
+    cashback_formatted    TEXT,
+    rate_percent          TEXT,
+    affiliate_url         TEXT,
+    canonical_url         TEXT,
+    request_count         INTEGER DEFAULT 1,
+    first_seen_at         TEXT NOT NULL,
+    updated_at            TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_prod_updated ON products_cache(updated_at);
+CREATE INDEX IF NOT EXISTS idx_prod_count ON products_cache(request_count DESC);
 """
 
 
@@ -158,6 +185,33 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_customer ON sessions(customer_id);
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT,
+    action      TEXT NOT NULL,
+    path        TEXT,
+    ip_address  TEXT,
+    user_agent  TEXT,
+    detail      TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_customer ON activity_logs(customer_id);
+CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_logs(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS payment_transfers (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id     TEXT NOT NULL,
+    amount          INTEGER NOT NULL,
+    transfer_code   TEXT,
+    note            TEXT,
+    proof_image     TEXT,
+    order_ids       TEXT,
+    created_at      TEXT NOT NULL,
+    created_by      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_customer ON payment_transfers(customer_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_time ON payment_transfers(created_at DESC);
 """
 
 
@@ -184,6 +238,12 @@ _LATER_COLUMNS = {
         "password_set_at": "TEXT",
         "failed_logins": "INTEGER NOT NULL DEFAULT 0",
         "locked_until": "TEXT",
+        "role": "TEXT NOT NULL DEFAULT 'user'",
+        "last_login_at": "TEXT",
+        "login_count": "INTEGER NOT NULL DEFAULT 0",
+    },
+    "products_cache": {
+        "image_url": "TEXT",
     },
 }
 
@@ -612,3 +672,115 @@ def forget_customer(
         "orders": counts["orders"],
         "link_requests": counts["link_requests"],
     }
+
+
+def get_product_cache(conn: sqlite3.Connection, item_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM products_cache WHERE item_id = ?", (str(item_id),)
+    ).fetchone()
+
+
+def upsert_product_cache(
+    conn: sqlite3.Connection,
+    item_id: str,
+    shop_id: str = "",
+    name: str = "",
+    price: int = 0,
+    price_formatted: str = "",
+    shopee_rate: float = 0.0,
+    seller_rate: float = 0.0,
+    shopee_part: int = 0,
+    shopee_part_formatted: str = "",
+    seller_part: int = 0,
+    seller_part_formatted: str = "",
+    total_commission: int = 0,
+    commission_formatted: str = "",
+    is_capped: bool = False,
+    cashback: int = 0,
+    cashback_formatted: str = "",
+    rate_percent: str = "80%",
+    affiliate_url: str | None = None,
+    canonical_url: str = "",
+    image_url: str = "",
+) -> sqlite3.Row:
+    timestamp = now()
+    existing = get_product_cache(conn, item_id)
+    if existing:
+        final_aff_url = affiliate_url or existing["affiliate_url"]
+        conn.execute(
+            """
+            UPDATE products_cache SET
+                shop_id = COALESCE(NULLIF(?, ''), shop_id),
+                name = COALESCE(NULLIF(?, ''), name),
+                price = CASE WHEN ? > 0 THEN ? ELSE price END,
+                price_formatted = COALESCE(NULLIF(?, ''), price_formatted),
+                shopee_rate = CASE WHEN ? > 0 THEN ? ELSE shopee_rate END,
+                seller_rate = CASE WHEN ? > 0 THEN ? ELSE seller_rate END,
+                shopee_part = CASE WHEN ? > 0 THEN ? ELSE shopee_part END,
+                shopee_part_formatted = COALESCE(NULLIF(?, ''), shopee_part_formatted),
+                seller_part = CASE WHEN ? > 0 THEN ? ELSE seller_part END,
+                seller_part_formatted = COALESCE(NULLIF(?, ''), seller_part_formatted),
+                total_commission = CASE WHEN ? > 0 THEN ? ELSE total_commission END,
+                commission_formatted = COALESCE(NULLIF(?, ''), commission_formatted),
+                is_capped = ?,
+                cashback = CASE WHEN ? > 0 THEN ? ELSE cashback END,
+                cashback_formatted = COALESCE(NULLIF(?, ''), cashback_formatted),
+                rate_percent = COALESCE(NULLIF(?, ''), rate_percent),
+                affiliate_url = ?,
+                canonical_url = COALESCE(NULLIF(?, ''), canonical_url),
+                image_url = COALESCE(NULLIF(?, ''), image_url),
+                request_count = request_count + 1,
+                updated_at = ?
+            WHERE item_id = ?
+            """,
+            (
+                shop_id, name, price, price, price_formatted,
+                shopee_rate, shopee_rate, seller_rate, seller_rate,
+                shopee_part, shopee_part, shopee_part_formatted,
+                seller_part, seller_part, seller_part_formatted,
+                total_commission, total_commission, commission_formatted,
+                1 if is_capped else 0,
+                cashback, cashback, cashback_formatted,
+                rate_percent, final_aff_url, canonical_url, image_url,
+                timestamp, str(item_id),
+            ),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO products_cache (
+                item_id, shop_id, name, price, price_formatted,
+                shopee_rate, seller_rate, shopee_part, shopee_part_formatted,
+                seller_part, seller_part_formatted, total_commission, commission_formatted,
+                is_capped, cashback, cashback_formatted, rate_percent,
+                affiliate_url, canonical_url, image_url, request_count, first_seen_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            """,
+            (
+                str(item_id), shop_id, name, price, price_formatted,
+                shopee_rate, seller_rate, shopee_part, shopee_part_formatted,
+                seller_part, seller_part_formatted, total_commission, commission_formatted,
+                1 if is_capped else 0, cashback, cashback_formatted, rate_percent,
+                affiliate_url, canonical_url, image_url, timestamp, timestamp,
+            ),
+        )
+    return get_product_cache(conn, item_id)
+
+
+def get_hot_products(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM products_cache ORDER BY request_count DESC, updated_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
+def get_stale_hot_products(
+    conn: sqlite3.Connection, limit: int = 20, max_age_hours: int = 6
+) -> list[sqlite3.Row]:
+    cutoff = (
+        datetime.now(timezone.utc).astimezone() - timedelta(hours=max_age_hours)
+    ).isoformat()
+    return conn.execute(
+        "SELECT * FROM products_cache WHERE updated_at < ? ORDER BY request_count DESC LIMIT ?",
+        (cutoff, limit),
+    ).fetchall()

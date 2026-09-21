@@ -81,6 +81,7 @@ class ProductInfo:
     is_capped: bool
     has_xtra: bool
     last_update: str
+    image_url: str = ""
 
     def cashback(self, rate: float) -> int:
         return round(self.total_commission * rate)
@@ -163,4 +164,5 @@ def lookup(url: str, timeout: float = TIMEOUT) -> ProductInfo | None:
         is_capped=bool(data.get("isCapped")),
         has_xtra=bool(data.get("isXtra")),
         last_update=str(data.get("lastUpdate") or ""),
+        image_url=str(data.get("imageUrl") or ""),
     )

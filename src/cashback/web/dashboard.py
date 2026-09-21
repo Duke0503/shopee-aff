@@ -34,12 +34,14 @@ See core/accounts.py for why the bot is the login channel.
 from __future__ import annotations
 
 import json
+import math
 import mimetypes
+import random
 import re
 import socket
 import threading
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -255,9 +257,16 @@ def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
             item["is_estimate"] = False
         orders.append(item)
 
+    role = (customer["role"] if customer and "role" in customer.keys() else "user") or "user"
     return {
         "customer_id": customer_id,
         "display_name": (customer["display_name"] if customer else "") or "",
+        "role": role,
+        "is_admin": role == "admin",
+        "is_employee": role == "employee",
+        "is_staff": role in ("admin", "employee"),
+        "last_login_at": customer["last_login_at"] if customer and "last_login_at" in customer.keys() else None,
+        "login_count": customer["login_count"] if customer and "login_count" in customer.keys() else 0,
         # Enough to recognise the account, never enough to reconstruct it.
         "bank_name": (customer["bank_name"] if customer else "") or "",
         "bank_account_tail": _tail(
@@ -375,19 +384,22 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         return
 
-    _extra_headers: list[tuple[str, str]] = []
-    _head_only: bool = False
+    def setup(self):
+        super().setup()
+        self._extra_headers: list[tuple[str, str]] = []
+        self._head_only: bool = False
 
     def _send(self, status: int, body: bytes, content_type: str):
+        headers_to_send = list(getattr(self, "_extra_headers", []))
+        self._extra_headers = []
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
-            for name, value in self._extra_headers:
+            for name, value in headers_to_send:
                 self.send_header(name, value)
-            self._extra_headers = []
             self.end_headers()
-            if not self._head_only:
+            if not getattr(self, "_head_only", False):
                 self.wfile.write(body)
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             pass
@@ -416,13 +428,29 @@ class _Handler(BaseHTTPRequestHandler):
             addr = addr[7:]
         return addr in LOOPBACK or (self.client_address[0] or "") in LOOPBACK
 
-    def _session_customer(self) -> str | None:
+    def _session_customer_info(self) -> tuple[str | None, dict | None]:
         token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
         if not token:
-            return None
+            return None, None
         with ledger.connect(self.cfg.db_path) as conn:
             customer_id = accounts.customer_for_token(conn, token)
+            if not customer_id:
+                conn.commit()
+                return None, None
+            cust = ledger.get_customer(conn, customer_id)
             conn.commit()
+            return customer_id, dict(cust) if cust else None
+
+    def _session_is_staff(self) -> bool:
+        _, cust = self._session_customer_info()
+        return bool(cust and cust.get("role") in ("admin", "employee"))
+
+    def _session_is_admin(self) -> bool:
+        _, cust = self._session_customer_info()
+        return bool(cust and cust.get("role") == "admin")
+
+    def _session_customer(self) -> str | None:
+        customer_id, _ = self._session_customer_info()
         return customer_id
 
     def _set_session(self, token: str, clear: bool = False):
@@ -445,10 +473,26 @@ class _Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
 
         if path == "/api/payouts":
-            if not self.from_loopback:
+            if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._json(
                 snapshot(self.cfg.db_path, self.cfg.advertised_cashback_rate))
+        if path == "/api/admin/metrics":
+            return self._admin_metrics()
+        if path.startswith("/api/admin/users/"):
+            subparts = path.strip("/").split("/")
+            if len(subparts) == 4:
+                return self._admin_user_detail(urllib.parse.unquote(subparts[3]))
+        if path == "/api/admin/users":
+            return self._admin_users()
+        if path == "/api/admin/employees":
+            return self._admin_employees()
+        if path == "/api/admin/orders":
+            return self._admin_orders()
+        if path == "/api/admin/products":
+            return self._admin_products()
+        if path == "/api/admin/logs":
+            return self._admin_logs()
         if path == "/api/labels":
             return self._json(labels())
         if path == "/api/site":
@@ -458,6 +502,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(site_figures(self.cfg))
         if path == "/api/shopee/link-status":
             return self._shopee_link_status()
+        if path == "/api/shopee/cache/stats":
+            return self._shopee_cache_stats()
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
@@ -496,6 +542,20 @@ class _Handler(BaseHTTPRequestHandler):
         kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         if kind.startswith("text/") or kind == "application/javascript":
             kind += "; charset=utf-8"
+
+        # Caching & Security headers
+        headers: list[tuple[str, str]] = []
+        if "/assets/" in path and target.suffix in (".js", ".css"):
+            headers.append(("Cache-Control", "public, max-age=31536000, immutable"))
+        elif target.suffix in (".webp", ".ico", ".png", ".jpg", ".svg"):
+            headers.append(("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800"))
+        elif target == index:
+            headers.append(("Cache-Control", "no-cache, must-revalidate"))
+        else:
+            headers.append(("Cache-Control", "public, max-age=3600"))
+
+        headers.append(("X-Content-Type-Options", "nosniff"))
+        self._extra_headers = headers
         self._send(200, target.read_bytes(), kind)
 
     # -- POST -----------------------------------------------------------
@@ -507,6 +567,18 @@ class _Handler(BaseHTTPRequestHandler):
             return self._login()
         if path == "/api/auth/logout":
             return self._logout()
+        if path == "/api/admin/login":
+            return self._admin_login()
+        if path == "/api/admin/logout":
+            return self._logout()
+        if path == "/api/admin/employees":
+            return self._admin_create_employee()
+        if path == "/api/admin/employees/update":
+            return self._admin_update_employee()
+        if path == "/api/admin/orders/mark-paid":
+            return self._admin_mark_paid()
+        if path == "/api/admin/transfers":
+            return self._admin_record_transfer()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -517,10 +589,20 @@ class _Handler(BaseHTTPRequestHandler):
             return self._shopee_preview()
         if path == "/api/shopee/convert":
             return self._shopee_convert()
+        if path == "/api/shopee/smart-resolve":
+            return self._shopee_smart_resolve()
+        if path == "/api/shopee/cache/refresh-hot":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._shopee_cache_refresh_hot()
+        if path == "/api/activity/log":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._record_activity_log()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
-            if not self.from_loopback:
+            if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             customer_id, action = parts[2], parts[3]
             if action == "ask-bank":
@@ -627,9 +709,1045 @@ class _Handler(BaseHTTPRequestHandler):
             conn.commit()
         return self._json({"ok": True, "message": "ok"})
 
+    # -- Admin & Staff Handlers -----------------------------------------
+    def _admin_login(self):
+        from ..core import audit
+
+        body = self._body()
+        name = str(body.get("name") or body.get("username") or "")
+        password = str(body.get("password") or "")
+        with ledger.connect(self.cfg.db_path) as conn:
+            result = accounts.login(conn, name, password)
+            if not result.ok:
+                conn.commit()
+                audit.record(audit.LOGIN_REFUSED, name=name[:40], reason=result.reason)
+                return self._json({"ok": False, "message": "Tài khoản hoặc mật khẩu không chính xác."}, 401)
+
+            cust_row = ledger.get_customer(conn, result.customer_id)
+            cust = dict(cust_row) if cust_row else {}
+            conn.commit()
+
+        role = cust.get("role") or "user"
+        if role not in ("admin", "employee"):
+            self._set_session("", clear=True)
+            return self._json({
+                "ok": False,
+                "message": "Tài khoản của bạn không có quyền truy cập khu vực quản trị."
+            }, 403)
+
+        audit.record(audit.LOGIN_OK, customer_id=result.customer_id)
+        self._set_session(result.token)
+        return self._json({
+            "ok": True,
+            "customer_id": result.customer_id,
+            "display_name": cust.get("display_name") or result.customer_id,
+            "role": role,
+            "is_admin": role == "admin",
+            "is_employee": role == "employee",
+        })
+
+    def _admin_metrics(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        is_admin = cust.get("role") == "admin"
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        period = qs.get("period", ["all"])[0]
+
+        date_filter = "1=1"
+        if period == "today":
+            date_filter = "date(COALESCE(recorded_at, approved_at)) = date('now')"
+        elif period == "7d":
+            date_filter = "COALESCE(recorded_at, approved_at) >= datetime('now', '-7 days')"
+        elif period == "30d":
+            date_filter = "COALESCE(recorded_at, approved_at) >= datetime('now', '-30 days')"
+        elif period == "month":
+            date_filter = "strftime('%Y-%m', COALESCE(recorded_at, approved_at)) = strftime('%Y-%m', 'now')"
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            total_users = conn.execute("SELECT COUNT(*) FROM customers WHERE role = 'user'").fetchone()[0]
+            total_employees = conn.execute("SELECT COUNT(*) FROM customers WHERE role IN ('admin', 'employee')").fetchone()[0]
+            try:
+                active_24h = conn.execute(
+                    "SELECT COUNT(*) FROM customers WHERE role = 'user' AND last_login_at >= datetime('now', '-1 day')"
+                ).fetchone()[0]
+            except Exception:
+                active_24h = 0
+
+            # Orders in period
+            orders_count = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {date_filter}").fetchone()[0]
+            approved_count = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {date_filter} AND status = 'approved'").fetchone()[0]
+            paid_count = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {date_filter} AND status = 'paid'").fetchone()[0]
+            awaiting_count = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {date_filter} AND status = 'awaiting_approval'").fetchone()[0]
+            rejected_count = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {date_filter} AND status = 'rejected'").fetchone()[0]
+
+            total_gmv = conn.execute(
+                f"SELECT COALESCE(SUM(order_value), 0) FROM orders WHERE {date_filter}"
+            ).fetchone()[0]
+
+            gross_commission = conn.execute(
+                f"SELECT COALESCE(SUM(COALESCE(approved_commission, estimated_commission, 0)), 0) FROM orders WHERE {date_filter} AND status != 'rejected'"
+            ).fetchone()[0]
+
+            cashback_paid = conn.execute(
+                f"SELECT COALESCE(SUM(COALESCE(cashback_amount, 0)), 0) FROM orders WHERE {date_filter} AND status = 'paid'"
+            ).fetchone()[0]
+
+            cashback_ready = conn.execute(
+                f"SELECT COALESCE(SUM(COALESCE(cashback_amount, 0)), 0) FROM orders WHERE {date_filter} AND status = 'approved' AND paid_at IS NULL"
+            ).fetchone()[0]
+
+            cashback_pipeline = conn.execute(
+                f"SELECT COALESCE(SUM(COALESCE(estimated_commission, 0)), 0) FROM orders WHERE {date_filter} AND status = 'awaiting_approval'"
+            ).fetchone()[0]
+            cashback_pipeline = round_dong(cashback_pipeline * self.cfg.advertised_cashback_rate)
+
+            cached_products = 0
+            try:
+                cached_products = conn.execute("SELECT COUNT(*) FROM products_cache").fetchone()[0]
+            except Exception:
+                pass
+
+            total_logs = 0
+            try:
+                total_logs = conn.execute("SELECT COUNT(*) FROM activity_logs").fetchone()[0]
+            except Exception:
+                pass
+
+            # Calculated KPIs
+            aov = round_dong(total_gmv / orders_count) if orders_count > 0 else 0
+            avg_commission = round_dong(gross_commission / orders_count) if orders_count > 0 else 0
+            settled_count = approved_count + paid_count + rejected_count
+            approval_rate = round(((approved_count + paid_count) / settled_count) * 100, 1) if settled_count > 0 else 100.0
+
+            total_cashback_committed = cashback_paid + cashback_ready
+            net_profit = round_dong(gross_commission - total_cashback_committed)
+            net_margin = round((net_profit / gross_commission) * 100, 1) if gross_commission > 0 else 20.0
+
+            # Daily Trends
+            trend_rows = conn.execute(f"""
+                SELECT substr(COALESCE(recorded_at, approved_at), 1, 10) as day,
+                       COUNT(*) as orders_count,
+                       COALESCE(SUM(order_value), 0) as gmv,
+                       COALESCE(SUM(CASE WHEN status != 'rejected' THEN COALESCE(approved_commission, estimated_commission, 0) ELSE 0 END), 0) as commission,
+                       COALESCE(SUM(CASE WHEN status != 'rejected' THEN round(COALESCE(cashback_amount, estimated_commission * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as cashback
+                  FROM orders
+                 WHERE {date_filter}
+                 GROUP BY day
+                 ORDER BY day ASC
+            """).fetchall()
+            trends = []
+            for tr in trend_rows:
+                tr_comm = tr["commission"]
+                tr_cash = tr["cashback"]
+                trends.append({
+                    "day": tr["day"],
+                    "orders_count": tr["orders_count"],
+                    "gmv": tr["gmv"],
+                    "commission": round_dong(tr_comm),
+                    "cashback": round_dong(tr_cash),
+                    "net_profit": round_dong(tr_comm - tr_cash),
+                })
+
+            # Top 5 Customers
+            cust_date_filter = date_filter.replace("recorded_at", "o.recorded_at").replace("approved_at", "o.approved_at")
+            top_cust_rows = conn.execute(f"""
+                SELECT c.customer_id, c.display_name, c.zalo_user_id,
+                       COUNT(o.order_id) as total_orders,
+                       COALESCE(SUM(o.order_value), 0) as total_gmv,
+                       COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN COALESCE(o.approved_commission, o.estimated_commission, 0) ELSE 0 END), 0) as total_commission,
+                       COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN round(COALESCE(o.cashback_amount, o.estimated_commission * {self.cfg.advertised_cashback_rate})) ELSE 0 END), 0) as total_cashback
+                  FROM orders o
+                  JOIN customers c ON c.customer_id = o.customer_id
+                 WHERE {cust_date_filter}
+                 GROUP BY c.customer_id
+                 ORDER BY total_commission DESC
+                 LIMIT 5
+            """).fetchall()
+            top_customers = [dict(r) for r in top_cust_rows]
+
+            # Top 5 Products
+            product_rows = conn.execute(f"""
+                SELECT o.order_id, o.order_value, o.estimated_commission, o.approved_commission, o.status,
+                       r.estimate_detail, r.affiliate_url, r.source_url
+                  FROM orders o
+                  LEFT JOIN link_requests r ON r.request_id = o.request_id
+                 WHERE {cust_date_filter}
+            """).fetchall()
+            
+            product_map = {}
+            for pr in product_rows:
+                detail = json.loads(pr["estimate_detail"]) if pr["estimate_detail"] else {}
+                p_name = detail.get("name") or detail.get("title") or _product_name(pr["estimate_detail"])
+                if p_name not in product_map:
+                    product_map[p_name] = {
+                        "name": p_name,
+                        "orders_count": 0,
+                        "total_gmv": 0,
+                        "total_commission": 0,
+                        "total_cashback": 0,
+                        "affiliate_url": pr["affiliate_url"],
+                        "source_url": pr["source_url"],
+                    }
+                item = product_map[p_name]
+                item["orders_count"] += 1
+                item["total_gmv"] += pr["order_value"] or 0
+                if pr["status"] != "rejected":
+                    comm = pr["approved_commission"] or pr["estimated_commission"] or 0
+                    item["total_commission"] += comm
+                    item["total_cashback"] += round_dong(comm * self.cfg.advertised_cashback_rate)
+
+            top_products = sorted(product_map.values(), key=lambda x: x["total_commission"], reverse=True)[:5]
+
+            # Channel Acquisition & Behavior Analytics
+            act_date_filter = "1=1"
+            if period == "today":
+                act_date_filter = "date(created_at) = date('now')"
+            elif period == "7d":
+                act_date_filter = "created_at >= datetime('now', '-7 days')"
+            elif period == "30d":
+                act_date_filter = "created_at >= datetime('now', '-30 days')"
+            elif period == "month":
+                act_date_filter = "strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+
+            def _query_channel(actions, name, description, icon, status_badge):
+                placeholders = ','.join(['?'] * len(actions))
+                user_rows = conn.execute(
+                    f"SELECT DISTINCT customer_id FROM activity_logs WHERE action IN ({placeholders}) AND {act_date_filter}",
+                    actions
+                ).fetchall()
+                channel_users = [r[0] for r in user_rows if r[0]]
+                total_events = conn.execute(
+                    f"SELECT COUNT(*) FROM activity_logs WHERE action IN ({placeholders}) AND {act_date_filter}",
+                    actions
+                ).fetchone()[0]
+
+                if not channel_users:
+                    return {
+                        "channel_id": actions[0],
+                        "name": name,
+                        "description": description,
+                        "icon": icon,
+                        "status_badge": status_badge,
+                        "unique_users": 0,
+                        "total_events": total_events,
+                        "converted_users": 0,
+                        "conversion_rate": 0.0,
+                        "orders_count": 0,
+                        "total_gmv": 0,
+                        "total_commission": 0,
+                    }
+
+                u_placeholders = ','.join(['?'] * len(channel_users))
+                orders_data = conn.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT customer_id) as conv_users,
+                           COUNT(order_id) as orders_count,
+                           COALESCE(SUM(order_value), 0) as total_gmv,
+                           COALESCE(SUM(CASE WHEN status != 'rejected' THEN COALESCE(approved_commission, estimated_commission, 0) ELSE 0 END), 0) as total_comm
+                      FROM orders
+                     WHERE customer_id IN ({u_placeholders})
+                    """,
+                    channel_users
+                ).fetchone()
+
+                conv_users = orders_data[0]
+                conv_rate = round((conv_users / len(channel_users)) * 100, 1) if len(channel_users) > 0 else 0.0
+                return {
+                    "channel_id": actions[0],
+                    "name": name,
+                    "description": description,
+                    "icon": icon,
+                    "status_badge": status_badge,
+                    "unique_users": len(channel_users),
+                    "total_events": total_events,
+                    "converted_users": conv_users,
+                    "conversion_rate": conv_rate,
+                    "orders_count": orders_data[1],
+                    "total_gmv": orders_data[2],
+                    "total_commission": round_dong(orders_data[3]),
+                }
+
+            channels = [
+                _query_channel(
+                    ["group_join"],
+                    "Thành viên mới vào Group Zalo",
+                    "Khách mới bấm tham gia nhóm cộng đồng săn sale",
+                    "Users",
+                    "Nguồn tăng trưởng 🚀"
+                ),
+                _query_channel(
+                    ["group_message"],
+                    "Nhắn tin tương tác trong Group",
+                    "Chat, hỏi mã giảm giá & gửi link công khai trong nhóm",
+                    "MessageSquare",
+                    "Tương tác cộng đồng 🔥"
+                ),
+                _query_channel(
+                    ["bot_dm"],
+                    "Nhắn tin riêng 1-1 cho Bot",
+                    "Inbox trực tiếp cho Bot Zalo để nhận link kín đáo",
+                    "Bot",
+                    "Tỷ lệ chốt đơn cao 💎"
+                ),
+                _query_channel(
+                    ["login", "web_link", "web_use"],
+                    "Khách truy cập & dùng Website",
+                    "Đăng nhập web, dán link rút gọn & cập nhật STK ngân hàng",
+                    "Globe",
+                    "Khách hàng số hóa ⭐"
+                ),
+            ]
+
+        metrics = {
+            "period": period,
+            "is_admin": is_admin,
+            "total_users": total_users,
+            "total_employees": total_employees,
+            "active_24h": active_24h,
+            "orders": {
+                "total": orders_count,
+                "awaiting": awaiting_count,
+                "approved": approved_count,
+                "paid": paid_count,
+                "rejected": rejected_count,
+            },
+            "kpis": {
+                "total_gmv": total_gmv,
+                "aov": aov,
+                "avg_commission": avg_commission,
+                "approval_rate": approval_rate,
+                "net_margin": net_margin,
+            },
+            "cached_products": cached_products,
+            "total_logs": total_logs,
+            "trends": trends,
+            "top_customers": top_customers,
+            "top_products": top_products,
+            "channels": channels,
+            "financials": {
+                "gross_commission": round_dong(gross_commission) if is_admin else None,
+                "cashback_paid": cashback_paid if is_admin else None,
+                "cashback_ready": cashback_ready if is_admin else None,
+                "cashback_pipeline": cashback_pipeline if is_admin else None,
+                "total_cashback": total_cashback_committed if is_admin else None,
+                "net_profit": net_profit if is_admin else None,
+            } if is_admin else None,
+        }
+        return self._json({"ok": True, "metrics": metrics})
+
+    def _admin_users(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        page = max(1, int(qs.get("page", ["1"])[0])) if qs.get("page", ["1"])[0].isdigit() else 1
+        limit = min(200, max(1, int(qs.get("limit", ["20"])[0]))) if qs.get("limit", ["20"])[0].isdigit() else 20
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        bank_filter = qs.get("bank", ["all"])[0]
+        sort_by = (qs.get("sort_by", [""])[0] or "").strip().lower()
+        sort_order = "ASC" if (qs.get("sort_order", ["desc"])[0] or "").strip().lower() == "asc" else "DESC"
+
+        where_clauses = ["c.role = 'user'"]
+        params = []
+        if search:
+            where_clauses.append("(LOWER(c.customer_id) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(c.zalo_user_id, '')) LIKE ? OR LOWER(COALESCE(c.bank_account, '')) LIKE ? OR LOWER(COALESCE(c.bank_name, '')) LIKE ?)")
+            pat = f"%{search}%"
+            params.extend([pat, pat, pat, pat, pat])
+        if bank_filter == "has_bank":
+            where_clauses.append("c.bank_account IS NOT NULL AND c.bank_account != ''")
+        elif bank_filter == "no_bank":
+            where_clauses.append("(c.bank_account IS NULL OR c.bank_account = '')")
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * limit
+
+        sort_columns = {
+            "orders": "order_count",
+            "order_count": "order_count",
+            "total_cashback": "total_cashback",
+            "awaiting_amount": "awaiting_amount",
+            "ready_amount": "ready_amount",
+            "paid_amount": "paid_amount",
+            "login_count": "c.login_count",
+            "last_login": "COALESCE(c.last_login_at, c.created_at)",
+            "last_login_at": "COALESCE(c.last_login_at, c.created_at)",
+            "last_bot_activity": "COALESCE(last_bot_activity, c.created_at)",
+            "created_at": "c.created_at",
+            "name": "COALESCE(c.display_name, c.customer_id)",
+            "customer_id": "c.customer_id",
+        }
+        if sort_by in sort_columns:
+            col_expr = sort_columns[sort_by]
+            if sort_order == "ASC" and sort_by in ("orders", "order_count", "total_cashback", "awaiting_amount", "ready_amount", "paid_amount", "login_count"):
+                order_sql = f"CASE WHEN {col_expr} IS NULL THEN 1 ELSE 0 END, {col_expr} ASC"
+            else:
+                order_sql = f"{col_expr} {sort_order}"
+        else:
+            order_sql = "COALESCE(c.last_login_at, c.created_at) DESC"
+
+        rate = self.cfg.advertised_cashback_rate
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            total = conn.execute(f"SELECT COUNT(*) FROM customers c WHERE {where_sql}", params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT c.customer_id, c.display_name, c.zalo_user_id, c.bank_name, c.bank_account, "
+                f"       c.account_holder, c.created_at, c.last_login_at, c.login_count, c.status, "
+                f"       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.customer_id) as order_count, "
+                f"       (SELECT COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN ROUND(COALESCE(o.cashback_amount, o.estimated_commission * {rate})) ELSE 0 END), 0) FROM orders o WHERE o.customer_id = c.customer_id) as total_cashback, "
+                f"       (SELECT COALESCE(SUM(ROUND(COALESCE(o.cashback_amount, o.estimated_commission * {rate}))), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'awaiting_approval') as awaiting_amount, "
+                f"       (SELECT COALESCE(SUM(COALESCE(o.cashback_amount, 0)), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'approved' AND o.paid_at IS NULL) as ready_amount, "
+                f"       (SELECT COALESCE(SUM(COALESCE(o.cashback_amount, 0)), 0) FROM orders o WHERE o.customer_id = c.customer_id AND o.status = 'paid') as paid_amount, "
+                f"       (SELECT MAX(created_at) FROM ( "
+                f"           SELECT created_at FROM link_requests WHERE customer_id = c.customer_id "
+                f"           UNION ALL "
+                f"           SELECT created_at FROM activity_logs WHERE customer_id = c.customer_id OR (c.zalo_user_id IS NOT NULL AND c.zalo_user_id != '' AND customer_id = c.zalo_user_id) "
+                f"       )) as last_bot_activity "
+                f"  FROM customers c "
+                f" WHERE {where_sql} "
+                f" ORDER BY {order_sql} "
+                f" LIMIT {limit} OFFSET {offset}",
+                params
+            ).fetchall()
+            users = [dict(r) for r in rows]
+            for u in users:
+                req_rows = conn.execute("""
+                    SELECT r.request_id, r.source_url, r.affiliate_url, r.created_at, r.estimate_detail
+                      FROM link_requests r
+                     WHERE r.customer_id = ?
+                     ORDER BY r.created_at DESC
+                     LIMIT 3
+                """, (u["customer_id"],)).fetchall()
+                reqs = []
+                for r in req_rows:
+                    detail = json.loads(r["estimate_detail"]) if r["estimate_detail"] else {}
+                    p_name = detail.get("name") or detail.get("title") or _product_name(r["estimate_detail"])
+                    reqs.append({
+                        "name": p_name or r["source_url"],
+                        "created_at": r["created_at"],
+                        "affiliate_url": r["affiliate_url"],
+                    })
+                u["recent_requests"] = reqs
+
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+        return self._json({
+            "ok": True,
+            "users": users,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        })
+
+    def _admin_employees(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") != "admin":
+            return self._json({"ok": False, "message": "Chỉ có Admin mới có quyền quản lý nhân viên."}, 403)
+
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        page = max(1, int(qs.get("page", ["1"])[0])) if qs.get("page", ["1"])[0].isdigit() else 1
+        limit = min(200, max(1, int(qs.get("limit", ["20"])[0]))) if qs.get("limit", ["20"])[0].isdigit() else 20
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        role_filter = qs.get("role", ["all"])[0]
+        sort_by = (qs.get("sort_by", [""])[0] or "").strip().lower()
+        sort_order = "ASC" if (qs.get("sort_order", ["desc"])[0] or "").strip().lower() == "asc" else "DESC"
+
+        where_clauses = ["role IN ('admin', 'employee')"]
+        params = []
+        if search:
+            where_clauses.append("(LOWER(customer_id) LIKE ? OR LOWER(COALESCE(display_name, '')) LIKE ?)")
+            pat = f"%{search}%"
+            params.extend([pat, pat])
+        if role_filter in ("admin", "employee"):
+            where_clauses.append("role = ?")
+            params.append(role_filter)
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * limit
+
+        sort_columns = {
+            "name": "COALESCE(display_name, customer_id)",
+            "customer_id": "customer_id",
+            "role": "role",
+            "status": "status",
+            "login_count": "login_count",
+            "last_login": "COALESCE(last_login_at, created_at)",
+            "last_login_at": "COALESCE(last_login_at, created_at)",
+            "created_at": "created_at",
+        }
+        order_sql = f"{sort_columns[sort_by]} {sort_order}" if sort_by in sort_columns else "created_at DESC"
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            total = conn.execute(f"SELECT COUNT(*) FROM customers WHERE {where_sql}", params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT customer_id, display_name, role, status, created_at, last_login_at, login_count "
+                f"  FROM customers "
+                f" WHERE {where_sql} "
+                f" ORDER BY {order_sql} "
+                f" LIMIT {limit} OFFSET {offset}",
+                params
+            ).fetchall()
+            employees = [dict(r) for r in rows]
+
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+        return self._json({
+            "ok": True,
+            "employees": employees,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        })
+
+    def _admin_create_employee(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") != "admin":
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        username = str(body.get("username") or "").strip()
+        password = str(body.get("password") or "").strip()
+        display_name = str(body.get("display_name") or username).strip()
+        role = str(body.get("role") or "employee").strip()
+
+        if not username or len(username) < 3:
+            return self._json({"ok": False, "message": "Tên đăng nhập phải từ 3 ký tự"}, 400)
+        if not password or len(password) < 6:
+            return self._json({"ok": False, "message": "Mật khẩu phải từ 6 ký tự"}, 400)
+        if role not in ("admin", "employee"):
+            role = "employee"
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            existing = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ?", (username,)).fetchone()
+            if existing:
+                return self._json({"ok": False, "message": "Tài khoản này đã tồn tại"}, 400)
+
+            now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            conn.execute(
+                "INSERT INTO customers (customer_id, display_name, password_hash, role, status, created_at, password_set_at) "
+                "VALUES (?, ?, ?, ?, 'active', ?, ?)",
+                (username, display_name, accounts.hash_password(password), role, now_iso, now_iso)
+            )
+            conn.commit()
+
+        return self._json({"ok": True, "message": f"Đã tạo thành công nhân viên {display_name} ({role})"})
+
+    def _admin_update_employee(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") != "admin":
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        target_id = str(body.get("customer_id") or "").strip()
+        new_role = body.get("role")
+        new_status = body.get("status")
+        new_password = body.get("new_password")
+
+        if not target_id:
+            return self._json({"ok": False, "message": "Thiếu customer_id"}, 400)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            target = conn.execute("SELECT customer_id, role FROM customers WHERE customer_id = ?", (target_id,)).fetchone()
+            if not target:
+                return self._json({"ok": False, "message": "Không tìm thấy nhân viên"}, 404)
+
+            if target_id == "admin" and (new_role == "employee" or new_status == "disabled"):
+                return self._json({"ok": False, "message": "Không thể vô hiệu hóa hoặc hạ quyền tài khoản admin gốc"}, 400)
+
+            if new_role in ("admin", "employee"):
+                conn.execute("UPDATE customers SET role = ? WHERE customer_id = ?", (new_role, target_id))
+            if new_status in ("active", "disabled"):
+                conn.execute("UPDATE customers SET status = ? WHERE customer_id = ?", (new_status, target_id))
+            if new_password and len(str(new_password).strip()) >= 6:
+                conn.execute(
+                    "UPDATE customers SET password_hash = ?, password_set_at = ? WHERE customer_id = ?",
+                    (accounts.hash_password(str(new_password).strip()), datetime.now(timezone.utc).isoformat(timespec="seconds"), target_id)
+                )
+            conn.commit()
+
+        return self._json({"ok": True, "message": "Đã cập nhật thông tin nhân viên"})
+
+    def _admin_orders(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        page = max(1, int(qs.get("page", ["1"])[0])) if qs.get("page", ["1"])[0].isdigit() else 1
+        limit = min(200, max(1, int(qs.get("limit", ["20"])[0]))) if qs.get("limit", ["20"])[0].isdigit() else 20
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        status_filter = qs.get("status", ["all"])[0]
+        customer_id = qs.get("customer_id", [""])[0].strip()
+        sort_by = (qs.get("sort_by", [""])[0] or "").strip().lower()
+        sort_order = "ASC" if (qs.get("sort_order", ["desc"])[0] or "").strip().lower() == "asc" else "DESC"
+
+        where_clauses = ["1=1"]
+        params = []
+        if search:
+            where_clauses.append("(LOWER(o.order_id) LIKE ? OR LOWER(o.customer_id) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(r.estimate_detail, '')) LIKE ?)")
+            pat = f"%{search}%"
+            params.extend([pat, pat, pat, pat])
+        if status_filter != "all" and status_filter in ("awaiting_approval", "approved", "paid", "rejected"):
+            where_clauses.append("o.status = ?")
+            params.append(status_filter)
+        if customer_id:
+            where_clauses.append("o.customer_id = ?")
+            params.append(customer_id)
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * limit
+
+        sort_columns = {
+            "order_value": "o.order_value",
+            "commission": "o.estimated_commission",
+            "estimated_commission": "o.estimated_commission",
+            "cashback": "o.cashback_amount",
+            "cashback_amount": "o.cashback_amount",
+            "date": "COALESCE(o.recorded_at, o.approved_at)",
+            "recorded_at": "COALESCE(o.recorded_at, o.approved_at)",
+            "order_id": "o.order_id",
+            "customer": "COALESCE(c.display_name, o.customer_id)",
+            "status": "o.status",
+        }
+        if sort_by in sort_columns:
+            col_expr = sort_columns[sort_by]
+            if sort_order == "ASC" and sort_by in ("order_value", "commission", "estimated_commission", "cashback", "cashback_amount"):
+                order_sql = f"CASE WHEN {col_expr} IS NULL THEN 1 ELSE 0 END, {col_expr} ASC"
+            else:
+                order_sql = f"{col_expr} {sort_order}"
+        else:
+            order_sql = "COALESCE(o.recorded_at, o.approved_at) DESC"
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM orders o "
+                f"  LEFT JOIN customers c ON c.customer_id = o.customer_id "
+                f"  LEFT JOIN link_requests r ON r.request_id = o.request_id "
+                f" WHERE {where_sql}",
+                params
+            ).fetchone()[0]
+
+            rows = conn.execute(
+                f"SELECT o.order_id, o.customer_id, c.display_name as customer_name, "
+                f"       o.status, o.order_value, o.estimated_commission, o.approved_commission, "
+                f"       o.cashback_amount, o.recorded_at, o.approved_at, o.paid_at, "
+                f"       o.rejection_reason, r.source_url, r.affiliate_url, r.estimate_detail "
+                f"  FROM orders o "
+                f"  LEFT JOIN customers c ON c.customer_id = o.customer_id "
+                f"  LEFT JOIN link_requests r ON r.request_id = o.request_id "
+                f" WHERE {where_sql} "
+                f" ORDER BY {order_sql} "
+                f" LIMIT {limit} OFFSET {offset}",
+                params
+            ).fetchall()
+            orders = []
+            rate = self.cfg.advertised_cashback_rate
+            for r in rows:
+                item = dict(r)
+                item["product"] = _product_name(item.pop("estimate_detail", None))
+                if item.get("cashback_amount") is None and item.get("status") != "rejected":
+                    comm = item.get("approved_commission") or item.get("estimated_commission") or 0
+                    item["cashback_amount"] = round(comm * rate)
+                orders.append(item)
+
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+        return self._json({
+            "ok": True,
+            "orders": orders,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        })
+
+    def _admin_products(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        page = max(1, int(qs.get("page", ["1"])[0])) if qs.get("page", ["1"])[0].isdigit() else 1
+        limit = min(200, max(1, int(qs.get("limit", ["20"])[0]))) if qs.get("limit", ["20"])[0].isdigit() else 20
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        sort_by = (qs.get("sort_by", [""])[0] or "").strip().lower()
+        sort_order = "ASC" if (qs.get("sort_order", ["desc"])[0] or "").strip().lower() == "asc" else "DESC"
+
+        where_clauses = ["1=1"]
+        params = []
+        if search:
+            where_clauses.append("(LOWER(name) LIKE ? OR item_id LIKE ?)")
+            pat = f"%{search}%"
+            params.extend([pat, pat])
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * limit
+
+        sort_columns = {
+            "price": "p.price",
+            "commission": "p.total_commission",
+            "cashback": "p.cashback",
+            "requests": "p.request_count",
+            "request_count": "p.request_count",
+            "orders": "order_count",
+            "order_count": "order_count",
+            "updated_at": "p.updated_at",
+            "name": "p.name",
+        }
+        if sort_by in sort_columns:
+            col_expr = sort_columns[sort_by]
+            if sort_order == "ASC" and sort_by in ("price", "commission", "cashback"):
+                order_sql = f"CASE WHEN {col_expr} IS NULL THEN 1 ELSE 0 END, {col_expr} ASC"
+            else:
+                order_sql = f"{col_expr} {sort_order}"
+        else:
+            order_sql = "p.request_count DESC, p.updated_at DESC"
+
+        products = []
+        total = 0
+        try:
+            with ledger.connect(self.cfg.db_path) as conn:
+                total = conn.execute(f"SELECT COUNT(*) FROM products_cache WHERE {where_sql}", params).fetchone()[0]
+                rows = conn.execute(
+                    f"SELECT p.item_id, p.name, p.price, p.price_formatted, p.total_commission, "
+                    f"       p.commission_formatted, p.cashback, p.cashback_formatted, p.rate_percent, "
+                    f"       p.affiliate_url, p.canonical_url, p.request_count, p.updated_at, p.image_url, "
+                    f"       (SELECT COUNT(o.order_id) FROM orders o "
+                    f"          LEFT JOIN link_requests r ON r.request_id = o.request_id "
+                    f"         WHERE (r.source_url LIKE '%' || p.item_id || '%' OR r.estimate_detail LIKE '%' || p.item_id || '%') "
+                    f"       ) as order_count "
+                    f"  FROM products_cache p "
+                    f" WHERE {where_sql} "
+                    f" ORDER BY {order_sql} "
+                    f" LIMIT {limit} OFFSET {offset}",
+                    params
+                ).fetchall()
+                products = [dict(r) for r in rows]
+                for p in products:
+                    item_id = p.get("item_id")
+                    name = p.get("name") or ""
+                    if item_id:
+                        req_rows = conn.execute("""
+                            SELECT r.customer_id, c.display_name, c.zalo_user_id,
+                                   c.bank_name, c.bank_account, c.account_holder,
+                                   MAX(r.created_at) as last_requested_at,
+                                   COUNT(r.request_id) as request_count
+                              FROM link_requests r
+                              LEFT JOIN customers c ON c.customer_id = r.customer_id
+                             WHERE r.source_url LIKE ? OR r.estimate_detail LIKE ? OR (? != '' AND r.estimate_detail LIKE ?)
+                             GROUP BY r.customer_id
+                             ORDER BY last_requested_at DESC
+                        """, (f"%{item_id}%", f"%{item_id}%", name[:20], f"%{name[:20]}%")).fetchall()
+                        p["requesters"] = [dict(r) for r in req_rows]
+
+                        order_rows = conn.execute(f"""
+                            SELECT o.order_id, o.customer_id, c.display_name, c.zalo_user_id,
+                                   c.bank_name, c.bank_account, c.account_holder,
+                                   o.order_value, o.approved_commission, o.estimated_commission,
+                                   COALESCE(o.cashback_amount, ROUND(COALESCE(o.approved_commission, o.estimated_commission, 0) * {self.cfg.advertised_cashback_rate})) as cashback_amount, o.status,
+                                   COALESCE(o.recorded_at, o.approved_at) as order_date
+                              FROM orders o
+                              LEFT JOIN customers c ON c.customer_id = o.customer_id
+                              LEFT JOIN link_requests r ON r.request_id = o.request_id
+                             WHERE (r.source_url LIKE ? OR r.estimate_detail LIKE ? OR (? != '' AND r.estimate_detail LIKE ?))
+                             ORDER BY order_date DESC
+                        """, (f"%{item_id}%", f"%{item_id}%", name[:20], f"%{name[:20]}%")).fetchall()
+                        p["buyers"] = [dict(r) for r in order_rows]
+                        p["order_count"] = len(order_rows)
+                        p["total_bought_gmv"] = sum(r["order_value"] or 0 for r in order_rows)
+                    else:
+                        p["requesters"] = []
+                        p["buyers"] = []
+                        p["order_count"] = 0
+                        p["total_bought_gmv"] = 0
+        except Exception:
+            pass
+
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+        return self._json({
+            "ok": True,
+            "products": products,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        })
+
+    def _admin_logs(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        page = max(1, int(qs.get("page", ["1"])[0])) if qs.get("page", ["1"])[0].isdigit() else 1
+        limit = min(200, max(1, int(qs.get("limit", ["25"])[0]))) if qs.get("limit", ["25"])[0].isdigit() else 25
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        action_filter = qs.get("action", ["all"])[0]
+        sort_by = (qs.get("sort_by", [""])[0] or "").strip().lower()
+        sort_order = "ASC" if (qs.get("sort_order", ["desc"])[0] or "").strip().lower() == "asc" else "DESC"
+
+        where_clauses = ["1=1"]
+        params = []
+        if search:
+            where_clauses.append("(LOWER(l.customer_id) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(l.action) LIKE ? OR LOWER(COALESCE(l.path, '')) LIKE ? OR LOWER(COALESCE(l.detail, '')) LIKE ?)")
+            pat = f"%{search}%"
+            params.extend([pat, pat, pat, pat, pat])
+        if action_filter != "all":
+            where_clauses.append("l.action = ?")
+            params.append(action_filter)
+
+        where_sql = " AND ".join(where_clauses)
+        offset = (page - 1) * limit
+
+        sort_columns = {
+            "date": "l.created_at",
+            "created_at": "l.created_at",
+            "action": "l.action",
+            "customer": "l.customer_id",
+        }
+        order_sql = f"{sort_columns[sort_by]} {sort_order}" if sort_by in sort_columns else "l.created_at DESC"
+
+        logs = []
+        total = 0
+        try:
+            with ledger.connect(self.cfg.db_path) as conn:
+                total = conn.execute(
+                    f"SELECT COUNT(*) FROM activity_logs l "
+                    f"  LEFT JOIN customers c ON c.customer_id = l.customer_id "
+                    f" WHERE {where_sql}",
+                    params
+                ).fetchone()[0]
+
+                rows = conn.execute(
+                    f"SELECT l.id as log_id, l.customer_id, c.display_name, l.action, l.path, l.detail, l.created_at "
+                    f"  FROM activity_logs l "
+                    f"  LEFT JOIN customers c ON c.customer_id = l.customer_id "
+                    f" WHERE {where_sql} "
+                    f" ORDER BY {order_sql} "
+                    f" LIMIT {limit} OFFSET {offset}",
+                    params
+                ).fetchall()
+                logs = [dict(r) for r in rows]
+        except Exception:
+            pass
+
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+        return self._json({
+            "ok": True,
+            "logs": logs,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+            }
+        })
+
+    def _admin_mark_paid(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        customer_id = str(body.get("customer_id") or "")
+        order_ids = body.get("order_ids")
+        if not isinstance(order_ids, list):
+            return self._json({"ok": False, "message": "order_ids must be a list"}, 400)
+
+        result = mark_paid(self.cfg, customer_id, [str(i) for i in order_ids])
+        return self._json(result)
+
+    def _admin_user_detail(self, customer_id: str):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            user_row = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (customer_id,)).fetchone()
+            if not user_row:
+                return self._json({"ok": False, "message": "Khách hàng không tồn tại"}, 404)
+            user_data = dict(user_row)
+            user_data.pop("password_hash", None)
+
+            # Orders
+            orders_rows = conn.execute("""
+                SELECT o.order_id, o.customer_id, o.request_id, o.order_value,
+                       o.estimated_commission, o.approved_commission, o.cashback_amount,
+                       o.status, o.rejection_reason, o.recorded_at, o.approved_at, o.paid_at,
+                       r.source_url, r.affiliate_url,
+                       COALESCE(
+                           (SELECT p.name FROM products_cache p WHERE r.source_url LIKE '%' || p.item_id || '%' LIMIT 1),
+                           'Sản phẩm Shopee'
+                       ) as product
+                  FROM orders o
+                  LEFT JOIN link_requests r ON r.request_id = o.request_id
+                 WHERE o.customer_id = ?
+                 ORDER BY COALESCE(o.recorded_at, o.approved_at, o.updated_at) DESC
+            """, (customer_id,)).fetchall()
+            orders = [dict(r) for r in orders_rows]
+            rate = self.cfg.advertised_cashback_rate
+            for o in orders:
+                if o.get("cashback_amount") is None and o.get("status") != "rejected":
+                    comm = o.get("approved_commission") or o.get("estimated_commission") or 0
+                    o["cashback_amount"] = round(comm * rate)
+
+            # Link requests
+            req_rows = conn.execute("""
+                SELECT request_id, customer_id, created_at, source_url, affiliate_url,
+                       estimated_commission, channel, status, estimate_detail
+                  FROM link_requests
+                 WHERE customer_id = ?
+                 ORDER BY created_at DESC
+                 LIMIT 100
+            """, (customer_id,)).fetchall()
+            requests = []
+            for r in req_rows:
+                detail = json.loads(r["estimate_detail"]) if r["estimate_detail"] else {}
+                p_name = detail.get("name") or detail.get("title") or _product_name(r["estimate_detail"])
+                requests.append({
+                    "request_id": r["request_id"],
+                    "source_url": r["source_url"],
+                    "affiliate_url": r["affiliate_url"],
+                    "created_at": r["created_at"],
+                    "name": p_name or r["source_url"],
+                })
+
+            # Transfers
+            transfer_rows = conn.execute("""
+                SELECT id, customer_id, amount, transfer_code, note, proof_image, order_ids, created_at, created_by
+                  FROM payment_transfers
+                 WHERE customer_id = ?
+                 ORDER BY created_at DESC
+            """, (customer_id,)).fetchall()
+            transfers = [dict(r) for r in transfer_rows]
+
+            # Stats
+            stats = {
+                "total_cashback": sum((o.get("cashback_amount") or 0) for o in orders if o.get("status") != "rejected"),
+                "paid_amount": sum((o.get("cashback_amount") or 0) for o in orders if o.get("status") == "paid"),
+                "ready_amount": sum((o.get("cashback_amount") or 0) for o in orders if o.get("status") == "approved" and not o.get("paid_at")),
+                "awaiting_amount": sum((o.get("cashback_amount") or 0) for o in orders if o.get("status") == "awaiting_approval"),
+                "total_orders": len(orders),
+                "total_requests": len(requests),
+                "total_transferred": sum(t.get("amount") or 0 for t in transfers),
+            }
+
+            user_data["order_count"] = stats["total_orders"]
+            user_data["total_cashback"] = stats["total_cashback"]
+            user_data["paid_amount"] = stats["paid_amount"]
+            user_data["ready_amount"] = stats["ready_amount"]
+            user_data["awaiting_amount"] = stats["awaiting_amount"]
+            last_req = requests[0]["created_at"] if requests else None
+            user_data["last_bot_activity"] = last_req
+
+            return self._json({
+                "ok": True,
+                "user": user_data,
+                "orders": orders,
+                "link_requests": requests,
+                "transfers": transfers,
+                "stats": stats,
+            })
+
+    def _admin_record_transfer(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        customer_id = str(body.get("customer_id") or "").strip()
+        if not customer_id:
+            return self._json({"ok": False, "message": "Thiếu mã khách hàng (customer_id)"}, 400)
+        try:
+            amount = int(body.get("amount") or 0)
+        except (ValueError, TypeError):
+            amount = 0
+        if amount <= 0:
+            return self._json({"ok": False, "message": "Số tiền chuyển khoản phải lớn hơn 0"}, 400)
+
+        transfer_code = str(body.get("transfer_code") or "").strip()
+        note = str(body.get("note") or "").strip()
+        proof_image = body.get("proof_image") or ""
+        order_ids = body.get("order_ids")
+        order_ids_str = ",".join(str(o) for o in order_ids) if isinstance(order_ids, list) else (str(order_ids) if order_ids else "")
+        mark_as_paid = bool(body.get("mark_orders_paid", True))
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            cur = conn.execute("""
+                INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, order_ids, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)
+            """, (customer_id, amount, transfer_code, note, proof_image, order_ids_str, cust_id))
+            transfer_id = cur.lastrowid
+
+            if mark_as_paid:
+                if order_ids and isinstance(order_ids, list):
+                    for oid in order_ids:
+                        conn.execute("""
+                            UPDATE orders SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                             WHERE order_id = ? AND customer_id = ? AND status = 'approved'
+                        """, (str(oid), customer_id))
+                else:
+                    conn.execute("""
+                        UPDATE orders SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                         WHERE customer_id = ? AND status = 'approved' AND paid_at IS NULL
+                    """, (customer_id,))
+
+            conn.commit()
+
+        return self._json({
+            "ok": True,
+            "message": f"Đã ghi nhận chuyển khoản {amount:,}đ cho {customer_id}",
+            "transfer_id": transfer_id
+        })
+
+
+    def _record_activity_log(self):
+        body = self._body()
+        action = str(body.get("action") or "").strip()
+        if not action:
+            return self._json({"ok": False, "message": "missing_action"}, 400)
+        customer_id = body.get("customer_id")
+        display_name = body.get("display_name")
+        path = body.get("path")
+        detail = body.get("detail")
+        if isinstance(detail, dict):
+            detail = json.dumps(detail, ensure_ascii=False)
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            conn.execute(
+                "INSERT INTO activity_logs (customer_id, action, path, detail, created_at)"
+                " VALUES (?, ?, ?, ?, datetime('now'))",
+                (customer_id, action, path, detail)
+            )
+            if action == "group_join" and customer_id:
+                conn.execute(
+                    "INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)"
+                    " VALUES (?, ?, ?, datetime('now'), 'active')",
+                    (customer_id, customer_id, display_name or "")
+                )
+            conn.commit()
+        return self._json({"ok": True, "action": action})
+
     def _shopee_preview(self):
         from ..shopee.commission import lookup
         from ..shopee.dashboard_lookup import ANY_SHOPEE_URL
+
+        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL, parse_url, is_short_link, resolve_short_link
 
         body = self._body()
         raw_url = str(body.get("url") or "").strip()
@@ -638,8 +1756,12 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": "invalid_url"}, 400)
         url = match.group(0)
 
+        target_url = url
+        if is_short_link(target_url):
+            target_url = resolve_short_link(target_url)
+
         try:
-            est = lookup(url, third_party=self.cfg.third_party_fallback)
+            est = lookup(target_url, third_party=self.cfg.third_party_fallback)
         except Exception as exc:
             return self._json({"ok": False, "message": str(exc)}, 500)
 
@@ -647,7 +1769,38 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "found": False})
 
         rate = self.cfg.advertised_cashback_rate
-        cb = est.cashback(rate)
+        raw_commission = est.commission
+        cb = round_dong(raw_commission * rate)
+
+        # Upsert into products_cache if item_id can be extracted
+        parsed = parse_url(target_url)
+        if parsed:
+            _, shop_id, item_id = parsed
+            with ledger.connect(self.cfg.db_path) as conn:
+                ledger.upsert_product_cache(
+                    conn,
+                    item_id=item_id,
+                    shop_id=shop_id,
+                    name=est.name,
+                    price=est.price,
+                    price_formatted=_vnd(est.price),
+                    shopee_rate=est.shopee_rate,
+                    seller_rate=est.seller_rate,
+                    shopee_part=est.shopee_part,
+                    shopee_part_formatted=_vnd(est.shopee_part),
+                    seller_part=est.seller_part,
+                    seller_part_formatted=_vnd(est.seller_part),
+                    total_commission=raw_commission,
+                    commission_formatted=_vnd(raw_commission),
+                    is_capped=est.is_capped,
+                    cashback=cb,
+                    cashback_formatted=_vnd(cb),
+                    rate_percent=f"{rate:.0%}",
+                    canonical_url=target_url,
+                    image_url=getattr(est, "image_url", "") or "",
+                )
+                conn.commit()
+
         return self._json({
             "ok": True,
             "found": True,
@@ -660,8 +1813,8 @@ class _Handler(BaseHTTPRequestHandler):
             "seller_rate": est.seller_rate,
             "seller_part": est.seller_part,
             "seller_part_formatted": _vnd(est.seller_part),
-            "commission": est.commission,
-            "commission_formatted": _vnd(est.commission),
+            "commission": raw_commission,
+            "commission_formatted": _vnd(raw_commission),
             "is_capped": est.is_capped,
             "cashback": cb,
             "cashback_formatted": _vnd(cb),
@@ -670,7 +1823,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _shopee_convert(self):
         from ..core.identifiers import new_request_id
-        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL
+        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL, parse_url, is_short_link, resolve_short_link
         from ..core import audit
 
         body = self._body()
@@ -680,18 +1833,47 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "invalid_url"}, 400)
         url = match.group(0)
 
-        customer_id = self._session_customer() or str(body.get("customer_id") or "").strip().upper()
+        target_url = url
+        if is_short_link(target_url):
+            target_url = resolve_short_link(target_url)
+
+        customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
+        display_name = str(body.get("display_name") or "").strip()
         if not customer_id:
-            return self._json({"ok": False, "error": "need_customer_id"}, 400)
+            customer_id = "C0001"
 
         with ledger.connect(self.cfg.db_path) as conn:
-            cust = ledger.get_customer(conn, customer_id)
+            cust = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
             if not cust:
-                return self._json({"ok": False, "error": "customer_not_found"}, 404)
+                conn.execute("""
+                    INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)
+                    VALUES (?, ?, ?, datetime('now'), 'active')
+                """, (customer_id, customer_id, display_name or customer_id))
+                conn.commit()
+            else:
+                customer_id = cust["customer_id"]
+
+            # Check if this item_id already has an affiliate_url in products_cache
+            parsed = parse_url(target_url)
+            if parsed:
+                _, _, item_id = parsed
+                cached = ledger.get_product_cache(conn, item_id)
+                if cached and cached["affiliate_url"]:
+                    return self._json({
+                        "ok": True,
+                        "ready": True,
+                        "affiliate_url": cached["affiliate_url"],
+                        "cached": True,
+                    })
 
             existing = ledger.find_reusable_request(
                 conn, customer_id, url, resend_within_days=self.cfg.link_attribution_days)
             if existing is not None and existing["affiliate_url"]:
+                if parsed:
+                    ledger.upsert_product_cache(
+                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=existing["affiliate_url"]
+                    )
+                    conn.commit()
                 return self._json({
                     "ok": True,
                     "ready": True,
@@ -718,6 +1900,11 @@ class _Handler(BaseHTTPRequestHandler):
                 "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
             if req_row and req_row["affiliate_url"]:
+                if parsed:
+                    ledger.upsert_product_cache(
+                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=req_row["affiliate_url"]
+                    )
+                    conn.commit()
                 return self._json({
                     "ok": True,
                     "ready": True,
@@ -732,6 +1919,8 @@ class _Handler(BaseHTTPRequestHandler):
             })
 
     def _shopee_link_status(self):
+        from ..shopee.dashboard_lookup import parse_url, is_short_link, resolve_short_link
+
         query = urllib.parse.urlparse(self.path).query
         params = urllib.parse.parse_qs(query)
         request_id = (params.get("request_id") or [""])[0]
@@ -739,13 +1928,256 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": "missing request_id"}, 400)
         with ledger.connect(self.cfg.db_path) as conn:
             row = conn.execute(
-                "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
+                "SELECT affiliate_url, source_url FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
-        if not row:
-            return self._json({"ok": False, "message": "not_found"}, 404)
-        if row["affiliate_url"]:
-            return self._json({"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]})
+            if not row:
+                return self._json({"ok": False, "message": "not_found"}, 404)
+            if row["affiliate_url"]:
+                src_url = row["source_url"]
+                if is_short_link(src_url):
+                    src_url = resolve_short_link(src_url)
+                parsed = parse_url(src_url)
+                if parsed:
+                    ledger.upsert_product_cache(
+                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=row["affiliate_url"]
+                    )
+                    conn.commit()
+                return self._json({"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]})
         return self._json({"ok": True, "ready": False})
+
+    def _shopee_smart_resolve(self):
+        """Unified Smart Resolve: 12h on-demand cache refresh + instant affiliate URL reuse."""
+        from ..shopee.commission import lookup
+        from ..shopee.dashboard_lookup import ANY_SHOPEE_URL, parse_url, is_short_link, resolve_short_link
+
+        body = self._body()
+        raw_url = str(body.get("url") or "").strip()
+        customer_id = self._session_customer() or str(body.get("customer_id") or "C0001").strip()
+        display_name = str(body.get("display_name") or "").strip()
+        channel = str(body.get("channel") or "zalo").strip()
+        max_age_hours = float(body.get("max_age_hours") or 12.0)
+
+        match = ANY_SHOPEE_URL.search(raw_url)
+        if not match:
+            return self._json({"ok": False, "error": "invalid_url"}, 400)
+        url = match.group(0)
+
+        target_url = url
+        if is_short_link(target_url):
+            target_url = resolve_short_link(target_url)
+
+        parsed = parse_url(target_url)
+        item_id = parsed[2] if parsed else None
+        shop_id = parsed[1] if parsed else ""
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            if customer_id:
+                cust_row = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
+                if not cust_row:
+                    conn.execute("""
+                        INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)
+                        VALUES (?, ?, ?, datetime('now'), 'active')
+                    """, (customer_id, customer_id, display_name or customer_id))
+                    conn.commit()
+                else:
+                    customer_id = cust_row["customer_id"]
+
+            rate = self.cfg.advertised_cashback_rate
+            cached_row = ledger.get_product_cache(conn, item_id) if item_id else None
+
+            # Case A: Cache hit with affiliate_url already generated
+            if cached_row and cached_row["affiliate_url"]:
+                updated_at_str = cached_row["updated_at"]
+                try:
+                    updated_dt = datetime.fromisoformat(updated_at_str)
+                    age_seconds = (datetime.now(timezone.utc).astimezone() - updated_dt).total_seconds()
+                    age_hours = age_seconds / 3600.0
+                except Exception:
+                    age_hours = 999.0
+
+                # If fresh (< 12 hours) and price is known: INSTANT RESPONSE (0.005s)
+                if age_hours < max_age_hours and cached_row["price"] and cached_row["price"] > 0:
+                    conn.execute(
+                        "UPDATE products_cache SET request_count = request_count + 1 WHERE item_id = ?",
+                        (item_id,),
+                    )
+                    if customer_id:
+                        req_id = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{random.randint(10, 99)}"
+                        conn.execute("""
+                            INSERT OR IGNORE INTO link_requests (request_id, customer_id, created_at, source_url, affiliate_url, channel, status, estimate_detail)
+                            VALUES (?, ?, datetime('now'), ?, ?, ?, 'success', ?)
+                        """, (
+                            req_id, customer_id, raw_url, cached_row["affiliate_url"], channel,
+                            json.dumps({"name": cached_row["name"], "price": cached_row["price"], "commission": cached_row["total_commission"]}, ensure_ascii=False)
+                        ))
+                    conn.commit()
+                    return self._json({
+                        "ok": True,
+                        "ready": True,
+                        "source": "cache_instant",
+                        "age_hours": round(age_hours, 1),
+                        "item_id": item_id,
+                        "shop_id": cached_row["shop_id"],
+                        "name": cached_row["name"],
+                        "price": cached_row["price"],
+                        "price_formatted": cached_row["price_formatted"],
+                        "shopee_rate": cached_row["shopee_rate"],
+                        "seller_rate": cached_row["seller_rate"],
+                        "shopee_part": cached_row["shopee_part"],
+                        "shopee_part_formatted": cached_row["shopee_part_formatted"],
+                        "seller_part": cached_row["seller_part"],
+                        "seller_part_formatted": cached_row["seller_part_formatted"],
+                        "total_commission": cached_row["total_commission"],
+                        "commission_formatted": cached_row["commission_formatted"],
+                        "is_capped": bool(cached_row["is_capped"]),
+                        "cashback": cached_row["cashback"],
+                        "cashback_formatted": cached_row["cashback_formatted"],
+                        "rate_percent": cached_row["rate_percent"] or f"{rate:.0%}",
+                        "affiliate_url": cached_row["affiliate_url"],
+                    })
+
+                # If stale (>= 12 hours): Refresh price & commission only (~0.4s), reuse affiliate_url!
+                try:
+                    est = lookup(target_url, third_party=self.cfg.third_party_fallback)
+                except Exception:
+                    est = None
+
+                if est and est.price > 0:
+                    raw_comm = est.commission
+                    cb = round_dong(raw_comm * rate)
+                    new_cached = ledger.upsert_product_cache(
+                        conn,
+                        item_id=item_id,
+                        shop_id=shop_id or cached_row["shop_id"],
+                        name=est.name,
+                        price=est.price,
+                        price_formatted=_vnd(est.price),
+                        shopee_rate=est.shopee_rate,
+                        seller_rate=est.seller_rate,
+                        shopee_part=est.shopee_part,
+                        shopee_part_formatted=_vnd(est.shopee_part),
+                        seller_part=est.seller_part,
+                        seller_part_formatted=_vnd(est.seller_part),
+                        total_commission=raw_comm,
+                        commission_formatted=_vnd(raw_comm),
+                        is_capped=est.is_capped,
+                        cashback=cb,
+                        cashback_formatted=_vnd(cb),
+                        rate_percent=f"{rate:.0%}",
+                        affiliate_url=cached_row["affiliate_url"],
+                        canonical_url=target_url,
+                        image_url=getattr(est, "image_url", "") or "",
+                    )
+                    if customer_id:
+                        req_id = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{random.randint(10, 99)}"
+                        conn.execute("""
+                            INSERT OR IGNORE INTO link_requests (request_id, customer_id, created_at, source_url, affiliate_url, channel, status, estimate_detail)
+                            VALUES (?, ?, datetime('now'), ?, ?, ?, 'success', ?)
+                        """, (
+                            req_id, customer_id, raw_url, cached_row["affiliate_url"], channel,
+                            json.dumps({"name": est.name, "price": est.price, "commission": raw_comm}, ensure_ascii=False)
+                        ))
+                    conn.commit()
+                    return self._json({
+                        "ok": True,
+                        "ready": True,
+                        "source": "cache_refreshed",
+                        "age_hours": 0.0,
+                        "item_id": item_id,
+                        "shop_id": new_cached["shop_id"],
+                        "name": new_cached["name"],
+                        "price": new_cached["price"],
+                        "price_formatted": new_cached["price_formatted"],
+                        "shopee_rate": new_cached["shopee_rate"],
+                        "seller_rate": new_cached["seller_rate"],
+                        "shopee_part": new_cached["shopee_part"],
+                        "shopee_part_formatted": new_cached["shopee_part_formatted"],
+                        "seller_part": new_cached["seller_part"],
+                        "seller_part_formatted": new_cached["seller_part_formatted"],
+                        "total_commission": new_cached["total_commission"],
+                        "commission_formatted": new_cached["commission_formatted"],
+                        "is_capped": bool(new_cached["is_capped"]),
+                        "cashback": new_cached["cashback"],
+                        "cashback_formatted": new_cached["cashback_formatted"],
+                        "rate_percent": new_cached["rate_percent"],
+                        "affiliate_url": new_cached["affiliate_url"],
+                    })
+
+        # Case B: If not in cache, delegate to standard convert flow
+        return self._shopee_convert()
+
+    def _shopee_cache_stats(self):
+        """Stats on cached products and top requested items."""
+        with ledger.connect(self.cfg.db_path) as conn:
+            total = conn.execute("SELECT COUNT(*) FROM products_cache").fetchone()[0]
+            with_aff = conn.execute(
+                "SELECT COUNT(*) FROM products_cache WHERE affiliate_url IS NOT NULL"
+            ).fetchone()[0]
+            hot = [dict(r) for r in ledger.get_hot_products(conn, limit=10)]
+        return self._json({
+            "ok": True,
+            "total_cached": total,
+            "with_affiliate_url": with_aff,
+            "top_products": hot,
+        })
+
+    def _shopee_cache_refresh_hot(self):
+        """Background refresh for top hot products older than max_age_hours."""
+        from ..shopee.commission import lookup
+
+        body = self._body() if hasattr(self, "_cached_body") or int(self.headers.get("Content-Length") or 0) > 0 else {}
+        limit = int(body.get("limit") or 20)
+        max_age_hours = int(body.get("max_age_hours") or 6)
+
+        refreshed = []
+        with ledger.connect(self.cfg.db_path) as conn:
+            stale_rows = ledger.get_stale_hot_products(conn, limit=limit, max_age_hours=max_age_hours)
+            rate = self.cfg.advertised_cashback_rate
+
+            for row in stale_rows:
+                target_url = row["canonical_url"] or f"https://shopee.vn/product/{row['shop_id']}/{row['item_id']}"
+                try:
+                    est = lookup(target_url, third_party=self.cfg.third_party_fallback)
+                    if est and est.price > 0:
+                        raw_comm = est.commission
+                        cb = round_dong(raw_comm * rate)
+                        ledger.upsert_product_cache(
+                            conn,
+                            item_id=row["item_id"],
+                            shop_id=row["shop_id"],
+                            name=est.name,
+                            price=est.price,
+                            price_formatted=_vnd(est.price),
+                            shopee_rate=est.shopee_rate,
+                            seller_rate=est.seller_rate,
+                            shopee_part=est.shopee_part,
+                            shopee_part_formatted=_vnd(est.shopee_part),
+                            seller_part=est.seller_part,
+                            seller_part_formatted=_vnd(est.seller_part),
+                            total_commission=raw_comm,
+                            commission_formatted=_vnd(raw_comm),
+                            is_capped=est.is_capped,
+                            cashback=cb,
+                            cashback_formatted=_vnd(cb),
+                            rate_percent=f"{rate:.0%}",
+                            affiliate_url=row["affiliate_url"],
+                            canonical_url=target_url,
+                            image_url=getattr(est, "image_url", "") or "",
+                        )
+                        refreshed.append({
+                            "item_id": row["item_id"],
+                            "name": est.name,
+                            "price": est.price,
+                        })
+                except Exception:
+                    continue
+            conn.commit()
+
+        return self._json({
+            "ok": True,
+            "refreshed_count": len(refreshed),
+            "refreshed": refreshed,
+        })
 
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 

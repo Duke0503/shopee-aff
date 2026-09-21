@@ -1,14 +1,11 @@
 # Mẫu tin nhắn bot — bản viết lại
 
-> Ngày viết: 09/09/2026 · Cập nhật: 16/09/2026
-> Cài đặt đang dùng: **báo hoàn 80%** *(kỳ nào bị giữ thuế thì khách nhận 70%)*
-> · **trả sau khi Shopee duyệt đơn** · **gom đủ 50.000₫ mới chuyển**
+> Ngày viết: 09/09/2026 · Cập nhật: 18/09/2026
+> Cài đặt đang dùng: **hoàn 80% dự kiến** *(chốt thực tế theo quyết toán sau voucher và thuế)*
+> · **hoàn sau khi Shopee chốt kỳ đối soát** · **không mức tối thiểu**
 >
-> ⚠️ Phần thân bài dưới đây là **bản thiết kế gốc ngày 09/09**, giữ lại để
-> hiểu *vì sao* từng câu được viết như vậy. Câu chữ đang chạy thật nằm ở
-> [`resources/messages.vi.json`](../../resources/messages.vi.json), và danh
-> sách lệnh ở [mục cuối file này](#lệnh-khách-gõ-được).
-> Đi kèm: [Phân tích mô hình](./shopee-cashback-bot-analysis.md)
+> ⚠️ Câu chữ đang chạy thật nằm ở [`resources/messages.vi.json`](../../resources/messages.vi.json), và danh sách lệnh ở [mục cuối file này](#lệnh-khách-gõ-được).
+> Đi kèm: [Phân tích mô hình](../01-business/business-model.md)
 
 ---
 
@@ -16,55 +13,33 @@
 
 Khách đọc xong **phải biết đúng 3 điều**, không cần hỏi lại:
 
-1. **Tôi được bao nhiêu tiền?** — bằng đồng, không bằng phần trăm
-2. **Khi nào tôi nhận được?** — bằng ngày, không nói chung chung
+1. **Tôi được bao nhiêu tiền?** — bằng đồng, ghi rõ là con số dự kiến 80%
+2. **Khi nào tôi nhận được?** — sau khi Shopee duyệt và chốt kỳ đối soát (30–70 ngày)
 3. **Khi nào tôi KHÔNG được?** — nói trước, không đợi khách hỏi
-
-Ba cái đã sửa so với bản cũ:
-
-| Bản cũ | Bản mới | Vì sao |
-|---|---|---|
-| Số to nhất là **hoa hồng của bạn** (₫36.750) | Số to nhất là **tiền khách nhận** (₫25.725) | Khách đang tưởng họ được 36.750₫ → chờ 2 tháng nhận 25.725₫ → nghĩ bị ăn bớt |
-| Không nói khi nào trả | **"Khoảng 50–70 ngày sau khi đơn hoàn tất"** | Không nói = khách tự đoán là vài ngày = chắc chắn cãi nhau |
-| Không nói khi nào mất | **Ghi rõ 4 trường hợp không được hoàn** | Nói trước là điều kiện. Nói sau là bào chữa |
-| *"Tắt app Shopee chạy ngầm / KHÔNG vào Live-Video"* | **Đã gỡ** | Đây là dạy khách né hệ thống Shopee. Bot bạn gửi, Shopee lưu log |
 
 ---
 
 ## 1️⃣ Tin nhắn chính — khi trả link
 
 ```
-✅ Link của bạn đây ạ!
+✅ Link hoàn tiền của bạn
 
 🔗 https://s.shopee.vn/9zxbhjyJYu
 
-━━━━━━━━━━━━━━━━━━━━━━
-💵 BẠN ĐƯỢC HOÀN: ~25.725₫
-━━━━━━━━━━━━━━━━━━━━━━
+📦 Bỉm Tã Quần Bobby Size L
+💵 Giá: 350.000₫
+💰 Hoa hồng Shopee (dự kiến): 35.000₫
+🎁 Bạn nhận về (80% dự kiến): 28.000₫
+ℹ️ Số tiền thực nhận sẽ thay đổi theo mã giảm giá và sau khi khấu trừ thuế theo quyết toán thực tế từ Shopee.
 
-📅 Nhận khi nào?
-   Sau khi Shopee duyệt đơn
-   → khoảng 50–70 ngày kể từ lúc đơn hoàn tất
+👉 Để được ghi nhận hoàn tiền:
+• Bấm đúng link trên rồi đặt hàng trên Shopee
+• Nên mua ngay sau khi bấm link trên cùng thiết bị
+• Hạn chế bấm thêm link Affiliate khác trước khi mua
 
-📌 Cách nhận: đơn duyệt xong bot tự nhắn bạn,
-   lúc đó bạn gửi số tài khoản là được chuyển.
-
-⚠️ 4 trường hợp KHÔNG được hoàn:
-   1. Bạn huỷ đơn hoặc trả hàng
-   2. Bạn bấm link hoàn tiền của nhóm khác sau link này
-      (Shopee chỉ tính link bấm sau cùng)
-   3. Shopee không ghi nhận đơn
-   4. Shop đó không tham gia chương trình hoa hồng
-
-💡 Để chắc ăn:
-   • Bấm link xong mua luôn, đừng để mai
-   • Mua trên đúng máy/điện thoại vừa bấm link
-   • Đừng bấm thêm link hoàn tiền nào khác cho đơn này
-
-ℹ️ Số 25.725₫ là ước tính (70% hoa hồng 36.750₫).
-   Số cuối cùng tính theo mức Shopee duyệt —
-   nếu bạn dùng thêm voucher, giá giảm thì tiền
-   hoàn cũng giảm theo.
+⚡ Tiền hoàn sẽ tự động chuyển khoản sau khi Shopee hoàn tất kỳ đối soát!
+🌐 Tra cứu & cài đặt tài khoản nhận tiền tại: https://hoantiendp.com
+❓ Gõ /huongdan xem cách dùng • /coche xem cơ chế
 ```
 
 **Vì sao đặt thứ tự như vậy:** tiền của khách → thời gian → điều kiện mất → mẹo → ghi chú. Khách đọc 2 dòng đầu là đã có thứ họ cần. Phần sau dành cho người đọc kỹ.

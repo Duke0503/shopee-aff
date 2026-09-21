@@ -104,54 +104,29 @@ U = tiền user thực nhận
 M = bạn giữ, TRƯỚC chi phí vận hành
 ```
 
-### 3.2 — Hai chính sách, khác nhau gấp đôi
+### 3.2 — Chính sách chốt chính thức: 80% Dự Kiến (Gross) & Quyết Toán Thực Nhận (Net)
 
-| | **A. Chủ chịu thuế** | **B. Trừ thuế vào cashback của user** |
-|---|---|---|
-| User thực nhận | **80% × C** — ổn định | **70% × C** khi bị khấu trừ |
-| Bạn giữ trước vận hành | **~9,02% × C** | **~19,02% × C** |
-| Quảng cáo trung thực là | "hoàn 80%" | **"hoàn 70%"** |
+Để tối ưu chuyển đổi khách hàng (tránh khách so sánh thấy số thấp hơn bên khác), đồng thời bảo vệ 100% dòng tiền của shop không bao giờ bị âm:
 
-**Ví dụ — đơn 300.000₫, Shopee duyệt hoa hồng 27.000₫:**
+1. **Giai đoạn Tạo link & Xem trước (Preview / Dự kiến):**
+   - Tính **80% trên hoa hồng gốc Shopee ước tính ($C_{gross}$)**.
+   - Ví dụ sản phẩm hoa hồng gốc 100.000₫ → Báo khách: *Hoa hồng Shopee (dự kiến): 100.000₫ · Bạn nhận về (80% dự kiến): 80.000₫*.
+   - Đính kèm lưu ý minh bạch: *Số tiền thực nhận sẽ thay đổi theo mã giảm giá và sau khi khấu trừ thuế theo quyết toán thực tế từ Shopee*.
 
-| | Chủ chịu | User chịu |
-|---|---|---|
-| User nhận | 21.600₫ (80,0%) | **18.900₫ (70,0%)** |
-| Bạn giữ | 2.435₫ (9,02%) | **5.135₫ (19,02%)** |
+2. **Giai đoạn Quyết toán & Chuyển tiền (Settlement / Thực nhận):**
+   - Tiền Shopee chuyển về cho shop sau khi trừ 10% thuế TNCN tại nguồn: $\text{Net} \approx 90\% \times C_{approved}$.
+   - Shop chia đúng **80% của số tiền Shopee thực trả về cho shop**:
+     $$U = 80\% \times \text{Tiền Shopee thực trả} \approx 80\% \times 90.000₫ = 72.000₫$$
+   - Shop luôn giữ chắc **20% của số tiền thực nhận**, loại bỏ hoàn toàn rủi ro bù lỗ cho voucher hoặc thuế.
 
-### 3.3 — 🚩 Cảnh báo về chính sách B
+3. **Thời gian hoàn tiền:**
+   - Hoàn tiền tự động sau khi Shopee hoàn tất kỳ đối soát và thanh toán cho hệ thống (khoảng 30–70 ngày tuỳ ngày đặt hàng). Không áp dụng luật lệ chuyển tiền trước riêng lẻ để tránh rủi ro gian lận hoàn/huỷ đơn.
 
-Chính sách B cho biên gấp đôi. Nhưng có một chỗ phải nhìn thẳng:
-
-> **Ở quy mô 30 đơn/ngày, hoa hồng của bạn khoảng 8–10 triệu/tháng — LUÔN vượt mốc 2 triệu.**
->
-> Nghĩa là **kỳ nào cũng bị khấu trừ**, nghĩa là **user KHÔNG BAO GIỜ nhận 80%. Luôn luôn là 70%.**
-
-**Vậy quảng cáo "hoàn 80%" là con số không bao giờ xảy ra.**
-
-Bản rà soát v8 tự viết ở mục 6: *"không nên ghi với user rằng user là người nộp thuế — điều đó không đúng bản chất"*. Nhưng chính sách B **làm đúng điều đó về mặt kinh tế**, chỉ là không nói ra.
-
-Còn một vấn đề nữa: nếu tháng nào đó không vượt mốc 2 triệu, cashback nhảy lên 80%. **Khách không nhìn thấy, không kiểm soát, không đoán được biến này** — nó là tổng doanh thu tháng của bạn. Hai khách mua giống hệt nhau sẽ nhận khác nhau.
-
-**Chọn một, đừng đứng giữa:**
-
-| | Quảng cáo | User nhận | Bạn giữ |
+| Giai đoạn | Cơ sở tính | Tỷ lệ | Ví dụ đơn $100.000₫$ |
 |---|---|---|---|
-| ✅ **A** | "hoàn 70%" | 70% ổn định | ~19% |
-| ✅ **B** | "hoàn 80%" | 80% ổn định | ~9% |
-| ❌ **C** | "hoàn 80%" | thực ra 70% | ~19% |
-
-**70% vẫn nằm trong vùng thị trường (70–90%)**, ổn định, và bạn nói đúng những gì bạn làm. Cách C là thứ đẻ ra mấy thread *"cú lừa bot hoàn tiền"* trên diễn đàn.
-
-*(Hệ thống hỗ trợ cả hai — đổi bằng `CHINH_SACH_THUE` trong `.env`. Chọn `user_chiu` thì chương trình tự in cảnh báo này ra.)*
-
-### 3.4 — 19,02% CHƯA phải lợi nhuận
-
-Con số đó mới chỉ trừ cashback và phí Shopee. **Chưa trừ:** máy chủ, phí chuyển khoản, giới thiệu, marketing, hỗ trợ khách, đối soát sai, và nghĩa vụ thuế cuối năm nếu còn phát sinh.
-
-```
-Lợi nhuận thật = Hoa hồng duyệt × 19,02%  −  toàn bộ chi phí vận hành
-```
+| **Lúc tạo link (Dự kiến)** | Hoa hồng Shopee gốc | **80%** | **80.000₫** |
+| **Lúc quyết toán (Thực nhận)** | Tiền Shopee trả về (sau thuế/voucher) | **80% Net** | **72.000₫** *(80% của 90k)* |
+| **Shop giữ lại** | Tiền Shopee trả về | **20% Net** | **18.000₫** *(20% của 90k)* |
 
 ---
 

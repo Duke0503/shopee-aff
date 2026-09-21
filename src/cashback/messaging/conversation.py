@@ -240,7 +240,7 @@ def handle(
         # into money in their head. One worked example at a typical rate
         # does what the percentage cannot.
         "example": _vnd(round_dong(
-            EXAMPLE_ORDER_VND * EXAMPLE_RATE * cashback_rate)),
+            EXAMPLE_ORDER_VND * EXAMPLE_RATE * 0.9 * cashback_rate)),
     }
 
     common["tax_clause"] = (
@@ -634,19 +634,21 @@ def deliver_ready_links(
             cap_line = messages.render(
                 "cap_line", cap=_vnd(CAP)
             ) if estimate.is_capped else ""
+            raw_comm = estimate.commission
+            cb = round_dong(raw_comm * cashback_rate)
             text = messages.render(
                 "link_ready",
                 link=row["affiliate_url"],
                 product=_short(estimate.name),
                 price=_vnd(estimate.price),
-                commission=_vnd(estimate.commission),
+                commission=_vnd(raw_comm),
                 shopee_rate=_pct(estimate.shopee_rate),
                 shopee_part=_vnd(estimate.shopee_part),
                 seller_rate=_pct(estimate.seller_rate),
                 seller_part=_vnd(estimate.seller_part),
                 cap_tag=cap_tag,
                 cap_line=cap_line,
-                cashback=_vnd(estimate.cashback(cashback_rate)),
+                cashback=_vnd(cb),
                 rate=f"{cashback_rate:.0%}",
                 tax_clause=tax_clause,
                 days=payout_window,
