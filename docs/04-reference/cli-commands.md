@@ -138,3 +138,9 @@
 | `--withheld` | - | this payout period was withheld at 10%% |
 | `--dry-run` | - | parse and show, change nothing |
 
+## `cashback sync-accesstrade`
+
+| Tham số | Mặc định | Ý nghĩa |
+|---|---|---|
+| `--days` | `30` | số ngày gần nhất cần đồng bộ đơn hàng AccessTrade TikTok Shop |
+

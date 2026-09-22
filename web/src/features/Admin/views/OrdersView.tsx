@@ -41,6 +41,7 @@ export function OrdersView() {
   const [limit, setLimit] = React.useState(20)
   const [searchTerm, setSearchTerm] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
+  const [platformFilter, setPlatformFilter] = React.useState<string>("all")
   const [sortBy, setSortBy] = React.useState<string>("date")
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc")
 
@@ -51,13 +52,14 @@ export function OrdersView() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders", page, limit, searchTerm, statusFilter, sortBy, sortOrder],
+    queryKey: ["admin-orders", page, limit, searchTerm, statusFilter, platformFilter, sortBy, sortOrder],
     queryFn: () =>
       fetchAdminOrders({
         page,
         limit,
         search: searchTerm,
         status: statusFilter,
+        platform: platformFilter,
         sort_by: sortBy,
         sort_order: sortOrder,
       }),
@@ -85,12 +87,13 @@ export function OrdersView() {
     total_pages: Math.ceil(orders.length / limit) || 1,
   }
 
-  const renderStatus = (status: AdminOrder["status"]) => {
+  const renderStatus = (status: AdminOrder["status"], platform?: string) => {
+    const platformLabel = platform === "tiktok" ? "TikTok" : "Shopee"
     switch (status) {
       case "awaiting_approval":
         return (
           <Badge variant="warning">
-            <Clock className="mr-1 h-3 w-3" /> Chờ Shopee đối soát
+            <Clock className="mr-1 h-3 w-3" /> Chờ {platformLabel} đối soát
           </Badge>
         )
       case "approved":
@@ -108,7 +111,7 @@ export function OrdersView() {
       case "rejected":
         return (
           <Badge variant="danger">
-            <XCircle className="mr-1 h-3 w-3" /> Shopee từ chối
+            <XCircle className="mr-1 h-3 w-3" /> {platformLabel} từ chối
           </Badge>
         )
       default:
@@ -118,22 +121,66 @@ export function OrdersView() {
 
   const toolbar = (
     <Card className="p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setPage(1)
-            }}
-            placeholder="Tìm theo mã đơn, khách hàng, tên sản phẩm..."
-            className="pl-9 text-xs sm:text-sm"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Tìm theo mã đơn, khách hàng, tên sản phẩm..."
+              className="pl-9 text-xs sm:text-sm"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:border-l sm:pl-3 dark:border-border">
+            <button
+              onClick={() => {
+                setPlatformFilter("all")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                platformFilter === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Tất cả sàn
+            </button>
+            <button
+              onClick={() => {
+                setPlatformFilter("shopee")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                platformFilter === "shopee"
+                  ? "bg-orange-600 text-white"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Shopee
+            </button>
+            <button
+              onClick={() => {
+                setPlatformFilter("tiktok")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                platformFilter === "tiktok"
+                  ? "bg-rose-600 text-white"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              TikTok Shop
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 border-t pt-2.5 dark:border-border">
           <button
             onClick={() => {
               setStatusFilter("all")
@@ -342,9 +389,18 @@ export function OrdersView() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="line-clamp-2 text-xs font-medium text-foreground leading-snug" title={o.product}>
-                        {o.product || "Đơn hàng Shopee"}
+                        {o.product || (o.platform === "tiktok" ? "Đơn hàng TikTok Shop" : "Đơn hàng Shopee")}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {o.platform === "tiktok" ? (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                            TikTok
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                            Shopee
+                          </span>
+                        )}
                         {o.item_id && (
                           <CodeBadge code={o.item_id} label="SP:" variant="purple" />
                         )}
@@ -355,7 +411,7 @@ export function OrdersView() {
                             rel="noreferrer"
                             className="inline-flex items-center text-muted-foreground hover:text-foreground text-[10px]"
                           >
-                            Shopee <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
+                            {o.platform === "tiktok" ? "TikTok" : "Shopee"} <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
                           </a>
                         )}
                         {o.affiliate_url && (
@@ -421,7 +477,7 @@ export function OrdersView() {
                   <OrderFinancialCard order={o} />
                 </TableCell>
 
-                <TableCell className="whitespace-nowrap">{renderStatus(o.status)}</TableCell>
+                <TableCell className="whitespace-nowrap">{renderStatus(o.status, o.platform)}</TableCell>
 
                 <TableCell className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
                   {shortDate(o.recorded_at || o.approved_at)}

@@ -37,16 +37,30 @@ export function MyOrdersTable({ orders }: { orders: MyOrder[] }) {
     {
       accessorKey: "product",
       header: () => t("col_product"),
-      cell: ({ row }) => (
-        <div className="min-w-0">
-          <div className="max-w-[24ch] truncate font-medium sm:max-w-[40ch]">
-            {row.original.product || row.original.order_id}
+      cell: ({ row }) => {
+        const isTikTok = row.original.platform === "tiktok"
+        return (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                  isTikTok
+                    ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                    : "bg-orange-500/10 text-orange-600 border border-orange-500/20"
+                }`}
+              >
+                {isTikTok ? "TikTok" : "Shopee"}
+              </span>
+              <div className="max-w-[20ch] truncate font-medium sm:max-w-[36ch]">
+                {row.original.product || row.original.order_id}
+              </div>
+            </div>
+            <div className="text-muted-foreground font-mono text-[11px]">
+              {row.original.order_id}
+            </div>
           </div>
-          <div className="text-muted-foreground font-mono text-[11px]">
-            {row.original.order_id}
-          </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       accessorKey: "status",

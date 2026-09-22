@@ -2,7 +2,7 @@
 
 ## Nguyên tắc phân tầng
 
-Sáu package, xếp theo hướng phụ thuộc **một chiều**: tầng dưới không bao
+Bảy package, xếp theo hướng phụ thuộc **một chiều**: tầng dưới không bao
 giờ biết tầng trên.
 
 ```mermaid
@@ -10,19 +10,23 @@ graph TD
     CLI[cli<br/>lệnh người vận hành]
     MSG[messaging<br/>Zalo]
     WRK[worker<br/>gom lô]
-    SHP[shopee<br/>link + hoa hồng]
+    PRV[providers<br/>Shopee & TikTok]
+    SHP[shopee<br/>browser bridge & CDP]
     LDG[ledger<br/>sổ sách]
     COR[core<br/>quy tắc tiền, log, audit]
 
     CLI --> MSG
     CLI --> WRK
-    CLI --> SHP
+    CLI --> PRV
     CLI --> LDG
     MSG --> LDG
-    MSG --> SHP
+    MSG --> PRV
     MSG --> COR
-    WRK --> SHP
+    WRK --> PRV
     WRK --> LDG
+    PRV --> SHP
+    PRV --> LDG
+    PRV --> COR
     SHP --> COR
     SHP --> LDG
     LDG --> COR
@@ -69,6 +73,15 @@ kiểm chứng được mà không cần dựng database hay mở trình duyệt
 | `third_party_lookup.py` | Dự phòng khi dashboard không trả lời |
 | `report_importer.py` | Đọc CSV báo cáo chuyển đổi, đoán cột |
 | `reconciliation.py` | Khớp `sub_id` ngược về khách |
+
+### `providers` — tích hợp đa sàn thương mại điện tử
+
+| Module | Việc |
+|---|---|
+| `base.py` | `AffiliateProvider` interface, dataclass `LinkResult`, `CommissionInfo`, `OrderRecord` |
+| `shopee_provider.py` | Provider cho sàn Shopee (nối `worker`, `shopee.commission`, `browser_bridge`) |
+| `tiktok_provider.py` | Provider cho TikTok Shop qua AccessTrade Publisher API (tạo link v2, parse hoa hồng) |
+| `accesstrade_reconciler.py` | Đồng bộ đơn hàng AccessTrade TikTok Shop (`order-list`), khớp `sub1` về khách |
 
 ### `messaging` — nói chuyện với khách
 

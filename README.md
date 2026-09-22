@@ -1,4 +1,4 @@
-# Shopee Affiliate Cashback & Reconciliation Platform
+# Shopee & TikTok Shop Affiliate Cashback & Reconciliation Platform
 
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Package Manager](https://img.shields.io/badge/package%20manager-uv-purple.svg)](https://github.com/astral-sh/uv)
@@ -6,9 +6,9 @@
 [![Tests](https://img.shields.io/badge/tests-337%20passed-success.svg)](https://docs.pytest.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-An enterprise-grade, automated Shopee Affiliate link generation, customer ledger, order reconciliation, and cashback management system. 
+An enterprise-grade, multi-platform automated Affiliate link generation, customer ledger, order reconciliation, and cashback management system supporting **Shopee** and **TikTok Shop** (via AccessTrade Publisher API). 
 
-Built with an asynchronous Zalo messaging bot, a dedicated headless browser bridge for resilient affiliate link generation, an idempotent financial ledger, and an integrated full-stack customer tracking portal with VietQR automated payouts.
+Built with an asynchronous Zalo messaging bot, a dedicated headless browser bridge for resilient Shopee affiliate links, AccessTrade API integration for TikTok Shop, an idempotent financial ledger, and an integrated full-stack customer tracking portal with VietQR automated payouts.
 
 ---
 
@@ -39,15 +39,16 @@ flowchart TD
 
     subgraph CorePlatform["Core Application Engine"]
         MSG["Messaging Router (Zalo Client)"]
+        PRV["Affiliate Provider Router (Shopee & TikTok)"]
         WQ["Batch Queue & Worker Engine"]
         LDG[("Financial Ledger (SQLite WAL)")]
         WEB["Dashboard & API Server (Port 8899)"]
     end
 
-    subgraph BrowserBridge["Affiliate Automation"]
-        BR["Bridge Server (Port 8787)"]
-        EXT["Dedicated Browser Profile & Chrome Extension"]
-        SP["Shopee Affiliate Dashboard"]
+    subgraph AffiliatePipelines["Affiliate Automation & Integration"]
+        BR["Shopee Bridge Server (Port 8787)"]
+        EXT["Shopee Browser Profile & Extension"]
+        AT["AccessTrade Publisher API (TikTok Shop)"]
     end
 
     subgraph Operator["Operator Administration"]
@@ -57,25 +58,27 @@ flowchart TD
     end
 
     ZC <-->|Long-polling or REST| MSG
-    MSG -->|Enqueues Request| WQ
+    MSG -->|Enqueues Request| PRV
+    PRV -->|Shopee Links| WQ
+    PRV -->|TikTok Links| AT
     MSG <-->|Read and Write| LDG
     WQ -->|Submits Batches by sub_id| BR
     BR <-->|Native Automation| EXT
-    EXT <-->|Real User Session| SP
-    SP -->|Commission Reports| BR
-    BR -->|Reconciliation Pipeline| LDG
+    AT -->|Orders Sync (order-list)| LDG
+    EXT -->|Reconciliation Reports| LDG
     WP <-->|Customer Auth and Orders| WEB
     WEB <-->|Queries Data| LDG
-    CLI <-->|Ops and Auditing| LDG
+    CLI <-->|Ops, Auditing & Sync| LDG
     ADM <-->|Payout Approvals| WEB
     WEB -->|VietQR Generation| VQR
 ```
 
 The system is decoupled into discrete, fault-tolerant components:
 - **`messaging`**: Handles real-time customer dialogues via the official Zalo Bot API, customer consent, identification, and outbound notifications.
-- **`worker`**: Aggregates link conversion requests across batched sliding windows to minimize Shopee rate limiting and anti-bot triggering.
-- **`shopee`**: Controls an isolated browser profile via a dedicated extension bridge (`browser_bridge.py`), bypassing GraphQL signature verification (`af-ac-enc-dat`, `x-sap-sec`) that blocks standard headless scrapers.
-- **`ledger`**: Encapsulates double-entry ledger semantics, customer balances, order lifecycles, and audit logging.
+- **`providers`**: Unified multi-platform abstraction (`AffiliateProvider`) routing requests dynamically to Shopee or TikTok Shop.
+- **`worker`**: Aggregates Shopee link conversion requests across batched sliding windows to minimize Shopee rate limiting and anti-bot triggering.
+- **`shopee`**: Controls an isolated browser profile via a dedicated extension bridge (`browser_bridge.py`), bypassing GraphQL signature verification (`af-ac-enc-dat`, `x-sap-sec`).
+- **`ledger`**: Encapsulates double-entry ledger semantics, customer balances, order lifecycles with multi-platform tags (`platform='shopee'|'tiktok'`), and audit logging.
 - **`web`**: Serves pre-compiled React 19 SPA static assets and high-performance REST endpoints for customer lookup and operator payout workflows.
 
 ---
@@ -139,6 +142,7 @@ The platform enforces three non-negotiable financial rules in code (`core/policy
 │   ├── core/                      # Configuration, logging, policy, and math
 │   ├── ledger/                    # SQLite repository, schema, and payout calculations
 │   ├── messaging/                 # Zalo bot client, templates, and conversation engine
+│   ├── providers/                 # Multi-platform adapters (Shopee, TikTok/AccessTrade)
 │   ├── shopee/                    # Browser bridge, report parser, and reconciliation
 │   ├── web/                       # Embedded HTTP server and API endpoints
 │   └── worker/                    # Batch request scheduler and queues
@@ -244,6 +248,7 @@ The `cashback` CLI provides enterprise administration tools:
 | `cashback payouts --qr` | Generates `payouts.html` with scannable VietQR codes |
 | `cashback pay <order-id>` | Confirms payment and updates order state to `paid` |
 | `cashback reconcile --live` | Triggers an immediate Shopee conversion report reconciliation |
+| `cashback sync-accesstrade` | Synchronizes TikTok Shop orders from AccessTrade Publisher API |
 | `cashback metrics` | Displays key financial indicators (conversion rate, margins) |
 | `cashback audit --scan` | Performs automated anomaly detection on customer accounts |
 | `cashback audit --customer <id>` | Dumps full transaction and request audit trail for a customer |

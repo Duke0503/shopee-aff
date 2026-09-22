@@ -254,7 +254,7 @@ export function DashboardView({
             <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Tổng Hoa Hồng Shopee
+                  Tổng Hoa Hồng Sàn
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
                   <TrendingUp className="h-5 w-5" />
@@ -319,7 +319,7 @@ export function DashboardView({
                   >
                     <Percent className="mr-0.5 h-2.5 w-2.5" /> Biên lãi {fin.estimated_net_margin ?? fin.real_net_margin ?? kpis.net_margin}%
                   </Badge>
-                  <span className="truncate">20% trên thực nhận Shopee</span>
+                  <span className="truncate">20% trên thực nhận sàn</span>
                 </div>
               </div>
             </Card>
@@ -354,7 +354,7 @@ export function DashboardView({
             <Card className="p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Tổng Đơn Hàng Shopee
+                  Tổng Đơn Hàng
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <ShoppingBag className="h-5 w-5" />
@@ -492,7 +492,7 @@ export function DashboardView({
                 <>
                   <div className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                    <span>Hoa hồng Shopee</span>
+                    <span>Hoa hồng sàn</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
@@ -682,7 +682,7 @@ export function DashboardView({
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-amber-500">
-                    <span>Hoa hồng Shopee:</span>
+                    <span>Hoa hồng sàn:</span>
                     <strong>{vnd(hoveredData.trend.commission)}</strong>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-sky-500">
@@ -989,7 +989,7 @@ export function DashboardView({
             <div>
               <div className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5 text-amber-500" /> Chờ Shopee đối soát
+                  <Clock className="h-3.5 w-3.5 text-amber-500" /> Chờ đối soát
                 </span>
                 <span className="font-semibold text-foreground">
                   {metrics.orders.awaiting} đơn (
@@ -1073,7 +1073,7 @@ export function DashboardView({
             <div>
               <div className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                  <XCircle className="h-3.5 w-3.5 text-destructive" /> Shopee từ chối / Hủy
+                  <XCircle className="h-3.5 w-3.5 text-destructive" /> Sàn từ chối / Hủy
                 </span>
                 <span className="font-semibold text-foreground">
                   {metrics.orders.rejected} đơn (
@@ -1112,7 +1112,7 @@ export function DashboardView({
               </Badge>
             </div>
             <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
-              <span className="text-muted-foreground">Tỷ lệ Shopee duyệt đơn:</span>
+              <span className="text-muted-foreground">Tỷ lệ duyệt đơn:</span>
               <span className="font-bold text-foreground">
                 {kpis.approval_rate}%
               </span>
@@ -1252,9 +1252,9 @@ export function DashboardView({
                       <div className="min-w-0">
                         <div
                           className="line-clamp-1 text-xs font-semibold text-foreground"
-                          title={prod.name}
+                          title={prod.name || "Sản phẩm"}
                         >
-                          {prod.name}
+                          {prod.name || "Sản phẩm"}
                         </div>
                         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                           <span>{prod.orders_count} lượt mua</span>

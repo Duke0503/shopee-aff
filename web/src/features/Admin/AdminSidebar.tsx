@@ -51,7 +51,7 @@ export function AdminSidebar({
       items: [
         {
           id: "orders" as AdminTab,
-          label: "Đơn Hàng Shopee",
+          label: "Đơn Hàng",
           icon: ShoppingBag,
           adminOnly: false,
         },

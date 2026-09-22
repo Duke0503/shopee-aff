@@ -91,6 +91,7 @@ export const askForBank = (customerId: string) =>
 export interface MyOrder {
   order_id: string
   status: "awaiting_approval" | "approved" | "rejected" | "paid"
+  platform?: "shopee" | "tiktok" | string
   order_value: number | null
   estimated_commission: number | null
   approved_commission: number | null
@@ -338,6 +339,7 @@ export interface UserDetailData {
     affiliate_url: string | null
     created_at: string
     name: string | null
+    platform?: "shopee" | "tiktok" | string
   }[]
   transfers: UserTransfer[]
   stats: {
@@ -392,6 +394,7 @@ export interface AdminOrder {
   source_url: string | null
   affiliate_url: string | null
   product: string
+  platform?: "shopee" | "tiktok" | string
   item_id?: string | null
   image_url?: string | null
   financial_breakdown?: OrderFinancialBreakdown
@@ -521,6 +524,7 @@ export const fetchAdminOrders = (params?: {
   search?: string
   status?: string
   customer_id?: string
+  platform?: string
   sort_by?: string
   sort_order?: "asc" | "desc"
 }) => {
@@ -529,6 +533,7 @@ export const fetchAdminOrders = (params?: {
   if (params?.limit) qs.set("limit", String(params.limit))
   if (params?.search) qs.set("search", params.search)
   if (params?.status && params.status !== "all") qs.set("status", params.status)
+  if (params?.platform && params.platform !== "all") qs.set("platform", params.platform)
   if (params?.customer_id) qs.set("customer_id", params.customer_id)
   if (params?.sort_by) qs.set("sort_by", params.sort_by)
   if (params?.sort_order) qs.set("sort_order", params.sort_order)

@@ -196,7 +196,22 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                         return (
                           <TableRow key={o.order_id}>
                             <TableCell><CodeBadge code={o.order_id} variant="purple" /></TableCell>
-                            <TableCell className="text-xs max-w-[180px] truncate" title={o.product}>{o.product}</TableCell>
+                            <TableCell className="text-xs max-w-[180px]">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                                    o.platform === "tiktok"
+                                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                                      : "bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30"
+                                  }`}
+                                >
+                                  {o.platform === "tiktok" ? "TikTok" : "Shopee"}
+                                </span>
+                                <span className="truncate" title={o.product || (o.platform === "tiktok" ? "Đơn hàng TikTok Shop" : "Đơn hàng Shopee")}>
+                                  {o.product || (o.platform === "tiktok" ? "Đơn hàng TikTok Shop" : "Đơn hàng Shopee")}
+                                </span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-xs text-right"><EmptyDash value={o.order_value} type="currency" /></TableCell>
                             <TableCell className="text-xs text-right font-medium text-foreground"><EmptyDash value={o.cashback_amount} type="currency" /></TableCell>
                             <TableCell className="text-xs text-right whitespace-nowrap">
@@ -233,8 +248,19 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                       {detail.link_requests.map((r) => (
                         <TableRow key={r.request_id}>
                           <TableCell className="text-xs max-w-[300px]">
-                            <div className="truncate" title={r.name || r.source_url}>{r.name || r.source_url}</div>
-                            <div className="text-[10px] text-muted-foreground font-mono truncate" title={r.source_url}>{r.source_url}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                                  r.platform === "tiktok"
+                                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                                    : "bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30"
+                                }`}
+                              >
+                                {r.platform === "tiktok" ? "TikTok" : "Shopee"}
+                              </span>
+                              <div className="truncate" title={r.name || r.source_url}>{r.name || r.source_url}</div>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5" title={r.source_url}>{r.source_url}</div>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{shortDate(r.created_at)}</TableCell>
                           <TableCell className="text-center">

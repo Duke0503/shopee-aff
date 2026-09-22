@@ -197,12 +197,20 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             me = bot.get_me()
             print(f"Zalo bot: {me.get('display_name')} "
                   f"(groups: {me.get('can_join_groups')})")
+            consecutive_429 = 0
             while not stop.is_set():
                 try:
                     updates = bot.get_updates(timeout=20)
+                    consecutive_429 = 0
                 except ZaloError as exc:
-                    print(f"[zalo] {exc}")
-                    time.sleep(5)
+                    if "429" in str(exc) or "too many requests" in str(exc).lower():
+                        consecutive_429 += 1
+                        backoff = min(120, 15 * (2 ** min(consecutive_429 - 1, 3)))
+                        print(f"[zalo] Rate limited (HTTP 429), backing off for {backoff}s...")
+                        time.sleep(backoff)
+                    else:
+                        print(f"[zalo] {exc}")
+                        time.sleep(5)
                     continue
 
                 for update in updates:
@@ -210,8 +218,11 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                     if not msg:
                         continue
                     where = "group" if msg.chat.is_group else "private"
-                    print(f"[zalo] {where} from {msg.sender_name or msg.sender_id}: "
-                          f"{(msg.text or '')[:60]!r}")
+                    try:
+                        print(f"[zalo] {where} from {msg.sender_name or msg.sender_id}: "
+                              f"{(msg.text or '')[:60]!r}")
+                    except Exception:
+                        pass
                     try:
                         replies = zalo_handler.handle(
                             cfg.db_path, msg, cfg.advertised_cashback_rate,
@@ -239,6 +250,11 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                     zalo_handler.notify_failed_links(cfg.db_path, bot)
                 except Exception as exc:
                     print(f"[zalo] delivery error: {exc}")
+
+                # Rate limit & resource protection: Zalo getUpdates returns immediately
+                # (no long-poll server hold). Sleep when idle to avoid spamming Zalo and SQLite.
+                if not updates:
+                    time.sleep(3)
 
     def link_loop() -> None:
         totals = worker.Totals()

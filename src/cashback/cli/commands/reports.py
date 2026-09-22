@@ -310,3 +310,23 @@ def cmd_review_resolve(cfg: Config, args: argparse.Namespace) -> int:
         return 1
     print(f"Row #{args.resolve} marked resolved. The ledger was not changed.")
     return 0
+
+
+def cmd_sync_accesstrade(cfg: Config, args: argparse.Namespace) -> int:
+    """Synchronize TikTok Shop orders from AccessTrade Orders API."""
+    from ...providers.accesstrade_reconciler import sync_accesstrade_orders
+
+    print("Synchronizing TikTok Shop orders via AccessTrade API...")
+    days = getattr(args, "days", 30)
+    summary = sync_accesstrade_orders(cfg, since_days=days)
+
+    if summary.error:
+        print(f"Sync Notice: {summary.error}")
+        return 1
+
+    print(f"Orders read from AccessTrade: {summary.rows_read}")
+    print(f"  New orders inserted:        {summary.orders_new}")
+    print(f"  Orders newly approved:      {summary.approved}")
+    print(f"  Orders newly rejected:      {summary.rejected}")
+    print(f"  Orders unchanged/skipped:   {summary.skipped}")
+    return 0

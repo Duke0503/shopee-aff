@@ -276,9 +276,13 @@ class ZaloBot:
             try:
                 updates = self.get_updates(timeout=timeout)
             except ZaloError as exc:
-                print(f"[zalo] poll failed, retrying in 5s: {exc}")
-                time.sleep(5)
+                backoff = 30 if "429" in str(exc) else 5
+                print(f"[zalo] poll failed, retrying in {backoff}s: {exc}")
+                time.sleep(backoff)
                 continue
+
+            if not updates:
+                time.sleep(3)
 
             for update in updates:
                 key = update.update_id or (

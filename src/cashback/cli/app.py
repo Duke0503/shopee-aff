@@ -11,6 +11,17 @@ from __future__ import annotations
 import argparse
 import sys
 
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from ..core.config import Config, load
 from ..core.logging_setup import configure as configure_logging
 from ..core.policy import WITHHOLDING_THRESHOLD_VND, TaxPolicy
@@ -191,6 +202,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--dry-run", action="store_true", help="parse and show, change nothing"
     )
+
+    p = sub.add_parser(
+        "sync-accesstrade",
+        help="synchronize TikTok Shop orders from AccessTrade API",
+    )
+    p.add_argument(
+        "--days", type=int, default=30,
+        help="number of days to look back for orders (default 30)",
+    )
+
     return parser
 
 
@@ -229,6 +250,7 @@ def _handlers() -> dict:
         "inspect-report": reports.cmd_inspect_report,
         "reconcile": reports.cmd_reconcile,
         "review": reports.cmd_review,
+        "sync-accesstrade": reports.cmd_sync_accesstrade,
 
         "bridge": browser.cmd_bridge,
         "setup-token": browser.cmd_setup_token,

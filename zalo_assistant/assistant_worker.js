@@ -5,8 +5,10 @@ import path from "node:path";
 import sizeOf from "image-size";
 import { config } from "./config.js";
 
-// Regex nhận diện link Shopee
+// Regex nhận diện link Shopee & TikTok Shop
 const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s]+/i;
+const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s]+/i;
+const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s]+/i;
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -224,30 +226,32 @@ function extractTextAndUrls(data) {
   if (data.href) urls.push(data.href);
   if (data.url) urls.push(data.url);
 
-  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee nào
+  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee hoặc TikTok nào
   try {
     const rawJson = JSON.stringify(data);
-    const shopeeMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s"'\\]+/gi);
-    if (shopeeMatches) {
-      for (const m of shopeeMatches) {
+    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s"'\\]+/gi);
+    if (productMatches) {
+      for (const m of productMatches) {
         urls.push(m);
       }
     }
   } catch (_) {}
 
-  // Chỉ giữ lại link Shopee hợp lệ
-  const shopeeUrls = urls.filter((u) => SHOPEE_LINK_REGEX.test(u));
+  // Chỉ giữ lại link Shopee hoặc TikTok Shop hợp lệ
+  const validUrls = urls.filter((u) => PRODUCT_LINK_REGEX.test(u));
 
-  return { text: text.trim(), urls: [...new Set(shopeeUrls)] };
+  return { text: text.trim(), urls: [...new Set(validUrls)] };
 }
 
   // Bộ nhớ đệm RAM (Level-1 Cache) lưu sản phẩm trong 12 tiếng để phản hồi tức thì 0.001s
   const memoryProductCache = new Map(); // key: item_id, val: { data, cachedAt }
 
-  // 3. Helper xử lý link Shopee (Áp dụng Smart Resolve 3 tầng + Cache RAM 12h + DB SQLite)
-  async function handleShopeeLink(rawUrl, threadId, threadType, senderName, senderUid, customerId = null) {
+  // 3. Helper xử lý link Shopee & TikTok Shop (Áp dụng Smart Resolve đa sàn + Cache RAM + DB SQLite)
+  async function handleProductLink(rawUrl, threadId, threadType, senderName, senderUid, customerId = null) {
     try {
-      console.log(`[Shopee Link] Đang kiểm tra thông tin link: ${rawUrl} (Người gửi: ${senderName}, UID: ${senderUid})`);
+      const isTikTok = TIKTOK_LINK_REGEX.test(rawUrl);
+      const platformLabel = isTikTok ? "TikTok Shop" : "Shopee";
+      console.log(`[${platformLabel} Link] Đang kiểm tra thông tin link: ${rawUrl} (Người gửi: ${senderName}, UID: ${senderUid})`);
       const effectiveCustomerId = customerId || (senderUid ? String(senderUid) : config.DEFAULT_CUSTOMER_ID);
 
       // Gọi Smart Resolve API từ hệ thống FastAPI chính
@@ -266,9 +270,9 @@ function extractTextAndUrls(data) {
       let productData = resolveRes.ok && resolveRes.ready ? resolveRes : null;
       let affUrl = productData?.affiliate_url;
 
-      // Nếu sản phẩm mới tinh chưa từng có (ready: false), chờ extension tạo link (tối đa 16s)
+      // Nếu sản phẩm mới tinh chưa từng có (ready: false), chờ extension/worker tạo link (tối đa 16s)
       if (!affUrl && resolveRes.request_id) {
-        console.log(`[Shopee Link] Sản phẩm mới, chờ worker chuyển đổi link (request_id: ${resolveRes.request_id})...`);
+        console.log(`[${platformLabel} Link] Sản phẩm mới, chờ worker chuyển đổi link (request_id: ${resolveRes.request_id})...`);
         const maxAttempts = 20; // 20 * 800ms = 16s
         for (let i = 0; i < maxAttempts; i++) {
           await sleep(800);
@@ -277,7 +281,7 @@ function extractTextAndUrls(data) {
             const statusData = await statusRes.json();
             if (statusData.ok && statusData.ready && statusData.affiliate_url) {
               affUrl = statusData.affiliate_url;
-              console.log(`[Shopee Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
+              console.log(`[${platformLabel} Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
               break;
             }
           } catch (_) {}
@@ -300,10 +304,10 @@ function extractTextAndUrls(data) {
 
       // Nếu sau 16s vẫn không có link Affiliate, TUYỆT ĐỐI KHÔNG gửi link gốc rawUrl
       if (!affUrl) {
-        console.warn(`[Shopee Link] Không lấy được link affiliate cho: ${rawUrl}`);
+        console.warn(`[${platformLabel} Link] Không lấy được link affiliate cho: ${rawUrl}`);
         const busyMsg =
           tagPrefix +
-          `⚠️ Hệ thống đang chuyển đổi link sản phẩm hơi chậm một chút. Bạn đợi khoảng 10 giây rồi dán lại link giúp mình nhé!`;
+          `⚠️ Hệ thống đang chuyển đổi link sản phẩm ${platformLabel} hơi chậm một chút. Bạn đợi khoảng 10 giây rồi dán lại link giúp mình nhé!`;
         await api.sendMessage({ msg: busyMsg, mentions }, threadId, threadType);
         return;
       }
@@ -324,26 +328,36 @@ function extractTextAndUrls(data) {
 
       let replyText = "";
       const boldTargets = [
-        "Link hoàn tiền của bạn đã sẵn sàng",
-        "Bấm link trên và đặt hàng trực tiếp trên Shopee",
+        `Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng`,
+        `Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}`,
         "Nên mua ngay sau khi mở link",
       ];
 
-      if (productData && (productData.shopee_rate > 0 || productData.seller_rate > 0 || productData.found)) {
+      if (productData && (productData.shopee_rate > 0 || productData.seller_rate > 0 || productData.commission > 0 || productData.total_commission > 0 || productData.found)) {
         const commissionLines = [];
         const commissionItems = [];
-        if (productData.shopee_rate > 0) {
-          const capNote = productData.is_capped
-            ? " (tối đa 40.000đ/sản phẩm theo quy định Shopee)"
-            : "";
-          const coreText = `Shopee ${productData.shopee_rate}% → ${productData.shopee_part_formatted}`;
-          commissionLines.push(`• ${coreText}${capNote}`);
-          commissionItems.push(coreText);
-        }
-        if (productData.seller_rate > 0) {
-          const coreText = `Shop ${productData.seller_rate}% → ${productData.seller_part_formatted}`;
+        if (isTikTok) {
+          const rateText = (productData.seller_rate && productData.seller_rate > 0)
+            ? `TikTok Shop ${productData.seller_rate}%`
+            : "TikTok Shop";
+          const payoutPart = productData.seller_part_formatted || productData.commission_formatted || `${productData.commission || productData.total_commission || 0}đ`;
+          const coreText = `${rateText} → ${payoutPart}`;
           commissionLines.push(`• ${coreText}`);
           commissionItems.push(coreText);
+        } else {
+          if (productData.shopee_rate > 0) {
+            const capNote = productData.is_capped
+              ? " (tối đa 40.000đ/sản phẩm theo quy định Shopee)"
+              : "";
+            const coreText = `Shopee ${productData.shopee_rate}% → ${productData.shopee_part_formatted}`;
+            commissionLines.push(`• ${coreText}${capNote}`);
+            commissionItems.push(coreText);
+          }
+          if (productData.seller_rate > 0) {
+            const coreText = `Shop ${productData.seller_rate}% → ${productData.seller_part_formatted}`;
+            commissionLines.push(`• ${coreText}`);
+            commissionItems.push(coreText);
+          }
         }
         if (commissionLines.length === 0) {
           commissionLines.push(`• Đang cập nhật`);
@@ -357,19 +371,19 @@ function extractTextAndUrls(data) {
 
         replyText =
           tagPrefix +
-          `🎉 Link hoàn tiền của bạn đã sẵn sàng\n\n` +
+          `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
           `🔗 ${affUrl}\n\n` +
           `📊 Hoa hồng hiện tại:\n` +
           `${commissionSection}\n\n` +
           `🎁 ${payoutLine}\n\n` +
-          `👉 Bấm link trên và đặt hàng trực tiếp trên Shopee.\n` +
+          `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       } else {
         replyText =
           tagPrefix +
-          `🎉 Link hoàn tiền của bạn đã sẵn sàng\n\n` +
+          `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
           `🔗 ${affUrl}\n\n` +
-          `👉 Bấm link trên và đặt hàng trực tiếp trên Shopee.\n` +
+          `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       }
 
@@ -392,11 +406,12 @@ function extractTextAndUrls(data) {
         threadId,
         threadType
       );
-      console.log(`[Shopee Link] Đã phản hồi tin nhắn kèm link Affiliate cho ${senderName}`);
+      console.log(`[${platformLabel} Link] Đã phản hồi tin nhắn kèm link Affiliate cho ${senderName}`);
     } catch (err) {
-      console.error(`[Shopee Link Error]:`, err.message);
+      console.error(`[Product Link Error]:`, err.message);
     }
   }
+  const handleShopeeLink = handleProductLink;
 
   // LẮNG NGHE SỰ KIỆN QUA WEBSOCKET
   api.listener.on("connected", () => {
@@ -438,10 +453,10 @@ function extractTextAndUrls(data) {
         isGroup ? `zalo_group_${message.threadId}` : "zalo_dm"
       );
 
-      // 1. Kiểm tra nếu có link Shopee
+      // 1. Kiểm tra nếu có link Shopee hoặc TikTok Shop
       if (urls.length > 0) {
-        const shopeeUrl = urls[0];
-        await handleShopeeLink(shopeeUrl, message.threadId, message.type, senderName, senderUid);
+        const productUrl = urls[0];
+        await handleProductLink(productUrl, message.threadId, message.type, senderName, senderUid);
         return;
       }
 
@@ -543,7 +558,7 @@ function extractTextAndUrls(data) {
               `🆔 Mã Khách Hàng (ID): ${custId}\n` +
               `🌐 Website tra cứu: https://hoantiendp.com\n\n` +
               `📌 HƯỚNG DẪN SỬ DỤNG:\n` +
-              `1️⃣ Khi dán link sản phẩm Shopee trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n` +
+              `1️⃣ Khi dán link sản phẩm Shopee hoặc TikTok Shop trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n` +
               `2️⃣ Để đăng nhập website cài đặt Số Tài Khoản Ngân Hàng nhận tiền hoàn, bạn gõ lệnh:\n` +
               `👉 /matkhau (Bot sẽ cấp mật khẩu đăng nhập bảo mật cho bạn)`;
 
@@ -627,12 +642,12 @@ function extractTextAndUrls(data) {
 
         const reply =
           tagPrefix +
-          `📋 HƯỚNG DẪN NHẬN HOÀN TIỀN 80% SHOPEE\n\n` +
-          `1️⃣ Gửi link sản phẩm Shopee bạn muốn mua vào nhóm hoặc inbox riêng cho mình.\n` +
+          `📋 HƯỚNG DẪN NHẬN HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP\n\n` +
+          `1️⃣ Gửi link sản phẩm Shopee hoặc TikTok Shop bạn muốn mua vào nhóm hoặc inbox riêng cho mình.\n` +
           `2️⃣ Nhận lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n` +
-          `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên Shopee.\n` +
+          `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên sàn Shopee hoặc TikTok Shop.\n` +
           `4️⃣ Nhắn tin riêng cho Bot gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
-          `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi Shopee hoàn tất đối soát.\n\n` +
+          `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n` +
           `📌 Các lệnh hỗ trợ:\n` +
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
           `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
@@ -652,10 +667,10 @@ function extractTextAndUrls(data) {
           : undefined;
 
         const boldTargets = [
-          "HƯỚNG DẪN NHẬN HOÀN TIỀN 80% SHOPEE",
+          "HƯỚNG DẪN NHẬN HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP",
           "inbox riêng cho mình",
           "hoàn tiền 80% hoa hồng",
-          "đặt hàng trực tiếp trên Shopee",
+          "đặt hàng trực tiếp",
           "https://hoantiendp.com",
           "cập nhật số tài khoản ngân hàng",
           "/id",
@@ -723,11 +738,11 @@ function extractTextAndUrls(data) {
 
         const reply =
           tagPrefix +
-          `💡 CHÍNH SÁCH HOÀN TIỀN 80% SHOPEE\n\n` +
-          `• Tỷ lệ hoàn tiền: Bạn nhận trọn 80% hoa hồng thực tế mà hệ thống nhận được từ Shopee Affiliate.\n` +
+          `💡 CHÍNH SÁCH HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP\n\n` +
+          `• Tỷ lệ hoàn tiền: Bạn nhận trọn 80% hoa hồng thực tế mà hệ thống nhận được từ Shopee Affiliate & TikTok Shop (AccessTrade).\n` +
           `• Mức ước tính ban đầu: Được tính trên giá niêm yết hiện tại của sản phẩm.\n` +
-          `• Số tiền thực nhận: Sẽ được tính theo hoa hồng Shopee thực tế duyệt sau khi trừ voucher giảm giá và các khoản thuế/khấu trừ theo quy định (nếu có).\n` +
-          `• Thời gian chi trả: Tiền sẽ được tự động chuyển cho bạn sau khi Shopee hoàn tất đối soát (thường từ 30 - 70 ngày kể từ khi đơn giao thành công).\n` +
+          `• Số tiền thực nhận: Sẽ được tính theo hoa hồng thực tế sàn duyệt sau khi trừ voucher giảm giá và các khoản thuế/khấu trừ theo quy định (nếu có).\n` +
+          `• Thời gian chi trả: Tiền sẽ được tự động chuyển cho bạn sau khi sàn đối soát (thường từ 30 - 70 ngày kể từ khi đơn giao thành công).\n` +
           `• Tra cứu minh bạch: Truy cập website https://hoantiendp.com để xem chi tiết từng đơn hàng và số tiền tích lũy nhé!`;
 
         const mentions = tagText
@@ -735,13 +750,13 @@ function extractTextAndUrls(data) {
           : undefined;
 
         const boldTargets = [
-          "CHÍNH SÁCH HOÀN TIỀN 80% SHOPEE",
+          "CHÍNH SÁCH HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP",
           "80% hoa hồng thực tế",
-          "Shopee Affiliate",
-          "hoa hồng Shopee thực tế duyệt",
+          "Shopee Affiliate & TikTok Shop",
+          "hoa hồng thực tế sàn duyệt",
           "thuế/khấu trừ",
           "tự động chuyển cho bạn",
-          "sau khi Shopee hoàn tất đối soát",
+          "sau khi sàn đối soát",
           "30 - 70 ngày",
           "https://hoantiendp.com",
         ];
@@ -768,26 +783,60 @@ function extractTextAndUrls(data) {
       } else if (cmd === "/topdeal" || cmd === "/hot" || cmd === "!topdeal" || cmd === "!hot") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
+
+        // Check for subcommand: /topdeal tiktok
+        const subCmd = (text || "").trim().split(/\s+/)[1]?.toLowerCase();
+        const isTikTokDeal = subCmd === "tiktok" || subCmd === "tt";
+
         try {
-          const statsRes = await fetch(`${config.MAIN_API_URL}/api/shopee/cache/stats`);
-          const stats = await statsRes.json();
-          const topItems = (stats.top_products || []).filter((p) => p.price && p.affiliate_url).slice(0, 5);
-          if (topItems.length === 0) {
-            await api.sendMessage(
-              tagPrefix + `🔥 Hiện tại chưa có đủ dữ liệu top sản phẩm hot trong nhóm. Bạn cứ dán link Shopee vào nhé!`,
-              message.threadId,
-              message.type
-            );
-          } else {
-            const lines = [`🔥 TOP SẢN PHẨM ĐƯỢC QUAN TÂM NHẤT TRONG NHÓM\n`];
-            for (let i = 0; i < topItems.length; i++) {
-              const item = topItems[i];
-              lines.push(`${i + 1}️⃣ ${item.name.substring(0, 55)}...`);
-              lines.push(`💰 Giá: ${item.price_formatted} | Hoàn 80%: ${item.cashback_formatted || "..."}`);
-              lines.push(`🔗 ${item.affiliate_url}\n`);
+          if (isTikTokDeal) {
+            // TikTok Shop top deals via AccessTrade product feed
+            const tkRes = await fetch(`${config.MAIN_API_URL}/api/tiktok/topdeal?limit=5`);
+            const tkData = await tkRes.json();
+            const topItems = (tkData.products || []).filter((p) => p.detail_link).slice(0, 5);
+
+            if (!tkData.ok || topItems.length === 0) {
+              await api.sendMessage(
+                tagPrefix + `🛍️ Hiện chưa có dữ liệu top sản phẩm TikTok Shop. Bạn cứ dán link TikTok Shop vào nhé!`,
+                message.threadId,
+                message.type
+              );
+            } else {
+              const lines = [`🔥 TOP SẢN PHẨM TIKTOK SHOP BÁN CHẠY NHẤT\n`];
+              for (let i = 0; i < topItems.length; i++) {
+                const item = topItems[i];
+                const commPct = item.commission_rate_pct ? `${item.commission_rate_pct}%` : "?%";
+                const priceStr = item.price_formatted && item.price_formatted !== "N/A" ? `${item.price_formatted}` : "";
+                lines.push(`${i + 1}️⃣ ${(item.title || "Sản phẩm").substring(0, 55)}...`);
+                if (priceStr) lines.push(`💰 Giá: ${priceStr} | HH: ${commPct}`);
+                lines.push(`🔗 ${item.detail_link}\n`);
+              }
+              lines.push(`👉 Dán link vào nhóm để nhận link hoàn tiền 80%!`);
+              await api.sendMessage(tagPrefix + lines.join("\n"), message.threadId, message.type);
             }
-            lines.push(`👉 Bấm link trên để đặt hàng và nhận hoàn tiền 80% nhé!`);
-            await api.sendMessage(tagPrefix + lines.join("\n"), message.threadId, message.type);
+          } else {
+            // Shopee hot products (default)
+            const statsRes = await fetch(`${config.MAIN_API_URL}/api/shopee/cache/stats`);
+            const stats = await statsRes.json();
+            const topItems = (stats.top_products || []).filter((p) => p.price && p.affiliate_url).slice(0, 5);
+            if (topItems.length === 0) {
+              await api.sendMessage(
+                tagPrefix + `🔥 Chưa có đủ dữ liệu top sản phẩm Shopee hot.\n\n💡 Gõ /topdeal tiktok để xem top TikTok Shop nhé!`,
+                message.threadId,
+                message.type
+              );
+            } else {
+              const lines = [`🔥 TOP SẢN PHẨM SHOPEE ĐƯỢC QUAN TÂM NHẤT TRONG NHÓM\n`];
+              for (let i = 0; i < topItems.length; i++) {
+                const item = topItems[i];
+                lines.push(`${i + 1}️⃣ ${(item.name || "").substring(0, 55)}...`);
+                lines.push(`💰 Giá: ${item.price_formatted} | Hoàn 80%: ${item.cashback_formatted || "..."}`);
+                lines.push(`🔗 ${item.affiliate_url}\n`);
+              }
+              lines.push(`👉 Bấm link trên để đặt hàng và nhận hoàn tiền 80% nhé!`);
+              lines.push(`\n💡 Gõ /topdeal tiktok để xem top TikTok Shop!`);
+              await api.sendMessage(tagPrefix + lines.join("\n"), message.threadId, message.type);
+            }
           }
         } catch (err) {
           console.error("[Top Deal Error]:", err.message);

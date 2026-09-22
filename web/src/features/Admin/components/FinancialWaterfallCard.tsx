@@ -53,7 +53,7 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
             </Badge>
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Hạch toán chi tiết khấu trừ từ Shopee, số tiền đã hoàn, dự tính sẽ hoàn khách và lợi nhuận dự tính thực nhận.
+            Hạch toán chi tiết khấu trừ từ các sàn (Shopee & TikTok), số tiền đã hoàn, dự tính sẽ hoàn khách và lợi nhuận dự tính thực nhận.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
               </span>
               <Building2 className="h-3.5 w-3.5 text-destructive" />
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Thuế & phí Shopee</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Thuế & phí theo sàn</div>
             <div className="mt-2 text-base font-bold font-mono text-destructive">
               -{vnd(fee + tax)}
             </div>
@@ -110,18 +110,18 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
               <span className="font-mono text-destructive">-{vnd(tax)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Phí sàn (0.98%):</span>
+              <span>Phí sàn / DV:</span>
               <span className="font-mono text-destructive">-{vnd(fee)}</span>
             </div>
           </div>
         </div>
 
-        {/* Step 3: Net Shopee */}
+        {/* Step 3: Net Platform */}
         <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                3. Thực Nhận Shopee
+                3. Thực Nhận Sàn
               </span>
               <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
             </div>
@@ -131,7 +131,7 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
             </div>
           </div>
           <div className="mt-2 text-[10px] text-muted-foreground border-t border-blue-500/20 pt-1.5">
-            Chiếm ~89.02% hoa hồng
+            Chiếm ~89% - 90% hoa hồng
           </div>
         </div>
 
@@ -205,9 +205,9 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
           <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
           <div className="leading-snug text-[11px]">
             <strong className="text-foreground">Công thức tính minh bạch (Quy tắc 8:2): </strong>
-            Shopee thanh toán Thực Nhận (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span> sau khi trừ 10% thuế TNCN và 0.98% phí sàn). Khách nhận trọn vẹn 80% (<span className="font-mono font-medium text-foreground">{vnd(totalCashback)}</span>). Admin giữ trọn vẹn 20% = 
+            Sàn thanh toán Thực Nhận (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span> sau khi trừ thuế TNCN và phí dịch vụ theo từng sàn). Khách nhận trọn vẹn 80% (<span className="font-mono font-medium text-foreground">{vnd(totalCashback)}</span>). Admin giữ trọn vẹn 20% = 
             <strong className="text-emerald-600 dark:text-emerald-400"> Lợi Nhuận Dự Tính ({vnd(estimatedProfit)} ~ {estimatedMargin}%)</strong>.
-            {" "}Lợi nhuận trên giấy trước thuế sàn là <span className="font-mono font-semibold text-foreground">{vnd(paperProfit)} ({paperMargin}%)</span>. Khi Shopee duyệt đơn, lợi nhuận chuyển sang Thực Thu (đã chốt: <span className="font-mono font-medium text-foreground">{vnd(realizedProfit)} ({realizedMargin}%)</span>).
+            {" "}Lợi nhuận trên giấy trước thuế sàn là <span className="font-mono font-semibold text-foreground">{vnd(paperProfit)} ({paperMargin}%)</span>. Khi sàn đối soát duyệt đơn, lợi nhuận chuyển sang Thực Thu (đã chốt: <span className="font-mono font-medium text-foreground">{vnd(realizedProfit)} ({realizedMargin}%)</span>).
           </div>
         </div>
       </div>

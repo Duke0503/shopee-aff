@@ -34,11 +34,23 @@ function OrderCard({ order }: { order: MyOrder }) {
   const t = useT()
   const link = order.affiliate_url ?? order.source_url
   const when = order.paid_at ?? order.approved_at ?? order.recorded_at
+  const isTikTok = order.platform === "tiktok"
 
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-1.5">
+            <span
+              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                isTikTok
+                  ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                  : "bg-orange-500/10 text-orange-600 border border-orange-500/20"
+              }`}
+            >
+              {isTikTok ? "TikTok" : "Shopee"}
+            </span>
+          </div>
           <div className="line-clamp-2 text-sm leading-snug font-medium">
             {order.product || order.order_id}
           </div>

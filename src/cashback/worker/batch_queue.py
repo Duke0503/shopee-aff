@@ -150,6 +150,33 @@ def apply_results(db_path: Path, results: list[dict]) -> dict:
                 int(commission) if commission is not None else None,
             ):
                 stored += 1
+                try:
+                    p_row = conn.execute(
+                        "SELECT * FROM products_cache WHERE (affiliate_url = ? OR canonical_url = (SELECT source_url FROM link_requests WHERE request_id = ?)) AND name IS NOT NULL LIMIT 1",
+                        (affiliate_url, request_id),
+                    ).fetchone()
+                    if p_row:
+                        import json
+                        detail_json = json.dumps({
+                            "name": p_row["name"],
+                            "price": p_row["price"] or 0,
+                            "commission": p_row["total_commission"] or 0,
+                            "shopee_rate": p_row["shopee_rate"] or 0,
+                            "seller_rate": p_row["seller_rate"] or 0,
+                            "shopee_part": p_row["shopee_part"] or 0,
+                            "seller_part": p_row["seller_part"] or 0,
+                            "total_rate": (p_row["shopee_rate"] or 0) + (p_row["seller_rate"] or 0),
+                            "is_capped": bool(p_row["is_capped"]),
+                            "source": "shopee",
+                            "image_url": p_row["image_url"] or "",
+                            "item_id": str(p_row["item_id"]) if p_row["item_id"] else "",
+                        }, ensure_ascii=False)
+                        conn.execute(
+                            "UPDATE link_requests SET estimate_detail = ?, estimated_commission = COALESCE(estimated_commission, ?), estimate_source = COALESCE(estimate_source, 'shopee') WHERE request_id = ? AND (estimate_detail IS NULL OR estimate_detail = '')",
+                            (detail_json, p_row["total_commission"], request_id),
+                        )
+                except Exception:
+                    pass
             else:
                 skipped += 1
 

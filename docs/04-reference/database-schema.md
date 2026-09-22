@@ -36,6 +36,7 @@ erDiagram
 | `estimated_commission` | INTEGER |  |
 | `channel` | TEXT |  |
 | `status` | TEXT | bắt buộc |
+| `platform` | TEXT | bắt buộc, mặc định 'shopee' (shopee / tiktok) |
 | `notified_at` | TEXT |  |
 
 ## `orders`
@@ -50,6 +51,7 @@ erDiagram
 | `approved_commission` | INTEGER |  |
 | `cashback_amount` | INTEGER |  |
 | `status` | TEXT | bắt buộc |
+| `platform` | TEXT | bắt buộc, mặc định 'shopee' (shopee / tiktok) |
 | `rejection_reason` | TEXT |  |
 | `recorded_at` | TEXT |  |
 | `approved_at` | TEXT |  |

@@ -50,6 +50,8 @@ class Config:
     reconcile_interval_minutes: int
     reconcile_days: int
     _period_is_withheld: bool
+    accesstrade_api_key: str = ""
+    accesstrade_base_url: str = "https://api.accesstrade.vn"
 
     @property
     def has_shopee_credentials(self) -> bool:
@@ -160,4 +162,8 @@ def load() -> Config:
         _period_is_withheld=os.getenv(
             "PAYOUT_PERIOD_WITHHELD", "false"
         ).strip().lower() in ("1", "true", "yes"),
+        accesstrade_api_key=os.getenv("ACCESSTRADE_API_KEY", "").strip(),
+        accesstrade_base_url=os.getenv(
+            "ACCESSTRADE_BASE_URL", "https://api.accesstrade.vn"
+        ).strip(),
     )

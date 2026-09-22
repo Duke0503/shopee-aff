@@ -25,16 +25,16 @@ export const config = {
 
   // Mẫu câu chào mừng trong nhóm (Spintax tự nhiên, linh hoạt gửi vào nhóm hoặc inbox + web tra cứu đơn)
   GROUP_WELCOME_TEMPLATES: [
-    "Hello {tag}! Rất vui được đón tiếp bạn đến với {groupName} ✨\n👉 Chuẩn bị mua gì trên Shopee, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
-    "Chào mừng {tag} đã gia nhập {groupName}! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
-    "Chào mừng thành viên mới {tag}! 🚀\n👉 Để nhận hoàn tiền 80% Shopee, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
+    "Hello {tag}! Rất vui được đón tiếp bạn đến với {groupName} ✨\n👉 Chuẩn bị mua sắm trên Shopee hoặc TikTok Shop, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
+    "Chào mừng {tag} đã gia nhập {groupName}! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee / TikTok Shop vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
+    "Chào mừng thành viên mới {tag}! 🚀\n👉 Để nhận hoàn tiền 80% Shopee & TikTok Shop, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
   ],
 
   // Mẫu câu nhắn tin riêng (Private DM 1-1)
   PRIVATE_WELCOME_TEMPLATES: [
     `Chào {name}! Mình là Bot hỗ trợ của Cộng Đồng Hoàn Tiền DP 🤖\n\n` +
     `💡 Cách nhận hoàn tiền 80% cực kỳ đơn giản:\n` +
-    `1. Copy link sản phẩm Shopee bạn muốn mua.\n` +
+    `1. Copy link sản phẩm Shopee hoặc TikTok Shop bạn muốn mua.\n` +
     `2. Gửi link vào đây cho mình (hoặc gửi thẳng vào nhóm).\n` +
     `3. Mình sẽ gửi lại link mua hàng đã kích hoạt hoàn tiền 80%.\n` +
     `4. Đặt hàng xong, bạn có thể truy cập website để xem chi tiết đơn hàng và số tiền hoàn:\n` +
@@ -42,8 +42,8 @@ export const config = {
     `👉 Bạn có thể gõ /chinhsach hoặc /huongdan để xem chi tiết chính sách đối soát nhé!`,
 
     `Hi {name} ơi! Chào mừng bạn đến với nhóm Hoàn Tiền DP 🎁\n\n` +
-    `Mình là trợ lý tự động giúp bạn nhận lại 80% hoa hồng Shopee cho mỗi đơn mua.\n` +
-    `Mỗi khi chuẩn bị mua gì trên Shopee, bạn cứ gửi link sản phẩm qua đây, mình gửi lại link hoàn tiền cho bạn ngay trong 3 giây nhé!\n\n` +
+    `Mình là trợ lý tự động giúp bạn nhận lại 80% hoa hồng Shopee & TikTok Shop cho mỗi đơn mua.\n` +
+    `Mỗi khi chuẩn bị mua sắm trên Shopee hoặc TikTok, bạn cứ gửi link sản phẩm qua đây, mình gửi lại link hoàn tiền cho bạn ngay trong vài giây nhé!\n\n` +
     `🌐 Sau khi mua xong, bạn vào https://hoantiendp.com để xem danh sách đơn hàng và theo dõi tiến độ hoàn tiền cực kỳ rõ ràng và minh bạch nhé!`
   ],
 
