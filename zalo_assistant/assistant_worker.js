@@ -10,17 +10,21 @@ const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shop
 const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
 const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
 
+process.on("uncaughtException", (err) => {
+  console.error("[Uncaught Exception]:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Unhandled Rejection]:", reason);
+});
+
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[Unhandled Rejection]:", reason);
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("[Uncaught Exception]:", err);
-});
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function main() {
   console.log("=== KHỞI ĐỘNG ZALO ASSISTANT BOT (FULL PLAN) ===");
@@ -418,7 +422,14 @@ function extractTextAndUrls(data) {
   });
 
   api.listener.on("closed", (code, reason) => {
-    console.warn(`[Listener] WebSocket đóng (${code}): ${reason}. Sẽ tự động kết nối lại.`);
+    console.warn(`[Listener] WebSocket đóng (${code}): ${reason}. Sẽ tự động kết nối lại sau 3s...`);
+    setTimeout(() => {
+      try {
+        api.listener.start({ retryOnClose: true });
+      } catch (err) {
+        console.error("[Listener Reconnect Error]:", err.message);
+      }
+    }, 3000);
   });
 
   api.listener.on("error", (err) => {
@@ -1053,6 +1064,7 @@ function extractTextAndUrls(data) {
             } catch (_) {
               members.push({ uid, name: "Thành viên " + uid.slice(-4) });
             }
+            await sleep(300);
           }
 
           // Đồng bộ vào cơ sở dữ liệu khách hàng
@@ -1076,6 +1088,19 @@ function extractTextAndUrls(data) {
   // Chạy đồng bộ nhóm ngay khi khởi động và định kỳ mỗi 5 phút
   syncGroupInfo();
   setInterval(syncGroupInfo, 5 * 60 * 1000);
+  setInterval(() => {}, 60 * 60 * 1000); // Keep process event loop alive
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`[HTTP Server Warning] Cổng ${config.PORT} đang bị chiếm, sẽ tự động thử lại sau 5s...`);
+      setTimeout(() => {
+        try { server.close(); } catch (_) {}
+        server.listen(config.PORT);
+      }, 5000);
+    } else {
+      console.error("[HTTP Server Error]:", err);
+    }
+  });
 
   server.listen(config.PORT, () => {
     console.log(`[HTTP Server] Notification API đang chạy tại http://localhost:${config.PORT}`);
