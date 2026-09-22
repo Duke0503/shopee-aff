@@ -74,7 +74,24 @@ class Estimate:
     @staticmethod
     def from_json(text: str) -> "Estimate | None":
         try:
-            return Estimate(**json.loads(text))
+            d = json.loads(text)
+            if not isinstance(d, dict):
+                return None
+            if not {"commission", "price", "name"}.issubset(d.keys()):
+                return None
+            return Estimate(
+                commission=int(d.get("commission", 0) or 0),
+                price=int(d.get("price", 0) or 0),
+                total_rate=float(d.get("total_rate", 0.0) or 0.0),
+                shopee_rate=float(d.get("shopee_rate", 0.0) or 0.0),
+                seller_rate=float(d.get("seller_rate", 0.0) or 0.0),
+                shopee_part=int(d.get("shopee_part", 0) or 0),
+                seller_part=int(d.get("seller_part", 0) or 0),
+                is_capped=bool(d.get("is_capped", False)),
+                name=str(d.get("name", "") or ""),
+                source=str(d.get("source", "") or ""),
+                image_url=str(d.get("image_url", "") or ""),
+            )
         except (ValueError, TypeError):
             return None
 

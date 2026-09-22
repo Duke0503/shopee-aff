@@ -154,6 +154,21 @@ def find_shopee_urls(text: str) -> list[str]:
     return seen
 
 
+def find_affiliate_urls(text: str) -> list[str]:
+    """Find any supported platform URLs (Shopee, TikTok) in a message."""
+    from ..providers.tiktok_provider import ANY_TIKTOK_URL
+
+    seen: list[str] = []
+    for url in find_shopee_urls(text):
+        if url not in seen:
+            seen.append(url)
+    for match in ANY_TIKTOK_URL.findall(text or ""):
+        url = match.rstrip(".,;)]}")
+        if url not in seen:
+            seen.append(url)
+    return seen
+
+
 def parse_bank_details(text: str) -> dict | None:
     match = BANK_LINE.search(text or "")
     if not match:
@@ -465,7 +480,7 @@ def handle(
             summary = f"{bank['bank']} - {bank['account']} - {bank['holder']}"
             return [Reply(private, messages.render("bank_saved", name=summary))]
 
-        urls = find_shopee_urls(text)
+        urls = find_affiliate_urls(text)
         if not urls:
             # Someone typed a slash command that does not exist. Saying so
             # beats the old behaviour, which was to treat it as chatter and
@@ -506,17 +521,25 @@ def handle(
             # customer mutes the chat.
             return [Reply(private, messages.render("not_a_link"))]
 
-        # Queue the links first. Making someone hand over bank details before
+        # Queue or generate the links. Making someone hand over bank details before
         # they have seen anything useful is how you lose them in the first
         # minute -- and the money is two months away regardless.
+        from ..providers.registry import get_registry
+        reg = get_registry()
+
         resent = 0
         for url in urls:
-            # Someone resending a product almost always means "I never got
-            # it", not "make me a second one". Reusing the link they already
-            # have answers that, saves a trip to Shopee, and spares them
-            # three near-identical messages to choose between.
+            provider = reg.detect_provider(url)
+            platform_name = provider.platform_name if provider else "shopee"
+
+            if provider and provider.platform_name == "tiktok":
+                req_id = new_request_id()
+                provider.create_link(url, customer_id, req_id, conn, cashback_rate)
+                continue
+
+            # Shopee / async flow
             existing = ledger.find_reusable_request(
-                conn, customer_id, url, resend_within_days=attribution_days)
+                conn, customer_id, url, resend_within_days=attribution_days, platform=platform_name)
             if existing is not None:
                 if existing["affiliate_url"]:
                     ledger.resend_request(conn, existing["request_id"])
@@ -533,6 +556,7 @@ def handle(
                 affiliate_url=None,
                 estimated_commission=None,
                 channel="zalo_group" if in_group else "zalo",
+                platform=platform_name,
             )
             audit.record(audit.LINK_REQUESTED, customer_id=customer_id,
                          request_id=request_id, url=url,
@@ -671,6 +695,12 @@ def deliver_ready_links(
             bot.send(row["private_chat_id"], text)
         except Exception as exc:  # a bad chat id must not stall the queue
             log.info(f"could not deliver {row['request_id']}: {exc}")
+            if "code 410" in str(exc) or "invalid" in str(exc).lower():
+                with ledger.connect(db_path) as conn:
+                    conn.execute(
+                        "UPDATE link_requests SET notified_at=? WHERE request_id=?",
+                        (ledger.now(), row["request_id"]),
+                    )
             continue
 
         with ledger.connect(db_path) as conn:

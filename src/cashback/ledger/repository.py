@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS link_requests (
     estimated_commission INTEGER,
     channel              TEXT,
     status               TEXT NOT NULL DEFAULT 'pending',
-    notified_at          TEXT
+    notified_at          TEXT,
+    platform             TEXT NOT NULL DEFAULT 'shopee'
 );
 CREATE INDEX IF NOT EXISTS idx_req_customer ON link_requests(customer_id);
 CREATE INDEX IF NOT EXISTS idx_req_status ON link_requests(status);
@@ -74,7 +75,8 @@ CREATE TABLE IF NOT EXISTS orders (
     recorded_at          TEXT,
     approved_at          TEXT,
     paid_at              TEXT,
-    updated_at           TEXT NOT NULL
+    updated_at           TEXT NOT NULL,
+    platform             TEXT NOT NULL DEFAULT 'shopee'
 );
 CREATE INDEX IF NOT EXISTS idx_order_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_order_status ON orders(status);
@@ -151,10 +153,11 @@ def now() -> str:
 @contextmanager
 def connect(db_path: Path) -> Iterator[sqlite3.Connection]:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=60.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 60000")
     try:
         yield conn
         conn.commit()
@@ -232,11 +235,15 @@ _LATER_COLUMNS = {
         # told; after MAX_LINK_ATTEMPTS it is given up on and they hear
         # about it.
         "attempts": "INTEGER NOT NULL DEFAULT 0",
+        "platform": "TEXT NOT NULL DEFAULT 'shopee'",
     },
     # The last status the customer was actually told about. Compared with
     # `status` to find who is owed an update, which makes the notifier safe
     # to run repeatedly and safe across a restart.
-    "orders": {"notified_status": "TEXT"},
+    "orders": {
+        "notified_status": "TEXT",
+        "platform": "TEXT NOT NULL DEFAULT 'shopee'",
+    },
     # Signing in to the customer-facing view. password_hash is PBKDF2 and
     # cannot be read back -- asking the bot for a password issues a new
     # one rather than repeating the old.
@@ -267,6 +274,11 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
         for name, kind in columns.items():
             if name not in present:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+
+    # Ensure multi-platform & canonical indexes exist
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_platform ON orders(platform)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_req_platform ON link_requests(platform)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_products_cache_canonical ON products_cache(canonical_url)")
 
 
 # ======================================================================
@@ -350,14 +362,15 @@ def record_link_request(
     affiliate_url: str | None,
     estimated_commission: int | None,
     channel: str = "direct",
+    platform: str = "shopee",
 ) -> None:
     conn.execute(
         "INSERT INTO link_requests"
         " (request_id, customer_id, created_at, source_url, affiliate_url,"
-        "  estimated_commission, channel, status)"
-        " VALUES (?,?,?,?,?,?,?,?)",
+        "  estimated_commission, channel, status, platform)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
         (request_id, customer_id, now(), source_url, affiliate_url,
-         estimated_commission, channel, PENDING),
+         estimated_commission, channel, PENDING, platform),
     )
 
 
@@ -402,16 +415,17 @@ def add_order(
     request_id: str | None,
     order_value: int | None,
     estimated_commission: int | None,
+    platform: str = "shopee",
 ) -> None:
     conn.execute(
         "INSERT INTO orders"
         " (order_id, customer_id, request_id, order_value, estimated_commission,"
-        "  status, recorded_at, updated_at)"
-        " VALUES (?,?,?,?,?,?,?,?)",
+        "  status, recorded_at, updated_at, platform)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
         (order_id, customer_id, request_id, order_value, estimated_commission,
-         AWAITING_APPROVAL, now(), now()),
+         AWAITING_APPROVAL, now(), now(), platform),
     )
-    _record_transition(conn, order_id, None, AWAITING_APPROVAL, "recorded by Shopee")
+    _record_transition(conn, order_id, None, AWAITING_APPROVAL, f"recorded by {platform.title()}")
     if request_id:
         conn.execute(
             "UPDATE link_requests SET status=? WHERE request_id=? AND status=?",
@@ -541,6 +555,7 @@ def find_reusable_request(
     customer_id: str,
     source_url: str,
     resend_within_days: int,
+    platform: str | None = None,
 ) -> sqlite3.Row | None:
     """A link this customer asked for recently for this exact product.
 
@@ -560,6 +575,14 @@ def find_reusable_request(
     """
     cutoff = (datetime.now(timezone.utc).astimezone()
               - timedelta(days=resend_within_days)).isoformat()
+    if platform:
+        return conn.execute(
+            "SELECT * FROM link_requests"
+            " WHERE customer_id=? AND source_url=? AND platform=? AND created_at >= ?"
+            "   AND status != 'failed'"
+            " ORDER BY created_at DESC LIMIT 1",
+            (customer_id, source_url, platform, cutoff),
+        ).fetchone()
     return conn.execute(
         "SELECT * FROM link_requests"
         " WHERE customer_id=? AND source_url=? AND created_at >= ?"
