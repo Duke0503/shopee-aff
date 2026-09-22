@@ -7,21 +7,20 @@ import { config } from "./config.js";
 
 // Regex nhận diện link Shopee & TikTok Shop
 const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s]+/i;
-const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s]+/i;
-const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s]+/i;
+const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
+const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+process.on("unhandledRejection", (reason) => {
+  console.error("[Unhandled Rejection]:", reason);
+});
 
-function getRandomTemplate(templates, data) {
-  const tpl = templates[Math.floor(Math.random() * templates.length)];
-  return tpl.replace(/\{(\w+)\}/g, (_, key) => data[key] ?? "");
-}
+process.on("uncaughtException", (err) => {
+  console.error("[Uncaught Exception]:", err);
+});
 
 async function main() {
   console.log("=== KHỞI ĐỘNG ZALO ASSISTANT BOT (FULL PLAN) ===");
@@ -229,7 +228,7 @@ function extractTextAndUrls(data) {
   // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee hoặc TikTok nào
   try {
     const rawJson = JSON.stringify(data);
-    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\/[^\s"'\\]+/gi);
+    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s"'\\]+/gi);
     if (productMatches) {
       for (const m of productMatches) {
         urls.push(m);
@@ -1085,4 +1084,5 @@ function extractTextAndUrls(data) {
 
 main().catch((err) => {
   console.error("Lỗi khởi động Assistant:", err);
+  setTimeout(main, 10000);
 });
