@@ -1838,6 +1838,11 @@ class _Handler(BaseHTTPRequestHandler):
                              ORDER BY last_requested_at DESC
                         """, (f"%{item_id}%", f"%{item_id}%", name[:20], f"%{name[:20]}%")).fetchall()
                         p["requesters"] = [dict(r) for r in req_rows]
+                        real_requests = sum(r["request_count"] for r in p["requesters"])
+                        if real_requests > 0:
+                            p["request_count"] = real_requests
+                        elif not p["requesters"]:
+                            p["request_count"] = 0
 
                         order_rows = conn.execute(f"""
                             SELECT o.order_id, o.customer_id, c.display_name, c.zalo_user_id,
@@ -2310,9 +2315,9 @@ class _Handler(BaseHTTPRequestHandler):
         if not match:
             from ..providers.registry import get_registry
             provider = get_registry().detect_provider(raw_url)
-            if provider and provider.platform_name == "tiktok":
+            if provider and provider.platform_name != "shopee":
                 prev = provider.preview(raw_url, self.cfg.advertised_cashback_rate)
-                if not prev or prev.price <= 0:
+                if not prev:
                     return self._json({"ok": True, "found": False})
                 return self._json({
                     "ok": True,
@@ -2320,19 +2325,19 @@ class _Handler(BaseHTTPRequestHandler):
                     "name": prev.name,
                     "price": prev.price,
                     "price_formatted": prev.price_formatted,
-                    "shopee_rate": prev.commission_rate * 100,
-                    "shopee_part": prev.raw_commission,
-                    "shopee_part_formatted": prev.commission_formatted,
-                    "seller_rate": 0.0,
-                    "seller_part": 0,
-                    "seller_part_formatted": "0đ",
-                    "commission": prev.raw_commission,
+                    "shopee_rate": 0.0,
+                    "shopee_part": 0,
+                    "shopee_part_formatted": "0đ",
+                    "seller_rate": round(prev.commission_rate * 100, 1),
+                    "seller_part": prev.raw_commission,
+                    "seller_part_formatted": prev.commission_formatted,
+                    "total_commission": prev.raw_commission,
                     "commission_formatted": prev.commission_formatted,
-                    "is_capped": False,
+                    "is_capped": getattr(prev, "is_capped", False),
                     "cashback": prev.cashback_amount,
                     "cashback_formatted": prev.cashback_formatted,
                     "rate_percent": f"{self.cfg.advertised_cashback_rate:.0%}",
-                    "platform": "tiktok",
+                    "platform": provider.platform_name,
                     "image_url": prev.image_url,
                 })
             return self._json({"ok": False, "message": "invalid_url"}, 400)
@@ -2381,6 +2386,7 @@ class _Handler(BaseHTTPRequestHandler):
                     rate_percent=f"{rate:.0%}",
                     canonical_url=target_url,
                     image_url=getattr(est, "image_url", "") or "",
+                    increment_count=False,
                 )
                 conn.commit()
 
@@ -2415,7 +2421,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not match:
             from ..providers.registry import get_registry
             provider = get_registry().detect_provider(raw_url)
-            if provider and provider.platform_name == "tiktok":
+            if provider and provider.platform_name != "shopee":
                 customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
                 display_name = str(body.get("display_name") or "").strip()
                 if not customer_id:
@@ -2435,14 +2441,22 @@ class _Handler(BaseHTTPRequestHandler):
                     audit.record(audit.LINK_REQUESTED, customer_id=customer_id, request_id=res.request_id, url=raw_url, channel="web")
                     conn.commit()
                 if res.error:
-                    return self._json({"ok": False, "error": res.error}, 500)
+                    is_no_aff = (res.error == "product_not_in_affiliate")
+                    p_name = "TikTok Shop" if provider.platform_name == "tiktok" else ("Lazada" if provider.platform_name == "lazada" else "ShopeeFood")
+                    return self._json({
+                        "ok": False,
+                        "ready": False,
+                        "error": res.error,
+                        "no_affiliate": is_no_aff,
+                        "message": f"Sản phẩm này người bán không tham gia chương trình tiếp thị liên kết (Affiliate) trên {p_name}." if is_no_aff else res.error,
+                    }, 200 if is_no_aff else 500)
                 if res.is_ready and res.affiliate_url:
                     resp_data = {
                         "ok": True,
                         "ready": True,
                         "affiliate_url": res.affiliate_url,
                         "request_id": res.request_id,
-                        "platform": "tiktok",
+                        "platform": provider.platform_name,
                         "cached": res.cached,
                     }
                     if res.product_preview:
@@ -2466,12 +2480,16 @@ class _Handler(BaseHTTPRequestHandler):
                             "found": True,
                         })
                     return self._json(resp_data)
-                return self._json({
+                resp_not_ready = {
                     "ok": True,
                     "ready": False,
                     "request_id": res.request_id,
-                    "platform": "tiktok",
-                })
+                    "platform": provider.platform_name,
+                }
+                if res.product_preview and res.product_preview.source_rate_info:
+                    if res.product_preview.source_rate_info.get("is_group_order"):
+                        resp_not_ready["is_group_order"] = True
+                return self._json(resp_not_ready)
             return self._json({"ok": False, "error": "invalid_url"}, 400)
         url = match.group(0)
 
@@ -2595,10 +2613,12 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": "missing request_id"}, 400)
         with ledger.connect(self.cfg.db_path) as conn:
             row = conn.execute(
-                "SELECT affiliate_url, source_url FROM link_requests WHERE request_id=?", (request_id,)
+                "SELECT affiliate_url, source_url, estimate_detail, status FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
             if not row:
                 return self._json({"ok": False, "message": "not_found"}, 404)
+            if row["status"] == "failed":
+                return self._json({"ok": False, "ready": False, "failed": True, "error": "link_generation_failed"})
             if row["affiliate_url"]:
                 src_url = row["source_url"]
                 if is_short_link(src_url):
@@ -2629,7 +2649,17 @@ class _Handler(BaseHTTPRequestHandler):
                             (detail_json, cached["total_commission"], request_id),
                         )
                     conn.commit()
-                return self._json({"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]})
+                resp = {"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]}
+                if row["estimate_detail"]:
+                    try:
+                        detail = json.loads(row["estimate_detail"])
+                        if "is_group_order" in detail:
+                            resp["is_group_order"] = detail["is_group_order"]
+                        if "name" in detail:
+                            resp["name"] = detail["name"]
+                    except Exception:
+                        pass
+                return self._json(resp)
         return self._json({"ok": True, "ready": False})
 
     def _shopee_smart_resolve(self):
@@ -2759,6 +2789,7 @@ class _Handler(BaseHTTPRequestHandler):
                         affiliate_url=cached_row["affiliate_url"],
                         canonical_url=target_url,
                         image_url=getattr(est, "image_url", "") or "",
+                        increment_count=True,
                     )
                     if customer_id:
                         req_id = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{random.randint(10, 99)}"
@@ -2856,6 +2887,7 @@ class _Handler(BaseHTTPRequestHandler):
                             affiliate_url=row["affiliate_url"],
                             canonical_url=target_url,
                             image_url=getattr(est, "image_url", "") or "",
+                            increment_count=False,
                         )
                         refreshed.append({
                             "item_id": row["item_id"],

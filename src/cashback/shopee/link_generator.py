@@ -83,6 +83,7 @@ _CLICK_TEMPLATE = """
 _READ_TEMPLATE = """
 (() => {
   const deadline = Date.now() + %(timeout_ms)d;
+  const start = Date.now();
   const previous = %(previous)s;
   const read = () => {
     const el = document.querySelector(%(result)s);
@@ -91,11 +92,22 @@ _READ_TEMPLATE = """
     if (text === previous) return '';        // still the last answer
     return text;
   };
+  const checkError = () => {
+    const errEl = document.querySelector('.ant-form-item-explain-error, .ant-message-error, .ant-notification-notice-error, .ant-alert-error');
+    if (errEl && errEl.innerText && errEl.innerText.trim()) {
+      return errEl.innerText.trim();
+    }
+    return '';
+  };
   return new Promise(resolve => {
     const tick = () => {
       const found = read();
       if (found) return resolve({ ok: true, links: found.split(/\\r?\\n/)
         .map(s => s.trim()).filter(Boolean) });
+      if (Date.now() - start > 2000) {
+        const errMsg = checkError();
+        if (errMsg) return resolve({ ok: false, why: 'shopee_error: ' + errMsg });
+      }
       if (Date.now() > deadline) return resolve({ ok: false, why: 'timed out waiting for a result' });
       setTimeout(tick, 300);
     };

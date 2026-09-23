@@ -732,6 +732,7 @@ def upsert_product_cache(
     affiliate_url: str | None = None,
     canonical_url: str = "",
     image_url: str = "",
+    increment_count: bool = False,
 ) -> sqlite3.Row:
     timestamp = now()
     existing = get_product_cache(conn, item_id)
@@ -759,7 +760,7 @@ def upsert_product_cache(
                 affiliate_url = ?,
                 canonical_url = COALESCE(NULLIF(?, ''), canonical_url),
                 image_url = COALESCE(NULLIF(?, ''), image_url),
-                request_count = request_count + 1,
+                request_count = CASE WHEN ? THEN request_count + 1 ELSE request_count END,
                 updated_at = ?
             WHERE item_id = ?
             """,
@@ -772,6 +773,7 @@ def upsert_product_cache(
                 1 if is_capped else 0,
                 cashback, cashback, cashback_formatted,
                 rate_percent, final_aff_url, canonical_url, image_url,
+                1 if increment_count else 0,
                 timestamp, str(item_id),
             ),
         )

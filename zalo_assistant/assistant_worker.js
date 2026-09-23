@@ -5,10 +5,12 @@ import path from "node:path";
 import sizeOf from "image-size";
 import { config } from "./config.js";
 
-// Regex nhận diện link Shopee & TikTok Shop
+// Regex nhận diện link Shopee, TikTok Shop, Lazada & ShopeeFood
 const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s]+/i;
 const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
-const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
+const LAZADA_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:lazada\.vn|s\.lazada\.vn|c\.lazada\.vn)\/[^\s]+/i;
+const SHOPEEFOOD_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopeefood\.vn|food\.shopee\.vn|shopee\.vn\/now-food)\/[^\s]+/i;
+const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/i;
 
 process.on("uncaughtException", (err) => {
   console.error("[Uncaught Exception]:", err);
@@ -229,10 +231,10 @@ function extractTextAndUrls(data) {
   if (data.href) urls.push(data.href);
   if (data.url) urls.push(data.url);
 
-  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee hoặc TikTok nào
+  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee, TikTok, Lazada hay ShopeeFood nào
   try {
     const rawJson = JSON.stringify(data);
-    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s"'\\]+/gi);
+    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s"'\\]+/gi);
     if (productMatches) {
       for (const m of productMatches) {
         urls.push(m);
@@ -240,7 +242,7 @@ function extractTextAndUrls(data) {
     }
   } catch (_) {}
 
-  // Chỉ giữ lại link Shopee hoặc TikTok Shop hợp lệ
+  // Chỉ giữ lại link sản phẩm hợp lệ
   const validUrls = urls.filter((u) => PRODUCT_LINK_REGEX.test(u));
 
   return { text: text.trim(), urls: [...new Set(validUrls)] };
@@ -253,7 +255,9 @@ function extractTextAndUrls(data) {
   async function handleProductLink(rawUrl, threadId, threadType, senderName, senderUid, customerId = null) {
     try {
       const isTikTok = TIKTOK_LINK_REGEX.test(rawUrl);
-      const platformLabel = isTikTok ? "TikTok Shop" : "Shopee";
+      const isLazada = LAZADA_LINK_REGEX.test(rawUrl);
+      const isFood = SHOPEEFOOD_LINK_REGEX.test(rawUrl);
+      const platformLabel = isTikTok ? "TikTok Shop" : (isLazada ? "Lazada" : (isFood ? "ShopeeFood" : "Shopee"));
       console.log(`[${platformLabel} Link] Đang kiểm tra thông tin link: ${rawUrl} (Người gửi: ${senderName}, UID: ${senderUid})`);
       const effectiveCustomerId = customerId || (senderUid ? String(senderUid) : config.DEFAULT_CUSTOMER_ID);
 
@@ -270,27 +274,6 @@ function extractTextAndUrls(data) {
         }),
       }).then((r) => r.json()).catch(() => ({ ok: false }));
 
-      let productData = resolveRes.ok && resolveRes.ready ? resolveRes : null;
-      let affUrl = productData?.affiliate_url;
-
-      // Nếu sản phẩm mới tinh chưa từng có (ready: false), chờ extension/worker tạo link (tối đa 16s)
-      if (!affUrl && resolveRes.request_id) {
-        console.log(`[${platformLabel} Link] Sản phẩm mới, chờ worker chuyển đổi link (request_id: ${resolveRes.request_id})...`);
-        const maxAttempts = 20; // 20 * 800ms = 16s
-        for (let i = 0; i < maxAttempts; i++) {
-          await sleep(800);
-          try {
-            const statusRes = await fetch(`${config.MAIN_API_URL}/api/shopee/link-status?request_id=${resolveRes.request_id}`);
-            const statusData = await statusRes.json();
-            if (statusData.ok && statusData.ready && statusData.affiliate_url) {
-              affUrl = statusData.affiliate_url;
-              console.log(`[${platformLabel} Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
-              break;
-            }
-          } catch (_) {}
-        }
-      }
-
       const isGroup = threadType === ThreadType.Group;
       const isAdmin = isGroup && await isGroupAdminOrCreator(threadId, senderUid);
       const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
@@ -305,12 +288,56 @@ function extractTextAndUrls(data) {
           ]
         : undefined;
 
-      // Nếu sau 16s vẫn không có link Affiliate, TUYỆT ĐỐI KHÔNG gửi link gốc rawUrl
+      // Nếu người bán (Shop) không tham gia chương trình tiếp thị liên kết (Affiliate)
+      if (resolveRes.no_affiliate || resolveRes.error === "product_not_in_affiliate") {
+        console.warn(`[${platformLabel} Link] Shop không tham gia Affiliate: ${rawUrl}`);
+        const noAffMsg =
+          tagPrefix +
+          `⚠️ Rất tiếc, người bán (Shop) của sản phẩm này hiện không tham gia chương trình hoàn tiền / tiếp thị liên kết trên ${platformLabel} nên hệ thống không thể tạo link hoàn tiền được bạn nhé! 🛍️\n\n` +
+          `👉 Bạn hãy thử tìm sản phẩm tương tự từ các Shop khác xem sao nha!`;
+        await api.sendMessage({ msg: noAffMsg, mentions }, threadId, threadType);
+        return;
+      }
+
+      let productData = resolveRes.ok && resolveRes.ready ? resolveRes : null;
+      let affUrl = productData?.affiliate_url;
+
+      // Nếu sản phẩm mới tinh chưa từng có (ready: false), chờ extension/worker tạo link (tối đa 28s)
+      if (!affUrl && resolveRes.request_id) {
+        console.log(`[${platformLabel} Link] Sản phẩm mới, chờ worker chuyển đổi link (request_id: ${resolveRes.request_id})...`);
+        const maxAttempts = 35; // 35 * 800ms = 28s
+        for (let i = 0; i < maxAttempts; i++) {
+          await sleep(800);
+          try {
+            const statusRes = await fetch(`${config.MAIN_API_URL}/api/shopee/link-status?request_id=${resolveRes.request_id}`);
+            const statusData = await statusRes.json();
+            if (statusData.failed) {
+              console.warn(`[${platformLabel} Link] Worker báo lỗi tạo link (failed) cho request_id: ${resolveRes.request_id}`);
+              break;
+            }
+            if (statusData.ok && statusData.ready && statusData.affiliate_url) {
+              affUrl = statusData.affiliate_url;
+              if (statusData.is_group_order || resolveRes.is_group_order) {
+                productData = productData || {};
+                productData.is_group_order = true;
+              }
+              if (statusData.name && (!productData || !productData.name)) {
+                productData = productData || {};
+                productData.name = statusData.name;
+              }
+              console.log(`[${platformLabel} Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Nếu sau thời gian chờ vẫn không có link Affiliate, TUYỆT ĐỐI KHÔNG gửi link gốc rawUrl
       if (!affUrl) {
         console.warn(`[${platformLabel} Link] Không lấy được link affiliate cho: ${rawUrl}`);
         const busyMsg =
           tagPrefix +
-          `⚠️ Hệ thống đang chuyển đổi link sản phẩm ${platformLabel} hơi chậm một chút. Bạn đợi khoảng 10 giây rồi dán lại link giúp mình nhé!`;
+          `⚠️ Hệ thống chưa thể tạo link hoàn tiền cho liên kết ${platformLabel} này (có thể quán/sản phẩm không thuộc chương trình tiếp thị liên kết hoặc link chia sẻ đã hết hạn).\n\n👉 Bạn hãy thử sao chép link trực tiếp từ trang chính của quán/sản phẩm giúp mình nhé!`;
         await api.sendMessage({ msg: busyMsg, mentions }, threadId, threadType);
         return;
       }
@@ -332,17 +359,54 @@ function extractTextAndUrls(data) {
       let replyText = "";
       const boldTargets = [
         `Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng`,
+        `Link đặt ShopeeFood của bạn đã sẵn sàng`,
         `Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}`,
+        `Bấm link trên để mở App Shopee / ShopeeFood và đặt món`,
         "Nên mua ngay sau khi mở link",
+        "Nên đặt món ngay sau khi mở link",
       ];
 
-      if (productData && (productData.shopee_rate > 0 || productData.seller_rate > 0 || productData.commission > 0 || productData.total_commission > 0 || productData.found)) {
+      if (isFood) {
+        const rawStoreName = (productData?.name || "").trim();
+        const hasValidStoreName =
+          rawStoreName &&
+          !/^quán ăn shopeefood$/i.test(rawStoreName) &&
+          !/^shop(\s*\(.*?\))?$/i.test(rawStoreName) &&
+          !/^shopeefood$/i.test(rawStoreName);
+
+        const storeSection = hasValidStoreName ? `🍽️ ${rawStoreName}\n` : "";
+        const readyTitle = `Link đặt ShopeeFood của bạn đã sẵn sàng`;
+        const actionTitle = `Bấm link trên để mở App Shopee / ShopeeFood và đặt món`;
+        boldTargets.push(readyTitle, actionTitle, "nhận 80% hoa hồng tích lũy");
+
+        const groupOrderTip = (productData?.is_group_order || resolveRes?.is_group_order)
+          ? `\n👥 Bạn đang đặt đơn nhóm: Người chốt đơn/thanh toán chỉ cần bấm vào link hoàn tiền này trước khi thanh toán đơn nhóm để được ghi nhận hoa hồng nhé!\n`
+          : "";
+
+        replyText =
+          tagPrefix +
+          `🍜 ${readyTitle}\n\n` +
+          storeSection +
+          `🔗 ${affUrl}\n\n` +
+          `🎁 Bạn sẽ nhận 80% hoa hồng tích lũy của đơn sau khi giao hàng thành công (Shopee áp dụng trần hoa hồng cho từng quán)!\n` +
+          groupOrderTip +
+          `\n👉 ${actionTitle}.\n` +
+          `💡 Nên đặt món ngay sau khi mở link và hạn chế bấm link khác trước khi chốt đơn bạn nhé!`;
+      } else if (productData && (productData.shopee_rate > 0 || productData.seller_rate > 0 || productData.commission > 0 || productData.total_commission > 0 || productData.found)) {
         const commissionLines = [];
         const commissionItems = [];
         if (isTikTok) {
           const rateText = (productData.seller_rate && productData.seller_rate > 0)
             ? `TikTok Shop ${productData.seller_rate}%`
             : "TikTok Shop";
+          const payoutPart = productData.seller_part_formatted || productData.commission_formatted || `${productData.commission || productData.total_commission || 0}đ`;
+          const coreText = `${rateText} → ${payoutPart}`;
+          commissionLines.push(`• ${coreText}`);
+          commissionItems.push(coreText);
+        } else if (isLazada) {
+          const rateText = (productData.seller_rate && productData.seller_rate > 0)
+            ? `Lazada ${productData.seller_rate}%`
+            : "Lazada";
           const payoutPart = productData.seller_part_formatted || productData.commission_formatted || `${productData.commission || productData.total_commission || 0}đ`;
           const coreText = `${rateText} → ${payoutPart}`;
           commissionLines.push(`• ${coreText}`);
@@ -375,6 +439,7 @@ function extractTextAndUrls(data) {
         replyText =
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
+          (productData.name ? `📦 ${productData.name}\n` : "") +
           `🔗 ${affUrl}\n\n` +
           `📊 Hoa hồng hiện tại:\n` +
           `${commissionSection}\n\n` +

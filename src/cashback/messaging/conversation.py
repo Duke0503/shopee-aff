@@ -200,6 +200,19 @@ def _ensure_customer(conn: sqlite3.Connection, msg: Message) -> sqlite3.Row:
     ).fetchone()
 
     if row is None:
+        # Check if customer already exists from Zalo group sync by display_name
+        if msg.sender_name:
+            match_name = conn.execute(
+                "SELECT * FROM customers WHERE display_name = ? ORDER BY (CASE WHEN bank_account IS NOT NULL THEN 0 ELSE 1 END), created_at ASC",
+                (msg.sender_name,),
+            ).fetchone()
+            if match_name is not None:
+                conn.execute(
+                    "UPDATE customers SET private_chat_id = ? WHERE customer_id = ?",
+                    (private or sender, match_name["customer_id"]),
+                )
+                return ledger.get_customer(conn, match_name["customer_id"])
+
         customer_id = next_customer_id(conn)
         ledger.add_customer(
             conn,
