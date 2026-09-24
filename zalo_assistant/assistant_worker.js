@@ -519,12 +519,15 @@ function extractTextAndUrls(data) {
       const senderUid = message.data.uidFrom;
       const isAdmin = isGroup && await isGroupAdminOrCreator(message.threadId, senderUid);
 
-      // Chỉ lắng nghe ở nhóm chính (Hoàn Tiền Shopee), loại trừ nhóm dev/test
+      // Lắng nghe và tracking ở cả nhóm chính (Hoàn Tiền Shopee) và nhóm dev (Dev Internal DP)
       const allowedGroups = [
         String(config.GROUP_MAIN_ID),
         String(config.ACTIVE_GROUP_ID),
+        String(config.GROUP_TEST_ID),
         "2813090100064697955",
         "2417491944968337600",
+        "8786316503449470342",
+        "9181140731214988069",
       ].filter(Boolean);
       if (isGroup && !allowedGroups.includes(String(message.threadId))) {
         return;
@@ -981,8 +984,11 @@ function extractTextAndUrls(data) {
       const allowedGroups = [
         String(config.GROUP_MAIN_ID),
         String(config.ACTIVE_GROUP_ID),
+        String(config.GROUP_TEST_ID),
         "2813090100064697955",
         "2417491944968337600",
+        "8786316503449470342",
+        "9181140731214988069",
       ].filter(Boolean);
       if (!allowedGroups.includes(String(event.threadId))) return;
 
@@ -1114,23 +1120,39 @@ function extractTextAndUrls(data) {
   });
 
   async function syncGroupInfo() {
+    const groupsToSync = [
+      { id: String(config.GROUP_MAIN_ID || "2813090100064697955"), defaultName: "Hoàn Tiền Shopee" },
+      { id: String(config.GROUP_TEST_ID || "8786316503449470342"), defaultName: "Dev Internal DP" },
+    ];
+
+    for (const grp of groupsToSync) {
+      try {
+        const res = await api.getGroupInfo(grp.id);
+        const gInfo = res?.gridInfoMap?.[grp.id] || res;
+        if (gInfo) {
+          const totalMembers = gInfo.totalMember || 0;
+          const groupName = gInfo.name || grp.defaultName;
+          console.log(`[Group Sync] "${groupName}" (${grp.id}): ${totalMembers} thành viên`);
+          await fetch(`${config.MAIN_API_URL}/api/activity/group-info`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              group_id: grp.id,
+              group_name: groupName,
+              total_members: totalMembers,
+            }),
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn(`[Group Sync Warning] ${grp.id}:`, err.message);
+      }
+    }
+
     try {
       const targetGid = String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID);
       const res = await api.getGroupInfo(targetGid);
       const gInfo = res?.gridInfoMap?.[targetGid] || res;
       if (gInfo) {
-        const totalMembers = gInfo.totalMember || 33;
-        const groupName = gInfo.name || "Hoàn Tiền Shopee";
-        console.log(`[Group Sync] Nhóm chính "${groupName}" (${targetGid}): ${totalMembers} thành viên`);
-        await fetch(`${config.MAIN_API_URL}/api/activity/group-info`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            group_id: targetGid,
-            group_name: groupName,
-            total_members: totalMembers,
-          }),
-        }).catch(() => {});
 
         // Bóc tách danh sách UID thành viên trong nhóm và đồng bộ vào hệ thống khách hàng
         const uids = (gInfo.memVerList || []).map((item) => item.split("_")[0]);
