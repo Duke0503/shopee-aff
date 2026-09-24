@@ -520,7 +520,12 @@ function extractTextAndUrls(data) {
       const isAdmin = isGroup && await isGroupAdminOrCreator(message.threadId, senderUid);
 
       // Chỉ lắng nghe ở nhóm chính (Hoàn Tiền Shopee), loại trừ nhóm dev/test
-      const allowedGroups = [String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID)].filter(Boolean);
+      const allowedGroups = [
+        String(config.GROUP_MAIN_ID),
+        String(config.ACTIVE_GROUP_ID),
+        "2813090100064697955",
+        "2417491944968337600",
+      ].filter(Boolean);
       if (isGroup && !allowedGroups.includes(String(message.threadId))) {
         return;
       }
@@ -973,7 +978,12 @@ function extractTextAndUrls(data) {
   // B. LẮNG NGHE SỰ KIỆN THÀNH VIÊN VÀO NHÓM
   api.listener.on("group_event", async (event) => {
     try {
-      const allowedGroups = [String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID)].filter(Boolean);
+      const allowedGroups = [
+        String(config.GROUP_MAIN_ID),
+        String(config.ACTIVE_GROUP_ID),
+        "2813090100064697955",
+        "2417491944968337600",
+      ].filter(Boolean);
       if (!allowedGroups.includes(String(event.threadId))) return;
 
       console.log(`[Group Event] Nhận sự kiện: ${event.type} (${event.act}) trong group ${event.threadId}`);
