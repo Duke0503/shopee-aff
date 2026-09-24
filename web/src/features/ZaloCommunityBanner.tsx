@@ -10,22 +10,36 @@ export function ZaloCommunityBanner() {
 
   return (
     <Card className="luxury-panel relative overflow-hidden border border-border/80 p-6 sm:p-7 md:p-8 shadow-md w-full h-full flex flex-col justify-between">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-      <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-semibold text-foreground/85 shadow-2xs backdrop-blur-xs">
-          <Icon.chat className="size-3.5 text-primary" />
-          <span>{t("zalo_community_badge")}</span>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+      <div className="space-y-5">
+        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-300 shadow-2xs backdrop-blur-xs">
+          <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span>🥮 Sự Kiện Trung Thu — Nhóm Zalo Chính Thức</span>
         </div>
 
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-foreground break-words leading-tight">
-          {t("zalo_community_title")}
-        </h2>
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-start sm:items-center">
+          <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border border-amber-400/30 group">
+            <img
+              src="/autumn-square.jpg"
+              alt="Đón Trung Thu Hoàn Tiền 80%"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <span className="absolute bottom-1 right-1 bg-black/75 backdrop-blur-xs text-[10px] font-bold text-amber-300 px-1.5 py-0.5 rounded">
+              80%
+            </span>
+          </div>
 
-        <p className="text-muted-foreground text-xs sm:text-sm md:text-base leading-relaxed">
-          {t("zalo_community_lead")}
-        </p>
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground break-words leading-tight">
+              {t("zalo_community_title")}
+            </h2>
+            <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+              {t("zalo_community_lead")}
+            </p>
+          </div>
+        </div>
 
-        <ul className="space-y-3 text-xs sm:text-sm text-foreground/90 font-medium pt-1">
+        <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90 font-medium pt-1">
           <li className="flex items-start gap-2.5">
             <span className="grid size-5 place-items-center rounded-full bg-success-soft text-success shrink-0 mt-0.5 border border-success/30">
               <Icon.confirm className="size-3" />

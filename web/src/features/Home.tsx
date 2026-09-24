@@ -17,20 +17,34 @@ export function Home() {
       <Header current="home" />
 
       <main className="min-w-0 overflow-x-hidden">
-        {/* HERO: Unboxed Command Capsule */}
-        <section className="hero-wash border-b border-border/40 py-10 sm:py-16">
-          <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
+        {/* HERO: Unboxed Command Capsule with Mid-Autumn Festive Atmosphere */}
+        <section className="relative overflow-hidden border-b border-border/40 py-12 sm:py-20">
+          {/* Responsive Festive Background Wallpaper */}
+          <div
+            className="pointer-events-none absolute inset-0 hidden sm:block bg-cover bg-center bg-no-repeat transition-opacity duration-500"
+            style={{ backgroundImage: "url('/hero-bg-pc.jpg')" }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0 block sm:hidden bg-cover bg-top bg-no-repeat transition-opacity duration-500"
+            style={{ backgroundImage: "url('/hero-bg-mobile.jpg')" }}
+          />
+
+          {/* Vignette & Gradient Overlays for contrast and smooth blending */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#060b19]/65 via-[#081024]/55 to-background" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background via-background/80 to-transparent" />
+
+          <div className="relative z-10 mx-auto max-w-[1100px] px-4 sm:px-6">
             <div className="text-center max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-1 text-xs font-medium text-foreground/85 shadow-2xs backdrop-blur-xs mb-5 select-none">
-                <span className="size-1.5 rounded-full bg-success animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-black/40 px-4 py-1.5 text-xs font-semibold text-amber-200 shadow-md backdrop-blur-md mb-5 select-none animate-pulse">
+                <span className="size-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
                 <span>{t("home_hero_badge")}</span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-[1.15]">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.15] drop-shadow-md">
                 {t("home_hero_title")}
               </h1>
 
-              <p className="text-muted-foreground mt-3.5 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
+              <p className="text-slate-200/90 mt-3.5 text-sm sm:text-base leading-relaxed max-w-xl mx-auto drop-shadow-xs">
                 {t("home_hero_lead")}
               </p>
             </div>
@@ -41,17 +55,17 @@ export function Home() {
               </Reveal>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs text-muted-foreground">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-3 py-1 shadow-2xs backdrop-blur-xs">
-                <Icon.flash className="size-3 text-warning shrink-0" />
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs text-slate-200/90">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1 shadow-2xs backdrop-blur-md">
+                <Icon.flash className="size-3 text-amber-300 shrink-0" />
                 <span>{t("home_trust_badge_1")}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-3 py-1 shadow-2xs backdrop-blur-xs">
-                <Icon.confirm className="size-3 text-success shrink-0" />
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1 shadow-2xs backdrop-blur-md">
+                <Icon.confirm className="size-3 text-emerald-400 shrink-0" />
                 <span>{t("home_trust_badge_2")}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-3 py-1 shadow-2xs backdrop-blur-xs">
-                <Icon.order className="size-3 text-primary shrink-0" />
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1 shadow-2xs backdrop-blur-md">
+                <Icon.order className="size-3 text-amber-300 shrink-0" />
                 <span>{t("home_trust_badge_3")}</span>
               </div>
             </div>
