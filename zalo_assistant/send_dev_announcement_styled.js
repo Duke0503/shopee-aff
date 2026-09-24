@@ -46,7 +46,7 @@ async function main() {
 
   const rawMessage = `📢 **THÔNG BÁO QUAN TRỌNG: NÂNG CẤP HỆ THỐNG HOÀN TIỀN 80%** 🎉
 
-Chào cả nhà! Để hỗ trợ mọi người mua sắm, săn sale và đặt đồ ăn tiết kiệm nhất, Trợ lý @Hoàn Tiền Shopping Dp đã chính thức có mặt để phục vụ cả nhà rồi đây ạ ✨
+Chào cả nhà @All! Để hỗ trợ mọi người mua sắm, săn sale và đặt đồ ăn tiết kiệm nhất, Trợ lý @Hoàn Tiền Shopping Dp đã chính thức có mặt để phục vụ cả nhà rồi đây ạ ✨
 
 Từ nay, mỗi khi mua sắm, mọi người chỉ cần gửi link cho **mình** (hoặc gửi thẳng vào nhóm), mình sẽ tạo link hoàn tiền **80%** gửi lại ngay trong tích tắc nha!
 
@@ -78,6 +78,14 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
     mentions.push({ pos, uid: ownId, len: tag.length });
     styles.push({ start: pos, len: tag.length, st: "b" });
     searchIndex = pos + tag.length;
+  }
+
+  // Tạo mentions cho @All
+  const allTag = "@All";
+  const allPos = cleanText.indexOf(allTag);
+  if (allPos !== -1) {
+    mentions.push({ pos: allPos, uid: "-1", len: allTag.length });
+    styles.push({ start: allPos, len: allTag.length, st: "b" });
   }
 
   // Sắp xếp styles theo thứ tự vị trí xuất hiện
