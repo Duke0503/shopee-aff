@@ -43,29 +43,31 @@ async function main() {
   const api = await zalo.login(creds);
   const ownId = await api.getOwnId();
   const mainGid = String(config.GROUP_MAIN_ID || "2813090100064697955");
-  const imgPath = path.resolve("./announcement_poster.jpg");
+  const imgPath = path.resolve("./mid_autumn_poster.jpg");
 
-  const rawMessage = `📢 **THÔNG BÁO QUAN TRỌNG: NÂNG CẤP HỆ THỐNG HOÀN TIỀN 80%** 🎉
+  const rawMessage = `🥮 **ĐÓN TẾT TRUNG THU — RINH TRỌN HOÀN TIỀN 80% CÙNG TRỢ LÝ DP** 🌕✨
 
-Chào cả nhà @All! Để hỗ trợ mọi người mua sắm, săn sale và đặt đồ ăn tiết kiệm nhất, Trợ lý @Hoàn Tiền Shopping Dp đã chính thức có mặt để phục vụ cả nhà rồi đây ạ ✨
+Chào cả nhà @All! Không khí Tết Trung Thu đang rộn ràng khắp nơi rồi ạ 🎉
 
-Từ nay, mỗi khi mua sắm, mọi người chỉ cần gửi link cho **mình** (hoặc gửi thẳng vào nhóm), mình sẽ tạo link hoàn tiền **80%** gửi lại ngay trong tích tắc nha!
+Để đồng hành cùng mọi người săn sale bánh trung thu, mua quà biếu, sắm đèn lồng và đặt tiệc trà sữa/đồ ăn liên hoan tiết kiệm nhất, Trợ lý @Hoàn Tiền Shopping Dp chính thức ra mắt để phục vụ cả nhà từ hôm nay ✨
 
-🚀 **CÁC TIỆN ÍCH MỚI MÌNH HỖ TRỢ CẢ NHÀ:**
-1️⃣ **HOÀN TIỀN SHOPEEFOOD (MỚI):** Đặt trà sữa, đồ ăn, ship siêu tốc — nhận trọn **80% hoàn tiền**.
-2️⃣ **HOÀN TIỀN TIKTOK SHOP (MỚI):** Mua sắm qua video, livestream TikTok — nhận lại **80% hoa hồng**.
-3️⃣ **SHOPEE SIÊU TỐC:** Nhận link hoàn tiền chỉ trong **3 - 5 giây**, hoạt động 24/7 bất kể ngày đêm.
-4️⃣ **TRA CỨU MINH BẠCH:** Theo dõi trạng thái đơn hàng và cài đặt STK nhận tiền dễ dàng tại: **https://hoantiendp.com**
+Từ nay, mỗi khi mua sắm hay đặt đồ ăn mùa lễ hội, cả nhà chỉ cần gửi link cho **mình** (hoặc gửi thẳng vào nhóm), mình sẽ tạo ngay link hoàn tiền **80%** chỉ trong tích tắc nha!
 
-🎁 **KÍCH HOẠT TÀI KHOẢN VỚI MÌNH (Làm 1 lần duy nhất):**
+🚀 **TIỆN ÍCH HOÀN TIỀN MÙA TRUNG THU DÀNH CHO CẢ NHÀ:**
+1️⃣ **HOÀN TIỀN SHOPEEFOOD (MỚI):** Đặt trà sữa, đồ ăn liên hoan, ship đồ ăn vặt tiệc trăng rằm — nhận trọn **80% hoàn tiền**.
+2️⃣ **HOÀN TIỀN TIKTOK SHOP (MỚI):** Mua bánh trung thu, quà tặng qua video/livestream TikTok — nhận lại **80% hoa hồng**.
+3️⃣ **SHOPEE SIÊU TỐC:** Săn sale bánh kẹo, lồng đèn, đồ chơi — nhận link hoàn tiền chỉ trong **3 - 5 giây** 24/7.
+4️⃣ **TRA CỨU MINH BẠCH:** Xem chi tiết từng đơn hàng và cài đặt STK ngân hàng nhận tiền tiện lợi tại: **https://hoantiendp.com**
+
+🎁 **KÍCH HOẠT TÀI KHOẢN VỚI MÌNH (Làm 1 lần duy nhất để nhận hoàn tiền):**
 👉 **Bước 1:** Bấm vào nick của mình: @Hoàn Tiền Shopping Dp
 👉 **Bước 2:** Chọn **"Nhắn tin"** và gửi cho mình chữ: **/id**
 (Mình sẽ gửi tặng ngay Mã Khách Hàng và hướng dẫn bạn đăng nhập web cài STK nhận tiền hoàn tự động nhé)
 
-💡 **MẸO MUA SẮM CỰC TIỆN:**
-Cả nhà có thể dán link sản phẩm trực tiếp vào nhóm này hoặc nhắn tin riêng cho **mình** bất cứ lúc nào nhé, mình luôn sẵn sàng hỗ trợ 24/7!
+💡 **MẸO MUA SẮM TIẾT KIỆM:**
+Cả nhà có thể gửi link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop vào nhóm này hoặc nhắn tin riêng cho **mình** bất kỳ lúc nào nhé!
 
-Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua sắm thật vui và tiết kiệm được thật nhiều nha! ❤️`;
+Chúc cả nhà và gia đình một mùa Tết Trung Thu thật ấm áp, đoàn viên và mua sắm siêu tiết kiệm cùng DP! ❤️🏮`;
 
   const { cleanText, styles } = parseMarkdownStyles(rawMessage);
 
@@ -80,7 +82,7 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
     searchIndex = pos + tag.length;
   }
 
-  // Tạo mentions cho @All
+  // Mention @All
   const allTag = "@All";
   const allPos = cleanText.indexOf(allTag);
   if (allPos !== -1) {
@@ -90,7 +92,7 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
 
   styles.sort((a, b) => a.start - b.start);
 
-  console.log(`1. Đang gửi ảnh poster vào nhóm chính Hoàn Tiền Shopee (${mainGid})...`);
+  console.log(`1. Đang gửi ảnh poster Trung Thu vào nhóm chính Hoàn Tiền Shopee (${mainGid})...`);
   const imgRes = await api.sendMessage(
     {
       msg: "",
@@ -103,7 +105,7 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
 
   await new Promise((r) => setTimeout(r, 1200));
 
-  console.log(`2. Đang gửi bài viết thông báo có IN ĐẬM và TAG trợ lý...`);
+  console.log(`2. Đang gửi bài viết Trung Thu có IN ĐẬM, TAG @All và TAG trợ lý...`);
   const textRes = await api.sendMessage(
     {
       msg: cleanText,
