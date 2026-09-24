@@ -60,7 +60,7 @@ Từ nay, mỗi khi mua sắm, mọi người chỉ cần gửi link cho **mình
 🎁 **KÍCH HOẠT TÀI KHOẢN VỚI MÌNH (Làm 1 lần duy nhất):**
 👉 **Bước 1:** Bấm vào nick của mình: @Hoàn Tiền Shopping Dp
 👉 **Bước 2:** Chọn **"Nhắn tin"** và gửi cho mình chữ: **/id**
-*(Mình sẽ gửi tặng ngay Mã Khách Hàng và hướng dẫn bạn đăng nhập web cài STK nhận tiền hoàn tự động nhé)*
+(Mình sẽ gửi tặng ngay Mã Khách Hàng và hướng dẫn bạn đăng nhập web cài STK nhận tiền hoàn tự động nhé)
 
 💡 **MẸO MUA SẮM CỰC TIỆN:**
 Cả nhà có thể dán link sản phẩm trực tiếp vào nhóm này hoặc nhắn tin riêng cho **mình** bất cứ lúc nào nhé, mình luôn sẵn sàng hỗ trợ 24/7!
