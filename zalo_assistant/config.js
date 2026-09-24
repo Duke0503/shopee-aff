@@ -9,8 +9,10 @@ export const config = {
   // Danh sách UID Quản trị viên toàn hệ thống (Minh Đức & Xuân Phước)
   // Khi gửi link hoặc lệnh, bot sẽ không tag tên mà chỉ phản hồi nội dung
   GLOBAL_ADMIN_UIDS: [
-    "6356806862452292219", // Minh Đức (Chủ nhóm chính)
-    "7835381167015183856", // Xuân Phước (Phó nhóm chính / Tạo nhóm test)
+    "6356806862452292219", // Minh Đức (ID Zalo cũ)
+    "6823332485297437912", // Minh Đức (ID Zalo cá nhân mới)
+    "7835381167015183856", // Xuân Phước (ID Zalo cũ)
+    "7654552834503557971", // Xuân Phước (ID Zalo cá nhân mới)
   ],
 
   // Cổng HTTP API nội bộ để nhận thông báo từ hệ thống chính
@@ -19,6 +21,14 @@ export const config = {
 
   // Default customer ID dùng khi khách chưa có mã
   DEFAULT_CUSTOMER_ID: "default_bot",
+
+  // Bật/tắt tự động chào mừng trong nhóm khi có thành viên mới gia nhập
+  ENABLE_GROUP_WELCOME: true,
+
+  // Danh sách nhóm ĐƯỢC PHÉP gửi tin chào mừng (Chỉ nhóm chính, cấm tuyệt đối nhóm Dev / nội bộ)
+  ALLOWED_WELCOME_GROUP_IDS: [
+    "2813090100064697955", // Hoàn Tiền Shopee (Nhóm chính)
+  ],
 
   // Tạm tắt chế độ tự động nhắn tin riêng 1-1 cho người mới vào (khi cần mở lại chỉ cần đổi thành true)
   ENABLE_PRIVATE_WELCOME: false,

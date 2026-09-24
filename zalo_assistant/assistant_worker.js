@@ -109,32 +109,78 @@ async function main() {
     return template;
   }
 
-  // 1. Helper gửi lời chào trong nhóm kèm @tag
-  async function sendGroupWelcome(groupId, member, groupName = "nhóm") {
-    const name = member.dName || member.name || "bạn";
-    const uid = member.id || member.uid;
-    const tagText = `@${name}`;
+  // Dynamic Group Name Resolver
+  const groupNameCache = new Map();
+  async function getGroupName(groupId) {
+    const gidStr = String(groupId);
+    if (gidStr === String(config.GROUP_MAIN_ID) || gidStr === "2813090100064697955") {
+      return "Hoàn Tiền Shopee";
+    }
+    if (gidStr === String(config.GROUP_TEST_ID) || gidStr === "8786316503449470342") {
+      return "Dev Internal DP";
+    }
+    if (groupNameCache.has(gidStr)) {
+      return groupNameCache.get(gidStr);
+    }
+    try {
+      const res = await api.getGroupInfo(gidStr);
+      const gInfo = res?.gridInfoMap?.[gidStr] || res;
+      const name = gInfo?.name || gInfo?.groupName || "Hoàn Tiền Shopee";
+      groupNameCache.set(gidStr, name);
+      return name;
+    } catch {
+      return "Hoàn Tiền Shopee";
+    }
+  }
 
-    const text = getRandomTemplate(config.GROUP_WELCOME_TEMPLATES, {
-      tag: tagText,
+  // 1. Helper gửi lời chào trong nhóm (hỗ trợ gộp tag nhiều người trong 1 tin nhắn để chống spam)
+  async function sendGroupWelcomeBatch(groupId, members, groupName = "Hoàn Tiền Shopee") {
+    if (!members || members.length === 0) return;
+    const validMembers = members.filter((m) => String(m.id || m.uid) !== String(ownId));
+    if (validMembers.length === 0) return;
+
+    // Chọn ngẫu nhiên mẫu template
+    const rawTemplate = getRandomTemplate(config.GROUP_WELCOME_TEMPLATES, {
+      tag: "__TAGS_PLACEHOLDER__",
       groupName: groupName,
     });
 
-    const tagPos = text.indexOf(tagText);
-    const mentions = [
-      {
-        uid: String(uid),
-        pos: tagPos,
-        len: tagText.length,
-      },
-    ];
+    const placeholderIdx = rawTemplate.indexOf("__TAGS_PLACEHOLDER__");
+    const prefix = placeholderIdx !== -1 ? rawTemplate.substring(0, placeholderIdx) : "Chào mừng ";
+    const suffix = placeholderIdx !== -1 ? rawTemplate.substring(placeholderIdx + "__TAGS_PLACEHOLDER__".length) : "! 🎉";
 
-    const delay = randomInt(config.DELAY_GROUP_MIN_MS, config.DELAY_GROUP_MAX_MS);
-    console.log(`[Group Welcome] Chờ ${delay}ms trước khi chào ${name} trong group...`);
-    await sleep(delay);
+    const mentions = [];
+    let tagsStr = "";
+
+    for (let i = 0; i < validMembers.length; i++) {
+      const m = validMembers[i];
+      const mName = m.dName || m.name || `bạn ${String(m.id || m.uid).slice(-4)}`;
+      const tagText = `@${mName}`;
+      const mUid = String(m.id || m.uid);
+
+      if (i > 0) {
+        if (i === validMembers.length - 1) {
+          tagsStr += " & ";
+        } else {
+          tagsStr += ", ";
+        }
+      }
+
+      const mentionPos = prefix.length + tagsStr.length;
+      mentions.push({
+        uid: mUid,
+        pos: mentionPos,
+        len: tagText.length,
+      });
+
+      tagsStr += tagText;
+    }
+
+    const fullText = prefix + tagsStr + suffix;
 
     const boldTargets = [
       "dán thẳng link vào nhóm hoặc inbox riêng cho mình",
+      "nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee / TikTok Shop vào nhóm này",
       "nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee vào nhóm này",
       "gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình",
       "nhận trọn 80% hoàn tiền",
@@ -142,13 +188,17 @@ async function main() {
       "hoàn tiền 80% Shopee",
       "https://hoantiendp.com",
       "Shopee Affiliate ghi nhận",
+      "Mã Khách Hàng",
+      "/id",
+      "/matkhau",
     ];
 
     const styles = [];
     for (const target of boldTargets) {
-      const start = text.indexOf(target);
-      if (start !== -1) {
-        styles.push({ start, len: target.length, st: "b" });
+      let startIndex = 0;
+      while ((startIndex = fullText.indexOf(target, startIndex)) !== -1) {
+        styles.push({ start: startIndex, len: target.length, st: "b" });
+        startIndex += target.length;
       }
     }
     styles.sort((a, b) => a.start - b.start);
@@ -156,17 +206,50 @@ async function main() {
     try {
       await api.sendMessage(
         {
-          msg: text,
+          msg: fullText,
           mentions: mentions,
           styles: styles.length > 0 ? styles : undefined,
         },
         groupId,
         ThreadType.Group
       );
-      console.log(`[Group Welcome] Đã tag chào ${name} thành công!`);
+      console.log(`[Group Welcome Batch] Đã gửi lời chào tới ${validMembers.length} thành viên trong nhóm ${groupName}!`);
     } catch (err) {
-      console.error(`[Group Welcome Error]:`, err.message);
+      console.error(`[Group Welcome Batch Error]:`, err.message);
     }
+  }
+
+  // Buffer gom lời chào (Debounce chống spam khi nhiều thành viên cùng vào nhóm một lúc)
+  const pendingWelcomeQueues = new Map();
+  function queueGroupWelcome(groupId, newMembers, groupName) {
+    const gidStr = String(groupId);
+    let queue = pendingWelcomeQueues.get(gidStr);
+    if (!queue) {
+      queue = { members: [], timer: null };
+      pendingWelcomeQueues.set(gidStr, queue);
+    }
+
+    for (const m of newMembers) {
+      const mid = String(m.id || m.uid);
+      if (mid !== String(ownId) && !queue.members.some((ex) => String(ex.id || ex.uid) === mid)) {
+        queue.members.push(m);
+      }
+    }
+
+    if (queue.timer) {
+      clearTimeout(queue.timer);
+    }
+
+    const delay = randomInt(config.DELAY_GROUP_MIN_MS, config.DELAY_GROUP_MAX_MS);
+    console.log(`[Group Welcome] Đang gom ${queue.members.length} thành viên mới, sẽ gửi chào mừng sau ${delay}ms...`);
+    queue.timer = setTimeout(async () => {
+      const membersToSend = [...queue.members];
+      queue.members = [];
+      queue.timer = null;
+      if (membersToSend.length > 0) {
+        await sendGroupWelcomeBatch(gidStr, membersToSend, groupName);
+      }
+    }, delay);
   }
 
   // 2. Helper gửi tin nhắn riêng 1-1 cho thành viên mới
@@ -727,7 +810,8 @@ function extractTextAndUrls(data) {
       }
 
       if (cmd === "!ping" || cmd === "/ping") {
-        const reply = `Pong! 🏓 Bot Normie đang hoạt động ổn định 24/7 tại nhóm Dev Internal DP.`;
+        const currentGName = await getGroupName(message.threadId);
+        const reply = `Pong! 🏓 Trợ lý Hoàn Tiền đang hoạt động ổn định 24/7 tại ${currentGName}.`;
         await api.sendMessage(reply, message.threadId, message.type);
       } else if (cmd === "!help" || cmd === "/huongdan" || cmd === "/help") {
         const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
@@ -952,7 +1036,8 @@ function extractTextAndUrls(data) {
           console.error("[Refresh Cache Error]:", err.message);
         }
       } else if (cmd === "!test-welcome") {
-        await sendGroupWelcome(message.threadId, { id: senderUid, dName: senderName }, "Dev Internal DP");
+        const gName = await getGroupName(message.threadId);
+        await sendGroupWelcomeBatch(message.threadId, [{ id: senderUid, dName: senderName }], gName);
         if (config.ENABLE_PRIVATE_WELCOME) {
           await sendPrivateWelcome({ id: senderUid, dName: senderName });
         }
@@ -996,30 +1081,45 @@ function extractTextAndUrls(data) {
 
       if (event.type === GroupEventType.JOIN) {
         const updateMembers = event.data.updateMembers || [];
+        const realGroupName = await getGroupName(event.threadId);
+
+        // Ghi nhận tất cả thành viên mới vào nhật ký quản trị
         for (const member of updateMembers) {
           if (member.id === ownId) continue;
 
-          console.log(`[Member Joined] Phát hiện thành viên mới gia nhập: ${member.dName || member.id}`);
+          console.log(`[Member Joined] Phát hiện thành viên mới gia nhập: ${member.dName || member.id} (nhóm: ${realGroupName})`);
           
-          // Ghi nhận thành viên mới vào hệ thống quản trị
           logActivity(
             "group_join",
             member.id || member.uid,
             member.dName || member.name,
-            { groupId: event.threadId, groupName: "Dev Internal DP" },
+            { groupId: event.threadId, groupName: realGroupName },
             `zalo_group_${event.threadId}`
           );
 
-          // 1. Chào mừng trong nhóm kèm @tag
-          await sendGroupWelcome(event.threadId, member, "Dev Internal DP");
-
-          // 2. Nhắn tin riêng 1-1 (Tạm tắt theo config, giữ nguyên code để bật lại khi cần)
           if (config.ENABLE_PRIVATE_WELCOME) {
             await sendPrivateWelcome(member);
           } else {
             console.log(`[Private DM] Tạm tắt gửi tin riêng cho người mới: ${member.dName || member.id}`);
           }
         }
+
+        // Kiểm tra điều kiện gửi lời chào mừng trong nhóm:
+        // 1. Phải bật cấu hình ENABLE_GROUP_WELCOME trong config.js
+        if (!config.ENABLE_GROUP_WELCOME) {
+          console.log(`[Group Welcome] Đã tắt chào mừng theo cấu hình (ENABLE_GROUP_WELCOME: false).`);
+          return;
+        }
+
+        // 2. Chỉ gửi chào mừng ở các nhóm trong ALLOWED_WELCOME_GROUP_IDS (mặc định CHỈ nhóm chính, cấm tuyệt đối nhóm Dev)
+        const allowedWelcomeIds = (config.ALLOWED_WELCOME_GROUP_IDS || [String(config.GROUP_MAIN_ID)]).map(String);
+        if (!allowedWelcomeIds.includes(String(event.threadId))) {
+          console.log(`[Group Welcome] Bỏ qua chào mừng vì nhóm ${event.threadId} (${realGroupName}) không thuộc danh sách được phép gửi lời chào.`);
+          return;
+        }
+
+        // 3. Đưa vào hàng đợi chào mừng (tự động gom nhóm nếu nhiều người cùng vào một lúc để chống spam)
+        queueGroupWelcome(event.threadId, updateMembers, realGroupName);
       }
     } catch (err) {
       console.error("[Group Event Handler Error]:", err);
