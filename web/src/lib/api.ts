@@ -449,6 +449,7 @@ export interface AdminProduct {
   image_url?: string | null
   request_count: number
   updated_at: string
+  last_requested_at?: string | null
   requesters?: ProductRequester[]
   buyers?: ProductBuyer[]
   order_count?: number

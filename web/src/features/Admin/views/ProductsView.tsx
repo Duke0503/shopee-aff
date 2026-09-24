@@ -20,6 +20,7 @@ import {
   Copy,
   Check,
   Flame,
+  Clock,
 } from "lucide-react"
 import { PaginationBar } from "@/features/Admin/components/PaginationBar"
 import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
@@ -186,6 +187,15 @@ export function ProductsView() {
               />
             </TableHead>
             <TableHead className="whitespace-nowrap">Người Hỏi (Khách)</TableHead>
+            <TableHead className="whitespace-nowrap">
+              <SortableHeader
+                title="Thời Gian Hỏi"
+                column="last_requested_at"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSort={handleSort}
+              />
+            </TableHead>
             <TableHead className="text-center whitespace-nowrap">
               <SortableHeader
                 title="Lượt Mua"
@@ -287,16 +297,30 @@ export function ProductsView() {
                     <Badge variant="default" className="bg-amber-500 text-white">
                       <Flame className="mr-1 h-3 w-3" /> {p.request_count} lượt
                     </Badge>
-                  ) : (
+                  ) : (p.request_count || 0) > 0 ? (
                     <Badge variant="secondary" className="font-mono text-[11px]">
-                      {p.request_count || 1}
+                      {p.request_count}
                     </Badge>
+                  ) : (
+                    <EmptyDash value={0} />
                   )}
                 </TableCell>
 
                 {/* Requesters Column with Customer Profile Tooltip */}
                 <TableCell className="min-w-[160px]">
                   <CustomerHoverCard requesters={p.requesters || []} />
+                </TableCell>
+
+                {/* Thời Gian Hỏi Cuối */}
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap font-mono">
+                  {p.last_requested_at ? (
+                    <div className="flex items-center gap-1.5 text-[11px] text-foreground/90">
+                      <Clock className="h-3 w-3 text-primary/70 shrink-0" />
+                      <span>{shortDate(p.last_requested_at)}</span>
+                    </div>
+                  ) : (
+                    <EmptyDash value={null} />
+                  )}
                 </TableCell>
 
                 {/* Lượt Mua */}

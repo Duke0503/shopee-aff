@@ -1789,6 +1789,7 @@ class _Handler(BaseHTTPRequestHandler):
             "orders": "order_count",
             "order_count": "order_count",
             "updated_at": "p.updated_at",
+            "last_requested_at": "p.updated_at",
             "name": "p.name",
         }
         if sort_by in sort_columns:
@@ -1825,7 +1826,17 @@ class _Handler(BaseHTTPRequestHandler):
                 for p in products:
                     item_id = p.get("item_id")
                     name = p.get("name") or ""
+                    aff_url = p.get("affiliate_url") or ""
+                    canon_url = p.get("canonical_url") or ""
                     if item_id:
+                        match_params = (
+                            f"%{item_id}%",
+                            f"%{item_id}%",
+                            name[:20],
+                            f"%{name[:20]}%",
+                            aff_url if aff_url else "___NO_AFF___",
+                            canon_url if canon_url else "___NO_CANON___",
+                        )
                         req_rows = conn.execute("""
                             SELECT r.customer_id, c.display_name, c.zalo_user_id,
                                    c.bank_name, c.bank_account, c.account_holder,
@@ -1833,16 +1844,22 @@ class _Handler(BaseHTTPRequestHandler):
                                    COUNT(r.request_id) as request_count
                               FROM link_requests r
                               LEFT JOIN customers c ON c.customer_id = r.customer_id
-                             WHERE r.source_url LIKE ? OR r.estimate_detail LIKE ? OR (? != '' AND r.estimate_detail LIKE ?)
+                             WHERE r.source_url LIKE ? 
+                                OR r.estimate_detail LIKE ? 
+                                OR (? != '' AND r.estimate_detail LIKE ?)
+                                OR r.affiliate_url = ?
+                                OR r.source_url = ?
                              GROUP BY r.customer_id
                              ORDER BY last_requested_at DESC
-                        """, (f"%{item_id}%", f"%{item_id}%", name[:20], f"%{name[:20]}%")).fetchall()
+                        """, match_params).fetchall()
                         p["requesters"] = [dict(r) for r in req_rows]
                         real_requests = sum(r["request_count"] for r in p["requesters"])
                         if real_requests > 0:
                             p["request_count"] = real_requests
+                            p["last_requested_at"] = p["requesters"][0]["last_requested_at"]
                         elif not p["requesters"]:
                             p["request_count"] = 0
+                            p["last_requested_at"] = None
 
                         order_rows = conn.execute(f"""
                             SELECT o.order_id, o.customer_id, c.display_name, c.zalo_user_id,
@@ -1853,9 +1870,13 @@ class _Handler(BaseHTTPRequestHandler):
                               FROM orders o
                               LEFT JOIN customers c ON c.customer_id = o.customer_id
                               LEFT JOIN link_requests r ON r.request_id = o.request_id
-                             WHERE (r.source_url LIKE ? OR r.estimate_detail LIKE ? OR (? != '' AND r.estimate_detail LIKE ?))
+                             WHERE (r.source_url LIKE ? 
+                                 OR r.estimate_detail LIKE ? 
+                                 OR (? != '' AND r.estimate_detail LIKE ?)
+                                 OR r.affiliate_url = ?
+                                 OR r.source_url = ?)
                              ORDER BY order_date DESC
-                        """, (f"%{item_id}%", f"%{item_id}%", name[:20], f"%{name[:20]}%")).fetchall()
+                        """, match_params).fetchall()
                         p["buyers"] = [dict(r) for r in order_rows]
                         p["order_count"] = len(order_rows)
                         p["total_bought_gmv"] = sum(r["order_value"] or 0 for r in order_rows)
@@ -1864,6 +1885,7 @@ class _Handler(BaseHTTPRequestHandler):
                         p["buyers"] = []
                         p["order_count"] = 0
                         p["total_bought_gmv"] = 0
+                        p["last_requested_at"] = None
         except Exception:
             pass
 
