@@ -99,6 +99,16 @@ async function main() {
     } catch (_) {}
   }
 
+  // Helper chọn template ngẫu nhiên và thay thế biến
+  function getRandomTemplate(templates, vars = {}) {
+    if (!Array.isArray(templates) || templates.length === 0) return "";
+    let template = templates[Math.floor(Math.random() * templates.length)];
+    for (const [key, val] of Object.entries(vars)) {
+      template = template.replaceAll(`{${key}}`, val);
+    }
+    return template;
+  }
+
   // 1. Helper gửi lời chào trong nhóm kèm @tag
   async function sendGroupWelcome(groupId, member, groupName = "nhóm") {
     const name = member.dName || member.name || "bạn";
@@ -509,8 +519,8 @@ function extractTextAndUrls(data) {
       const senderUid = message.data.uidFrom;
       const isAdmin = isGroup && await isGroupAdminOrCreator(message.threadId, senderUid);
 
-      // Lắng nghe ở nhóm chính (Hoàn Tiền Shopee) và nhóm test (Dev Internal)
-      const allowedGroups = [String(config.ACTIVE_GROUP_ID), String(config.GROUP_MAIN_ID), String(config.GROUP_TEST_ID)].filter(Boolean);
+      // Chỉ lắng nghe ở nhóm chính (Hoàn Tiền Shopee), loại trừ nhóm dev/test
+      const allowedGroups = [String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID)].filter(Boolean);
       if (isGroup && !allowedGroups.includes(String(message.threadId))) {
         return;
       }
@@ -963,7 +973,7 @@ function extractTextAndUrls(data) {
   // B. LẮNG NGHE SỰ KIỆN THÀNH VIÊN VÀO NHÓM
   api.listener.on("group_event", async (event) => {
     try {
-      const allowedGroups = [String(config.ACTIVE_GROUP_ID), String(config.GROUP_MAIN_ID), String(config.GROUP_TEST_ID)].filter(Boolean);
+      const allowedGroups = [String(config.GROUP_MAIN_ID || config.ACTIVE_GROUP_ID)].filter(Boolean);
       if (!allowedGroups.includes(String(event.threadId))) return;
 
       console.log(`[Group Event] Nhận sự kiện: ${event.type} (${event.act}) trong group ${event.threadId}`);

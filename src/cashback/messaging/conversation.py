@@ -339,10 +339,18 @@ def handle(
             return [Reply(private, messages.render("terms", **common))]
 
         if command in COMMAND_ID:
-            return [Reply(private, messages.render(
+            id_reply = Reply(private, messages.render(
                 "account_id",
                 customer_id=customer_id,
-                zalo_id=customer["zalo_user_id"] or customer_id))]
+                zalo_id=customer["zalo_user_id"] or customer_id))
+            if in_group and public != private:
+                return [
+                    Reply(public, messages.render(
+                        "group_inbox_notify",
+                        name=f" {msg.sender_name}" if msg.sender_name else "")),
+                    id_reply,
+                ]
+            return [id_reply]
 
         if command in COMMAND_PASSWORD:
             # A request is a RESET, never a reminder. The password is
@@ -355,9 +363,17 @@ def handle(
             if password is None:
                 return [Reply(private, messages.render("password_failed"))]
             audit.record(audit.PASSWORD_ISSUED, customer_id=customer_id)
-            return [Reply(private, messages.render(
+            pwd_reply = Reply(private, messages.render(
                 "password_issued",
-                customer_id=customer_id, password=password))]
+                customer_id=customer_id, password=password))
+            if in_group and public != private:
+                return [
+                    Reply(public, messages.render(
+                        "group_inbox_notify",
+                        name=f" {msg.sender_name}" if msg.sender_name else "")),
+                    pwd_reply,
+                ]
+            return [pwd_reply]
 
         if command in COMMAND_BALANCE:
             # Always private: this is the one command that names a sum.
@@ -545,7 +561,7 @@ def handle(
             provider = reg.detect_provider(url)
             platform_name = provider.platform_name if provider else "shopee"
 
-            if provider and provider.platform_name == "tiktok":
+            if provider and provider.platform_name in ("tiktok", "shopeefood"):
                 req_id = new_request_id()
                 provider.create_link(url, customer_id, req_id, conn, cashback_rate)
                 continue
