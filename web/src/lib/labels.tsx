@@ -13,6 +13,8 @@ import { createContext, useContext, type ReactNode } from "react"
  * the same value, so they are substituted for free rather than passed
  * at each call site and forgotten at one of them.
  */
+import defaultLabels from "./defaultLabels.json"
+
 type Labels = Record<string, string>
 
 interface Bag {
@@ -20,7 +22,12 @@ interface Bag {
   defaults: Record<string, string>
 }
 
-const LabelContext = createContext<Bag>({ labels: {}, defaults: {} })
+const fallbackLabels = defaultLabels as unknown as Labels
+
+const LabelContext = createContext<Bag>({
+  labels: fallbackLabels,
+  defaults: { rate: "80%", reduced_rate: "50%", payout_days: "30" },
+})
 
 export function LabelProvider({
   value,
@@ -31,13 +38,18 @@ export function LabelProvider({
   defaults?: Record<string, string>
   children: ReactNode
 }) {
-  return <LabelContext value={{ labels: value, defaults }}>{children}</LabelContext>
+  const mergedLabels = { ...fallbackLabels, ...value }
+  return (
+    <LabelContext value={{ labels: mergedLabels, defaults }}>
+      {children}
+    </LabelContext>
+  )
 }
 
 export function useT() {
   const { labels, defaults } = useContext(LabelContext)
   return (key: string, values?: Record<string, string | number>) => {
-    let text = labels[key] ?? key
+    let text = labels[key] ?? fallbackLabels[key] ?? key
     for (const [name, value] of Object.entries({ ...defaults, ...values })) {
       text = text.replaceAll(`{${name}}`, String(value))
     }

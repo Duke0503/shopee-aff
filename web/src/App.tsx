@@ -4,6 +4,7 @@ import { Home } from "@/features/Home"
 import { fetchLabels, fetchSite } from "@/lib/api"
 import { configure } from "@/lib/format"
 import { LabelProvider } from "@/lib/labels"
+import defaultLabels from "@/lib/defaultLabels.json"
 import { TITLE_KEY, navigate, useRoute } from "@/routes"
 
 const CustomerView = React.lazy(() =>
@@ -23,6 +24,7 @@ export default function App() {
   const labels = useQuery({
     queryKey: ["labels"],
     queryFn: fetchLabels,
+    initialData: defaultLabels as Record<string, string>,
     staleTime: Infinity,
   })
   // The rate and the payout window appear inside the wording, so they
@@ -31,6 +33,7 @@ export default function App() {
   const site = useQuery({
     queryKey: ["site"],
     queryFn: fetchSite,
+    initialData: { rate: "80%", reduced: "50%", days: "30" },
     staleTime: Infinity,
   })
   const route = useRoute()
@@ -48,8 +51,8 @@ export default function App() {
 
   return (
     <LabelProvider
-      value={labels.data ?? {}}
-      defaults={site.data ? { ...site.data } : {}}
+      value={labels.data ?? (defaultLabels as Record<string, string>)}
+      defaults={site.data ? { ...site.data } : { rate: "80%" }}
     >
       <React.Suspense fallback={null}>
         {route === "home" && <Home />}

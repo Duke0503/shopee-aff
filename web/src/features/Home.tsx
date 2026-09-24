@@ -18,7 +18,7 @@ export function Home() {
 
       <main className="min-w-0 overflow-x-hidden">
         {/* HERO: Unboxed Command Capsule with Mid-Autumn Festive Atmosphere */}
-        <section className="relative overflow-hidden border-b border-border/40 py-12 sm:py-20">
+        <section className="relative overflow-hidden border-b border-border/40 py-12 sm:py-20 bg-[#070e22]">
           {/* Responsive Festive Background Wallpaper */}
           <div
             className="pointer-events-none absolute inset-0 hidden sm:block bg-cover bg-center bg-no-repeat transition-opacity duration-500"
@@ -30,8 +30,8 @@ export function Home() {
           />
 
           {/* Vignette & Gradient Overlays for contrast and smooth blending */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#060b19]/65 via-[#081024]/55 to-background" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background via-background/80 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#060b19]/60 via-transparent to-background/90" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
 
           <div className="relative z-10 mx-auto max-w-[1100px] px-4 sm:px-6">
             <div className="text-center max-w-2xl mx-auto">
