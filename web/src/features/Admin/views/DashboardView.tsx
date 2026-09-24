@@ -105,9 +105,9 @@ export function DashboardView({
   const topProducts = metrics.top_products || []
   const channels = metrics.channels || []
   const funnel = metrics.community_funnel || {
-    group_id: "2417491944968337600",
+    group_id: "2813090100064697955",
     group_name: "Hoàn Tiền Shopee",
-    group_members: 33,
+    group_members: 37,
     total_users: metrics.total_users || 15,
     new_group_members: period === "today" ? 1 : period === "7d" ? 10 : 33,
     new_users: period === "today" ? 3 : period === "7d" ? 12 : 15,

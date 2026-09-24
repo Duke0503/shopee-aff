@@ -1180,7 +1180,7 @@ function extractTextAndUrls(data) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               group_id: targetGid,
-              group_name: groupName,
+              group_name: gInfo?.name || "Hoàn Tiền Shopee",
               members,
             }),
           }).catch(() => {});

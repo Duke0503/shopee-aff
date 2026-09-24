@@ -1133,11 +1133,11 @@ class _Handler(BaseHTTPRequestHandler):
             top_products = sorted(product_map.values(), key=lambda x: x["total_commission"], reverse=True)[:5]
 
             # Community & Customer Funnel Analytics
-            # Primary: lấy trực tiếp từ nhóm Zalo "Hoàn Tiền Shopee" (2417491944968337600)
+            # Primary: lấy trực tiếp từ nhóm Zalo "Hoàn Tiền Shopee" (2813090100064697955)
             group_info_row = None
             try:
                 group_info_row = conn.execute(
-                    "SELECT group_name, total_members, group_id FROM group_info WHERE group_id = '2417491944968337600' ORDER BY updated_at DESC LIMIT 1"
+                    "SELECT group_name, total_members, group_id FROM group_info WHERE group_id = '2813090100064697955' OR group_name LIKE '%Hoàn Tiền Shopee%' ORDER BY updated_at DESC LIMIT 1"
                 ).fetchone()
             except Exception:
                 pass
@@ -1145,11 +1145,11 @@ class _Handler(BaseHTTPRequestHandler):
             if group_info_row and group_info_row[1] and group_info_row[1] > 0:
                 total_group_members = int(group_info_row[1])
                 main_group_name = str(group_info_row[0] or "Hoàn Tiền Shopee")
-                main_group_id = str(group_info_row[2] or "2417491944968337600")
+                main_group_id = str(group_info_row[2] or "2813090100064697955")
             else:
-                total_group_members = 33
+                total_group_members = 37
                 main_group_name = "Hoàn Tiền Shopee"
-                main_group_id = "2417491944968337600"
+                main_group_id = "2813090100064697955"
             
             user_date_filter = "1=1"
             if period == "today":
@@ -2182,7 +2182,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _sync_group_members(self):
         body = self._body()
-        group_id = str(body.get("group_id") or "2417491944968337600").strip()
+        group_id = str(body.get("group_id") or "2813090100064697955").strip()
         group_name = str(body.get("group_name") or "Hoàn Tiền Shopee").strip()
         members = body.get("members") or []
         if not group_id or not members:
