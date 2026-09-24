@@ -69,7 +69,6 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
 
   const { cleanText, styles } = parseMarkdownStyles(rawMessage);
 
-  // Mentions
   const mentions = [];
   const tag = "@Hoàn Tiền Shopping Dp";
   let searchIndex = 0;
@@ -83,19 +82,30 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
 
   styles.sort((a, b) => a.start - b.start);
 
-  console.log(`Đang bắn DUY NHẤT 1 TIN NHẮN (ảnh + bài viết có styles in đậm: ${styles.length} vị trí) vào nhóm chính Hoàn Tiền Shopee (${mainGid})...`);
-  const res = await api.sendMessage(
+  console.log(`1. Đang gửi ảnh poster vào nhóm chính Hoàn Tiền Shopee (${mainGid})...`);
+  const imgRes = await api.sendMessage(
+    {
+      msg: "",
+      attachments: [imgPath],
+    },
+    mainGid,
+    ThreadType.Group
+  );
+  console.log("Gửi ảnh poster thành công:", imgRes);
+
+  await new Promise((r) => setTimeout(r, 1200));
+
+  console.log(`2. Đang gửi bài viết thông báo có IN ĐẬM và TAG trợ lý...`);
+  const textRes = await api.sendMessage(
     {
       msg: cleanText,
-      attachments: [imgPath],
       mentions: mentions.length > 0 ? mentions : undefined,
       styles: styles.length > 0 ? styles : undefined,
     },
     mainGid,
     ThreadType.Group
   );
-
-  console.log("Bắn nhóm chính thành công:", JSON.stringify(res, null, 2));
+  console.log("Bắn bài viết vào nhóm chính thành công:", textRes);
 }
 
 main().catch((err) => {

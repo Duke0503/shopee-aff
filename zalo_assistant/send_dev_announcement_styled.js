@@ -83,7 +83,21 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
   // Sắp xếp styles theo thứ tự vị trí xuất hiện
   styles.sort((a, b) => a.start - b.start);
 
-  console.log("Đang gửi bài viết thông báo định dạng in đậm vào nhóm Dev...");
+  console.log("1. Đang gửi poster truyền thông trước...");
+  const imgRes = await api.sendMessage(
+    {
+      msg: "",
+      attachments: [imgPath],
+    },
+    devGid,
+    ThreadType.Group
+  );
+  console.log("Gửi ảnh thành công:", imgRes);
+
+  // Chờ 1.2s để Zalo hiển thị đúng thứ tự
+  await new Promise((r) => setTimeout(r, 1200));
+
+  console.log("2. Đang gửi bài viết thông báo có ĐẦY ĐỦ IN ĐẬM và TAG trợ lý...");
   const textRes = await api.sendMessage(
     {
       msg: cleanText,
@@ -94,17 +108,6 @@ Cảm ơn cả nhà đã luôn đồng hành cùng DP! Chúc mọi người mua 
     ThreadType.Group
   );
   console.log("Gửi bài viết thành công:", textRes);
-
-  console.log("Đang gửi poster truyền thông...");
-  const imgRes = await api.sendMessage(
-    {
-      msg: "✨ Poster hướng dẫn & tính năng mới Hệ thống Hoàn Tiền DP 80%",
-      attachments: [imgPath],
-    },
-    devGid,
-    ThreadType.Group
-  );
-  console.log("Gửi ảnh thành công:", imgRes);
 }
 
 main().catch((err) => {
