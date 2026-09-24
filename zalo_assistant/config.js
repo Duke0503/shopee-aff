@@ -32,18 +32,18 @@ export const config = {
 
   // Mẫu câu nhắn tin riêng (Private DM 1-1)
   PRIVATE_WELCOME_TEMPLATES: [
-    `Chào {name}! Mình là Bot hỗ trợ của Cộng Đồng Hoàn Tiền DP 🤖\n\n` +
+    `Chào {name}! Mình là Trợ lý hỗ trợ mua sắm của Cộng Đồng Hoàn Tiền DP ✨\n\n` +
     `💡 Cách nhận hoàn tiền 80% cực kỳ đơn giản:\n` +
-    `1. Copy link sản phẩm Shopee hoặc TikTok Shop bạn muốn mua.\n` +
+    `1. Copy link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop bạn muốn mua.\n` +
     `2. Gửi link vào đây cho mình (hoặc gửi thẳng vào nhóm).\n` +
-    `3. Mình sẽ gửi lại link mua hàng đã kích hoạt hoàn tiền 80%.\n` +
+    `3. Mình sẽ gửi lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n` +
     `4. Đặt hàng xong, bạn có thể truy cập website để xem chi tiết đơn hàng và số tiền hoàn:\n` +
     `🌐 Website: https://hoantiendp.com\n\n` +
     `👉 Bạn có thể gõ /chinhsach hoặc /huongdan để xem chi tiết chính sách đối soát nhé!`,
 
     `Hi {name} ơi! Chào mừng bạn đến với nhóm Hoàn Tiền DP 🎁\n\n` +
-    `Mình là trợ lý tự động giúp bạn nhận lại 80% hoa hồng Shopee & TikTok Shop cho mỗi đơn mua.\n` +
-    `Mỗi khi chuẩn bị mua sắm trên Shopee hoặc TikTok, bạn cứ gửi link sản phẩm qua đây, mình gửi lại link hoàn tiền cho bạn ngay trong vài giây nhé!\n\n` +
+    `Mình là Trợ lý hỗ trợ bạn nhận lại trọn vẹn 80% hoa hồng Shopee, ShopeeFood & TikTok Shop cho mỗi đơn mua.\n` +
+    `Mỗi khi chuẩn bị mua sắm hoặc đặt đồ ăn, bạn cứ gửi link sản phẩm qua đây, mình gửi lại link hoàn tiền cho bạn ngay trong vài giây nhé!\n\n` +
     `🌐 Sau khi mua xong, bạn vào https://hoantiendp.com để xem danh sách đơn hàng và theo dõi tiến độ hoàn tiền cực kỳ rõ ràng và minh bạch nhé!`
   ],
 

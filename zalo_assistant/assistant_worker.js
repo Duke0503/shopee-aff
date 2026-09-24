@@ -650,7 +650,7 @@ function extractTextAndUrls(data) {
               `📌 HƯỚNG DẪN SỬ DỤNG:\n` +
               `1️⃣ Khi dán link sản phẩm Shopee hoặc TikTok Shop trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n` +
               `2️⃣ Để đăng nhập website cài đặt Số Tài Khoản Ngân Hàng nhận tiền hoàn, bạn gõ lệnh:\n` +
-              `👉 /matkhau (Bot sẽ cấp mật khẩu đăng nhập bảo mật cho bạn)`;
+              `👉 /matkhau (Mình sẽ cấp mật khẩu đăng nhập bảo mật cho bạn ngay)`;
 
             await api.sendMessage(reply, message.threadId, message.type);
           } catch (err) {
@@ -736,7 +736,7 @@ function extractTextAndUrls(data) {
           `1️⃣ Gửi link sản phẩm Shopee hoặc TikTok Shop bạn muốn mua vào nhóm hoặc inbox riêng cho mình.\n` +
           `2️⃣ Nhận lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n` +
           `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên sàn Shopee hoặc TikTok Shop.\n` +
-          `4️⃣ Nhắn tin riêng cho Bot gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
+          `4️⃣ Nhắn tin riêng cho mình gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
           `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n` +
           `📌 Các lệnh hỗ trợ:\n` +
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
@@ -744,7 +744,7 @@ function extractTextAndUrls(data) {
           `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
           `• /web: Website tra cứu đơn & cập nhật STK ngân hàng\n\n` +
-          `💡 Lưu ý: Vui lòng nhắn tin riêng cho Bot khi gõ /id và /matkhau để bảo mật tài khoản!`;
+          `💡 Lưu ý: Vui lòng nhắn tin riêng cho mình khi gõ /id và /matkhau để bảo mật tài khoản!`;
 
         const mentions = tagText
           ? [
