@@ -34,8 +34,6 @@ class Config:
     shopee_app_id: str
     shopee_secret: str
     shopee_api_url: str
-    zalo_bot_token: str
-    zalo_api_url: str
     cashback_rate: float
     tax_policy: TaxPolicy
     link_attribution_days: int
@@ -52,14 +50,19 @@ class Config:
     _period_is_withheld: bool
     accesstrade_api_key: str = ""
     accesstrade_base_url: str = "https://api.accesstrade.vn"
+    backup_dir: Path = Path("./backups")
+    backup_keep: int = 30
+    backup_interval_hours: int = 24
+    # Ports and the assistant's address are per environment: a dev copy on
+    # the same machine must not take production's ports or its Zalo account.
+    dashboard_port: int = 8899
+    public_port: int = 80
+    assistant_url: str = "http://127.0.0.1:8891"
+    assistant_token: str = ""
 
     @property
     def has_shopee_credentials(self) -> bool:
         return bool(self.shopee_app_id and self.shopee_secret)
-
-    @property
-    def has_zalo_credentials(self) -> bool:
-        return bool(self.zalo_bot_token)
 
     def describe_mode(self) -> str:
         """How links are actually produced, not which API keys exist.
@@ -75,8 +78,7 @@ class Config:
             shopee = "Open API"
         else:
             shopee = "browser (real links; Open API was refused)"
-        zalo = "live" if self.has_zalo_credentials else "STDOUT (no token)"
-        return f"Shopee: {shopee}  |  Zalo: {zalo}"
+        return f"Shopee: {shopee}  |  Zalo: assistant at {self.assistant_url}"
 
     @property
     def advertised_cashback_rate(self) -> float:
@@ -139,10 +141,6 @@ def load() -> Config:
         shopee_api_url=os.getenv(
             "SHOPEE_API_URL", "https://open-api.affiliate.shopee.vn/graphql"
         ).strip(),
-        zalo_bot_token=os.getenv("ZALO_BOT_TOKEN", "").strip(),
-        zalo_api_url=os.getenv(
-            "ZALO_API_URL", "https://bot-api.zaloplatforms.com"
-        ).strip(),
         cashback_rate=float(os.getenv("CASHBACK_RATE", "0.80")),
         tax_policy=tax_policy,
         link_attribution_days=int(os.getenv("LINK_ATTRIBUTION_DAYS", "7")),
@@ -166,4 +164,11 @@ def load() -> Config:
         accesstrade_base_url=os.getenv(
             "ACCESSTRADE_BASE_URL", "https://api.accesstrade.vn"
         ).strip(),
+        backup_dir=Path(os.getenv("BACKUP_DIR", "./backups")),
+        backup_keep=int(os.getenv("BACKUP_KEEP", "30")),
+        backup_interval_hours=int(os.getenv("BACKUP_INTERVAL_HOURS", "24")),
+        dashboard_port=int(os.getenv("DASHBOARD_PORT", "8899")),
+        public_port=int(os.getenv("PUBLIC_PORT", "80")),
+        assistant_url=os.getenv("ASSISTANT_URL", "http://127.0.0.1:8891").strip(),
+        assistant_token=os.getenv("ASSISTANT_TOKEN", "").strip(),
     )

@@ -2,11 +2,12 @@ import { Zalo, LoginQRCallbackEventType } from "zca-js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import qrcodeTerminal from "qrcode-terminal";
+import { config } from "./config.js";
 
 const ARTIFACT_DIR = "C:\\Users\\ADMIN\\.gemini\\antigravity-cli\\brain\\05853b6c-d198-44d7-b77a-cce633717bc4";
 const QR_LOCAL_PATH = path.resolve("qr.png");
 const QR_ARTIFACT_PATH = path.join(ARTIFACT_DIR, "zalo_qr.png");
-const CREDENTIALS_PATH = path.resolve("credentials.json");
+const CREDENTIALS_PATH = config.CREDENTIALS_PATH;
 
 console.log("=== KHỞI TẠO ĐĂNG NHẬP ZALO QUA MÃ QR ===");
 

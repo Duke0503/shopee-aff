@@ -170,19 +170,15 @@ def _hash_token(token: str) -> str:
 
 
 def resolve_login_name(conn: sqlite3.Connection, name: str) -> str | None:
-    """Accept either the customer code or the Zalo id behind it.
+    """Accept the DP code, or the internal id / Zalo id behind it.
 
-    A customer reads "C0003" off the bot, but the one they remember is
-    often the long Zalo number, and being told "no such account" for an
-    id they can see on screen is how they conclude it is broken.
+    The code (DP00012) is what the bot hands out: nineteen-digit Zalo ids
+    are not something anyone types. The long ids still work, so a customer
+    who saved one before codes existed is not locked out.
     """
-    name = (name or "").strip()
-    if not name:
-        return None
-    row = conn.execute(
-        "SELECT customer_id FROM customers"
-        " WHERE customer_id=? OR zalo_user_id=?", (name, name)).fetchone()
-    return row["customer_id"] if row else None
+    from ..ledger.repository import find_customer_id
+
+    return find_customer_id(conn, name)
 
 
 def login(conn: sqlite3.Connection, name: str, password: str) -> LoginResult:

@@ -341,7 +341,7 @@ def cmd_dashboard(cfg: Config, args: argparse.Namespace) -> int:
 
     from ...web import dashboard
 
-    port = args.port
+    port = args.port or cfg.dashboard_port
     if args.open:
         # Opened after a moment so the server is listening by the time the
         # browser asks for the page.
@@ -351,4 +351,192 @@ def cmd_dashboard(cfg: Config, args: argparse.Namespace) -> int:
         ).start()
 
     dashboard.serve(cfg, port=port)
+    return 0
+
+
+def cmd_merge_customers(cfg: Config, args: argparse.Namespace) -> int:
+    """Fold duplicate customers left by the Zalo account change.
+
+    Shows the plan unless --apply is given. Applying snapshots the ledger
+    first and runs as one transaction: it all lands or none of it does.
+    """
+    from ...ledger import backup, merge
+
+    # The plan is read-only. Codes are issued by `serve` AFTER merging, so
+    # a merged-away row never takes a number.
+    skip = {name.strip() for name in args.skip}
+
+    def describe(row) -> str:
+        with ledger.connect(cfg.db_path) as conn:
+            counts = {t: conn.execute(
+                f"SELECT COUNT(*) FROM {t} WHERE customer_id=?",
+                (row["customer_id"],)).fetchone()[0]
+                for t in ("link_requests", "orders")}
+        extras = [label for label, present in (
+            ("bank", row["bank_account"]), ("password", row["password_hash"]))
+            if present]
+        return (f"{row['customer_id']:<20} {row['created_at'][:16]}  "
+                f"links={counts['link_requests']} orders={counts['orders']} "
+                + " ".join(extras))
+
+    with ledger.connect(cfg.db_path) as conn:
+        pairs = [p for p in merge.find_pairs(conn) if p.name not in skip]
+
+    blocked = [p for p in pairs if p.conflict]
+    for p in pairs:
+        mark = f"  !! {p.conflict}" if p.conflict else ""
+        print(f"{p.name}{mark}")
+        print(f"   old {describe(p.old)}")
+        print(f"   new {describe(p.new)}")
+    print()
+    print(f"{len(pairs)} pair(s), {len(blocked)} need a decision"
+          + (f", skipped: {', '.join(sorted(skip))}" if skip else ""))
+    for customer_id in args.delete:
+        print(f"delete {customer_id}")
+
+    if not args.apply:
+        print("\nNothing changed. Re-run with --apply to merge.")
+        return 0
+    if blocked:
+        print("\nRefusing: resolve or --skip the pairs marked !! first.")
+        return 1
+
+    snapshot = backup.create(cfg.db_path, cfg.backup_dir, keep=cfg.backup_keep)
+    print(f"\nBackup: {snapshot}")
+    ledger.initialise(cfg.db_path, assign_codes=False)
+    with ledger.connect(cfg.db_path) as conn:
+        for p in merge.find_pairs(conn):
+            if p.name in skip:
+                continue
+            merge.merge(conn, p)
+        outcomes = {cid: merge.delete_unused(conn, cid) for cid in args.delete}
+        refused = {cid: why for cid, why in outcomes.items() if why != "deleted"}
+        if refused:
+            raise SystemExit(f"Rolled back, nothing changed: {refused}")
+    print(f"Merged {len(pairs)} pair(s); deleted {len(args.delete)} row(s).")
+    return 0
+
+
+def cmd_backfill_products(cfg: Config, args: argparse.Namespace) -> int:
+    """Find the picture and name for link requests saved without them.
+
+    Opens short links and asks third-party sources, spaced out, so it
+    shows what it found first and writes only with --apply.
+    """
+    from ...shopee import product_backfill
+
+    with ledger.connect(cfg.db_path) as conn:
+        results = product_backfill.run(
+            conn, apply=args.apply, only_ordered=not args.all)
+    for r in results:
+        found = f"{r.source:<22} item={r.item_id or '-':<13}"
+        print(f"{r.request_id:<16} {found} {(r.name or '')[:40]}")
+    filled = sum(1 for r in results if r.image_url)
+    print()
+    print(f"{filled} of {len(results)} request(s) have a picture now"
+          + ("" if args.apply else " (nothing written; re-run with --apply)"))
+    return 0
+
+
+def cmd_campaign_create(cfg: Config, args: argparse.Namespace) -> int:
+    """Register a promotion. Shows it first; writes only with --apply."""
+    from ...ledger import campaigns
+
+    ledger.initialise(cfg.db_path)  # the campaign tables arrive by migration
+
+    excluded = []
+    with ledger.connect(cfg.db_path) as conn:
+        for key in args.exclude:
+            found = ledger.find_customer_id(conn, key)
+            if found is None:
+                print(f"Unknown customer to exclude: {key}")
+                return 1
+            excluded.append(found)
+    print(f"{args.id}: {args.name}")
+    print(f"  window  {args.starts} -> {args.ends}")
+    print(f"  slots   {args.slots} x {args.bonus:,} VND, min order {args.min_order:,} VND")
+    print(f"  on      {args.platforms}")
+    print(f"  per customer {args.per_customer or 'no limit'}")
+    print(f"  exclude {', '.join(excluded) or '-'}")
+    if not args.apply:
+        print("Nothing written. Re-run with --apply.")
+        return 0
+    with ledger.connect(cfg.db_path) as conn:
+        campaigns.create(conn, args.id, args.name, args.starts, args.ends,
+                         args.slots, args.bonus, min_order_value=args.min_order,
+                         platforms=args.platforms,
+                         excluded_customers=",".join(excluded),
+                         per_customer=args.per_customer)
+    print("Created.")
+    return 0
+
+
+def cmd_announce(cfg: Config, args: argparse.Namespace) -> int:
+    """Post an announcement to the test or main group. Shows it first;
+    sends only with --send. Rehearse in "test" before "main"."""
+    from pathlib import Path
+
+    from ...messaging.assistant_bridge import AssistantError, AssistantSender
+
+    text = Path(args.text).read_text(encoding="utf-8").strip()
+    image = str(Path(args.image).resolve()) if args.image else None
+    if image and not Path(image).is_file():
+        print(f"No such picture: {image}")
+        return 1
+    print(f"To group : {args.group}")
+    print(f"Picture  : {image or '-'}")
+    print(f"Tag all  : {'yes' if '@All' in text else 'no'}")
+    print("-" * 60)
+    print(text)
+    print("-" * 60)
+    if not args.send:
+        print("Nothing sent. Re-run with --send.")
+        return 0
+    try:
+        AssistantSender(cfg.assistant_url, cfg.assistant_token, timeout=90).broadcast(
+            text, group=args.group, image_path=image, mention_all="@All" in text)
+    except AssistantError as exc:
+        print(f"Not sent: {exc}")
+        return 1
+    print("Sent.")
+    return 0
+
+
+def cmd_campaign_status(cfg: Config, args: argparse.Namespace) -> int:
+    """Who holds which slot right now. Settles the slots first."""
+    from ...ledger import campaigns
+
+    ledger.initialise(cfg.db_path)  # the campaign tables arrive by migration
+
+    with ledger.connect(cfg.db_path) as conn:
+        campaigns.evaluate(conn)
+        for campaign in conn.execute("SELECT * FROM campaigns ORDER BY starts_at"):
+            awards = conn.execute(
+                "SELECT a.id, a.order_id, a.status, a.amount, c.customer_code,"
+                "       c.display_name, o.recorded_at, o.status AS order_status"
+                "  FROM campaign_awards a"
+                "  JOIN customers c ON c.customer_id = a.customer_id"
+                "  JOIN orders o ON o.order_id = a.order_id"
+                " WHERE a.campaign_id=? ORDER BY a.id", (campaign["campaign_id"],)).fetchall()
+            live = [a for a in awards if a["status"] != campaigns.VOID]
+            print(f"{campaign['campaign_id']} [{campaign['status']}] {campaign['name']}"
+                  f"  {len(live)}/{campaign['slots']} slots"
+                  f"  {campaign['starts_at']} -> {campaign['ends_at']}")
+            for a in sorted(live, key=lambda r: (ledger._created_sort_key(r["recorded_at"]), r["id"])):
+                print(f"  #{campaigns._rank(conn, campaign['campaign_id'], a['id']):<3}"
+                      f" {a['customer_code'] or '-':<8} {(a['display_name'] or '')[:22]:<22}"
+                      f" order {a['order_id']:<16} {a['order_status']:<18} bonus {a['status']}")
+            for a in awards:
+                if a["status"] == campaigns.VOID:
+                    print(f"  void {a['customer_code'] or '-':<8} order {a['order_id']} (cancelled)")
+    return 0
+
+
+def cmd_backup(cfg: Config, args: argparse.Namespace) -> int:
+    """Snapshot the ledger, safe to run while the bot is writing."""
+    from ...ledger import backup
+
+    dest = backup.create(cfg.db_path, cfg.backup_dir, keep=cfg.backup_keep)
+    print(f"Backup written: {dest} ({dest.stat().st_size:,} bytes)")
+    print(f"Keeping the newest {cfg.backup_keep} in {cfg.backup_dir}")
     return 0

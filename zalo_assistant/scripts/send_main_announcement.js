@@ -2,7 +2,7 @@ import { Zalo, ThreadType } from "zca-js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sizeOf from "image-size";
-import { config } from "./config.js";
+import { config } from "../config.js";
 
 function parseMarkdownStyles(mdText) {
   const styles = [];

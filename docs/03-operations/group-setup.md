@@ -254,11 +254,14 @@ xong trước — xem [CLAUDE.md](../../CLAUDE.md) mục 2.
 
 Ghi ở đây để khỏi hứa nhầm với khách:
 
-- **Bot không nghe cả nhóm.** Chỉ nhận tin khi được @tag hoặc bị reply. Gửi
-  link trong nhóm mà không tag thì bot không thấy.
-- **Bot không đọc được tin có khung ảnh xem trước.** Zalo bóc mất nội dung.
-  Chỉ có thể hướng dẫn khách bấm ✕. Không sửa được từ phía bot.
-- **Bot tắt lúc nào là mất tin lúc đó, vĩnh viễn.** Zalo `getUpdates` là
-  luồng trực tiếp, không phải hộp thư. Báo nhóm trước khi restart.
+> Từ 25/9/2026 không còn dùng Zalo Bot API. "Bot" là tài khoản Zalo cá
+> nhân chạy `zalo_assistant/`: nghe được cả nhóm, đọc được tin có khung
+> ảnh xem trước. Các giới hạn cũ về @tag và khung ảnh không còn đúng.
+
+- **Tài khoản cá nhân dùng công cụ không chính thức (`zca-js`).** Zalo khoá
+  tài khoản đó là mất liên lạc với mọi khách cùng lúc. Website là kênh
+  dự phòng: khách vẫn đăng nhập bằng mã DP để xem đơn.
+- **Đổi tài khoản Zalo của bot là mọi người đổi UID.** Sau khi đổi phải
+  chạy `cashback merge-customers`, nếu không mỗi người thành hai khách.
 - **Bot không tự chuyển tiền.** Ngân hàng Việt Nam không mở API cho tài
   khoản cá nhân. QR là để admin quét, không phải để bot tự trả.

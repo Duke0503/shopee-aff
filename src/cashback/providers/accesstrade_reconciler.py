@@ -6,6 +6,7 @@ TikTok Shop affiliate conversion orders and settle customer cashback.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -13,6 +14,7 @@ from typing import Any, Optional
 
 import httpx
 
+from .base import NormalizedOrder
 from .tiktok_provider import TikTokAccessTradeProvider
 from ..core.config import Config
 from ..core.policy import round_dong
@@ -28,6 +30,7 @@ class ReconcileSummary:
     approved: int = 0
     rejected: int = 0
     skipped: int = 0
+    needs_review: int = 0
     error: Optional[str] = None
 
 
@@ -108,10 +111,117 @@ def fetch_accesstrade_orders(
     return all_orders
 
 
+def fetch_accesstrade_transactions(
+    api_key: str,
+    base_url: str = "https://api.accesstrade.vn",
+    since_days: int = 30,
+    timeout: float = 20.0,
+    max_pages: int = 10,
+) -> list[dict[str, Any]]:
+    """Commission lines from /v1/transactions.
+
+    This, not /v1/order-list, is the endpoint that returns the sub ids a link
+    was created with (under _extra.sub_params). order-list has neither the
+    customer nor a status, so an order read from it can never be attributed
+    to anyone nor ever become approved. The range stays within 30 days: a
+    60-day window answered 500.
+    """
+    if not api_key:
+        return []
+    headers = {"Authorization": api_key if api_key.startswith("Token ") else f"Token {api_key}"}
+    now = datetime.now(timezone.utc)
+    params: dict[str, Any] = {
+        "since": (now - timedelta(days=min(since_days, 30))).strftime("%Y-%m-%dT00:00:00Z"),
+        "until": now.strftime("%Y-%m-%dT23:59:59Z"),
+        "limit": 100,
+    }
+    rows: list[dict[str, Any]] = []
+    with httpx.Client(timeout=timeout) as client:
+        for page in range(1, max_pages + 1):
+            resp = client.get(f"{base_url.rstrip('/')}/v1/transactions",
+                              headers=headers, params={**params, "page": page})
+            resp.raise_for_status()
+            data = resp.json()
+            batch = (data.get("data") if isinstance(data, dict) else data) or []
+            rows.extend(batch)
+            total = int(data.get("total") or 0) if isinstance(data, dict) else len(rows)
+            if not batch or len(rows) >= total:
+                break
+    return rows
+
+
+def normalize_transactions(rows: list[dict[str, Any]]) -> list[NormalizedOrder]:
+    """One order per transaction_id, from its commission lines.
+
+    TikTok reports an order as several lines -- the product, and often a
+    brand bonus -- and a customer looking at them sees "two orders". They
+    are one purchase: values and commissions are summed. An order counts
+    as approved only once AccessTrade has confirmed every line that was
+    not rejected; until then the commission is an estimate, never paid.
+    """
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        order_id = str(row.get("transaction_id") or row.get("order_id") or "").strip()
+        if order_id:
+            grouped.setdefault(order_id, []).append(row)
+
+    orders = []
+    for order_id, lines in grouped.items():
+        subs: dict[str, Any] = {}
+        for line in lines:
+            subs = ((line.get("_extra") or {}).get("sub_params") or {}) or subs
+        customer_id = str(subs.get("sub1") or lines[0].get("sub1") or "").strip()
+        request_id = str(subs.get("sub2") or lines[0].get("sub2") or "").strip() or None
+
+        def amount(line, key):
+            try:
+                return float(line.get(key) or 0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        value = sum(amount(l, "product_price") * (int(l.get("product_quantity") or 1)) for l in lines)
+        commission = sum(amount(l, "commission") for l in lines)
+        statuses = [int(l.get("status") or 0) for l in lines]
+        live = [l for l, st in zip(lines, statuses) if st != 2]
+
+        if not live:
+            status, approved = "rejected", None
+        elif all(int(l.get("status") or 0) == 1 and int(l.get("is_confirmed") or 0) == 1 for l in live):
+            status = "approved"
+            approved = round(sum(amount(l, "commission") for l in live))
+        else:
+            status, approved = "awaiting_approval", None
+
+        reason = next((l.get("reason_rejected") for l in lines if l.get("reason_rejected")), None)
+        orders.append(NormalizedOrder(
+            order_id=order_id,
+            platform="tiktok",
+            customer_id=customer_id,
+            request_id=request_id,
+            order_value=round(value),
+            estimated_commission=round(commission),
+            approved_commission=approved,
+            status=status,
+            rejection_reason=reason,
+            order_time=str(lines[0].get("transaction_time") or ""),
+        ))
+    return orders
+
+
+def _flag_once(conn, order_id: str, raw: Any, reason: str) -> None:
+    """Every sync sees the same order again; one open review is enough."""
+    if conn.execute(
+        "SELECT 1 FROM manual_review WHERE order_id=? AND resolved=0 AND reason=?",
+        (order_id, reason)).fetchone():
+        return
+    ledger.flag_for_review(conn, order_id, json.dumps(raw, ensure_ascii=False, default=str), reason)
+
+
 def sync_accesstrade_orders(
     cfg: Config,
     raw_orders: Optional[list[dict[str, Any]]] = None,
     since_days: int = 30,
+    transactions: Optional[list[dict[str, Any]]] = None,
 ) -> ReconcileSummary:
     """Synchronize AccessTrade orders into the ledger."""
     summary = ReconcileSummary()
@@ -120,38 +230,39 @@ def sync_accesstrade_orders(
         base_url=cfg.accesstrade_base_url,
     )
 
-    if raw_orders is None:
-        if not cfg.accesstrade_api_key:
-            summary.error = "ACCESSTRADE_API_KEY is not configured"
-            return summary
-        try:
-            raw_orders = fetch_accesstrade_orders(
-                api_key=cfg.accesstrade_api_key,
-                base_url=cfg.accesstrade_base_url,
-                since_days=since_days,
-            )
-        except Exception as exc:
-            summary.error = str(exc)
-            return summary
-
-    normalized_orders = provider.parse_orders(raw_orders)
+    if raw_orders is not None:
+        normalized_orders = provider.parse_orders(raw_orders)
+    else:
+        if transactions is None:
+            if not cfg.accesstrade_api_key:
+                summary.error = "ACCESSTRADE_API_KEY is not configured"
+                return summary
+            try:
+                transactions = fetch_accesstrade_transactions(
+                    api_key=cfg.accesstrade_api_key,
+                    base_url=cfg.accesstrade_base_url,
+                    since_days=since_days,
+                )
+            except Exception as exc:
+                summary.error = str(exc)
+                return summary
+        normalized_orders = normalize_transactions(transactions)
     summary.rows_read = len(normalized_orders)
 
     with ledger.connect(cfg.db_path) as conn:
         for order in normalized_orders:
             existing = ledger.get_order(conn, order.order_id)
             if not existing:
-                valid_cust_id = None
-                if order.customer_id:
-                    cust_row = conn.execute(
-                        "SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?",
-                        (order.customer_id, order.customer_id),
-                    ).fetchone()
-                    if cust_row:
-                        valid_cust_id = cust_row["customer_id"]
-                    else:
-                        ledger.add_customer(conn, order.customer_id, display_name=order.customer_id)
-                        valid_cust_id = order.customer_id
+                # Never guess. An order that cannot be tied to a customer --
+                # no sub1, or one matching nobody -- goes to a human rather
+                # than into the ledger under nobody, or under a made-up
+                # customer who could never be paid.
+                valid_cust_id = ledger.find_customer_id(conn, order.customer_id) if order.customer_id else None
+                if valid_cust_id is None:
+                    _flag_once(conn, order.order_id, order.__dict__,
+                               "tiktok order without a known customer (sub1)")
+                    summary.needs_review += 1
+                    continue
 
                 valid_req_id = None
                 if order.request_id:

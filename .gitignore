@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -107,3 +107,7 @@ zalo_assistant/credentials.json
 zalo_assistant/qr.png
 credentials.json
 qr.png
+
+# Ledger snapshots written by `cashback backup` and `serve`
+backups/
+zalo_assistant/friend_state.json

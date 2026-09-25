@@ -51,6 +51,13 @@ Kiểm trên 18 sản phẩm, đúng 18/18. **Bỏ quên trần này là hứa g
 số thật** — một chiếc xe 84,6 triệu sẽ được báo hoàn 2.368.800₫ thay vì
 28.000₫.
 
+**Một link chỉ thuộc về một khách.** sub_id1 của link là mã khách được
+tạo link, và đối soát ghi mọi đơn trên link đó cho người ấy. Tái dùng link
+theo *sản phẩm* (cache) là khách B mua thì tiền về khách A — đã xảy ra
+thật (sửa ngày 25/9/2026). Thông tin sản phẩm (giá, hoa hồng) dùng chung
+được; link thì chỉ tái dùng qua `ledger.find_own_request()`, tức theo
+*khách*. Test: `tests/test_link_attribution.py`.
+
 **Làm tròn tiền phải nửa-lên**, dùng `round_dong()`. `round()` của Python
 làm tròn về số chẵn: `round(9262.5) = 9262`, trong khi mọi công cụ khác
 trong thị trường hiện 9263.
@@ -94,16 +101,70 @@ trộn nhiều khách trong một lần submit** — phải gom theo từng khá
 **Antd là React**: gán `.value` trực tiếp thì form submit rỗng. Phải set
 qua native setter rồi dispatch `input` + `change`.
 
-**Zalo `getUpdates` là luồng trực tiếp, không phải hộp thư.** Tin nhắn chỉ
-tới nếu đúng lúc đó có poll đang mở. **Bot tắt lúc nào là mất tin lúc đó,
-vĩnh viễn.** Nên báo trước khi restart.
+**Không còn Zalo Bot API.** Từ 25/9/2026 mọi tin nhắn đi qua
+`zalo_assistant/` — một **tài khoản Zalo cá nhân** chạy bằng `zca-js`
+(thư viện không chính thức). Assistant trả lời khách; backend chỉ *chủ
+động* nói (link xong muộn, đơn duyệt, đã chuyển tiền) qua
+`messaging/notifications.py` → `/api/notify` của assistant. Tài khoản đó
+bị khoá là mất liên lạc với mọi khách cùng lúc: giữ delay giống người,
+đừng gọi API Zalo dồn dập, website là kênh dự phòng.
 
-**Zalo bóc mất nội dung tin có khung ảnh xem trước** và gắn nhãn
-`message.unsupported.received`. Không sửa được từ phía bot — chỉ có thể
-hướng dẫn khách bấm ✕ xoá khung ảnh.
+**Zalo cấp UID theo tài khoản đang xem.** Cùng một người, nhìn từ tài
+khoản bot cũ và mới là hai UID khác nhau. Ngày 24/9 bot đổi tài khoản →
+34 người thành 2 dòng khách. Đổi tài khoản bot lần nữa thì chạy
+`cashback merge-customers` (xem trước rồi mới `--apply`). UID cũ được giữ
+làm **bí danh** (`customer_aliases`): đơn về từ link cũ vẫn đúng người,
+gõ UID cũ vẫn đăng nhập được, và không tạo lại được khách bằng UID đó.
 
-**Trong nhóm, bot chỉ nhận tin khi được @tag hoặc bị reply.** Không nghe
-được cả nhóm.
+**Kết bạn chỉ với người tự nhắn riêng trước** (`zalo_assistant/friends.js`):
+mỗi người một lần, chờ ngẫu nhiên, tối đa `ZALO_FRIEND_REQUESTS_PER_DAY`
+lời mời/ngày; ai mời trước thì tự chấp nhận. **Đừng** gửi kết bạn hàng loạt
+cho cả nhóm — đó là dấu hiệu spam Zalo hay khoá tài khoản cá nhân nhất.
+
+**Một tài khoản Zalo chỉ một phiên.** Các script trong
+`zalo_assistant/scripts/` đăng nhập thêm một phiên vào đúng tài khoản của
+assistant — chạy lúc assistant đang chạy có thể đá phiên của nó ra. Bản
+dev bắt buộc dùng tài khoản Zalo khác (`ZALO_CREDENTIALS_PATH`).
+
+**Mã khách có hai lớp.** `customer_id` = UID, nằm trong sub_id của mọi
+link đã phát, **không bao giờ đổi**. Khách nhìn thấy và đăng nhập bằng
+`customer_code` (`DP00012`), do trigger cấp khi tạo khách, lấy từ bộ đếm
+chỉ tăng — số của khách đã xoá không bao giờ cấp lại. Tra khách từ bất kỳ
+dạng nào qua `ledger.find_customer_id()`.
+
+**Web không được tạo khách.** Chỉ assistant (gọi từ localhost) mới tạo
+khách mới, vì nó vừa thấy người đó trên Zalo. Từ internet: đăng nhập,
+hoặc gõ một mã có thật (`_requester` trong `dashboard.py`). Mã sai → 404,
+**không** bị đổi thành khách vãng lai. Tạo link dưới mã người khác không
+lấy được tiền của ai — tiền về chủ mã — nên không cần mật khẩu để tạo
+link; tiền và số tài khoản thì cần.
+
+**Khách vãng lai → tài khoản `HOUSE`.** Chưa đăng nhập, không gõ mã thì
+link gắn vào khách `HOUSE` (vai trò `house`): hoa hồng là của mình, khách
+không được hoàn. Vì mọi khách vãng lai là cùng một người nhận tiền, **một
+link cho mỗi sản phẩm** (`find_house_link`) — spam bao nhiêu cũng chỉ vào
+Shopee một lần mỗi sản phẩm. `HOUSE` không có mã DP, `mark_approved` luôn
+ghi tiền hoàn 0đ, không nằm trong danh sách chuyển tiền, không nhận thông
+báo. Đơn của `HOUSE` **không bao giờ** gắn lại cho khách đăng ký sau.
+
+Hợp đồng cho giao diện: `POST /api/shopee/convert` không kèm
+`customer_id` khi chưa đăng nhập → `{ready, affiliate_url, request_id,
+house: true}`; thấy `house: true` thì phải cảnh báo rõ link này **không**
+hoàn tiền, nút chính là vào Zalo lấy mã. `ready: false` thì hỏi
+`/api/shopee/link-status?request_id=…`. Lỗi `web_busy` (429) = web đã hết
+suất tạo link (60/giờ cho cả web, 20/ngày mỗi mã) → hướng khách sang
+Zalo, nơi không bị giới hạn. Hàng đợi phục vụ Zalo trước, rồi khách web,
+cuối cùng `HOUSE`.
+
+**Link đã trao thì đánh dấu `notified_at`.** Assistant tự chờ link 28
+giây rồi trả lời trong chat; mọi chỗ trao link (`link-status`,
+`smart-resolve`, `convert`) đánh dấu đã giao. Vòng thông báo chỉ gửi link
+quá 35 giây chưa ai lấy và chưa quá 2 giờ — cũ hơn thì đánh dấu, không
+gửi, để bật lại sau sự cố khách không nhận một loạt tin cũ.
+
+**Nhãn web đọc lại ở mỗi request.** Sửa `resources/dashboard.vi.json` là
+**web thật đổi ngay**, không cần restart. `web/src/lib/defaultLabels.json`
+là bản sao đóng gói vào bundle — sửa nhãn thì chép sang, rồi build.
 
 **Link tiếp thị KHÔNG hết hạn.** Bảy ngày của Shopee tính từ lúc khách
 **bấm** link, không phải từ lúc tạo link. Link tạo một tháng trước, hôm nay
@@ -127,7 +188,7 @@ lần chuyển là **thiếu số tài khoản**, và cái đó chủ không t�
 **Phần trăm không phải là số tiền.** *"Hoàn 80% hoa hồng"* không ai quy
 ra tiền được, và người mua hàng bình thường hiểu nhầm thành 80% giá trị
 đơn. Mọi chỗ nêu phần trăm phải kèm một ví dụ bằng đồng
-(`EXAMPLE_ORDER_VND`, `EXAMPLE_RATE` trong `conversation.py`).
+(`EXAMPLE_ORDER_VND`, `EXAMPLE_RATE` trong `messaging/notifications.py`).
 
 **Emoji cũng là câu chữ, không được nằm trong code.** Cùng lý do với
 tiếng Việt: chúng thuộc `resources/messages.vi.json` (xem
@@ -138,15 +199,44 @@ tiếng Việt: chúng thuộc `resources/messages.vi.json` (xem
 (`shopee/dashboard_lookup.py`). Đã từng có hai bản sao lệch nhau và link
 `shp.ee` bị coi là tin nhắn thường suốt một buổi.
 
+**Campaign (thưởng N suất đầu tiên)** nằm ở `ledger/campaigns.py`, dữ
+liệu ở bảng `campaigns` + `campaign_awards`. Event mới là **một dòng mới**
+(`cashback campaign-create`), không phải code mới. Luật đã chốt:
+
+- Suất thuộc về **đơn**, không thuộc về người: một người có thể giành nhiều
+  suất (`per_customer=0`). Muốn giới hạn thì `--per-customer N`.
+- Xếp hạng theo `recorded_at` (lúc hệ thống ghi nhận đơn), chỉ đơn ghi
+  nhận **trong** khung giờ event.
+- Đơn huỷ **trong** event → suất chuyển cho đơn kế tiếp. Huỷ **sau** event
+  → mất thưởng, suất **không** chuyển cho ai (`evaluate` chỉ lấp suất khi
+  đang trong khung giờ).
+- Thưởng chỉ trả khi đơn được duyệt, đi cùng tiền hoàn (`payouts.collect`
+  cộng `bonus_owed`). Suất đang giữ (held) không bao giờ trả được.
+- Nhân viên, `HOUSE`, và mã trong `--exclude` không bao giờ giữ suất.
+- Tin nhắn: đơn mới giành suất → dòng suất nằm **trong** tin "đã ghi nhận
+  đơn"; suất được chuyển sang đơn đã báo trước đó → tin riêng; mất suất →
+  tin riêng (hai bản: còn event / đã hết). Tin trả link có dòng gợi ý khi
+  event còn suất (`/api/campaigns/offer`, chỉ localhost). Đơn không thuộc
+  event nào thì không nhắc gì.
+- Không có campaign nào đang chạy thì mọi luồng cũ y hệt trước — đã kiểm
+  trên bản sao dữ liệu thật (57 khách: /donhang, số dư, tin duyệt, chuyển
+  tiền giống hệt). Test: `tests/test_campaigns.py`.
+
+Thông báo vào nhóm: `cashback announce --text … --image … --group test`
+(xem trước), thêm `--send` để gửi; tập ở `test` rồi mới `main`.
+
 ---
 
 ## 5. Trước khi bàn giao / chạy thật
 
-- [ ] **Đổi `ZALO_BOT_TOKEN`** — token cũ đã lộ trong ảnh chụp màn hình
 - [ ] Kiểm trần hoa hồng mỗi đơn trong tài khoản affiliate của chính mình
 - [ ] Đo ba chỉ số sau 100–300 đơn thật (`cashback metrics`)
 - [ ] Chạy `cashback audit --scan` trước mỗi đợt chuyển tiền
 - [ ] `cashback audit --archive` mỗi tháng để nén log
+- [ ] Chép `backups/` ra ngoài máy định kỳ — bản sao cùng ổ đĩa không cứu
+      được ổ đĩa hỏng
+- [ ] `ASSISTANT_TOKEN` trong `.env` phải có, và giống nhau cho cả hai phía
+      (backend và assistant cùng đọc một file `.env`)
 
 ---
 
@@ -155,9 +245,16 @@ tiếng Việt: chúng thuộc `resources/messages.vi.json` (xem
 **Trước khi sửa:** đọc docstring của module. Chúng ghi *vì sao*, không phải
 *cái gì* — phần *cái gì* thì code đã nói rồi.
 
+**Prod đang chạy ngay trong thư mục này.** Sửa file `.py`/`.js` chưa ảnh
+hưởng gì tới khi restart; nhưng `resources/dashboard.vi.json` và build web
+(`src/cashback/web/static/`) thì **đổi web thật ngay lập tức**. Build thử
+thì ra thư mục khác: `npx vite build --outDir <thư mục tạm>`.
+
 **Sau khi sửa:**
 
 ```bash
+uv run pytest -q                 # 3 test frontend trong test_dashboard.py
+                                 # đang fail sẵn (DashboardView.tsx)
 uv run python -c "
 import sys; sys.path.insert(0,'src')
 import importlib, pkgutil, cashback
@@ -167,29 +264,46 @@ print('moi module import sach')"
 
 uv run cashback --help          # parser còn dựng được không
 uv run cashback status          # cấu hình đọc được không
+node --check zalo_assistant/assistant_worker.js
 ```
 
-**Sửa `resources/messages.vi.json` thì phải restart bot** — tin nhắn được
+**Sửa `resources/messages.vi.json` thì phải restart** — tin nhắn được
 cache ở lần đọc đầu tiên.
 
 **Thêm cột CSDL** thì thêm vào `_LATER_COLUMNS` trong `ledger/repository.py`,
-đừng sửa DDL — `serve` tự chạy migration khi khởi động.
+đừng sửa DDL — `serve` tự chạy migration khi khởi động, **sau khi** đã tự
+backup.
+
+**Giữ nguyên kiểu xuống dòng của từng file** (có file CRLF, có file LF).
+Ghi đè cả file bằng công cụ khác kiểu là diff phình ra cả nghìn dòng.
 
 ---
 
-## 7. Bật/tắt bot
+## 7. Bật/tắt, deploy
 
 ```powershell
-# Trình duyệt riêng cho bot (đăng nhập Shopee một lần, nhớ mãi)
-powershell scripts/start-browser.ps1
-
-# Bot, chạy tách khỏi terminal
-$env:PYTHONUNBUFFERED="1"; $env:PYTHONIOENCODING="utf-8"
-Start-Process uv -ArgumentList "run","cashback","serve" `
-  -RedirectStandardOutput logs/console.log `
-  -RedirectStandardError  logs/console.err.log -WindowStyle Hidden
+start.bat          # bật cả 4: backend, assistant, tunnel, trình duyệt Shopee
 ```
+
+`scripts/start-all.ps1` ghi PID từng cửa sổ vào `logs/pids/` và lần sau
+chỉ tắt đúng những PID đó — không tắt theo tên, để một bản dev chạy cạnh
+không làm sập prod (và ngược lại).
+
+**Deploy một thay đổi:**
+
+1. `uv run pytest -q` và checklist ở mục 6.
+2. Tắt backend + assistant (đóng hai cửa sổ `[1]` và `[2]`).
+3. Nếu có việc dữ liệu (ví dụ `merge-customers`): chạy bản xem trước,
+   đọc kỹ, rồi mới `--apply`. Lệnh tự backup trước khi ghi.
+4. Bật lại (`start.bat`). `serve` tự backup rồi mới migration.
+5. Có sửa web thì `cd web && npm run build` (đổi web thật ngay khi xong).
 
 Đừng để bot phụ thuộc trình duyệt hằng ngày: đóng nó là bot mất một chân.
 `scripts/start-browser.ps1` dùng hồ sơ riêng ở `.browser-profile/` nên hai
 thứ độc lập hoàn toàn.
+
+**Bản dev** (chưa dựng): thư mục riêng, `.env` riêng với `DASHBOARD_PORT`,
+`BRIDGE_PORT`, `ASSISTANT_PORT` khác prod, `PUBLIC_PORT=0`, tài khoản Zalo
+riêng (`ZALO_CREDENTIALS_PATH`), nhóm dev (`ZALO_LISTEN_GROUP_IDS`), và bản
+sao database. Link Shopee thật tạo từ dev mang UID thật của admin trong
+sub_id — có đơn là ghi vào prod.

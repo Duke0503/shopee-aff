@@ -1,69 +1,63 @@
-"""Bridge between the main Python cashback backend and the Zalo Assistant worker.
+"""Sending messages through the Zalo assistant (zalo_assistant/).
 
-Enables the Python backend to notify the Zalo Assistant bot (running on local port 8891)
-to send messages or alerts to the internal dev group or individual users.
-All calls are non-blocking, fail-safe, and timed out at 2.5s to ensure the main
-cashback system never degrades if the assistant worker is offline.
+The assistant runs the personal Zalo account the business now talks through;
+the official Bot API is gone. Everything the backend says on its own
+initiative -- a link ready, an order approved, money sent -- goes out here.
+
+send() raises on anything short of a confirmed delivery. The notification
+functions only mark a message as sent after send() returns, so an assistant
+that is down or restarting leaves the message queued in the ledger instead
+of lost.
 """
 
 from __future__ import annotations
 
 import json
-import urllib.request
 import urllib.error
-from ..core.logging_setup import get_logger
-
-log = get_logger(__name__)
-
-ASSISTANT_API_BASE = "http://127.0.0.1:8891"
+import urllib.request
 
 
-def notify_assistant(message: str, target_id: str | None = None, is_user: bool = False) -> bool:
-    """Send a notification through the Zalo Assistant bot."""
-    if not message:
-        return False
-
-    payload = {
-        "message": message,
-        "type": "user" if is_user else "group",
-    }
-    if target_id:
-        payload["targetId"] = str(target_id)
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{ASSISTANT_API_BASE}/api/notify",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=2.5) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return bool(res_data.get("ok"))
-    except Exception as exc:
-        log.debug("Assistant notification omitted (worker might be offline): %s", exc)
-        return False
+class AssistantError(RuntimeError):
+    pass
 
 
-def broadcast_to_group(message: str) -> bool:
-    """Broadcast a message directly to the active group configured in the assistant."""
-    if not message:
-        return False
+class AssistantSender:
+    def __init__(self, base_url: str, token: str = "", timeout: float = 15.0):
+        self._base = base_url.rstrip("/")
+        self._token = token
+        self._timeout = timeout
 
-    data = json.dumps({"message": message}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{ASSISTANT_API_BASE}/api/broadcast",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    def send(self, user_id: str, text: str) -> None:
+        """Private message to one person, by their Zalo UID."""
+        if not user_id or not text:
+            raise AssistantError("empty recipient or message")
+        self._post("/api/notify", {"targetId": str(user_id), "type": "user",
+                                   "message": text})
 
-    try:
-        with urllib.request.urlopen(req, timeout=2.5) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return bool(res_data.get("ok"))
-    except Exception as exc:
-        log.debug("Assistant broadcast omitted: %s", exc)
-        return False
+    def broadcast(self, text: str, group: str = "test", image_path: str | None = None,
+                  mention_all: bool = False) -> dict:
+        """One announcement to a group: "test" rehearses it in the test
+        group, "main" is the real one. The picture goes first, as a message
+        of its own, because Zalo cuts a caption under an image short."""
+        payload = {"message": text, "group": group, "mentionAll": mention_all}
+        if image_path:
+            payload |= {"imagePath": image_path, "imageFirst": True}
+        return self._post("/api/broadcast", payload)
+
+    def _post(self, path: str, payload: dict) -> dict:
+        headers = {"Content-Type": "application/json"}
+        if self._token:
+            headers["X-Assistant-Token"] = self._token
+        request = urllib.request.Request(
+            f"{self._base}{path}", data=json.dumps(payload).encode("utf-8"),
+            headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout) as response:
+                body = json.loads(response.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as exc:
+            raise AssistantError(f"{path}: HTTP {exc.code}") from None
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise AssistantError(f"{path}: {exc}") from None
+        if not body.get("ok"):
+            raise AssistantError(f"{path}: {body.get('error') or 'not sent'}")
+        return body

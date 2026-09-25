@@ -102,27 +102,12 @@ class ShopeeProvider(BaseAffiliateProvider):
         target_url = self.normalize_url(url)
         parsed = parse_url(target_url)
 
-        # 1. Check products_cache
-        if parsed:
-            _, shop_id, item_id = parsed
-            cached = ledger.get_product_cache(conn, item_id)
-            if cached and cached["affiliate_url"]:
-                return AffiliateLinkResult(
-                    platform=self.platform_name,
-                    request_id=request_id,
-                    affiliate_url=cached["affiliate_url"],
-                    is_ready=True,
-                    cached=True,
-                )
-
-        # 2. Check reusable requests
-        existing = ledger.find_reusable_request(conn, customer_id, url, resend_within_days=7, platform=self.platform_name)
+        # Reuse is by customer, never by product: a cached link carries the
+        # sub_id of whoever it was made for. See ledger.find_own_request.
+        existing = ledger.find_own_request(
+            conn, customer_id, (url, target_url), resend_within_days=7,
+            platform=self.platform_name)
         if existing is not None and existing["affiliate_url"]:
-            if parsed:
-                ledger.upsert_product_cache(
-                    conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=existing["affiliate_url"]
-                )
-                conn.commit()
             return AffiliateLinkResult(
                 platform=self.platform_name,
                 request_id=existing["request_id"],
@@ -131,7 +116,7 @@ class ShopeeProvider(BaseAffiliateProvider):
                 cached=True,
             )
 
-        # 3. Create or reuse request in link_requests
+        # Create or reuse this customer's request
         actual_req_id = existing["request_id"] if existing else request_id
         if not existing:
             ledger.record_link_request(

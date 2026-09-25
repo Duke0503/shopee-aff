@@ -5,11 +5,12 @@ All money is stored as whole VND integers. Never floats.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 # --- Link request states -----------------------------------------------
 PENDING = "pending"          # link issued, unknown whether the customer bought
@@ -168,11 +169,13 @@ def connect(db_path: Path) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def initialise(db_path: Path) -> None:
+def initialise(db_path: Path, assign_codes: bool = True) -> None:
+    """Bring the schema up to date. assign_codes=False leaves customer
+    codes unissued, for a merge that must run before numbering."""
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
         _add_missing_tables(conn)
-        _add_missing_columns(conn)
+        _add_missing_columns(conn, assign_codes)
 
 
 # Columns added after the first release. SQLite has no IF NOT EXISTS for
@@ -222,10 +225,32 @@ CREATE TABLE IF NOT EXISTS group_info (
     total_members   INTEGER NOT NULL,
     updated_at      TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS featured_deals (
+    id              TEXT PRIMARY KEY,
+    item_id         TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    platform        TEXT NOT NULL DEFAULT 'Shopee Mall',
+    category        TEXT NOT NULL,
+    original_price  INTEGER NOT NULL,
+    sale_price      INTEGER NOT NULL,
+    commission_rate REAL NOT NULL,
+    cashback        INTEGER NOT NULL,
+    image_url       TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    is_active       INTEGER DEFAULT 1,
+    sort_order      INTEGER DEFAULT 0,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_deals_cat ON featured_deals(category, is_active, sort_order);
 """
 
 
 _LATER_COLUMNS = {
+    "campaigns": {
+        "per_customer": "INTEGER NOT NULL DEFAULT 0",
+    },
     "link_requests": {
         "notified_at": "TEXT",
         "estimate_source": "TEXT",
@@ -255,6 +280,7 @@ _LATER_COLUMNS = {
         "role": "TEXT NOT NULL DEFAULT 'user'",
         "last_login_at": "TEXT",
         "login_count": "INTEGER NOT NULL DEFAULT 0",
+        "customer_code": "TEXT",
     },
     "products_cache": {
         "image_url": "TEXT",
@@ -262,11 +288,57 @@ _LATER_COLUMNS = {
 }
 
 
+# Promotions such as "20,000 VND extra for the first 20 customers". A bonus
+# is its own money, never folded into cashback: cashback is derived from an
+# approved commission (rule 1), a bonus is a promise we made. See
+# ledger/campaigns.py for the rules that fill and settle the slots.
+_CAMPAIGNS_DDL = """
+CREATE TABLE IF NOT EXISTS campaigns (
+    campaign_id        TEXT PRIMARY KEY,
+    name               TEXT NOT NULL,
+    starts_at          TEXT NOT NULL,
+    ends_at            TEXT NOT NULL,
+    slots              INTEGER NOT NULL,
+    bonus_vnd          INTEGER NOT NULL,
+    min_order_value    INTEGER NOT NULL DEFAULT 0,
+    platforms          TEXT NOT NULL DEFAULT 'shopee,shopeefood,tiktok',
+    excluded_customers TEXT NOT NULL DEFAULT '',
+    per_customer       INTEGER NOT NULL DEFAULT 0,
+    status             TEXT NOT NULL DEFAULT 'active',
+    created_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS campaign_awards (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id     TEXT NOT NULL REFERENCES campaigns(campaign_id),
+    customer_id     TEXT NOT NULL,
+    order_id        TEXT NOT NULL,
+    amount          INTEGER NOT NULL,
+    status          TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    confirmed_at    TEXT,
+    paid_at         TEXT,
+    voided_at       TEXT,
+    notified_status TEXT
+);
+-- One live slot per order: enforced here, not trusted to code. A customer
+-- may hold several (campaigns.per_customer caps it in code), so the old
+-- one-per-customer index is dropped from databases that already had it.
+DROP INDEX IF EXISTS idx_award_customer;
+CREATE INDEX IF NOT EXISTS idx_award_customer_lookup
+    ON campaign_awards(campaign_id, customer_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_award_order
+    ON campaign_awards(campaign_id, order_id) WHERE status != 'void';
+CREATE INDEX IF NOT EXISTS idx_award_order_lookup ON campaign_awards(order_id);
+"""
+
+
 def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SESSIONS_DDL)
+    conn.executescript(_CAMPAIGNS_DDL)
 
 
-def _add_missing_columns(conn: sqlite3.Connection) -> None:
+def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) -> None:
     for table, columns in _LATER_COLUMNS.items():
         present = {
             row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
@@ -275,10 +347,211 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
             if name not in present:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
 
+    _ensure_customer_aliases(conn)
+    _ensure_house(conn)
+    if assign_codes:
+        _ensure_customer_codes(conn)
+
     # Ensure multi-platform & canonical indexes exist
     conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_platform ON orders(platform)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_req_platform ON link_requests(platform)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_cache_canonical ON products_cache(canonical_url)")
+
+
+# The name a customer signs in with and reads back to us. customer_id is
+# the Zalo UID and cannot change -- it is inside the sub_id of every link
+# already handed out -- but nineteen digits is not something anyone types.
+CUSTOMER_CODE_PREFIX = "DP"
+CUSTOMER_CODE_DIGITS = 5
+# The account guest links are made under. See _ensure_house.
+HOUSE_CUSTOMER_ID = "HOUSE"
+HOUSE_ROLE = "house"
+
+# Rows that are not people to be paid never get a customer code.
+_STAFF_ROLES = ("admin", "employee", HOUSE_ROLE)
+
+# The counter only ever goes up. Deriving the next number from MAX() would
+# hand a deleted customer's code to the next person to join, and a code in
+# an old bank transfer must only ever mean one person.
+_CODE_COUNTER_DDL = """
+CREATE TABLE IF NOT EXISTS customer_code_counter (
+    id   INTEGER PRIMARY KEY CHECK (id = 1),
+    last INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO customer_code_counter (id, last) VALUES (1, 0);
+"""
+
+_CODE_TRIGGER = f"""
+CREATE TRIGGER IF NOT EXISTS trg_customer_code
+AFTER INSERT ON customers
+WHEN NEW.customer_code IS NULL
+     AND COALESCE(NEW.role, 'user') NOT IN {_STAFF_ROLES!r}
+BEGIN
+    UPDATE customer_code_counter SET last = last + 1 WHERE id = 1;
+    UPDATE customers SET customer_code = '{CUSTOMER_CODE_PREFIX}' || printf(
+        '%0{CUSTOMER_CODE_DIGITS}d',
+        (SELECT last FROM customer_code_counter WHERE id = 1))
+    WHERE rowid = NEW.rowid;
+END;
+"""
+
+
+# Zalo gives one person a different UID depending on which account is
+# looking. When the bot moved to a new Zalo account on 2026-09-24, every
+# member was seen again under a new id and got a second customer row. The
+# old ids are still inside the sub_id of every link handed out before the
+# move, so after merging they stay here as aliases of the surviving row.
+_ALIASES_DDL = """
+CREATE TABLE IF NOT EXISTS customer_aliases (
+    alias       TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    note        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_aliases_customer ON customer_aliases(customer_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_customer_not_alias
+BEFORE INSERT ON customers
+WHEN EXISTS (SELECT 1 FROM customer_aliases
+             WHERE alias IN (NEW.customer_id, NEW.zalo_user_id))
+BEGIN
+    SELECT RAISE(ABORT, 'that id is an alias of an existing customer');
+END;
+"""
+
+
+def _ensure_customer_aliases(conn: sqlite3.Connection) -> None:
+    conn.executescript(_ALIASES_DDL)
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_zalo"
+            " ON customers(zalo_user_id)"
+            " WHERE zalo_user_id IS NOT NULL AND zalo_user_id != ''")
+    except sqlite3.IntegrityError:
+        # Refusing to start over this would take the bot down; saying so
+        # loudly and leaving the rows for `cashback merge-customers` does not.
+        print("WARNING: two customers share a zalo_user_id;"
+              " run `cashback merge-customers` to resolve it")
+
+
+def _ensure_house(conn: sqlite3.Connection) -> None:
+    """The account a link is made under when the web does not know who asked.
+
+    A visitor who has not signed in and gave no code still gets a working
+    link, so the commission is ours rather than nobody's. Every visitor is
+    the same person here, so one link per product serves them all: a flood
+    of guests costs one trip to Shopee per product, not one per click.
+
+    Its orders pay no cashback (mark_approved forces zero), it never
+    appears among payouts, and nothing is ever sent to it.
+    """
+    conn.execute(
+        "INSERT OR IGNORE INTO customers"
+        " (customer_id, display_name, role, status, created_at)"
+        " VALUES (?, ?, ?, 'active', ?)",
+        (HOUSE_CUSTOMER_ID, "Web guests (house)", HOUSE_ROLE, now()))
+
+
+def is_house(conn: sqlite3.Connection, customer_id: str | None) -> bool:
+    return customer_id == HOUSE_CUSTOMER_ID or bool(conn.execute(
+        "SELECT 1 FROM customers WHERE customer_id=? AND role=?",
+        (customer_id, HOUSE_ROLE)).fetchone())
+
+
+def find_house_link(conn: sqlite3.Connection, item_id: str) -> sqlite3.Row | None:
+    """The guest link already made (or being made) for this product."""
+    return conn.execute(
+        "SELECT * FROM link_requests"
+        " WHERE customer_id=? AND status != 'failed'"
+        "   AND json_extract(estimate_detail, '$.item_id') = ?"
+        " ORDER BY (affiliate_url IS NULL OR affiliate_url = ''), created_at DESC"
+        " LIMIT 1", (HOUSE_CUSTOMER_ID, str(item_id))).fetchone()
+
+
+def format_customer_code(number: int) -> str:
+    return f"{CUSTOMER_CODE_PREFIX}{number:0{CUSTOMER_CODE_DIGITS}d}"
+
+
+def _created_sort_key(value: str | None) -> datetime:
+    """created_at holds two formats: ISO with an offset from now(), and
+    SQLite's datetime('now'), which is UTC without one. Compared as
+    strings they interleave wrongly, so both are brought to UTC."""
+    try:
+        moment = datetime.fromisoformat(str(value).replace(" ", "T"))
+    except ValueError:
+        return datetime.max.replace(tzinfo=timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def _ensure_customer_codes(conn: sqlite3.Connection) -> None:
+    """Give every customer a code, oldest first, and every new one on insert.
+
+    The trigger is what covers new rows: customers are created from half a
+    dozen places, and a rule each of them has to remember is a rule one of
+    them forgets. Numbers are never reused, so a code seen in an old bank
+    transfer can only ever mean one person.
+    """
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_code"
+                 " ON customers(customer_code)")
+    conn.executescript(_CODE_COUNTER_DDL)
+    missing = conn.execute(
+        "SELECT rowid, created_at FROM customers"
+        " WHERE customer_code IS NULL"
+        f"   AND COALESCE(role, 'user') NOT IN {_STAFF_ROLES!r}"
+    ).fetchall()
+    top = max(
+        conn.execute("SELECT last FROM customer_code_counter WHERE id=1")
+        .fetchone()[0],
+        conn.execute(
+            "SELECT COALESCE(MAX(CAST(substr(customer_code, ?) AS INTEGER)), 0)"
+            "  FROM customers WHERE customer_code LIKE ?",
+            (len(CUSTOMER_CODE_PREFIX) + 1, f"{CUSTOMER_CODE_PREFIX}%"),
+        ).fetchone()[0],
+    )
+    ordered = sorted(missing, key=lambda r: (_created_sort_key(r[1]), r[0]))
+    conn.executemany(
+        "UPDATE customers SET customer_code=? WHERE rowid=?",
+        [(format_customer_code(top + i), row[0])
+         for i, row in enumerate(ordered, start=1)],
+    )
+    conn.execute("UPDATE customer_code_counter SET last=? WHERE id=1",
+                 (top + len(ordered),))
+    # Recreated every start so a change to the rule (such as a new role that
+    # gets no code) reaches databases that already have the old trigger.
+    conn.execute("DROP TRIGGER IF EXISTS trg_customer_code")
+    conn.executescript(_CODE_TRIGGER)
+
+
+def find_customer_id(conn: sqlite3.Connection, key: str) -> str | None:
+    """The customer behind a DP code, an internal id, a Zalo id, or an
+    old Zalo id merged into another row (see customer_aliases)."""
+    key = "".join((key or "").split())
+    if not key:
+        return None
+    row = conn.execute(
+        "SELECT customer_id FROM customers"
+        " WHERE customer_code=? OR customer_id=? OR zalo_user_id=?",
+        (key.upper(), key, key)).fetchone()
+    if row is None:
+        # Retired DP codes are aliases too, typed in any case.
+        row = conn.execute(
+            "SELECT customer_id FROM customer_aliases WHERE alias IN (?, ?)",
+            (key, key.upper())).fetchone()
+    return row[0] if row else None
+
+
+def looks_like_customer_code(key: str) -> bool:
+    return bool(re.fullmatch(
+        rf"{CUSTOMER_CODE_PREFIX}\d+", "".join((key or "").split()).upper()))
+
+
+def customer_code_of(conn: sqlite3.Connection, customer_id: str) -> str:
+    row = conn.execute(
+        "SELECT customer_code FROM customers WHERE customer_id=?",
+        (customer_id,)).fetchone()
+    return (row[0] if row else None) or customer_id
 
 
 # ======================================================================
@@ -454,6 +727,10 @@ def mark_approved(
         return False
     if row["status"] != AWAITING_APPROVAL:
         return False
+    # Guest orders are ours in full. Enforced here, where every approval
+    # passes, rather than trusted to each reconciler.
+    if is_house(conn, row["customer_id"]):
+        cashback_amount = 0
 
     conn.execute(
         "UPDATE orders SET status=?, approved_commission=?, cashback_amount=?,"
@@ -495,6 +772,9 @@ def mark_paid(conn: sqlite3.Connection, order_id: str, note: str = "") -> bool:
         (PAID, now(), now(), order_id),
     )
     _record_transition(conn, order_id, APPROVED, PAID, note or "transferred")
+    # A campaign bonus riding on this order went out in the same transfer.
+    from . import campaigns
+    campaigns.settle(conn, order_id)
     return True
 
 
@@ -512,6 +792,13 @@ def orders_awaiting_payout(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 def flag_for_review(
     conn: sqlite3.Connection, order_id: str | None, raw_data: str, reason: str
 ) -> None:
+    """Queue a row for a human -- once. Reconciliation re-reads the same
+    report every hour; filing the same order again each time buried the
+    twelve real questions under a thousand copies of them."""
+    if order_id and conn.execute(
+        "SELECT 1 FROM manual_review WHERE order_id=? AND reason=? AND resolved=0",
+        (order_id, reason)).fetchone():
+        return
     conn.execute(
         "INSERT INTO manual_review (order_id, raw_data, reason, created_at)"
         " VALUES (?,?,?,?)",
@@ -545,8 +832,13 @@ def pending_link_jobs(
         "SELECT request_id, customer_id, source_url, created_at"
         " FROM link_requests"
         " WHERE status=? AND (affiliate_url IS NULL OR affiliate_url='')"
-        " ORDER BY created_at LIMIT ?",
-        (PENDING, limit),
+        # Someone waiting in a Zalo chat first, then a web customer, then
+        # guests: a flood of web requests must not delay the customers who
+        # are actually talking to us.
+        " ORDER BY CASE WHEN customer_id=? THEN 2"
+        "               WHEN COALESCE(channel, '') = 'web' THEN 1 ELSE 0 END,"
+        "          created_at LIMIT ?",
+        (PENDING, HOUSE_CUSTOMER_ID, limit),
     ).fetchall()
 
 
@@ -590,6 +882,39 @@ def find_reusable_request(
         " ORDER BY created_at DESC LIMIT 1",
         (customer_id, source_url, cutoff),
     ).fetchone()
+
+
+def find_own_request(
+    conn: sqlite3.Connection,
+    customer_id: str,
+    source_urls: Iterable[str],
+    resend_within_days: int,
+    platform: str | None = None,
+) -> sqlite3.Row | None:
+    """find_reusable_request across the spellings one product arrives in.
+
+    The same paste is stored as the raw text on one path and as the
+    extracted URL on another, so matching only one of them misses the
+    customer's own earlier link and makes a duplicate.
+
+    This is the ONLY way a link may be reused. A link carries the sub_id
+    of the customer it was made for, and reconciliation credits every order
+    on it to that customer -- so a link found by product rather than by
+    customer pays someone else for this customer's purchase.
+    """
+    for url in dict.fromkeys(u for u in source_urls if u):
+        row = find_reusable_request(
+            conn, customer_id, url, resend_within_days, platform=platform)
+        if row is not None:
+            return row
+    return None
+
+
+def mark_link_delivered(conn: sqlite3.Connection, request_id: str) -> None:
+    """The customer has the link in hand: nobody needs to send it again."""
+    conn.execute(
+        "UPDATE link_requests SET notified_at=? WHERE request_id=?"
+        " AND notified_at IS NULL", (now(), request_id))
 
 
 def resend_request(conn: sqlite3.Connection, request_id: str) -> None:
@@ -816,3 +1141,85 @@ def get_stale_hot_products(
         "SELECT * FROM products_cache WHERE updated_at < ? ORDER BY request_count DESC LIMIT ?",
         (cutoff, limit),
     ).fetchall()
+
+
+def get_featured_deals(
+    conn: sqlite3.Connection, category: str | None = None, limit: int = 24
+) -> list[sqlite3.Row]:
+    """Return active curated/hot deals, optionally filtered by category."""
+    if category and category != "all":
+        return conn.execute(
+            """
+            SELECT * FROM featured_deals
+            WHERE is_active = 1 AND category = ?
+            ORDER BY sort_order ASC, updated_at DESC
+            LIMIT ?
+            """,
+            (category, limit),
+        ).fetchall()
+    return conn.execute(
+        """
+        SELECT * FROM featured_deals
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, updated_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def upsert_featured_deal(
+    conn: sqlite3.Connection,
+    deal_id: str,
+    item_id: str,
+    name: str,
+    platform: str,
+    category: str,
+    original_price: int,
+    sale_price: int,
+    commission_rate: float,
+    cashback: int,
+    image_url: str,
+    url: str,
+    is_active: int = 1,
+    sort_order: int = 0,
+) -> None:
+    timestamp = now()
+    existing = conn.execute(
+        "SELECT id FROM featured_deals WHERE id = ?", (deal_id,)
+    ).fetchone()
+    if existing:
+        conn.execute(
+            """
+            UPDATE featured_deals SET
+                item_id = ?, name = ?, platform = ?, category = ?,
+                original_price = ?, sale_price = ?, commission_rate = ?,
+                cashback = ?, image_url = ?, url = ?, is_active = ?,
+                sort_order = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                item_id, name, platform, category,
+                original_price, sale_price, commission_rate,
+                cashback, image_url, url, is_active,
+                sort_order, timestamp, deal_id,
+            ),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO featured_deals (
+                id, item_id, name, platform, category,
+                original_price, sale_price, commission_rate,
+                cashback, image_url, url, is_active,
+                sort_order, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                deal_id, item_id, name, platform, category,
+                original_price, sale_price, commission_rate,
+                cashback, image_url, url, is_active,
+                sort_order, timestamp, timestamp,
+            ),
+        )
+

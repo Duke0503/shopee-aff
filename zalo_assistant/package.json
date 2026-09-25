@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Zalo Assistant Selfbot Worker for Group Automation and Notifications",
-  "main": "index.js",
+  "main": "assistant_worker.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node assistant_worker.js",
     "login": "node login.js"
   },
   "dependencies": {

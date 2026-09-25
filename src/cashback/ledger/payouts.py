@@ -56,6 +56,10 @@ class Payable:
     amount: int
     order_ids: list[str] = field(default_factory=list)
     bank: dict | None = None
+    customer_code: str = ""
+    # Campaign bonus included in amount, kept apart so a transfer can say
+    # what part is cashback and what part is a promotion.
+    bonus: int = 0
 
     @property
     def has_bank_details(self) -> bool:
@@ -63,7 +67,7 @@ class Payable:
 
     @property
     def reference(self) -> str:
-        return f"{REFERENCE_PREFIX} {self.customer_id}"
+        return f"{REFERENCE_PREFIX} {self.customer_code or self.customer_id}"
 
     def qr_url(self) -> str | None:
         """A VietQR with everything filled in, or None when unsure.
@@ -95,9 +99,12 @@ def collect(conn: sqlite3.Connection) -> list[Payable]:
     """
     rows = conn.execute(
         "SELECT o.customer_id, o.order_id, o.cashback_amount,"
-        "       c.display_name, c.bank_name, c.bank_account, c.account_holder"
+        "       c.display_name, c.bank_name, c.bank_account, c.account_holder,"
+        "       c.customer_code"
         "  FROM orders o JOIN customers c ON c.customer_id = o.customer_id"
         " WHERE o.status = 'approved' AND o.paid_at IS NULL"
+        # Guest orders are ours: there is nobody to pay.
+        "   AND COALESCE(c.role, 'user') != 'house'"
         " ORDER BY o.approved_at"
     ).fetchall()
 
@@ -114,10 +121,16 @@ def collect(conn: sqlite3.Connection) -> list[Payable]:
                 account_holder=row["account_holder"] or "",
                 amount=0,
                 bank=banks.find(row["bank_name"] or "", catalogue),
+                customer_code=row["customer_code"] or "",
             )
             by_customer[row["customer_id"]] = entry
         entry.amount += row["cashback_amount"] or 0
         entry.order_ids.append(row["order_id"])
+
+    from . import campaigns
+    for entry in by_customer.values():
+        entry.bonus = campaigns.bonus_owed(conn, entry.order_ids)
+        entry.amount += entry.bonus
 
     return sorted(by_customer.values(), key=lambda p: -p.amount)
 
@@ -174,19 +187,23 @@ def balance_for(conn: sqlite3.Connection, customer_id: str,
     """
     balance = Balance()
     rows = conn.execute(
-        "SELECT status, cashback_amount, estimated_commission, paid_at"
-        "  FROM orders WHERE customer_id = ?",
+        "SELECT o.status, o.cashback_amount, o.estimated_commission, o.paid_at,"
+        "       COALESCE((SELECT SUM(a.amount) FROM campaign_awards a"
+        "                 WHERE a.order_id = o.order_id AND a.status != 'void'), 0) AS bonus"
+        "  FROM orders o WHERE o.customer_id = ?",
         (customer_id,),
     ).fetchall()
     for row in rows:
+        # A campaign bonus follows its order: waiting while the order waits,
+        # payable once it is approved, paid with it.
         if row["paid_at"]:
-            balance.paid += row["cashback_amount"] or 0
+            balance.paid += (row["cashback_amount"] or 0) + row["bonus"]
         elif row["status"] == "approved":
-            balance.approved += row["cashback_amount"] or 0
+            balance.approved += (row["cashback_amount"] or 0) + row["bonus"]
             balance.approved_orders += 1
         elif row["status"] == "awaiting_approval":
             est_comm = row["estimated_commission"] or 0
             net_comm = round_dong(est_comm * (1 - 0.10 - 0.0098))
-            balance.awaiting += round_dong(net_comm * cashback_rate)
+            balance.awaiting += round_dong(net_comm * cashback_rate) + row["bonus"]
             balance.awaiting_orders += 1
     return balance

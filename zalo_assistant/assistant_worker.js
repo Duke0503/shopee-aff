@@ -1,9 +1,10 @@
-import { Zalo, ThreadType, GroupEventType } from "zca-js";
+import { Zalo, ThreadType, GroupEventType, FriendEventType } from "zca-js";
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import sizeOf from "image-size";
 import { config } from "./config.js";
+import { createFriendKeeper } from "./friends.js";
 
 // Regex nhận diện link Shopee, TikTok Shop, Lazada & ShopeeFood
 const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s]+/i;
@@ -30,7 +31,7 @@ function sleep(ms) {
 
 async function main() {
   console.log("=== KHỞI ĐỘNG ZALO ASSISTANT BOT (FULL PLAN) ===");
-  const credentials = JSON.parse(await fs.readFile("./credentials.json", "utf-8"));
+  const credentials = JSON.parse(await fs.readFile(config.CREDENTIALS_PATH, "utf-8"));
 
   const zalo = new Zalo({
     logging: false,
@@ -51,7 +52,17 @@ async function main() {
   console.log(`[Bot Online] Đăng nhập thành công với UID: ${ownId}`);
   console.log(`[Config] Nhóm đang kích hoạt (Active Group): ${config.ACTIVE_GROUP_ID}`);
 
-  // Cache thông tin trưởng nhóm & phó nhóm (admin) để không tag tên khi họ gõ lệnh hoặc gửi link
+  const wording = JSON.parse(await fs.readFile(config.MESSAGES_PATH, "utf-8"));
+  const friends = createFriendKeeper({
+    api,
+    ownId,
+    statePath: config.FRIEND_STATE_PATH,
+    dailyLimit: config.FRIEND_REQUESTS_PER_DAY,
+    message: wording.friend_request,
+  });
+
+  // Group owner and deputies, cached a minute. Only operator commands
+  // (/refreshcache) check it: everyone, admins included, is tagged by name.
   const groupAdminsCache = new Map();
 
   async function isGroupAdminOrCreator(groupId, uid) {
@@ -368,8 +379,7 @@ function extractTextAndUrls(data) {
       }).then((r) => r.json()).catch(() => ({ ok: false }));
 
       const isGroup = threadType === ThreadType.Group;
-      const isAdmin = isGroup && await isGroupAdminOrCreator(threadId, senderUid);
-      const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
+      const tagText = isGroup && senderUid ? `@${senderName}` : "";
       const tagPrefix = tagText ? `${tagText}\n` : "";
       const mentions = tagText
         ? [
@@ -435,7 +445,13 @@ function extractTextAndUrls(data) {
         return;
       }
 
-      if (!productData && affUrl) {
+      // A link made for this customer just now arrives with a name at most
+      // (link-status carries no figures), so a name alone is not enough to
+      // skip the preview: without it the reply goes out with no price and
+      // no cashback amount.
+      const hasFigures = productData && (productData.price > 0 || productData.commission > 0 ||
+        productData.total_commission > 0 || productData.shopee_rate > 0 || productData.seller_rate > 0);
+      if (!hasFigures && affUrl) {
         try {
           const previewRes = await fetch(`${config.MAIN_API_URL}/api/shopee/preview`, {
             method: "POST",
@@ -444,7 +460,8 @@ function extractTextAndUrls(data) {
           });
           const previewData = await previewRes.json();
           if (previewData.ok && previewData.found) {
-            productData = previewData;
+            const isGroupOrder = productData && productData.is_group_order;
+            productData = isGroupOrder ? { ...previewData, is_group_order: true } : previewData;
           }
         } catch (_) {}
       }
@@ -548,6 +565,36 @@ function extractTextAndUrls(data) {
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       }
 
+      // A campaign this order could still win: said only when true for this
+      // customer on this platform. Any failure leaves the reply as it was.
+      try {
+        const platformKey = isTikTok ? "tiktok" : isFood ? "shopeefood" : isLazada ? "lazada" : "shopee";
+        const offerRes = await fetch(
+          `${config.MAIN_API_URL}/api/campaigns/offer?customer_id=${encodeURIComponent(effectiveCustomerId)}&platform=${platformKey}`,
+          { signal: AbortSignal.timeout(3000) }
+        ).then((r) => r.json());
+        const offer = offerRes && offerRes.ok ? offerRes.offer : null;
+        if (offer && wording.campaign_link_hint) {
+          const money = (n) => `${Number(n).toLocaleString("vi-VN")}${wording.currency || ""}`;
+          const bonus = money(offer.bonus);
+          // The total only when the cashback is known: a guessed total is a promise.
+          const cashbackNum = Number(productData?.cashback) || 0;
+          const total = cashbackNum > 0 && wording.campaign_link_total
+            ? wording.campaign_link_total.replaceAll("{total}", money(cashbackNum + Number(offer.bonus)))
+            : "";
+          const rule = offer.per_customer > 0
+            ? (wording.campaign_rule_per_customer || "").replaceAll("{cap}", String(offer.per_customer))
+            : (wording.campaign_rule_unlimited || "");
+          replyText += "\n\n" + wording.campaign_link_hint
+            .replaceAll("{name}", offer.name)
+            .replaceAll("{slots}", String(offer.slots))
+            .replaceAll("{left}", String(offer.left))
+            .replaceAll("{bonus}", bonus)
+            .replaceAll("{rule}", rule)
+            .replaceAll("{total}", total);
+        }
+      } catch (_) {}
+
       const styles = [];
       for (const target of boldTargets) {
         if (!target) continue;
@@ -600,25 +647,21 @@ function extractTextAndUrls(data) {
       const isGroup = message.type === ThreadType.Group;
       const senderName = message.data.dName || "Bạn";
       const senderUid = message.data.uidFrom;
-      const isAdmin = isGroup && await isGroupAdminOrCreator(message.threadId, senderUid);
 
-      // Lắng nghe và tracking ở cả nhóm chính (Hoàn Tiền Shopee) và nhóm dev (Dev Internal DP)
-      const allowedGroups = [
-        String(config.GROUP_MAIN_ID),
-        String(config.ACTIVE_GROUP_ID),
-        String(config.GROUP_TEST_ID),
-        "2813090100064697955",
-        "2417491944968337600",
-        "8786316503449470342",
-        "9181140731214988069",
-      ].filter(Boolean);
+      // Only the groups this environment serves; see LISTEN_GROUP_IDS in config.js
+      const allowedGroups = config.LISTEN_GROUP_IDS.map(String);
       if (isGroup && !allowedGroups.includes(String(message.threadId))) {
         return;
       }
 
       // Bóc tách text và link từ message.data
       const { text, urls } = extractTextAndUrls(message.data);
-      console.log(`[Message In] [${isGroup ? 'Group ' + message.threadId : 'DM ' + senderUid}] ${senderName} (Admin: ${isAdmin}): text="${text}", urls=${JSON.stringify(urls)}`);
+      console.log(`[Message In] [${isGroup ? 'Group ' + message.threadId : 'DM ' + senderUid}] ${senderName}: text="${text}", urls=${JSON.stringify(urls)}`);
+
+      // They wrote to us first, privately: offer to be friends (once).
+      if (!isGroup && !message.isSelf) {
+        friends.afterPrivateMessage(senderUid).catch(() => {});
+      }
 
       // Ghi nhận nhật ký hành vi người dùng (Group Message vs Bot DM)
       logActivity(
@@ -643,12 +686,27 @@ function extractTextAndUrls(data) {
       const isIdCmd = cmd === "/id" || cmd === "!id" || cmd === "/ma" || cmd === "!ma";
       const isPassCmd = cmd === "/matkhau" || cmd === "!matkhau" || cmd === "/pass" || cmd === "!pass" || cmd === "/password" || cmd === "!password";
       const isBalanceCmd = cmd === "/sodu" || cmd === "!sodu";
+      const isOrdersCmd = ["/donhang", "!donhang", "/don", "!don", "/lichsu", "!lichsu"].includes(cmd);
 
-      // Xử lý lệnh lấy ID / Mật khẩu / Số dư
-      if (isIdCmd || isPassCmd || isBalanceCmd) {
+      // Xử lý lệnh lấy ID / Mật khẩu / Số dư / Đơn hàng
+      if (isIdCmd || isPassCmd || isBalanceCmd || isOrdersCmd) {
         // TRƯỜNG HỢP 1: Người dùng gõ trong NHÓM CHUNG -> Bot tag nhắc nhắn riêng để bảo mật
+        if (isGroup && isOrdersCmd) {
+          // Orders and amounts are private: answer only in a 1-1 chat.
+          const tagText = senderUid ? `@${senderName}` : "";
+          const reply = (tagText ? `${tagText}\n` : "") + wording.orders_in_group;
+          await api.sendMessage(
+            {
+              msg: reply,
+              mentions: tagText ? [{ uid: String(senderUid), pos: 0, len: tagText.length }] : undefined,
+            },
+            message.threadId,
+            message.type
+          );
+          return;
+        }
         if (isGroup) {
-          const tagText = senderUid && !isAdmin ? `@${senderName}` : "";
+          const tagText = senderUid ? `@${senderName}` : "";
           const tagPrefix = tagText ? `${tagText}\n` : "";
           const reply =
             tagPrefix +
@@ -701,7 +759,7 @@ function extractTextAndUrls(data) {
                   body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_id" }),
                 }).then((r) => r.json()).catch(() => null);
 
-                const custId = authRes?.customer_id || String(senderUid);
+                const custId = authRes?.customer_code || authRes?.customer_id || String(senderUid);
                 await api.sendMessage(
                   `✨ MÃ KHÁCH HÀNG (ID) CỦA BẠN ✨\n\n` +
                   `👤 Tên Zalo: ${senderName}\n` +
@@ -727,7 +785,7 @@ function extractTextAndUrls(data) {
               body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_id" }),
             }).then((r) => r.json()).catch(() => null);
 
-            const custId = authRes?.customer_id || String(senderUid);
+            const custId = authRes?.customer_code || authRes?.customer_id || String(senderUid);
             const reply =
               `✨ THÔNG TIN MÃ KHÁCH HÀNG CỦA BẠN ✨\n\n` +
               `👤 Tên Zalo: ${senderName}\n` +
@@ -754,7 +812,7 @@ function extractTextAndUrls(data) {
             }).then((r) => r.json()).catch(() => null);
 
             if (authRes && authRes.ok && authRes.password) {
-              const custId = authRes.customer_id;
+              const custId = authRes.customer_code || authRes.customer_id;
               const pwd = authRes.password;
               const reply =
                 `🔐 MẬT KHẨU ĐĂNG NHẬP WEBSITE 🔐\n\n` +
@@ -793,7 +851,7 @@ function extractTextAndUrls(data) {
 
               const reply =
                 `💰 SỐ DƯ TIỀN HOÀN CỦA BẠN 💰\n\n` +
-                `👤 Khách hàng: ${balRes.display_name} (${balRes.customer_id})\n` +
+                `👤 Khách hàng: ${balRes.display_name} (${balRes.customer_code || balRes.customer_id})\n` +
                 `💵 Đã tích lũy sẵn sàng nhận: ${formatVND(balRes.approved)}\n` +
                 `⏳ Đang chờ Shopee đối soát: ${formatVND(balRes.awaiting)}\n` +
                 `🎉 Đã chuyển khoản về ví: ${formatVND(balRes.paid)}\n` +
@@ -807,6 +865,28 @@ function extractTextAndUrls(data) {
           }
           return;
         }
+
+        if (isOrdersCmd) {
+          // The backend writes the messages (every order, newest first, split
+          // to fit Zalo); this only delivers them, in order.
+          try {
+            const res = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_orders" }),
+            }).then((r) => r.json()).catch(() => null);
+
+            if (res && res.ok && Array.isArray(res.parts)) {
+              for (const [i, part] of res.parts.entries()) {
+                if (i > 0) await sleep(randomInt(800, 1500));
+                await api.sendMessage(part, message.threadId, message.type);
+              }
+            }
+          } catch (err) {
+            console.error("[Get Orders Error]:", err);
+          }
+          return;
+        }
       }
 
       if (cmd === "!ping" || cmd === "/ping") {
@@ -814,7 +894,7 @@ function extractTextAndUrls(data) {
         const reply = `Pong! 🏓 Trợ lý Hoàn Tiền đang hoạt động ổn định 24/7 tại ${currentGName}.`;
         await api.sendMessage(reply, message.threadId, message.type);
       } else if (cmd === "!help" || cmd === "/huongdan" || cmd === "/help") {
-        const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
+        const tagText = isGroup && senderUid ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
 
         const reply =
@@ -877,7 +957,7 @@ function extractTextAndUrls(data) {
           message.type
         );
       } else if (cmd === "/web" || cmd === "!web") {
-        const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
+        const tagText = isGroup && senderUid ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
         const reply =
           tagPrefix +
@@ -910,7 +990,7 @@ function extractTextAndUrls(data) {
           message.type
         );
       } else if (cmd === "!chinhsach" || cmd === "/chinhsach") {
-        const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
+        const tagText = isGroup && senderUid ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
 
         const reply =
@@ -958,7 +1038,7 @@ function extractTextAndUrls(data) {
           message.type
         );
       } else if (cmd === "/topdeal" || cmd === "/hot" || cmd === "!topdeal" || cmd === "!hot") {
-        const tagText = isGroup && senderUid && !isAdmin ? `@${senderName}` : "";
+        const tagText = isGroup && senderUid ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
 
         // Check for subcommand: /topdeal tiktok
@@ -1019,7 +1099,8 @@ function extractTextAndUrls(data) {
           console.error("[Top Deal Error]:", err.message);
         }
       } else if (cmd === "/refreshcache") {
-        if (!isAdmin) return;
+        // Operators only: a refresh looks up every hot product at once.
+        if (!isGroup || !(await isGroupAdminOrCreator(message.threadId, senderUid))) return;
         try {
           const refRes = await fetch(`${config.MAIN_API_URL}/api/shopee/cache/refresh-hot`, {
             method: "POST",
@@ -1036,11 +1117,33 @@ function extractTextAndUrls(data) {
           console.error("[Refresh Cache Error]:", err.message);
         }
       } else if (cmd === "!test-welcome") {
+        // Operators only: it posts a welcome into the group.
+        if (!isGroup || !(await isGroupAdminOrCreator(message.threadId, senderUid))) return;
         const gName = await getGroupName(message.threadId);
         await sendGroupWelcomeBatch(message.threadId, [{ id: senderUid, dName: senderName }], gName);
         if (config.ENABLE_PRIVATE_WELCOME) {
           await sendPrivateWelcome({ id: senderUid, dName: senderName });
         }
+      } else if (/^\/[a-z0-9_]+(\s|$)/i.test(text.trim())) {
+        // Every command above has already answered. What reaches here is a
+        // slash command we do not have: say so, and list the ones a customer
+        // can use (operator commands are not listed). Only a message that
+        // STARTS with "/word" counts: "50k /cái" in a chat is not a command,
+        // and "!" also starts ordinary chat like "!!!".
+        const tagText = isGroup && senderUid ? `@${senderName}` : "";
+        const reply =
+          (tagText ? `${tagText}\n` : "") +
+          wording.unknown_command
+            .replace("{command}", cmd)
+            .replace("{commands}", wording.command_list);
+        await api.sendMessage(
+          {
+            msg: reply,
+            mentions: tagText ? [{ uid: String(senderUid), pos: 0, len: tagText.length }] : undefined,
+          },
+          message.threadId,
+          message.type
+        );
       }
     } catch (err) {
       console.error("[Message Listener Error]:", err);
@@ -1064,17 +1167,15 @@ function extractTextAndUrls(data) {
   }, 6 * 60 * 60 * 1000);
 
   // B. LẮNG NGHE SỰ KIỆN THÀNH VIÊN VÀO NHÓM
+  api.listener.on("friend_event", (event) => {
+    if (event.type === FriendEventType.REQUEST && !event.isSelf) {
+      friends.onFriendRequest(event.data?.fromUid);
+    }
+  });
+
   api.listener.on("group_event", async (event) => {
     try {
-      const allowedGroups = [
-        String(config.GROUP_MAIN_ID),
-        String(config.ACTIVE_GROUP_ID),
-        String(config.GROUP_TEST_ID),
-        "2813090100064697955",
-        "2417491944968337600",
-        "8786316503449470342",
-        "9181140731214988069",
-      ].filter(Boolean);
+      const allowedGroups = config.LISTEN_GROUP_IDS.map(String);
       if (!allowedGroups.includes(String(event.threadId))) return;
 
       console.log(`[Group Event] Nhận sự kiện: ${event.type} (${event.act}) trong group ${event.threadId}`);
@@ -1131,6 +1232,13 @@ function extractTextAndUrls(data) {
 
   // C. HTTP API NOTIFICATION SERVER (Port 8891)
   const server = http.createServer(async (req, res) => {
+    // Anything that can make this account speak needs the shared secret
+    // when one is configured. The server also listens on loopback only.
+    if (config.API_TOKEN && req.headers["x-assistant-token"] !== config.API_TOKEN) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "bad token" }));
+      return;
+    }
     // 1. Gửi thông báo tùy biến
     if (req.method === "POST" && req.url === "/api/notify") {
       let body = "";
@@ -1165,16 +1273,29 @@ function extractTextAndUrls(data) {
         try {
           const payload = JSON.parse(body);
           const text = payload.message || "";
+          // Only the two groups this instance knows: "test" to rehearse an
+          // announcement, anything else means the main group.
+          const groupId = payload.group === "test" ? config.GROUP_TEST_ID : config.ACTIVE_GROUP_ID;
           const attachments = payload.attachments || (payload.imagePath ? [payload.imagePath] : undefined);
 
-          console.log(`[HTTP Broadcast] Gửi broadcast vào group ${config.ACTIVE_GROUP_ID}: ${text}`);
-          const sendRes = await api.sendMessage(
-            attachments ? { msg: text, attachments } : text,
-            config.ACTIVE_GROUP_ID,
-            ThreadType.Group
-          );
+          console.log(`[HTTP Broadcast] Gửi broadcast vào group ${groupId}: ${text.slice(0, 80)}`);
+          const results = [];
+          // Picture first, then the text: a caption under an image is cut
+          // short by Zalo, a message of its own is not.
+          if (attachments && payload.imageFirst) {
+            results.push(await api.sendMessage({ msg: "", attachments }, groupId, ThreadType.Group));
+          }
+          if (text) {
+            const mentions = [];
+            const allPos = payload.mentionAll ? text.indexOf("@All") : -1;
+            if (allPos !== -1) mentions.push({ pos: allPos, uid: "-1", len: 4 });
+            const msg = { msg: text };
+            if (mentions.length) msg.mentions = mentions;
+            if (attachments && !payload.imageFirst) msg.attachments = attachments;
+            results.push(await api.sendMessage(msg, groupId, ThreadType.Group));
+          }
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true, result: sendRes }));
+          res.end(JSON.stringify({ ok: true, group: groupId, result: results }));
         } catch (err) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: false, error: err.message }));
@@ -1219,10 +1340,11 @@ function extractTextAndUrls(data) {
     }
   });
 
+  const knownMemberNames = new Map();
+
   async function syncGroupInfo() {
     const groupsToSync = [
-      { id: String(config.GROUP_MAIN_ID || "2813090100064697955"), defaultName: "Hoàn Tiền Shopee" },
-      { id: String(config.GROUP_TEST_ID || "8786316503449470342"), defaultName: "Dev Internal DP" },
+      { id: String(config.GROUP_MAIN_ID), defaultName: "Hoàn Tiền Shopee" },
     ];
 
     for (const grp of groupsToSync) {
@@ -1259,7 +1381,14 @@ function extractTextAndUrls(data) {
         if (uids.length > 0) {
           const members = [];
           for (const uid of uids) {
-            if (uid === ownId) continue;
+            if (uid === ownId || (config.IGNORE_MEMBER_UIDS || []).includes(uid)) continue;
+            // Names are only needed for people the ledger has not seen.
+            // Looking every member up every five minutes was ~12,000 profile
+            // reads a day from a personal account: a bot signal, for nothing.
+            if (knownMemberNames.has(uid)) {
+              members.push({ uid, name: knownMemberNames.get(uid) });
+              continue;
+            }
             try {
               const uInfo = await api.getUserInfo(uid);
               const name =
@@ -1268,6 +1397,7 @@ function extractTextAndUrls(data) {
                 uInfo?.name ||
                 ("Thành viên " + uid.slice(-4));
               members.push({ uid, name });
+              knownMemberNames.set(uid, name);
             } catch (_) {
               members.push({ uid, name: "Thành viên " + uid.slice(-4) });
             }
@@ -1302,14 +1432,14 @@ function extractTextAndUrls(data) {
       console.warn(`[HTTP Server Warning] Cổng ${config.PORT} đang bị chiếm, sẽ tự động thử lại sau 5s...`);
       setTimeout(() => {
         try { server.close(); } catch (_) {}
-        server.listen(config.PORT);
+        server.listen(config.PORT, "127.0.0.1");
       }, 5000);
     } else {
       console.error("[HTTP Server Error]:", err);
     }
   });
 
-  server.listen(config.PORT, () => {
+  server.listen(config.PORT, "127.0.0.1", () => {
     console.log(`[HTTP Server] Notification API đang chạy tại http://localhost:${config.PORT}`);
   });
 }

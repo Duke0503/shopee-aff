@@ -107,7 +107,7 @@ class TestTheSnapshotShape:
         entry = next(p for p in dashboard.snapshot(populated, RATE)["ready"]
                      if p["customer_id"] == "C0001")
         assert "img.vietqr.io" in entry["qr_url"]
-        assert entry["reference"].endswith("C0001")
+        assert entry["reference"].endswith("DP00001")
 
     def test_it_is_plain_json_not_dataclasses(self, populated):
         """The browser is the only consumer, so nothing may need repr()."""

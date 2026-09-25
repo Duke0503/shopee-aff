@@ -57,20 +57,26 @@ def run(
     for row in rows:
         result.rows_read += 1
 
-        # Never guess. A row we cannot attribute goes to a human.
-        if not row.customer_code:
-            ledger.flag_for_review(
-                conn, row.order_id, json.dumps(row.raw, ensure_ascii=False),
-                "no sub_id1, cannot attribute to a customer",
-            )
-            result.needs_review += 1
-            continue
+        # An id merged into another row still arrives here from every link
+        # issued before the merge; find_customer_id follows the alias.
+        customer_id = (ledger.find_customer_id(conn, row.customer_code)
+                       if row.customer_code else None)
+        if customer_id is None and row.request_code:
+            # sub_id2 names the exact link, and a link is made for exactly
+            # one customer. Customers renumbered since (the C0003-era codes)
+            # are still found this way. That is evidence, not a guess.
+            owner = conn.execute(
+                "SELECT customer_id FROM link_requests WHERE request_id=?",
+                (row.request_code,)).fetchone()
+            customer_id = owner[0] if owner else None
 
-        if ledger.get_customer(conn, row.customer_code) is None:
+        # Never guess. A row we cannot attribute goes to a human.
+        if customer_id is None:
+            reason = (f"sub_id1 '{row.customer_code}' is not a known customer"
+                      if row.customer_code
+                      else "no sub_id1, cannot attribute to a customer")
             ledger.flag_for_review(
-                conn, row.order_id, json.dumps(row.raw, ensure_ascii=False),
-                f"sub_id1 '{row.customer_code}' is not a known customer",
-            )
+                conn, row.order_id, json.dumps(row.raw, ensure_ascii=False), reason)
             result.needs_review += 1
             continue
 
@@ -98,7 +104,7 @@ def run(
             ledger.add_order(
                 conn,
                 order_id=row.order_id,
-                customer_id=row.customer_code,
+                customer_id=customer_id,
                 request_id=request_id,
                 order_value=row.order_value,
                 # The report carries what the order WOULD earn. It is an

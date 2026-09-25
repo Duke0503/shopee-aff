@@ -56,7 +56,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("dashboard",
                        help="open the end-of-day payout page in a browser")
-    p.add_argument("--port", type=int, default=8899)
+    p.add_argument("--port", type=int, default=None,
+                   help="default: DASHBOARD_PORT")
     p.add_argument("--open", action="store_true",
                    help="also open it in the default browser")
 
@@ -121,6 +122,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="erase even if a payout is still owed"
     )
 
+    sub.add_parser("backup", help="snapshot the ledger (safe while serving)")
+
+    p = sub.add_parser("campaign-create", help="register a bonus promotion")
+    p.add_argument("--id", required=True)
+    p.add_argument("--name", required=True)
+    p.add_argument("--starts", required=True, help="ISO time, e.g. 2026-09-26T00:00:00+07:00")
+    p.add_argument("--ends", required=True, help="ISO time, exclusive")
+    p.add_argument("--slots", type=int, required=True)
+    p.add_argument("--bonus", type=int, required=True, help="VND per slot")
+    p.add_argument("--min-order", type=int, default=0)
+    p.add_argument("--platforms", default="shopee,shopeefood,tiktok")
+    p.add_argument("--per-customer", type=int, default=0,
+                   help="most slots one customer may hold (0 = no limit)")
+    p.add_argument("--exclude", action="append", default=[], metavar="CUSTOMER",
+                   help="DP code, UID or id that never holds a slot (repeatable)")
+    p.add_argument("--apply", action="store_true")
+
+    sub.add_parser("campaign-status", help="who holds which campaign slot")
+
+    p = sub.add_parser("announce", help="post an announcement to a group via the assistant")
+    p.add_argument("--text", required=True, help="file holding the message")
+    p.add_argument("--image", help="picture sent before the message")
+    p.add_argument("--group", choices=("test", "main"), default="test")
+    p.add_argument("--send", action="store_true", help="send it (default: only show it)")
+
+    p = sub.add_parser(
+        "backfill-products",
+        help="find pictures and names for links saved without them")
+    p.add_argument("--apply", action="store_true",
+                   help="write what was found (default: only show it)")
+    p.add_argument("--all", action="store_true",
+                   help="every link request, not only those with an order")
+
+    p = sub.add_parser(
+        "merge-customers",
+        help="fold duplicate customers left by a Zalo account change")
+    p.add_argument("--apply", action="store_true",
+                   help="write the changes (default: only show the plan)")
+    p.add_argument("--skip", action="append", default=[], metavar="NAME",
+                   help="leave the pair with this display name alone")
+    p.add_argument("--delete", action="append", default=[], metavar="ID",
+                   help="remove a row with no history (a bot, a stale copy)")
+
     p = sub.add_parser("reset", help="wipe the whole ledger (testing only)")
     p.add_argument("--yes", action="store_true")
 
@@ -134,16 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--connect-timeout", type=int, default=45)
 
     p = sub.add_parser(
-        "zalo-check",
-        help="verify the Zalo token and dump raw updates to learn their shape",
-    )
-    p.add_argument(
-        "--seconds", type=int, default=0,
-        help="0 (default) listens until Ctrl+C"
-    )
-
-    p = sub.add_parser(
-        "serve", help="run everything: Zalo bot plus link generation"
+        "serve", help="run everything: links, notifications, payout page"
     )
     p.add_argument("--port", type=int, default=None)
     p.add_argument("--window", type=int, default=None, help="batch window seconds")
@@ -157,7 +192,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-reconcile", action="store_true",
         help="do not pull the conversion report on a timer"
     )
-    p.add_argument("--dashboard-port", type=int, default=8899)
+    p.add_argument("--dashboard-port", type=int, default=None,
+                   help="default: DASHBOARD_PORT")
     p.add_argument(
         "--no-dashboard", action="store_true",
         help="do not serve the payout page"
@@ -242,6 +278,12 @@ def _handlers() -> dict:
         "request": ledger_ops.cmd_request,
         "forget": ledger_ops.cmd_forget,
         "reset": ledger_ops.cmd_reset,
+        "backup": ledger_ops.cmd_backup,
+        "campaign-create": ledger_ops.cmd_campaign_create,
+        "campaign-status": ledger_ops.cmd_campaign_status,
+        "announce": ledger_ops.cmd_announce,
+        "backfill-products": ledger_ops.cmd_backfill_products,
+        "merge-customers": ledger_ops.cmd_merge_customers,
 
         "check-policy": analysis.cmd_check_policy,
         "metrics": analysis.cmd_metrics,
@@ -257,7 +299,6 @@ def _handlers() -> dict:
         "probe": browser.cmd_probe,
 
         "run": service.cmd_run,
-        "zalo-check": service.cmd_zalo_check,
         "serve": service.cmd_serve,
     }
 

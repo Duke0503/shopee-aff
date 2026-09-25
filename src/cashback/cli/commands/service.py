@@ -18,6 +18,10 @@ log = get_logger(__name__)
 # as "30-70 ngay".
 PAYOUT_WINDOW_TEXT = messages.render("payout_window")
 
+# How often the backend looks for something to tell customers. Short enough
+# that a late link arrives soon after the assistant stopped waiting for it.
+NOTIFY_INTERVAL_SECONDS = 10
+
 
 def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     from ...worker import runner as worker
@@ -35,14 +39,13 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
 
     # A late extension is not a reason to take the whole bot down. After a
     # restart it can take a poll cycle to notice the bridge is back, and
-    # quitting here kills the Zalo side too -- customers stop being answered
-    # over something that fixes itself in thirty seconds. The link loop
+    # quitting here takes the web and notifications down too, over
+    # something that fixes itself in thirty seconds. The link loop
     # re-checks the connection on every pass and picks it up on its own.
     if worker.wait_for_extension(bridge, args.connect_timeout):
         print("Extension connected.\n")
     else:
         print("\nExtension has not checked in yet. Carrying on without it:")
-        print("  - Zalo replies work now")
         print("  - links start generating as soon as it appears")
         print("If it stays away: load it at chrome://extensions, open")
         print("affiliate.shopee.vn, or re-sync with: cashback setup-token\n")
@@ -58,85 +61,13 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_zalo_check(cfg: Config, args: argparse.Namespace) -> int:
-    """Confirm the token works and reveal what updates actually look like.
-
-    Three things are undocumented and matter: the value of chat.type for a
-    group, whether a group message reaches the bot without an @mention, and
-    how that mention appears inside the text. Rather than guessing, this
-    prints raw updates so they can be read off.
-    """
-    import json as _json
-    import time
-
-    from ...messaging.zalo_client import ZaloBot, ZaloError
-
-    if not cfg.zalo_bot_token:
-        print("ZALO_BOT_TOKEN is empty in .env")
-        print("\nTo get one: open Zalo, find the 'Zalo Bot Manager' official")
-        print("account, choose 'Create bot'. The name must start with 'Bot'.")
-        print("The token arrives as a Zalo message.")
-        return 1
-
-    try:
-        with ZaloBot(cfg.zalo_bot_token, cfg.zalo_api_url) as bot:
-            me = bot.get_me()
-            print("Token works. Bot identity:")
-            print(_json.dumps(me, indent=2, ensure_ascii=False))
-
-            forever = args.seconds <= 0
-            window = "until Ctrl+C" if forever else f"for {args.seconds}s"
-            print(f"\nListening {window}. Now, in Zalo:")
-            print("  1. message the bot privately")
-            print("  2. add it to a group and send a message WITHOUT tagging it")
-            print("  3. send another message, this time tagging it\n")
-
-            deadline = time.time() + (args.seconds if not forever else 0)
-            seen = 0
-            while forever or time.time() < deadline:
-                remaining = 25 if forever else max(5, int(deadline - time.time()))
-                try:
-                    updates = bot.get_updates(timeout=min(25, remaining))
-                except ZaloError as exc:
-                    print(f"  getUpdates failed: {exc}")
-                    time.sleep(2)
-                    continue
-                for update in updates:
-                    seen += 1
-                    msg = update.message
-                    where = "?" 
-                    if msg:
-                        where = "GROUP" if msg.chat.is_group else "private"
-                    print(f"--- update {seen}  ({where}) ---")
-                    print(_json.dumps(update.raw, indent=2, ensure_ascii=False))
-                    if msg:
-                        print(f"  chat.id   = {msg.chat.id}")
-                        print(f"  chat.type = {msg.chat.type!r}"
-                              f"   <- is this the group marker?")
-                        print(f"  text      = {msg.text!r}")
-                        print(f"  sender    = {msg.sender_id} {msg.sender_name!r}")
-                if not updates:
-                    print(f"  ...{int(deadline - time.time())}s left, nothing yet")
-
-            if not seen:
-                print("No updates arrived. Either nothing was sent, or a webhook")
-                print("is registered -- getUpdates and webhooks are mutually")
-                print("exclusive. Check with getWebhookInfo.")
-                return 1
-            print(f"\n{seen} update(s) captured.")
-    except ZaloError as exc:
-        print(f"Failed: {exc}")
-        return 1
-    return 0
-
-
 def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
-    """Run everything: listen on Zalo, generate links, reply, and serve
-    the payout page.
+    """Run everything: generate links, send notifications through the
+    Zalo assistant, reconcile, and serve the site.
 
-    Two loops share one ledger. The Zalo loop only touches the database;
-    the link loop only touches the browser. Neither blocks the other, so a
-    slow browser pass never stops the bot from answering.
+    The loops share one ledger. The notify loop only touches the database
+    and the assistant; the link loop only touches the browser. Neither
+    blocks the other, so a slow browser pass never delays a notification.
 
     The payout page rides along on a third thread. It used to be a
     separate command, which meant the operator opened the URL at the end
@@ -147,17 +78,20 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     import time
 
     from ...worker import runner as worker
-    from ...messaging import conversation as zalo_handler
+    from ...messaging import notifications
+    from ...messaging.assistant_bridge import AssistantSender
     from ...shopee.browser_bridge import serve_in_background
     from ...worker.batch_queue import BatchSettings
-    from ...messaging.zalo_client import ZaloBot, ZaloError
 
-    if not cfg.zalo_bot_token:
-        print("ZALO_BOT_TOKEN is empty. Run: cashback zalo-check")
-        return 1
     if not cfg.bridge_token:
         print("BRIDGE_TOKEN is empty. Run: cashback setup-token")
         return 1
+
+    # Snapshot BEFORE migrating: a restart usually follows a code change,
+    # and a migration is the change most able to damage the data.
+    if cfg.db_path.exists():
+        from ...ledger import backup
+        print(f"Backup: {backup.create(cfg.db_path, cfg.backup_dir, keep=cfg.backup_keep)}")
 
     # Apply any schema added since this database was created. Cheap and
     # idempotent -- and skipping it once already had the bot querying a
@@ -172,8 +106,9 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     if not args.no_dashboard:
         from ...web import dashboard
         dashboard_server = dashboard.serve_in_background(
-            cfg, port=args.dashboard_port)
-        print(f"Payout page on http://127.0.0.1:{args.dashboard_port}")
+            cfg, port=args.dashboard_port or cfg.dashboard_port)
+        print("Payout page on http://127.0.0.1:"
+              f"{args.dashboard_port or cfg.dashboard_port}")
     print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}.")
 
     if not args.no_browser:
@@ -182,8 +117,9 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             print("Extension connected.")
         else:
             print("\nExtension has not checked in yet. Carrying on without it:")
-            print("  - Web & dashboard active on port 8899 and port 80")
-            print("  - Zalo replies active")
+            print(f"  - Web active on port {cfg.dashboard_port}"
+                  + (f" and {cfg.public_port}" if cfg.public_port else ""))
+            print("  - Notifications go out through the assistant")
             print("  - Links will generate as soon as browser opens")
 
     settings = BatchSettings(
@@ -192,69 +128,42 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
         min_gap_seconds=cfg.batch_min_gap_seconds,
     )
 
-    def zalo_loop() -> None:
-        with ZaloBot(cfg.zalo_bot_token, cfg.zalo_api_url) as bot:
-            me = bot.get_me()
-            print(f"Zalo bot: {me.get('display_name')} "
-                  f"(groups: {me.get('can_join_groups')})")
-            consecutive_429 = 0
-            while not stop.is_set():
-                try:
-                    updates = bot.get_updates(timeout=20)
-                    consecutive_429 = 0
-                except ZaloError as exc:
-                    if "429" in str(exc) or "too many requests" in str(exc).lower():
-                        consecutive_429 += 1
-                        backoff = min(120, 15 * (2 ** min(consecutive_429 - 1, 3)))
-                        print(f"[zalo] Rate limited (HTTP 429), backing off for {backoff}s...")
-                        time.sleep(backoff)
-                    else:
-                        print(f"[zalo] {exc}")
-                        time.sleep(5)
-                    continue
+    sender = AssistantSender(cfg.assistant_url, cfg.assistant_token)
 
-                for update in updates:
-                    msg = update.message
-                    if not msg:
-                        continue
-                    where = "group" if msg.chat.is_group else "private"
-                    try:
-                        print(f"[zalo] {where} from {msg.sender_name or msg.sender_id}: "
-                              f"{(msg.text or '')[:60]!r}")
-                    except Exception:
-                        pass
-                    try:
-                        replies = zalo_handler.handle(
-                            cfg.db_path, msg, cfg.advertised_cashback_rate,
-                            PAYOUT_WINDOW_TEXT, update.event_name,
-                            attribution_days=cfg.link_attribution_days,
-                            reduced_rate=cfg.reduced_cashback_rate,
-                        )
-                        zalo_handler.send_replies(bot, replies)
-                    except Exception as exc:
-                        print(f"[zalo] handler error: {exc}")
+    def notify_loop() -> None:
+        """Say what the backend has to say on its own: late links, order
+        news, money sent. Customers' own messages are the assistant's.
 
+        Nothing is marked sent until the assistant confirms it, so while
+        the assistant is down or restarting everything simply waits here.
+        """
+        # Cheap steps first, and each on its own: link delivery may look a
+        # price up over the network, and a slow or failing lookup must not
+        # hold back news of an approved order.
+        steps = (
+            # First: settles campaign slots, so an approval message sent
+            # in this same pass already knows about its bonus.
+            ("campaigns", lambda: notifications.notify_campaign_changes(
+                cfg.db_path, sender)),
+            ("orders", lambda: notifications.notify_order_changes(
+                cfg.db_path, sender, cfg.advertised_cashback_rate,
+                PAYOUT_WINDOW_TEXT)),
+            ("failed links", lambda: notifications.notify_failed_links(
+                cfg.db_path, sender)),
+            ("late links", lambda: notifications.deliver_ready_links(
+                cfg.db_path, sender, cfg.advertised_cashback_rate,
+                PAYOUT_WINDOW_TEXT, bridge=bridge,
+                third_party=cfg.third_party_fallback,
+                reduced_rate=cfg.reduced_cashback_rate)),
+        )
+        while not stop.wait(NOTIFY_INTERVAL_SECONDS):
+            for name, step in steps:
                 try:
-                    sent = zalo_handler.deliver_ready_links(
-                        cfg.db_path, bot, cfg.advertised_cashback_rate,
-                        PAYOUT_WINDOW_TEXT, bridge=bridge,
-                        third_party=cfg.third_party_fallback,
-                        reduced_rate=cfg.reduced_cashback_rate,
-                    )
+                    sent = step()
                     if sent:
-                        print(f"[zalo] delivered {sent} link(s) to customers")
-                    zalo_handler.notify_order_changes(
-                        cfg.db_path, bot, cfg.advertised_cashback_rate,
-                        PAYOUT_WINDOW_TEXT,
-                    )
-                    zalo_handler.notify_failed_links(cfg.db_path, bot)
+                        log.info(f"[notify] {name}: {sent} sent")
                 except Exception as exc:
-                    print(f"[zalo] delivery error: {exc}")
-
-                # Rate limit & resource protection: Zalo getUpdates returns immediately
-                # (no long-poll server hold). Sleep when idle to avoid spamming Zalo and SQLite.
-                if not updates:
-                    time.sleep(3)
+                    log.info(f"[notify] {name} failed: {exc}")
 
     def link_loop() -> None:
         totals = worker.Totals()
@@ -321,6 +230,38 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             if outcome.needs_review:
                 log.info(f"[reconcile] {outcome.needs_review} row(s) need a human")
 
+    def accesstrade_loop() -> None:
+        """Pull TikTok orders in from AccessTrade, on the same timer as the
+        Shopee report. Nothing ran this before: TikTok orders reached neither
+        the ledger nor the customer."""
+        from ...providers.accesstrade_reconciler import sync_accesstrade_orders
+
+        if stop.wait(90):
+            return
+        while True:
+            summary = sync_accesstrade_orders(cfg)
+            if summary.error:
+                log.info(f"[accesstrade] {summary.error}")
+            elif summary.orders_new or summary.approved or summary.rejected or summary.needs_review:
+                log.info(
+                    f"[accesstrade] {summary.rows_read} order(s): {summary.orders_new} new, "
+                    f"{summary.approved} approved, {summary.rejected} rejected, "
+                    f"{summary.needs_review} need a human")
+            if stop.wait(cfg.reconcile_interval_minutes * 60):
+                return
+
+    def backup_loop() -> None:
+        """Snapshot on a timer. The startup one is taken before migrating."""
+        from ...ledger import backup
+
+        while not stop.wait(cfg.backup_interval_hours * 3600):
+            try:
+                dest = backup.create(
+                    cfg.db_path, cfg.backup_dir, keep=cfg.backup_keep)
+                log.info(f"[backup] wrote {dest}")
+            except Exception as exc:
+                log.exception(f"[backup] failed: {exc}")
+
     def guarded(name: str, loop):
         """Run a loop so that one bad pass cannot end it for good.
 
@@ -342,7 +283,13 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                         return
         return run
 
-    threads = [threading.Thread(target=guarded("zalo", zalo_loop), daemon=True)]
+    threads = [
+        threading.Thread(target=guarded("notify", notify_loop), daemon=True),
+        threading.Thread(target=guarded("backup", backup_loop), daemon=True),
+    ]
+    if cfg.accesstrade_api_key:
+        threads.append(threading.Thread(
+            target=guarded("accesstrade", accesstrade_loop), daemon=True))
     if not args.no_browser:
         threads.append(threading.Thread(
             target=guarded("links", link_loop), daemon=True))

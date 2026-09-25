@@ -40,6 +40,7 @@ import random
 import re
 import socket
 import threading
+import time
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -71,7 +72,7 @@ def site_figures(cfg: Config) -> dict:
     in their head, so both places show one -- and showing two different
     ones would be worse than showing none.
     """
-    from ..messaging.conversation import EXAMPLE_ORDER_VND, EXAMPLE_RATE
+    from ..messaging.notifications import EXAMPLE_ORDER_VND, EXAMPLE_RATE
 
     rate = cfg.advertised_cashback_rate
     return {
@@ -155,6 +156,8 @@ def _pipeline(conn, rate: float) -> list[dict]:
         "  LEFT JOIN customers c ON c.customer_id = o.customer_id"
         "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
         " WHERE o.status = 'awaiting_approval'"
+        # Guest orders owe nobody anything; this page is about who to pay.
+        "   AND COALESCE(c.role, 'user') != 'house'"
         " ORDER BY o.recorded_at DESC"
     ).fetchall()
     out = []
@@ -206,11 +209,13 @@ def _resolve_product_info(
     """
     name = _product_name(estimate_detail)
     image_url = None
+    stored_item_id = None
     if estimate_detail:
         try:
             d = json.loads(estimate_detail)
             if isinstance(d, dict):
                 image_url = d.get("image_url")
+                stored_item_id = d.get("item_id")
         except Exception:
             pass
 
@@ -233,6 +238,19 @@ def _resolve_product_info(
             ).fetchone()
             if row:
                 if row["name"]:
+                    name = row["name"]
+                if not image_url and row["image_url"]:
+                    image_url = row["image_url"]
+
+        # Short links carry no item id, so the one saved with the estimate
+        # is often the only way back to the product.
+        if (not name or not image_url) and stored_item_id:
+            row = conn.execute(
+                "SELECT name, image_url FROM products_cache WHERE item_id = ?",
+                (str(stored_item_id),),
+            ).fetchone()
+            if row:
+                if not name and row["name"]:
                     name = row["name"]
                 if not image_url and row["image_url"]:
                     image_url = row["image_url"]
@@ -378,6 +396,22 @@ def snapshot(db_path: Path, rate: float = 0.80) -> dict:
 # One customer's own view
 # ----------------------------------------------------------------------
 
+def _order_campaign(conn, order_id: str) -> dict | None:
+    """Where an order stands in a promotion, for the customer's own view:
+    {name, rank, slots, bonus, status} for a slot, {name, slots, missed}
+    when the window was right but every slot was already taken."""
+    from ..ledger import campaigns
+
+    standing = campaigns.standing_for_order(conn, order_id)
+    if standing is not None:
+        return {"name": standing.name, "rank": standing.rank, "slots": standing.slots,
+                "bonus": standing.amount, "status": standing.status}
+    missed = campaigns.missed_for_order(conn, order_id)
+    if missed is not None:
+        return {"name": missed["name"], "slots": missed["slots"], "missed": True}
+    return None
+
+
 def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
     """What one customer can see: their orders and nothing else.
 
@@ -424,11 +458,13 @@ def my_orders(db_path: Path, customer_id: str, rate: float) -> dict:
             else:
                 item["cashback"] = item["cashback_amount"]
                 item["is_estimate"] = False
+            item["campaign"] = _order_campaign(conn, item["order_id"])
             orders.append(item)
 
     role = (customer["role"] if customer and "role" in customer.keys() else "user") or "user"
     return {
         "customer_id": customer_id,
+        "customer_code": (customer["customer_code"] if customer else None) or customer_id,
         "display_name": (customer["display_name"] if customer else "") or "",
         "role": role,
         "is_admin": role == "admin",
@@ -471,20 +507,21 @@ def ask_for_bank(cfg: Config, customer_id: str) -> dict:
     which is the only moment the question is reasonable.
     """
     from ..messaging import templates as messages
-    from ..messaging.zalo_client import ZaloBot, ZaloError
+    from ..messaging.assistant_bridge import AssistantError, AssistantSender
 
     if not SAFE_ID.match(customer_id or ""):
         return {"ok": False, "message": t("ask_failed", reason="bad id")}
 
     with ledger.connect(cfg.db_path) as conn:
         row = ledger.get_customer(conn, customer_id)
-    if row is None or not row["private_chat_id"]:
-        return {"ok": False, "message": t("ask_failed", reason="no private chat")}
+    recipient = row and (row["zalo_user_id"] or row["customer_id"])
+    if not recipient:
+        return {"ok": False, "message": t("ask_failed", reason="no Zalo id")}
 
     try:
-        with ZaloBot(cfg.zalo_bot_token, cfg.zalo_api_url) as bot:
-            bot.send(row["private_chat_id"], messages.render("need_bank"))
-    except (ZaloError, Exception) as exc:
+        AssistantSender(cfg.assistant_url, cfg.assistant_token).send(
+            recipient, messages.render("need_bank"))
+    except AssistantError as exc:
         return {"ok": False, "message": t("ask_failed", reason=str(exc)[:120])}
 
     return {"ok": True,
@@ -547,6 +584,83 @@ _MISSING_BUILD = (
 )
 
 
+# Requests from the internet, per client, per window. The customer codes are
+# sequential and therefore guessable, so password guessing is bounded per
+# address here and per account in accounts.login. Link endpoints are bounded
+# because each new link is a browser trip to Shopee, and a flood of them is
+# how the whole session ends up behind a captcha.
+_LIMITS = {
+    "/api/auth/login": (10, 600),
+    "/api/admin/login": (10, 600),
+    "/api/shopee/convert": (30, 600),
+    "/api/cashback/convert": (30, 600),
+    "/api/shopee/preview": (60, 600),
+    "/api/cashback/preview": (60, 600),
+}
+
+
+# New links the web may add to the browser's queue. Codes are sequential,
+# so a spammer can use real customers' codes; these ceilings bound the work
+# they can create, and web_busy points them at Zalo, which is never capped.
+WEB_LINKS_PER_HOUR = 60
+WEB_LINKS_PER_CUSTOMER_PER_DAY = 20
+
+
+class _RateLimiter:
+    def __init__(self) -> None:
+        self._hits: dict[tuple[str, str], list[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, path: str, client: str, now: float | None = None) -> bool:
+        rule = _LIMITS.get(path)
+        if rule is None:
+            return True
+        limit, window = rule
+        moment = time.monotonic() if now is None else now
+        with self._lock:
+            recent = [t for t in self._hits.get((path, client), [])
+                      if moment - t < window]
+            if len(recent) >= limit:
+                self._hits[(path, client)] = recent
+                return False
+            recent.append(moment)
+            self._hits[(path, client)] = recent
+            return True
+
+
+_limiter = _RateLimiter()
+
+
+def _cache_payload(product, own, rate: float, source: str,
+                   age_hours: float) -> dict:
+    """Smart-resolve answer: shared product facts, the customer's own link."""
+    return {
+        "ok": True,
+        "ready": True,
+        "source": source,
+        "age_hours": age_hours,
+        "item_id": product["item_id"],
+        "shop_id": product["shop_id"],
+        "name": product["name"],
+        "price": product["price"],
+        "price_formatted": product["price_formatted"],
+        "shopee_rate": product["shopee_rate"],
+        "seller_rate": product["seller_rate"],
+        "shopee_part": product["shopee_part"],
+        "shopee_part_formatted": product["shopee_part_formatted"],
+        "seller_part": product["seller_part"],
+        "seller_part_formatted": product["seller_part_formatted"],
+        "total_commission": product["total_commission"],
+        "commission_formatted": product["commission_formatted"],
+        "is_capped": bool(product["is_capped"]),
+        "cashback": product["cashback"],
+        "cashback_formatted": product["cashback_formatted"],
+        "rate_percent": product["rate_percent"] or f"{rate:.0%}",
+        "affiliate_url": own["affiliate_url"],
+        "request_id": own["request_id"],
+    }
+
+
 class _Handler(BaseHTTPRequestHandler):
     cfg: Config
 
@@ -596,6 +710,12 @@ class _Handler(BaseHTTPRequestHandler):
         if addr.startswith("::ffff:"):
             addr = addr[7:]
         return addr in LOOPBACK or (self.client_address[0] or "") in LOOPBACK
+
+    def _client_ip(self) -> str:
+        # Behind the tunnel every request arrives from localhost; the real
+        # address is the one Cloudflare puts in this header.
+        return (self.headers.get("CF-Connecting-IP")
+                or (self.client_address[0] or ""))
 
     def _session_customer_info(self) -> tuple[str | None, dict | None]:
         token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
@@ -662,6 +782,19 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_products()
         if path == "/api/admin/logs":
             return self._admin_logs()
+        if path == "/api/campaigns/offer":
+            # The assistant asks this before sending a link, to say whether
+            # an order from it could still win a campaign slot.
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            from ..ledger import campaigns
+
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            with ledger.connect(self.cfg.db_path) as conn:
+                found = ledger.find_customer_id(conn, (query.get("customer_id") or [""])[0])
+                offer = campaigns.offer_for(
+                    conn, found, (query.get("platform") or ["shopee"])[0]) if found else None
+            return self._json({"ok": True, "offer": offer})
         if path == "/api/labels":
             return self._json(labels())
         if path == "/api/site":
@@ -675,6 +808,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._shopee_cache_stats()
         if path == "/api/tiktok/topdeal":
             return self._tiktok_topdeal()
+        if path in ("/api/deals", "/api/shopee/deals"):
+            return self._deals()
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
@@ -734,6 +869,11 @@ class _Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         parts = path.strip("/").split("/")
 
+        if not self.from_loopback and not _limiter.allow(path, self._client_ip()):
+            # "locked" is what the login page already knows how to explain.
+            return self._json({"ok": False, "error": "rate_limited",
+                               "message": "locked"}, 429)
+
         if path == "/api/auth/login":
             return self._login()
         if path == "/api/auth/logout":
@@ -761,6 +901,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path in ("/api/shopee/convert", "/api/cashback/convert"):
             return self._shopee_convert()
         if path == "/api/shopee/smart-resolve":
+            # The assistant's endpoint. It answers with a ready link and
+            # trusts the id it is given; the web uses preview + convert.
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._shopee_smart_resolve()
         if path == "/api/shopee/cache/refresh-hot":
             if not self.from_loopback and not self._session_is_staff():
@@ -817,7 +961,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": result.reason}, 401)
         audit.record(audit.LOGIN_OK, customer_id=result.customer_id)
         self._set_session(result.token)
-        return self._json({"ok": True, "customer_id": result.customer_id})
+        with ledger.connect(self.cfg.db_path) as conn:
+            code = ledger.customer_code_of(conn, result.customer_id)
+        return self._json({"ok": True, "customer_id": result.customer_id,
+                           "customer_code": code})
 
     def _logout(self):
         token = _cookies(self.headers.get("Cookie")).get(SESSION_COOKIE, "")
@@ -1415,9 +1562,9 @@ class _Handler(BaseHTTPRequestHandler):
         where_clauses = ["c.role = 'user'"]
         params = []
         if search:
-            where_clauses.append("(LOWER(c.customer_id) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(c.zalo_user_id, '')) LIKE ? OR LOWER(COALESCE(c.bank_account, '')) LIKE ? OR LOWER(COALESCE(c.bank_name, '')) LIKE ?)")
+            where_clauses.append("(LOWER(c.customer_id) LIKE ? OR LOWER(COALESCE(c.customer_code, '')) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(c.zalo_user_id, '')) LIKE ? OR LOWER(COALESCE(c.bank_account, '')) LIKE ? OR LOWER(COALESCE(c.bank_name, '')) LIKE ?)")
             pat = f"%{search}%"
-            params.extend([pat, pat, pat, pat, pat])
+            params.extend([pat, pat, pat, pat, pat, pat])
         if bank_filter == "has_bank":
             where_clauses.append("c.bank_account IS NOT NULL AND c.bank_account != ''")
         elif bank_filter == "no_bank":
@@ -1455,7 +1602,7 @@ class _Handler(BaseHTTPRequestHandler):
         with ledger.connect(self.cfg.db_path) as conn:
             total = conn.execute(f"SELECT COUNT(*) FROM customers c WHERE {where_sql}", params).fetchone()[0]
             rows = conn.execute(
-                f"SELECT c.customer_id, c.display_name, c.zalo_user_id, c.bank_name, c.bank_account, "
+                f"SELECT c.customer_id, c.customer_code, c.display_name, c.zalo_user_id, c.bank_name, c.bank_account, "
                 f"       c.account_holder, c.created_at, c.last_login_at, c.login_count, c.status, "
                 f"       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.customer_id) as order_count, "
                 f"       (SELECT COALESCE(SUM(CASE WHEN o.status != 'rejected' THEN ROUND(COALESCE(o.cashback_amount, (o.estimated_commission - ROUND(o.estimated_commission * 0.1098)) * {rate})) ELSE 0 END), 0) FROM orders o WHERE o.customer_id = c.customer_id) as total_cashback, "
@@ -1655,9 +1802,9 @@ class _Handler(BaseHTTPRequestHandler):
         where_clauses = ["1=1"]
         params = []
         if search:
-            where_clauses.append("(LOWER(o.order_id) LIKE ? OR LOWER(o.customer_id) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(r.estimate_detail, '')) LIKE ?)")
+            where_clauses.append("(LOWER(o.order_id) LIKE ? OR LOWER(o.customer_id) LIKE ? OR LOWER(COALESCE(c.customer_code, '')) LIKE ? OR LOWER(COALESCE(c.display_name, '')) LIKE ? OR LOWER(COALESCE(r.estimate_detail, '')) LIKE ?)")
             pat = f"%{search}%"
-            params.extend([pat, pat, pat, pat])
+            params.extend([pat, pat, pat, pat, pat])
         if status_filter != "all" and status_filter in ("awaiting_approval", "approved", "paid", "rejected"):
             where_clauses.append("o.status = ?")
             params.append(status_filter)
@@ -1702,7 +1849,7 @@ class _Handler(BaseHTTPRequestHandler):
             ).fetchone()[0]
 
             rows = conn.execute(
-                f"SELECT o.order_id, o.customer_id, c.display_name as customer_name, "
+                f"SELECT o.order_id, o.customer_id, c.customer_code as customer_code, c.display_name as customer_name, "
                 f"       o.status, o.order_value, o.estimated_commission, o.approved_commission, "
                 f"       o.cashback_amount, o.recorded_at, o.approved_at, o.paid_at, "
                 f"       o.rejection_reason, r.source_url, r.affiliate_url, r.estimate_detail, "
@@ -1732,6 +1879,9 @@ class _Handler(BaseHTTPRequestHandler):
 
                 comm = item.get("approved_commission") or item.get("estimated_commission") or 0
                 cb = item.get("cashback_amount")
+                if item.get("customer_id") == ledger.HOUSE_CUSTOMER_ID:
+                    cb = 0  # a guest order: the whole commission is ours
+                    item["cashback_amount"] = 0
                 if cb is None and item.get("status") != "rejected":
                     plat = item.get("platform") or "shopee"
                     fee_factor = (1 - 0.10 - 0.0098) if plat == "shopee" else (1 - 0.10)
@@ -1838,7 +1988,7 @@ class _Handler(BaseHTTPRequestHandler):
                             canon_url if canon_url else "___NO_CANON___",
                         )
                         req_rows = conn.execute("""
-                            SELECT r.customer_id, c.display_name, c.zalo_user_id,
+                            SELECT r.customer_id, c.customer_code, c.display_name, c.zalo_user_id,
                                    c.bank_name, c.bank_account, c.account_holder,
                                    MAX(r.created_at) as last_requested_at,
                                    COUNT(r.request_id) as request_count
@@ -1862,7 +2012,7 @@ class _Handler(BaseHTTPRequestHandler):
                             p["last_requested_at"] = None
 
                         order_rows = conn.execute(f"""
-                            SELECT o.order_id, o.customer_id, c.display_name, c.zalo_user_id,
+                            SELECT o.order_id, o.customer_id, c.customer_code, c.display_name, c.zalo_user_id,
                                    c.bank_name, c.bank_account, c.account_holder,
                                    o.order_value, o.approved_commission, o.estimated_commission,
                                    COALESCE(o.cashback_amount, ROUND((COALESCE(o.approved_commission, o.estimated_commission, 0) - ROUND(COALESCE(o.approved_commission, o.estimated_commission, 0) * 0.1098)) * {self.cfg.advertised_cashback_rate})) as cashback_amount, o.status,
@@ -1948,7 +2098,7 @@ class _Handler(BaseHTTPRequestHandler):
                 ).fetchone()[0]
 
                 rows = conn.execute(
-                    f"SELECT l.id as log_id, l.customer_id, c.display_name, l.action, l.path, l.detail, l.created_at "
+                    f"SELECT l.id as log_id, l.customer_id, c.customer_code, c.display_name, l.action, l.path, l.detail, l.created_at "
                     f"  FROM activity_logs l "
                     f"  LEFT JOIN customers c ON c.customer_id = l.customer_id "
                     f" WHERE {where_sql} "
@@ -2231,10 +2381,8 @@ class _Handler(BaseHTTPRequestHandler):
                 if not uid:
                     continue
 
-                existing = conn.execute(
-                    "SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?",
-                    (uid, uid)
-                ).fetchone()
+                found = ledger.find_customer_id(conn, uid)
+                existing = (found,) if found else None
 
                 if not existing:
                     conn.execute("""
@@ -2273,10 +2421,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": "missing_uid"}, 400)
 
         with ledger.connect(self.cfg.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM customers WHERE customer_id = ? OR zalo_user_id = ?",
-                (uid, uid)
-            ).fetchone()
+            found = ledger.find_customer_id(conn, uid)
+            row = ledger.get_customer(conn, found) if found else None
             if not row:
                 conn.execute("""
                     INSERT INTO customers (customer_id, zalo_user_id, display_name, role, status, created_at)
@@ -2288,6 +2434,7 @@ class _Handler(BaseHTTPRequestHandler):
                 row = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (row["customer_id"],)).fetchone()
 
             cust_id = row["customer_id"]
+            cust_code = row["customer_code"] or cust_id
             display_name = row["display_name"] or name or f"Thành viên {cust_id[-4:]}"
 
             if action == "issue_password":
@@ -2297,8 +2444,19 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json({
                     "ok": True,
                     "customer_id": cust_id,
+                    "customer_code": cust_code,
                     "display_name": display_name,
                     "password": pwd,
+                })
+
+            if action == "get_orders":
+                from ..messaging import notifications
+                return self._json({
+                    "ok": True,
+                    "customer_id": cust_id,
+                    "customer_code": cust_code,
+                    "parts": notifications.order_history(
+                        conn, cust_id, self.cfg.advertised_cashback_rate),
                 })
 
             if action == "get_balance":
@@ -2308,6 +2466,7 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json({
                     "ok": True,
                     "customer_id": cust_id,
+                    "customer_code": cust_code,
                     "display_name": display_name,
                     "approved": bal.approved,
                     "awaiting": bal.awaiting,
@@ -2320,6 +2479,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({
                 "ok": True,
                 "customer_id": cust_id,
+                "customer_code": cust_code,
                 "display_name": display_name,
                 "has_password": bool(row["password_hash"]),
                 "has_bank": bool(row["bank_account"]),
@@ -2432,6 +2592,76 @@ class _Handler(BaseHTTPRequestHandler):
             "rate_percent": f"{rate:.0%}",
         })
 
+    def _requester(self, conn, body: dict) -> tuple[str | None, tuple | None]:
+        """Who a link is for: (customer_id, None) or (None, (payload, status)).
+
+        A signed-in customer is always themselves, whatever the form says.
+        Otherwise the id must already belong to someone. Creating a link
+        under another person's code gains nobody anything -- the money goes
+        to the owner of the code -- so a code is enough, no password.
+
+        Only the assistant, on loopback, may introduce a new customer: it
+        has just seen that person on Zalo. The web has seen nobody, and an
+        id typed there that matches no one would become a customer who can
+        never be paid.
+        """
+        session = self._session_customer()
+        if session:
+            return session, None
+        key = str(body.get("customer_id") or "").strip()
+        if not key:
+            if self.from_loopback:
+                # The assistant always knows who wrote; no id is a bug there.
+                return None, ({"ok": False, "error": "customer_id_required"}, 400)
+            # A visitor who gave no code still gets a working link, under the
+            # house account: the commission is ours rather than nobody's. The
+            # response says house=True so the page can warn plainly that this
+            # link earns the visitor nothing.
+            return ledger.HOUSE_CUSTOMER_ID, None
+        found = ledger.find_customer_id(conn, key)
+        if found:
+            return found, None
+        if not self.from_loopback or ledger.looks_like_customer_code(key):
+            return None, ({"ok": False, "error": "customer_not_found"}, 404)
+        name = str(body.get("display_name") or "").strip()
+        conn.execute(
+            "INSERT INTO customers (customer_id, zalo_user_id, display_name,"
+            " created_at, status) VALUES (?, ?, ?, ?, 'active')",
+            (key, key, name or key, ledger.now()))
+        conn.commit()
+        return key, None
+
+    def _channel(self, body: dict) -> str:
+        """Where a request came from. Only the assistant may say; the queue
+        serves Zalo first, so a web caller claiming Zalo would jump it."""
+        claimed = str(body.get("channel") or "").strip() if self.from_loopback else ""
+        return claimed or "web"
+
+    def _web_link_budget(self, conn, customer_id: str, house: bool) -> tuple | None:
+        """Refuse a NEW link from the internet past the web's share.
+
+        Links already made are reused and never counted. The assistant is
+        never limited: someone waiting in a Zalo chat always gets served.
+        """
+        if self.from_loopback:
+            return None
+        now_local = datetime.now(timezone.utc).astimezone()
+        hour_ago = (now_local - timedelta(hours=1)).isoformat(timespec="seconds")
+        recent = conn.execute(
+            "SELECT COUNT(*) FROM link_requests WHERE channel='web' AND created_at >= ?",
+            (hour_ago,)).fetchone()[0]
+        if recent >= WEB_LINKS_PER_HOUR:
+            return ({"ok": False, "error": "web_busy"}, 429)
+        if not house:
+            day_ago = (now_local - timedelta(days=1)).isoformat(timespec="seconds")
+            mine = conn.execute(
+                "SELECT COUNT(*) FROM link_requests WHERE channel='web'"
+                " AND customer_id=? AND created_at >= ?",
+                (customer_id, day_ago)).fetchone()[0]
+            if mine >= WEB_LINKS_PER_CUSTOMER_PER_DAY:
+                return ({"ok": False, "error": "web_busy"}, 429)
+        return None
+
     def _shopee_convert(self):
         from ..core.identifiers import new_request_id
         from ..shopee.dashboard_lookup import ANY_SHOPEE_URL, parse_url, is_short_link, resolve_short_link
@@ -2444,23 +2674,19 @@ class _Handler(BaseHTTPRequestHandler):
             from ..providers.registry import get_registry
             provider = get_registry().detect_provider(raw_url)
             if provider and provider.platform_name != "shopee":
-                customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
-                display_name = str(body.get("display_name") or "").strip()
-                if not customer_id:
-                    return self._json({"ok": False, "error": "customer_id_required"}, 400)
                 with ledger.connect(self.cfg.db_path) as conn:
-                    cust = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
-                    if not cust:
-                        conn.execute("""
-                            INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)
-                            VALUES (?, ?, ?, datetime('now'), 'active')
-                        """, (customer_id, customer_id, display_name or customer_id))
-                        conn.commit()
-                    else:
-                        customer_id = cust["customer_id"]
+                    customer_id, refusal = self._requester(conn, body)
+                    if refusal:
+                        return self._json(refusal[0], refusal[1])
+                    house = ledger.is_house(conn, customer_id)
+                    budget = self._web_link_budget(conn, customer_id, house)
+                    if budget:
+                        return self._json(*budget)
                     req_id = new_request_id()
                     res = provider.create_link(raw_url, customer_id, req_id, conn, self.cfg.advertised_cashback_rate)
                     audit.record(audit.LINK_REQUESTED, customer_id=customer_id, request_id=res.request_id, url=raw_url, channel="web")
+                    if res.is_ready and res.affiliate_url and res.request_id:
+                        ledger.mark_link_delivered(conn, res.request_id)
                     conn.commit()
                 if res.error:
                     is_no_aff = (res.error == "product_not_in_affiliate")
@@ -2480,6 +2706,7 @@ class _Handler(BaseHTTPRequestHandler):
                         "request_id": res.request_id,
                         "platform": provider.platform_name,
                         "cached": res.cached,
+                        "house": house,
                     }
                     if res.product_preview:
                         prev = res.product_preview
@@ -2507,6 +2734,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "ready": False,
                     "request_id": res.request_id,
                     "platform": provider.platform_name,
+                    "house": house,
                 }
                 if res.product_preview and res.product_preview.source_rate_info:
                     if res.product_preview.source_rate_info.get("is_group_order"):
@@ -2519,52 +2747,46 @@ class _Handler(BaseHTTPRequestHandler):
         if is_short_link(target_url):
             target_url = resolve_short_link(target_url)
 
-        customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
-        display_name = str(body.get("display_name") or "").strip()
-        if not customer_id:
-            return self._json({"ok": False, "error": "customer_id_required"}, 400)
-
         with ledger.connect(self.cfg.db_path) as conn:
-            cust = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
-            if not cust:
-                conn.execute("""
-                    INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)
-                    VALUES (?, ?, ?, datetime('now'), 'active')
-                """, (customer_id, customer_id, display_name or customer_id))
-                conn.commit()
-            else:
-                customer_id = cust["customer_id"]
+            customer_id, refusal = self._requester(conn, body)
+            if refusal:
+                return self._json(refusal[0], refusal[1])
 
-            # Check if this item_id already has an affiliate_url in products_cache
+            house = ledger.is_house(conn, customer_id)
             parsed = parse_url(target_url)
-            if parsed:
-                _, _, item_id = parsed
-                cached = ledger.get_product_cache(conn, item_id)
-                if cached and cached["affiliate_url"]:
-                    return self._json({
-                        "ok": True,
-                        "ready": True,
-                        "affiliate_url": cached["affiliate_url"],
-                        "cached": True,
-                    })
+            item_id = parsed[2] if parsed else None
 
-            existing = ledger.find_reusable_request(
-                conn, customer_id, url, resend_within_days=self.cfg.link_attribution_days)
+            # Reuse is by customer, never by product: see find_own_request.
+            # The house account is the one exception: every guest is the same
+            # payee, so one link per product serves them all, and a flood of
+            # guests costs one trip to Shopee per product rather than per click.
+            existing = None
+            if house and item_id:
+                existing = ledger.find_house_link(conn, item_id)
+            if existing is None:
+                existing = ledger.find_own_request(
+                    conn, customer_id, (raw_url, url),
+                    resend_within_days=self.cfg.link_attribution_days)
             if existing is not None and existing["affiliate_url"]:
-                if parsed:
-                    ledger.upsert_product_cache(
-                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=existing["affiliate_url"]
-                    )
-                    conn.commit()
+                ledger.mark_link_delivered(conn, existing["request_id"])
+                conn.commit()
                 return self._json({
                     "ok": True,
                     "ready": True,
                     "affiliate_url": existing["affiliate_url"],
                     "request_id": existing["request_id"],
+                    "house": house,
                 })
 
-            request_id = existing["request_id"] if existing else new_request_id()
-            if not existing:
+            if existing is not None:
+                # Already being made: wait on that one, do not queue another.
+                request_id = existing["request_id"]
+            else:
+                budget = self._web_link_budget(conn, customer_id, house)
+                if budget:
+                    return self._json(*budget)
+                request_id = new_request_id()
+                channel = self._channel(body)
                 ledger.record_link_request(
                     conn,
                     request_id=request_id,
@@ -2572,15 +2794,20 @@ class _Handler(BaseHTTPRequestHandler):
                     source_url=url,
                     affiliate_url=None,
                     estimated_commission=None,
-                    channel="web",
+                    channel=channel,
                 )
+                if item_id:
+                    # What find_house_link matches on, and how the console
+                    # finds the picture for a short link.
+                    conn.execute(
+                        "UPDATE link_requests SET estimate_detail=? WHERE request_id=?",
+                        (json.dumps({"item_id": str(item_id)}), request_id))
                 audit.record(audit.LINK_REQUESTED, customer_id=customer_id,
-                             request_id=request_id, url=url, channel="web")
+                             request_id=request_id, url=url, channel=channel)
                 conn.commit()
 
             # If products_cache already has this item, attach estimate_detail immediately
-            if parsed:
-                _, _, item_id = parsed
+            if item_id:
                 cached = ledger.get_product_cache(conn, item_id)
                 if cached and cached["name"]:
                     detail_json = json.dumps({
@@ -2607,22 +2834,19 @@ class _Handler(BaseHTTPRequestHandler):
                 "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
             if req_row and req_row["affiliate_url"]:
-                if parsed:
-                    ledger.upsert_product_cache(
-                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=req_row["affiliate_url"]
-                    )
-                    conn.commit()
                 return self._json({
                     "ok": True,
                     "ready": True,
                     "affiliate_url": req_row["affiliate_url"],
                     "request_id": request_id,
+                    "house": house,
                 })
 
             return self._json({
                 "ok": True,
                 "ready": False,
                 "request_id": request_id,
+                "house": house,
             })
 
     def _shopee_link_status(self):
@@ -2635,7 +2859,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "message": "missing request_id"}, 400)
         with ledger.connect(self.cfg.db_path) as conn:
             row = conn.execute(
-                "SELECT affiliate_url, source_url, estimate_detail, status FROM link_requests WHERE request_id=?", (request_id,)
+                "SELECT customer_id, affiliate_url, source_url, estimate_detail, status FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
             if not row:
                 return self._json({"ok": False, "message": "not_found"}, 404)
@@ -2647,9 +2871,6 @@ class _Handler(BaseHTTPRequestHandler):
                     src_url = resolve_short_link(src_url)
                 parsed = parse_url(src_url)
                 if parsed:
-                    ledger.upsert_product_cache(
-                        conn, item_id=parsed[2], shop_id=parsed[1], affiliate_url=row["affiliate_url"]
-                    )
                     cached = ledger.get_product_cache(conn, parsed[2])
                     if cached and cached["name"]:
                         detail_json = json.dumps({
@@ -2671,7 +2892,10 @@ class _Handler(BaseHTTPRequestHandler):
                             (detail_json, cached["total_commission"], request_id),
                         )
                     conn.commit()
-                resp = {"ok": True, "ready": True, "affiliate_url": row["affiliate_url"]}
+                # Whoever polls this shows the link to the customer.
+                ledger.mark_link_delivered(conn, request_id)
+                resp = {"ok": True, "ready": True, "affiliate_url": row["affiliate_url"],
+                        "house": ledger.is_house(conn, row["customer_id"])}
                 if row["estimate_detail"]:
                     try:
                         detail = json.loads(row["estimate_detail"])
@@ -2691,8 +2915,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         body = self._body()
         raw_url = str(body.get("url") or "").strip()
-        customer_id = self._session_customer() or str(body.get("customer_id") or "C0001").strip()
-        display_name = str(body.get("display_name") or "").strip()
+        customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
         channel = str(body.get("channel") or "zalo").strip()
         max_age_hours = float(body.get("max_age_hours") or 12.0)
 
@@ -2715,71 +2938,43 @@ class _Handler(BaseHTTPRequestHandler):
 
         with ledger.connect(self.cfg.db_path) as conn:
             if customer_id:
-                cust_row = conn.execute("SELECT customer_id FROM customers WHERE customer_id = ? OR zalo_user_id = ?", (customer_id, customer_id)).fetchone()
-                if not cust_row:
-                    conn.execute("""
-                        INSERT OR IGNORE INTO customers (customer_id, zalo_user_id, display_name, created_at, status)
-                        VALUES (?, ?, ?, datetime('now'), 'active')
-                    """, (customer_id, customer_id, display_name or customer_id))
-                    conn.commit()
-                else:
-                    customer_id = cust_row["customer_id"]
+                customer_id, refusal = self._requester(conn, body)
+                if refusal:
+                    return self._json(refusal[0], refusal[1])
 
             rate = self.cfg.advertised_cashback_rate
             cached_row = ledger.get_product_cache(conn, item_id) if item_id else None
 
-            # Case A: Cache hit with affiliate_url already generated
-            if cached_row and cached_row["affiliate_url"]:
-                updated_at_str = cached_row["updated_at"]
+            # Product facts (price, commission) are shared across customers;
+            # the link is not. Its sub_id1 names the customer it was made
+            # for and reconciliation credits every order on it to them, so a
+            # link found by product would pay someone else for this
+            # customer's purchase. Only this customer's own link is reused.
+            own = ledger.find_own_request(
+                conn, customer_id, (raw_url, url),
+                resend_within_days=self.cfg.link_attribution_days,
+            ) if customer_id else None
+
+            if cached_row and own is not None and own["affiliate_url"]:
                 try:
-                    updated_dt = datetime.fromisoformat(updated_at_str)
-                    age_seconds = (datetime.now(timezone.utc).astimezone() - updated_dt).total_seconds()
-                    age_hours = age_seconds / 3600.0
+                    updated_dt = datetime.fromisoformat(cached_row["updated_at"])
+                    age_hours = (datetime.now(timezone.utc).astimezone()
+                                 - updated_dt).total_seconds() / 3600.0
                 except Exception:
                     age_hours = 999.0
 
-                # If fresh (< 12 hours) and price is known: INSTANT RESPONSE (0.005s)
                 if age_hours < max_age_hours and cached_row["price"] and cached_row["price"] > 0:
                     conn.execute(
                         "UPDATE products_cache SET request_count = request_count + 1 WHERE item_id = ?",
                         (item_id,),
                     )
-                    if customer_id:
-                        req_id = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{random.randint(10, 99)}"
-                        conn.execute("""
-                            INSERT OR IGNORE INTO link_requests (request_id, customer_id, created_at, source_url, affiliate_url, channel, status, estimate_detail)
-                            VALUES (?, ?, datetime('now'), ?, ?, ?, 'success', ?)
-                        """, (
-                            req_id, customer_id, raw_url, cached_row["affiliate_url"], channel,
-                            json.dumps({"name": cached_row["name"], "price": cached_row["price"], "commission": cached_row["total_commission"]}, ensure_ascii=False)
-                        ))
+                    ledger.mark_link_delivered(conn, own["request_id"])
                     conn.commit()
-                    return self._json({
-                        "ok": True,
-                        "ready": True,
-                        "source": "cache_instant",
-                        "age_hours": round(age_hours, 1),
-                        "item_id": item_id,
-                        "shop_id": cached_row["shop_id"],
-                        "name": cached_row["name"],
-                        "price": cached_row["price"],
-                        "price_formatted": cached_row["price_formatted"],
-                        "shopee_rate": cached_row["shopee_rate"],
-                        "seller_rate": cached_row["seller_rate"],
-                        "shopee_part": cached_row["shopee_part"],
-                        "shopee_part_formatted": cached_row["shopee_part_formatted"],
-                        "seller_part": cached_row["seller_part"],
-                        "seller_part_formatted": cached_row["seller_part_formatted"],
-                        "total_commission": cached_row["total_commission"],
-                        "commission_formatted": cached_row["commission_formatted"],
-                        "is_capped": bool(cached_row["is_capped"]),
-                        "cashback": cached_row["cashback"],
-                        "cashback_formatted": cached_row["cashback_formatted"],
-                        "rate_percent": cached_row["rate_percent"] or f"{rate:.0%}",
-                        "affiliate_url": cached_row["affiliate_url"],
-                    })
+                    return self._json(_cache_payload(
+                        cached_row, own, rate, source="cache_instant",
+                        age_hours=round(age_hours, 1)))
 
-                # If stale (>= 12 hours): Refresh price & commission only (~0.4s), reuse affiliate_url!
+                # Stale numbers: refresh price and commission, keep the link.
                 try:
                     est = lookup(target_url, third_party=self.cfg.third_party_fallback)
                 except Exception:
@@ -2808,47 +3003,17 @@ class _Handler(BaseHTTPRequestHandler):
                         cashback=cb,
                         cashback_formatted=_vnd(cb),
                         rate_percent=f"{rate:.0%}",
-                        affiliate_url=cached_row["affiliate_url"],
                         canonical_url=target_url,
                         image_url=getattr(est, "image_url", "") or "",
                         increment_count=True,
                     )
-                    if customer_id:
-                        req_id = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{random.randint(10, 99)}"
-                        conn.execute("""
-                            INSERT OR IGNORE INTO link_requests (request_id, customer_id, created_at, source_url, affiliate_url, channel, status, estimate_detail)
-                            VALUES (?, ?, datetime('now'), ?, ?, ?, 'success', ?)
-                        """, (
-                            req_id, customer_id, raw_url, cached_row["affiliate_url"], channel,
-                            json.dumps({"name": est.name, "price": est.price, "commission": raw_comm}, ensure_ascii=False)
-                        ))
+                    ledger.mark_link_delivered(conn, own["request_id"])
                     conn.commit()
-                    return self._json({
-                        "ok": True,
-                        "ready": True,
-                        "source": "cache_refreshed",
-                        "age_hours": 0.0,
-                        "item_id": item_id,
-                        "shop_id": new_cached["shop_id"],
-                        "name": new_cached["name"],
-                        "price": new_cached["price"],
-                        "price_formatted": new_cached["price_formatted"],
-                        "shopee_rate": new_cached["shopee_rate"],
-                        "seller_rate": new_cached["seller_rate"],
-                        "shopee_part": new_cached["shopee_part"],
-                        "shopee_part_formatted": new_cached["shopee_part_formatted"],
-                        "seller_part": new_cached["seller_part"],
-                        "seller_part_formatted": new_cached["seller_part_formatted"],
-                        "total_commission": new_cached["total_commission"],
-                        "commission_formatted": new_cached["commission_formatted"],
-                        "is_capped": bool(new_cached["is_capped"]),
-                        "cashback": new_cached["cashback"],
-                        "cashback_formatted": new_cached["cashback_formatted"],
-                        "rate_percent": new_cached["rate_percent"],
-                        "affiliate_url": new_cached["affiliate_url"],
-                    })
+                    return self._json(_cache_payload(
+                        new_cached, own, rate, source="cache_refreshed",
+                        age_hours=0.0))
 
-        # Case B: If not in cache, delegate to standard convert flow
+        # No link of this customer's own yet: make one for them.
         return self._shopee_convert()
 
     def _shopee_cache_stats(self):
@@ -2946,6 +3111,31 @@ class _Handler(BaseHTTPRequestHandler):
         products = tiktok_provider.search_products(keyword=keyword, limit=limit)
         return self._json({"ok": True, "products": products})
 
+    def _deals(self):
+        """Return curated high-cashback featured deals, optionally filtered by category."""
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        cat = qs.get("category", ["all"])[0].strip()
+        with ledger.connect(self.cfg.db_path) as conn:
+            rows = ledger.get_featured_deals(conn, category=cat, limit=24)
+            deals = []
+            for r in rows:
+                deals.append({
+                    "id": r["id"],
+                    "itemId": r["item_id"],
+                    "name": r["name"],
+                    "platform": r["platform"],
+                    "category": r["category"],
+                    "originalPrice": r["original_price"],
+                    "salePrice": r["sale_price"],
+                    "commissionRate": r["commission_rate"],
+                    "cashback": r["cashback"],
+                    "image": r["image_url"],
+                    "url": r["url"],
+                })
+            return self._json({"ok": True, "deals": deals})
+
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 
 
@@ -2986,15 +3176,17 @@ def _create_server(port: int, handler) -> ThreadingHTTPServer | None:
             return None
 
 
-def serve(cfg: Config, port: int = 8899) -> None:
+def serve(cfg: Config, port: int | None = None) -> None:
+    port = cfg.dashboard_port if port is None else port
     handler = type("DashboardHandler", (_Handler,), {"cfg": cfg})
     server = _create_server(port, handler) or ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"Dashboard on http://127.0.0.1:{port}")
-    if port not in (0, 80):
-        p80 = _create_server(80, handler)
-        if p80 is not None:
-            threading.Thread(target=p80.serve_forever, daemon=True).start()
-            print("Also listening on port 80 for Cloudflare Tunnel")
+    public = cfg.public_port
+    if public and port not in (0, public):
+        extra = _create_server(public, handler)
+        if extra is not None:
+            threading.Thread(target=extra.serve_forever, daemon=True).start()
+            print(f"Also listening on port {public} for Cloudflare Tunnel")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -3003,15 +3195,17 @@ def serve(cfg: Config, port: int = 8899) -> None:
         server.server_close()
 
 
-def serve_in_background(cfg: Config, port: int = 8899) -> ThreadingHTTPServer:
+def serve_in_background(cfg: Config, port: int | None = None) -> ThreadingHTTPServer:
+    port = cfg.dashboard_port if port is None else port
     handler = type("DashboardHandler", (_Handler,), {"cfg": cfg})
     server = _create_server(port, handler) or ThreadingHTTPServer(("127.0.0.1", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    # Also bind to port 80 if available so Cloudflare Tunnel pointing to localhost:80 works
-    if port not in (0, 80):
-        p80 = _create_server(80, handler)
-        if p80 is not None:
-            threading.Thread(target=p80.serve_forever, daemon=True).start()
+    # The tunnel points at PUBLIC_PORT (80 in production, 0 to skip it).
+    public = cfg.public_port
+    if public and port not in (0, public):
+        extra = _create_server(public, handler)
+        if extra is not None:
+            threading.Thread(target=extra.serve_forever, daemon=True).start()
 
     return server

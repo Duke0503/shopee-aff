@@ -125,7 +125,7 @@ class TestTheQr:
         assert "970436" in url            # Vietcombank's BIN
         assert "0123456789" in url        # the account
         assert "amount=60000" in url
-        assert "C0001" in url             # the reference identifies the payout
+        assert "DP00001" in url           # the reference identifies the payout
 
     def test_no_qr_when_the_bank_cannot_be_matched(self, conn):
         ledger.add_customer(conn, "C0003", display_name="Odd Bank")
@@ -143,7 +143,7 @@ class TestTheQr:
 
     def test_the_reference_names_the_customer(self, conn, paying_customer):
         _approved(conn, "O1", paying_customer, 60_000)
-        assert payouts.collect(conn)[0].reference.endswith("C0001")
+        assert payouts.collect(conn)[0].reference.endswith("DP00001")
 
     def test_the_reference_is_plain_ascii(self, conn, paying_customer):
         """Bank references mangle anything else."""

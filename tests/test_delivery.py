@@ -12,12 +12,13 @@ proves nothing. These tests run the line.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from cashback.ledger import repository as ledger
-from cashback.messaging import conversation as convo
+from cashback.messaging import notifications as convo
 
 # A small balance. There is no minimum any more, so this is payable like
 # any other -- which is the point of the class that uses it.
@@ -42,6 +43,23 @@ class FakeBot:
             raise RuntimeError("chat_id is empty")
         self.sent.append((chat_id, text))
         return [{}]
+
+
+@pytest.fixture(autouse=True)
+def fresh_backoff():
+    convo._backoff.clear()
+    yield
+    convo._backoff.clear()
+
+
+@pytest.fixture(autouse=True)
+def no_assistant_wait(monkeypatch):
+    """Most tests here are about what the message says, not when it goes.
+
+    A link made seconds ago is normally the assistant's to hand over;
+    TestWhoseJobALinkIs covers that timing with the real window.
+    """
+    monkeypatch.setattr(convo, "ASSISTANT_WAIT", timedelta(seconds=-1))
 
 
 @pytest.fixture
@@ -75,15 +93,34 @@ class TestLinkDelivery:
         assert again == 0
         assert len(bot.sent) == 1
 
-    def test_a_failed_send_is_retried_next_pass(self, db, ready_link):
-        """Marking it delivered before the send succeeds loses the link."""
+    def test_a_failed_send_is_retried_after_a_pause(self, db, ready_link):
+        """Marking it delivered before the send succeeds loses the link;
+        retrying on every pass hammers Zalo with the same failing call."""
         convo.deliver_ready_links(db, FakeBot(fail=True), 0.70, "30-70 ngay",
                                   third_party=False)
         bot = FakeBot()
         assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 0
+        assert bot.sent == []
+        # Once the pause is over it goes out.
+        for key, (_, wait) in list(convo._backoff.items()):
+            convo._backoff[key] = (convo.datetime.now(convo.timezone.utc), wait)
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
                                          third_party=False) == 1
 
-    def test_a_customer_with_no_private_chat_is_skipped_not_crashed(self, db):
+    def test_the_pause_doubles_and_stops_at_an_hour(self):
+        for _ in range(12):
+            convo._failed("k")
+        assert convo._backoff["k"][1] == convo._BACKOFF_MAX
+        convo._backoff.clear()
+        convo._failed("k")
+        first = convo._backoff["k"][1]
+        convo._failed("k")
+        assert convo._backoff["k"][1] == 2 * first
+
+    def test_a_customer_with_no_old_bot_chat_is_reached_by_zalo_id(self, db):
+        """private_chat_id came from the retired Bot API; almost nobody has
+        one. Skipping them is how order news stopped reaching customers."""
         with ledger.connect(db) as conn:
             ledger.add_customer(conn, "C0002", zalo_user_id="u2",
                                 private_chat_id="")
@@ -91,8 +128,10 @@ class TestLinkDelivery:
                                        "https://s.shopee.vn/y", None, 1_000, "zalo")
             ledger.attach_affiliate_url(conn, "R00000000002",
                                         "https://s.shopee.vn/aff2", 1_000)
-        assert convo.deliver_ready_links(db, FakeBot(), 0.70, "30-70 ngay",
-                                         third_party=False) == 0
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 1
+        assert bot.sent[0][0] == "u2"
 
     def test_no_estimate_still_delivers_the_link(self, db):
         """A link with no price attached must still reach the customer."""
@@ -319,13 +358,78 @@ class TestTheTransferIsAnnounced:
 
     def test_it_names_the_transfer_reference(self, db):
         """What the customer will actually see in their bank app."""
-        assert "Hoan tien Shopee C0001" in self._paid(db, [PAYABLE]).sent[0][1]
+        assert "Hoan tien Shopee DP00001" in self._paid(db, [PAYABLE]).sent[0][1]
 
     def test_an_account_we_do_not_have_is_not_printed_as_a_blank(self, db):
         text = self._paid(db, [PAYABLE], bank=False).sent[0][1]
-        assert "Hoan tien Shopee C0001" in text
+        assert "Hoan tien Shopee DP00001" in text
         assert "- - " not in text
 
     def test_it_is_said_once_not_on_every_pass(self, db):
         bot = self._paid(db, [PAYABLE])
         assert convo.notify_order_changes(db, bot, 0.70, "30-70 ngay") == 0
+
+
+class TestWhoseJobALinkIs:
+    """The assistant answers in the chat for ASSISTANT_WAIT; after that a
+    link nobody collected is ours to send; after STALE_AFTER, nobody's."""
+
+    @pytest.fixture(autouse=True)
+    def real_window(self, monkeypatch):
+        monkeypatch.setattr(convo, "ASSISTANT_WAIT", timedelta(seconds=35))
+
+    def _age(self, db, request_id, seconds):
+        stamp = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+        with ledger.connect(db) as conn:
+            conn.execute("UPDATE link_requests SET created_at=? WHERE request_id=?",
+                         (stamp, request_id))
+
+    def _notified(self, db, request_id):
+        with ledger.connect(db) as conn:
+            return conn.execute("SELECT notified_at FROM link_requests"
+                                " WHERE request_id=?", (request_id,)).fetchone()[0]
+
+    def test_a_link_the_assistant_may_still_collect_is_left_to_it(
+            self, db, ready_link):
+        self._age(db, ready_link, 10)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 0
+        assert self._notified(db, ready_link) is None
+
+    def test_a_link_finished_too_late_for_the_assistant_is_sent(
+            self, db, ready_link):
+        self._age(db, ready_link, 120)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 1
+        assert bot.sent[0][0] == "u1"
+
+    def test_a_stale_link_is_marked_but_never_sent(self, db, ready_link):
+        self._age(db, ready_link, 3 * 3600)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 0
+        assert bot.sent == []
+        assert self._notified(db, ready_link) is not None
+
+    def test_a_link_already_handed_over_is_not_sent_again(self, db, ready_link):
+        self._age(db, ready_link, 120)
+        with ledger.connect(db) as conn:
+            ledger.mark_link_delivered(conn, ready_link)
+        bot = FakeBot()
+        assert convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay",
+                                         third_party=False) == 0
+
+    def test_the_message_goes_to_the_zalo_id_not_the_old_bot_chat(self, db):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "7654552834503557971",
+                                zalo_user_id="7654552834503557971")
+            ledger.record_link_request(conn, "R00000000009", "7654552834503557971",
+                                       "https://s.shopee.vn/y", None, 1_000, "zalo_dm")
+            ledger.attach_affiliate_url(conn, "R00000000009",
+                                        "https://s.shopee.vn/aff9", 1_000)
+        self._age(db, "R00000000009", 120)
+        bot = FakeBot()
+        convo.deliver_ready_links(db, bot, 0.70, "30-70 ngay", third_party=False)
+        assert bot.sent[0][0] == "7654552834503557971"

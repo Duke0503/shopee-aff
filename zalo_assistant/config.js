@@ -1,23 +1,74 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// One .env per environment, shared with the Python backend, so a dev copy
+// is a different .env and nothing else. Every value below falls back to
+// production's, which keeps a production machine working without edits.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+function loadEnv() {
+  const file = process.env.CASHBACK_ENV_FILE || path.join(HERE, "..", ".env");
+  const values = {};
+  try {
+    for (const line of fs.readFileSync(file, "utf-8").split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, "");
+    }
+  } catch (_) {}
+  return { ...values, ...process.env };
+}
+
+const env = loadEnv();
+const list = (value, fallback) =>
+  value ? value.split(",").map((s) => s.trim()).filter(Boolean) : fallback;
+
+const MAIN_GROUP = env.ZALO_MAIN_GROUP_ID || "2813090100064697955";
+
 export const config = {
-  // Nhóm thử nghiệm và nhóm thật (chuẩn hóa theo tài khoản mới)
-  GROUP_TEST_ID: "8786316503449470342", // Dev Internal DP (6 thành viên)
-  GROUP_MAIN_ID: "2813090100064697955", // Hoàn Tiền Shopee (37 thành viên)
+  GROUP_TEST_ID: env.ZALO_TEST_GROUP_ID || "8786316503449470342",
+  GROUP_MAIN_ID: MAIN_GROUP,
+  ACTIVE_GROUP_ID: MAIN_GROUP,
 
-  // Nhóm đang hoạt động: Nhóm chính Hoàn Tiền Shopee!
-  ACTIVE_GROUP_ID: "2813090100064697955",
+  // Groups this instance listens to. Production serves the main group only;
+  // a dev instance runs on its own Zalo account with its own list.
+  LISTEN_GROUP_IDS: list(env.ZALO_LISTEN_GROUP_IDS, [MAIN_GROUP]),
 
-  // Danh sách UID Quản trị viên toàn hệ thống (Minh Đức & Xuân Phước)
-  // Khi gửi link hoặc lệnh, bot sẽ không tag tên mà chỉ phản hồi nội dung
-  GLOBAL_ADMIN_UIDS: [
-    "6356806862452292219", // Minh Đức (ID Zalo cũ)
-    "6823332485297437912", // Minh Đức (ID Zalo cá nhân mới)
-    "7835381167015183856", // Xuân Phước (ID Zalo cũ)
-    "7654552834503557971", // Xuân Phước (ID Zalo cá nhân mới)
-  ],
+  // Group members that are not customers (the bot's other accounts). The
+  // member sync skips them, so a deleted row is not recreated five minutes
+  // later.
+  IGNORE_MEMBER_UIDS: list(env.ZALO_IGNORE_MEMBER_UIDS, [
+    "2483222542240728863", // Bot DP Shopee Affiliate
+    "2661802382181188028", // Bot DP Shopee Affiliate (id seen by the old account)
+  ]),
+
+  // Operators: may run /refreshcache. Each has two ids, one per bot
+  // account that has seen them.
+  GLOBAL_ADMIN_UIDS: list(env.ZALO_ADMIN_UIDS, [
+    "6356806862452292219",
+    "6823332485297437912",
+    "7835381167015183856",
+    "7654552834503557971",
+  ]),
+
+  // The Zalo session this instance logs in with. A dev instance must use
+  // its own account: one account logged in twice fights itself.
+  CREDENTIALS_PATH: path.resolve(HERE, env.ZALO_CREDENTIALS_PATH || "credentials.json"),
+
+  // Shared secret for the notify API; empty accepts any local caller.
+  API_TOKEN: env.ASSISTANT_TOKEN || "",
+
+  // Friend requests go only to people who messaged us privately first;
+  // see friends.js for why the ceiling is low.
+  FRIEND_REQUESTS_PER_DAY: Number(env.ZALO_FRIEND_REQUESTS_PER_DAY || 30),
+  FRIEND_STATE_PATH: path.resolve(HERE, env.ZALO_FRIEND_STATE_PATH || "friend_state.json"),
+
+  // Customer-facing wording shared with the backend.
+  MESSAGES_PATH: path.resolve(HERE, "..", "resources", "messages.vi.json"),
 
   // Cổng HTTP API nội bộ để nhận thông báo từ hệ thống chính
-  PORT: 8891,
-  MAIN_API_URL: "http://localhost:8899",
+  PORT: Number(env.ASSISTANT_PORT || 8891),
+  MAIN_API_URL: env.MAIN_API_URL || `http://127.0.0.1:${env.DASHBOARD_PORT || 8899}`,
 
   // Default customer ID dùng khi khách chưa có mã
   DEFAULT_CUSTOMER_ID: "default_bot",

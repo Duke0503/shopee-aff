@@ -163,6 +163,10 @@ def test_sync_accesstrade_orders_reconciliation(test_db):
     cfg = load()
     object.__setattr__(cfg, "db_path", test_db)
 
+    # The sync never invents a customer from a sub1 it does not know.
+    with ledger.connect(test_db) as conn:
+        ledger.add_customer(conn, "C_TEST", zalo_user_id="C_TEST")
+
     raw_orders = [
         {
             "order_id": "TT_REC_01",
