@@ -92,6 +92,8 @@ export function LinkGenerator() {
       if (!data.ok) {
         if (data.error === "customer_not_found") {
           setErrorText(t("link_gen_err_id_not_found"))
+        } else if (data.error === "rate_limited" || data.error === "web_busy") {
+          setErrorText(t("link_gen_err_busy"))
         } else {
           setErrorText(t("link_gen_err_id"))
         }
@@ -220,7 +222,7 @@ export function LinkGenerator() {
             </div>
             <div className="text-sm font-medium pt-0.5 flex items-center gap-2">
               <span className="text-muted-foreground">{t("link_gen_price_label")}:</span>
-              <span className="font-semibold text-foreground font-mono">{preview.price_formatted}</span>
+              <span className="font-semibold text-foreground tnum">{preview.price_formatted}</span>
             </div>
           </div>
 
@@ -228,13 +230,13 @@ export function LinkGenerator() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1 text-xs sm:text-sm">
             <div className="rounded-xl bg-muted/40 border border-border/40 p-3 flex flex-col justify-between">
               <div className="text-muted-foreground text-xs">{t("link_gen_commission_est")}</div>
-              <div className="font-semibold text-foreground mt-1 font-mono text-base sm:text-lg">
+              <div className="font-semibold text-foreground mt-1 tnum text-base sm:text-lg">
                 {preview.commission_formatted}
               </div>
             </div>
             <div className="rounded-xl bg-success-soft/30 border border-success/30 p-3 flex flex-col justify-between">
               <div className="text-foreground text-xs font-semibold">{t("link_gen_cashback_est")}</div>
-              <div className="text-success text-xl sm:text-2xl font-bold font-mono tracking-tight mt-0.5">
+              <div className="text-success text-xl sm:text-2xl font-bold tnum tracking-tight mt-0.5">
                 {preview.cashback_formatted}
               </div>
             </div>

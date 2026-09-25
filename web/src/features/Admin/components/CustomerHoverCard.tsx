@@ -151,7 +151,7 @@ export function CustomerHoverCard({ requesters }: CustomerHoverCardProps) {
                 {activeRequester.display_name || activeRequester.customer_id}
               </div>
               <div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                <span>ID: {activeRequester.customer_id}</span>
+                <span>ID: {activeRequester.customer_code || activeRequester.customer_id}</span>
                 {activeRequester.zalo_user_id && (
                   <span>· Zalo: {activeRequester.zalo_user_id.slice(0, 8)}...</span>
                 )}
@@ -260,7 +260,7 @@ export function CustomerHoverCard({ requesters }: CustomerHoverCardProps) {
                           {name}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono">
-                          ID: {req.customer_id}
+                          ID: {req.customer_code || req.customer_id}
                         </div>
                       </div>
                     </div>

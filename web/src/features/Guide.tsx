@@ -15,7 +15,7 @@ export function Guide() {
     <>
       <Header current="guide" />
 
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto max-w-[960px] px-4 pt-28 pb-14 sm:px-6 sm:pt-32">
         <div className="mb-8 text-center sm:text-left">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>

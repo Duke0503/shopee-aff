@@ -376,7 +376,7 @@ export function OrdersView() {
                 <TableCell className="min-w-[140px]">
                   <div className="space-y-0.5">
                     <div className="font-semibold text-foreground text-xs">{o.customer_name || o.customer_id}</div>
-                    <CodeBadge code={o.customer_id} label="KH:" variant="blue" />
+                    <CodeBadge code={o.customer_code || o.customer_id} label="KH:" variant="blue" />
                   </div>
                 </TableCell>
 

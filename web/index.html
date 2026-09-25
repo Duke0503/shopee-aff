@@ -30,12 +30,35 @@
     <meta name="twitter:description" content="Dán link Shopee nhận hoàn tiền tự động 80% hoa hồng về tài khoản ngân hàng." />
     <meta name="twitter:image" content="https://hoantiendp.com/badge-80.webp" />
 
+    <!-- Fonts & Icons (Fintech Standard: Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
     <!-- Icons & Theme -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/logo-mark.webp" />
     <meta name="theme-color" content="#10b981" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Hoàn Tiền DP" />
+
+    <!-- Immediate Theme Detection Script (Prevents flash of light/dark) -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem("theme");
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (saved === "dark" || (!saved && prefersDark)) {
+            document.documentElement.setAttribute("data-theme", "dark");
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.setAttribute("data-theme", "light");
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- Preload Critical LCP Assets -->
     <link rel="preload" href="/logo-mark.webp" as="image" type="image/webp" />

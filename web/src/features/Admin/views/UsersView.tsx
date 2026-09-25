@@ -306,7 +306,7 @@ export function UsersView() {
                   {/* Mã KH & Zalo ID */}
                   <TableCell className="whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-start">
-                      <CodeBadge code={u.customer_id} label="Mã:" />
+                      <CodeBadge code={u.customer_code || u.customer_id} label="Mã:" />
                       {u.zalo_user_id && (
                         <CodeBadge
                           code={u.zalo_user_id}

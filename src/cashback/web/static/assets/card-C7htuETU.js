@@ -1,0 +1,1 @@
+import{j as a}from"./vendor-query-C1--CjWS.js";import{c as t}from"./index-B6S510EA.js";function n({className:r,...o}){return a.jsx("div",{className:t("bg-card text-card-foreground card-shadow rounded-xl border border-border/80 transition-shadow",r),...o})}function e({className:r,...o}){return a.jsx("div",{className:t("p-4 pt-0",r),...o})}export{n as C,e as a};

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/lib/icons"
 import { BrandLogo } from "@/components/BrandLogo"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { UserProfileMenu } from "@/components/UserProfileMenu"
 import { useT } from "@/lib/labels"
 import { fetchMe } from "@/lib/api"
@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils"
  * land on: most people arriving from a Zalo group are deciding whether
  * this is worth using, and a password field is not an answer to that.
  */
-export function Header({ current }: { current: Route }) {
-  const t = useT()
+const ZALO_GROUP_URL = "https://zalo.me/g/645qel4gnwism4gagqxh"
 
+export function Header({ current }: { current: Route }) {
   const { data: me } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
@@ -26,57 +26,66 @@ export function Header({ current }: { current: Route }) {
 
   return (
     <>
-      <header
-        className="bg-background/80 sticky top-0 z-20 border-b border-border/80 backdrop-blur-md transition-all"
-        style={{ top: "env(safe-area-inset-top, 0px)" }}
-      >
-        <div className="mx-auto flex h-14 max-w-[1100px] items-center justify-between gap-3 px-4 sm:px-6">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-border/40 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all">
+        <div className="h-20 max-w-7xl mx-auto px-6 lg:px-12 flex items-center justify-between gap-6">
           <button
             onClick={() => navigate("home")}
-            className="flex items-center gap-2.5 font-semibold min-w-0 cursor-pointer text-left"
+            className="flex items-center gap-3 group text-left cursor-pointer"
           >
-            <BrandLogo />
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold sm:inline text-sm sm:text-base tracking-tight text-foreground truncate">
-                {t("brand")}
-              </span>
-            </div>
+            <BrandLogo className="size-11 rounded-xl shadow-[0_4px_12px_rgba(0,105,72,0.25)]" />
+            <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none group-hover:text-primary transition-colors font-bold">
+              Hoàn Tiền DP
+            </span>
           </button>
 
           {/* Desktop navigation */}
-          <nav className="hidden sm:flex items-center gap-2 shrink-0">
-            {current !== "guide" && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("guide")}>
-                <Icon.guide className="size-3.5 sm:mr-1" />
-                <span>{t("nav_guide")}</span>
-              </Button>
-            )}
-            {current !== "orders" && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("orders")}>
-                <span>{t("nav_orders")}</span>
-              </Button>
-            )}
-            {me ? (
-              <UserProfileMenu me={me} />
-            ) : (
-              current !== "login" && (
-                <Button size="sm" onClick={() => navigate("login")}>
-                  <Icon.signIn /> {t("nav_login")}
-                </Button>
-              )
-            )}
+          <nav className="hidden md:flex items-center gap-2">
+            <button
+              onClick={() => navigate("guide")}
+              className={cn(
+                "font-body-md text-body-md px-3.5 py-2 rounded-xl transition-all cursor-pointer font-medium",
+                current === "guide"
+                  ? "text-primary font-bold bg-primary/10 shadow-2xs"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+              )}
+            >
+              Hướng Dẫn
+            </button>
+            <button
+              onClick={() => navigate("orders")}
+              className={cn(
+                "font-body-md text-body-md px-3.5 py-2 rounded-xl transition-all cursor-pointer font-medium",
+                current === "orders"
+                  ? "text-primary font-bold bg-primary/10 shadow-2xs"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+              )}
+            >
+              Đơn Hàng Của Tôi
+            </button>
+            <a
+              href={ZALO_GROUP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container px-3.5 py-2 rounded-xl transition-all cursor-pointer font-medium"
+            >
+              Cộng Đồng Zalo
+            </a>
           </nav>
 
-          {/* Mobile header right: only profile / sign-in */}
-          <div className="flex sm:hidden items-center shrink-0">
+          {/* Action buttons + Theme Toggle */}
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
             {me ? (
               <UserProfileMenu me={me} />
             ) : (
               current !== "login" && (
-                <Button size="sm" onClick={() => navigate("login")}>
-                  <Icon.signIn className="size-3.5" />
-                  <span className="text-xs">{t("nav_login")}</span>
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => navigate("login")}
+                  className="inline-flex items-center justify-center font-label-lg text-label-lg bg-primary text-on-primary px-5 py-2.5 rounded-xl hover:bg-primary-container shadow-[0_4px_14px_rgba(0,105,72,0.2)] transition-all cursor-pointer font-bold"
+                >
+                  Đăng Nhập
+                </button>
               )
             )}
           </div>

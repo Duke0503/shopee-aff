@@ -273,7 +273,7 @@ export function LogsView() {
                   {l.display_name || l.customer_id}
                 </div>
                 <div className="font-mono text-[11px] text-muted-foreground">
-                  {l.customer_id}
+                  {l.customer_code || l.customer_id}
                 </div>
               </TableCell>
 

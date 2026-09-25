@@ -73,7 +73,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     <>
       <Header current="login" />
 
-      <main className="mx-auto w-full max-w-md px-4 py-8 sm:px-6 sm:py-14">
+      <main className="mx-auto w-full max-w-md px-4 pt-28 pb-14 sm:px-6">
         <div className="mb-6 text-center">
           <Mascot className="mx-auto size-24" mood={mood} />
           <h1 className="mt-3 text-2xl font-bold tracking-tight">

@@ -201,7 +201,7 @@ export function BuyerHoverCard({ buyers }: BuyerHoverCardProps) {
                 {activeBuyer.display_name || activeBuyer.customer_id} (Người mua)
               </div>
               <div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                <span>ID: {activeBuyer.customer_id}</span>
+                <span>ID: {activeBuyer.customer_code || activeBuyer.customer_id}</span>
                 {activeBuyer.zalo_user_id && (
                   <span>· Zalo: {activeBuyer.zalo_user_id.slice(0, 8)}...</span>
                 )}
@@ -331,7 +331,7 @@ export function BuyerHoverCard({ buyers }: BuyerHoverCardProps) {
                           {name}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono">
-                          ID: {buyer.customer_id}
+                          ID: {buyer.customer_code || buyer.customer_id}
                         </div>
                       </div>
                     </div>

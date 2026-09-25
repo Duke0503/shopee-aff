@@ -14,6 +14,7 @@ export interface OrderRow {
 export interface PipelineRow {
   order_id: string
   customer_id: string
+  customer_code?: string
   display_name: string | null
   product: string
   order_value: number | null
@@ -26,6 +27,7 @@ export interface PipelineRow {
 
 export interface Payable {
   customer_id: string
+  customer_code?: string
   display_name: string
   amount: number
   bank_name: string
@@ -109,6 +111,7 @@ export interface MyOrder {
 
 export interface Me {
   customer_id: string
+  customer_code?: string
   display_name: string
   role?: "admin" | "employee" | "user"
   is_admin?: boolean
@@ -179,6 +182,7 @@ export interface TrendPoint {
 
 export interface TopCustomer {
   customer_id: string
+  customer_code?: string
   display_name: string | null
   zalo_user_id: string | null
   total_orders: number
@@ -297,6 +301,7 @@ export interface AdminMetrics {
 
 export interface AdminUser {
   customer_id: string
+  customer_code?: string
   display_name: string | null
   zalo_user_id: string | null
   bank_name: string | null
@@ -322,6 +327,7 @@ export interface AdminUser {
 export interface UserTransfer {
   id: number
   customer_id: string
+  customer_code?: string
   amount: number
   transfer_code: string | null
   note: string | null
@@ -356,6 +362,7 @@ export interface UserDetailData {
 
 export interface AdminEmployee {
   customer_id: string
+  customer_code?: string
   display_name: string | null
   role: "admin" | "employee"
   status: "active" | "disabled"
@@ -381,6 +388,7 @@ export interface OrderFinancialBreakdown {
 export interface AdminOrder {
   order_id: string
   customer_id: string
+  customer_code?: string
   customer_name: string | null
   status: "awaiting_approval" | "approved" | "rejected" | "paid"
   order_value: number | null
@@ -402,6 +410,7 @@ export interface AdminOrder {
 
 export interface ProductRequester {
   customer_id: string
+  customer_code?: string
   display_name: string | null
   zalo_user_id: string | null
   bank_name: string | null
@@ -414,6 +423,7 @@ export interface ProductRequester {
 export interface ProductBuyer {
   order_id: string
   customer_id: string
+  customer_code?: string
   display_name: string | null
   zalo_user_id: string | null
   bank_name: string | null
@@ -459,6 +469,7 @@ export interface AdminProduct {
 export interface AdminLog {
   log_id: number
   customer_id: string
+  customer_code?: string
   display_name: string | null
   action: string
   path: string | null
@@ -590,6 +601,7 @@ export const fetchAdminUserDetail = (customerId: string) =>
 
 export const recordAdminTransfer = (data: {
   customer_id: string
+  customer_code?: string
   amount: number
   transfer_code?: string
   note?: string

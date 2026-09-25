@@ -30,6 +30,13 @@ export default defineConfig({
   },
   server: {
     // `npm run dev` talks to the real bot process for live data.
-    proxy: { "/api": "http://127.0.0.1:8899" },
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8899",
+        headers: {
+          "CF-Connecting-IP": "127.0.0.1",
+        },
+      },
+    },
   },
 })

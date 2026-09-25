@@ -64,7 +64,7 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
             <Icon.user className="size-3.5" />
           </div>
           <span className="max-w-[120px] truncate sm:max-w-[160px]">
-            {me.display_name || me.customer_id}
+            {me.display_name || me.customer_code || me.customer_id}
           </span>
           <Icon.expand
             className={`size-3.5 text-muted-foreground transition-transform ${
@@ -80,10 +80,10 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
               <Mascot className="size-10 shrink-0" mood="happy" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-bold">
-                  {me.display_name || me.customer_id}
+                  {me.display_name || me.customer_code || me.customer_id}
                 </div>
-                <div className="text-muted-foreground font-mono text-xs">
-                  {me.customer_id}
+                <div className="text-muted-foreground text-xs font-medium tracking-wide">
+                  {me.customer_code || me.customer_id}
                 </div>
               </div>
             </div>
@@ -106,7 +106,7 @@ export function UserProfileMenu({ me }: UserProfileMenuProps) {
               {me.has_bank ? (
                 <div className="mt-2">
                   <div className="text-sm font-semibold">
-                    {me.bank_name} &middot; <span className="font-mono font-normal">···{me.bank_account_tail}</span>
+                    {me.bank_name} &middot; <span className="tnum font-normal tracking-wider">···{me.bank_account_tail}</span>
                   </div>
                   {me.account_holder && (
                     <div className="text-muted-foreground text-xs uppercase">

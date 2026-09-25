@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-query-C1--CjWS.js";import{c as t}from"./index-B6S510EA.js";function i({children:a,delay:e=0,className:s}){return r.jsx("div",{className:t("reveal",s),style:{animationDelay:`${e}ms`},children:a})}export{i as R};

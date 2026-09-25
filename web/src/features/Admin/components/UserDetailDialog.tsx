@@ -476,7 +476,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                     <ProfileRow
                       icon={<User className="h-3.5 w-3.5" />}
                       label="Mã Khách Hàng (Customer ID)"
-                      value={user?.customer_id ? <CodeBadge code={user.customer_id} variant="blue" /> : "—"}
+                      value={user?.customer_id ? <CodeBadge code={user.customer_code || user.customer_id} variant="blue" /> : "—"}
                     />
                     <ProfileRow
                       icon={<User className="h-3.5 w-3.5" />}
