@@ -2813,13 +2813,21 @@ class _Handler(BaseHTTPRequestHandler):
                     detail_json = json.dumps({
                         "name": cached["name"],
                         "price": cached["price"] or 0,
+                        "price_formatted": cached["price_formatted"] or _vnd(cached["price"] or 0),
                         "commission": cached["total_commission"] or 0,
+                        "total_commission": cached["total_commission"] or 0,
+                        "commission_formatted": cached["commission_formatted"] or _vnd(cached["total_commission"] or 0),
                         "shopee_rate": cached["shopee_rate"] or 0,
                         "seller_rate": cached["seller_rate"] or 0,
                         "shopee_part": cached["shopee_part"] or 0,
+                        "shopee_part_formatted": cached["shopee_part_formatted"] or _vnd(cached["shopee_part"] or 0),
                         "seller_part": cached["seller_part"] or 0,
+                        "seller_part_formatted": cached["seller_part_formatted"] or _vnd(cached["seller_part"] or 0),
                         "total_rate": (cached["shopee_rate"] or 0) + (cached["seller_rate"] or 0),
                         "is_capped": bool(cached["is_capped"]),
+                        "cashback": cached["cashback"] or 0,
+                        "cashback_formatted": cached["cashback_formatted"] or _vnd(cached["cashback"] or 0),
+                        "rate_percent": cached["rate_percent"] or f"{self.cfg.advertised_cashback_rate:.0%}",
                         "source": "shopee",
                         "image_url": cached["image_url"] or "",
                         "item_id": str(item_id),
@@ -2876,13 +2884,21 @@ class _Handler(BaseHTTPRequestHandler):
                         detail_json = json.dumps({
                             "name": cached["name"],
                             "price": cached["price"] or 0,
+                            "price_formatted": cached["price_formatted"] or _vnd(cached["price"] or 0),
                             "commission": cached["total_commission"] or 0,
+                            "total_commission": cached["total_commission"] or 0,
+                            "commission_formatted": cached["commission_formatted"] or _vnd(cached["total_commission"] or 0),
                             "shopee_rate": cached["shopee_rate"] or 0,
                             "seller_rate": cached["seller_rate"] or 0,
                             "shopee_part": cached["shopee_part"] or 0,
+                            "shopee_part_formatted": cached["shopee_part_formatted"] or _vnd(cached["shopee_part"] or 0),
                             "seller_part": cached["seller_part"] or 0,
+                            "seller_part_formatted": cached["seller_part_formatted"] or _vnd(cached["seller_part"] or 0),
                             "total_rate": (cached["shopee_rate"] or 0) + (cached["seller_rate"] or 0),
                             "is_capped": bool(cached["is_capped"]),
+                            "cashback": cached["cashback"] or 0,
+                            "cashback_formatted": cached["cashback_formatted"] or _vnd(cached["cashback"] or 0),
+                            "rate_percent": cached["rate_percent"] or f"{self.cfg.advertised_cashback_rate:.0%}",
                             "source": "shopee",
                             "image_url": cached["image_url"] or "",
                             "item_id": str(parsed[2]),
@@ -2896,13 +2912,19 @@ class _Handler(BaseHTTPRequestHandler):
                 ledger.mark_link_delivered(conn, request_id)
                 resp = {"ok": True, "ready": True, "affiliate_url": row["affiliate_url"],
                         "house": ledger.is_house(conn, row["customer_id"])}
-                if row["estimate_detail"]:
+                raw_detail = (locals().get("detail_json") if locals().get("detail_json") else None) or row["estimate_detail"]
+                if raw_detail:
                     try:
-                        detail = json.loads(row["estimate_detail"])
+                        detail = json.loads(raw_detail)
                         if "is_group_order" in detail:
                             resp["is_group_order"] = detail["is_group_order"]
-                        if "name" in detail:
-                            resp["name"] = detail["name"]
+                        for k in ("name", "price", "price_formatted", "shopee_rate", "seller_rate",
+                                  "shopee_part", "shopee_part_formatted", "seller_part",
+                                  "seller_part_formatted", "commission", "total_commission",
+                                  "commission_formatted", "is_capped", "cashback",
+                                  "cashback_formatted", "rate_percent", "image_url"):
+                            if k in detail:
+                                resp[k] = detail[k]
                     except Exception:
                         pass
                 return self._json(resp)

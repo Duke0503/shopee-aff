@@ -284,6 +284,15 @@ async function main() {
     }
   }
 
+// Helper làm sạch URL bóc tách từ tin nhắn
+function cleanExtractedUrl(u) {
+  if (typeof u !== "string") return "";
+  let cleaned = u.trim();
+  // Loại bỏ các ký tự bọc URL hoặc dấu câu ở cuối/đầu do người dùng gõ kèm
+  cleaned = cleaned.replace(/^['"<([{\\]+/, "").replace(/['">,.;:)\]}\\]+$/, "");
+  return cleaned;
+}
+
 // Helper bóc tách toàn bộ URL và text từ mọi loại message Zalo (text, link card preview, object)
 function extractTextAndUrls(data) {
   let text = "";
@@ -300,6 +309,12 @@ function extractTextAndUrls(data) {
         if (parsed.description) text += " " + parsed.description;
       }
     } catch (_) {}
+
+    // Quét trực tiếp các link trong content text của người gửi
+    const directMatches = data.content.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/gi);
+    if (directMatches) {
+      urls.push(...directMatches);
+    }
   } else if (typeof data.content === "object" && data.content !== null) {
     if (data.content.href) urls.push(data.content.href);
     if (data.content.url) urls.push(data.content.url);
@@ -335,10 +350,10 @@ function extractTextAndUrls(data) {
   if (data.href) urls.push(data.href);
   if (data.url) urls.push(data.url);
 
-  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee, TikTok, Lazada hay ShopeeFood nào
+  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee, TikTok, Lazada hay ShopeeFood nào (cho phép dấu nháy đơn ' trong URL như L'Oreal)
   try {
     const rawJson = JSON.stringify(data);
-    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s"'\\]+/gi);
+    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s"\\]+/gi);
     if (productMatches) {
       for (const m of productMatches) {
         urls.push(m);
@@ -346,8 +361,10 @@ function extractTextAndUrls(data) {
     }
   } catch (_) {}
 
-  // Chỉ giữ lại link sản phẩm hợp lệ
-  const validUrls = urls.filter((u) => PRODUCT_LINK_REGEX.test(u));
+  // Chuẩn hóa và chỉ giữ lại link sản phẩm hợp lệ
+  const validUrls = urls
+    .map(cleanExtractedUrl)
+    .filter((u) => PRODUCT_LINK_REGEX.test(u));
 
   return { text: text.trim(), urls: [...new Set(validUrls)] };
 }
@@ -420,13 +437,9 @@ function extractTextAndUrls(data) {
             }
             if (statusData.ok && statusData.ready && statusData.affiliate_url) {
               affUrl = statusData.affiliate_url;
+              productData = { ...(productData || {}), ...statusData };
               if (statusData.is_group_order || resolveRes.is_group_order) {
-                productData = productData || {};
                 productData.is_group_order = true;
-              }
-              if (statusData.name && (!productData || !productData.name)) {
-                productData = productData || {};
-                productData.name = statusData.name;
               }
               console.log(`[${platformLabel} Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
               break;
