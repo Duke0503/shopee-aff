@@ -761,6 +761,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
 
+        if path.startswith("/s/"):
+            return self._open_share_link(path[3:].strip("/"))
+
         if path == "/api/payouts":
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
@@ -2685,8 +2688,11 @@ class _Handler(BaseHTTPRequestHandler):
                     req_id = new_request_id()
                     res = provider.create_link(raw_url, customer_id, req_id, conn, self.cfg.advertised_cashback_rate)
                     audit.record(audit.LINK_REQUESTED, customer_id=customer_id, request_id=res.request_id, url=raw_url, channel="web")
+                    share = {}
                     if res.is_ready and res.affiliate_url and res.request_id:
                         ledger.mark_link_delivered(conn, res.request_id)
+                        share = {"request_id": res.request_id}
+                        self._add_share_url(conn, share)
                     conn.commit()
                 if res.error:
                     is_no_aff = (res.error == "product_not_in_affiliate")
@@ -2708,6 +2714,8 @@ class _Handler(BaseHTTPRequestHandler):
                         "cached": res.cached,
                         "house": house,
                     }
+                    if share.get("share_url"):
+                        resp_data["share_url"] = share["share_url"]
                     if res.product_preview:
                         prev = res.product_preview
                         resp_data.update({
@@ -2769,14 +2777,16 @@ class _Handler(BaseHTTPRequestHandler):
                     resend_within_days=self.cfg.link_attribution_days)
             if existing is not None and existing["affiliate_url"]:
                 ledger.mark_link_delivered(conn, existing["request_id"])
-                conn.commit()
-                return self._json({
+                payload = {
                     "ok": True,
                     "ready": True,
                     "affiliate_url": existing["affiliate_url"],
                     "request_id": existing["request_id"],
                     "house": house,
-                })
+                }
+                self._add_share_url(conn, payload)
+                conn.commit()
+                return self._json(payload)
 
             if existing is not None:
                 # Already being made: wait on that one, do not queue another.
@@ -2842,13 +2852,16 @@ class _Handler(BaseHTTPRequestHandler):
                 "SELECT affiliate_url FROM link_requests WHERE request_id=?", (request_id,)
             ).fetchone()
             if req_row and req_row["affiliate_url"]:
-                return self._json({
+                payload = {
                     "ok": True,
                     "ready": True,
                     "affiliate_url": req_row["affiliate_url"],
                     "request_id": request_id,
                     "house": house,
-                })
+                }
+                self._add_share_url(conn, payload)
+                conn.commit()
+                return self._json(payload)
 
             return self._json({
                 "ok": True,
@@ -2911,7 +2924,10 @@ class _Handler(BaseHTTPRequestHandler):
                 # Whoever polls this shows the link to the customer.
                 ledger.mark_link_delivered(conn, request_id)
                 resp = {"ok": True, "ready": True, "affiliate_url": row["affiliate_url"],
+                        "request_id": request_id,
                         "house": ledger.is_house(conn, row["customer_id"])}
+                self._add_share_url(conn, resp)
+                conn.commit()
                 raw_detail = (locals().get("detail_json") if locals().get("detail_json") else None) or row["estimate_detail"]
                 if raw_detail:
                     try:
@@ -2929,6 +2945,51 @@ class _Handler(BaseHTTPRequestHandler):
                         pass
                 return self._json(resp)
         return self._json({"ok": True, "ready": False})
+
+    def _add_share_url(self, conn, payload: dict) -> None:
+        """Give a ready link its short address on our domain, for chat.
+
+        The affiliate link stays in the payload: the web shows it as is
+        (a visitor there is already in a real browser); the assistant
+        sends share_url, which gets a Zalo user out of the in-app browser.
+        """
+        from ..ledger import share_links
+        url = share_links.url_for(conn, self.cfg.public_base_url, payload.get("request_id") or "")
+        if url:
+            payload["share_url"] = url
+
+    def _open_share_link(self, code: str):
+        """/s/<code>: redirect a real browser, guide an in-app one."""
+        from ..ledger import share_links
+        from . import share_page
+
+        agent_header = self.headers.get("User-Agent") or ""
+        agent = share_page.classify(agent_header)
+        with ledger.connect(self.cfg.db_path) as conn:
+            row = share_links.find(conn, code)
+            if row is None or not share_page.is_safe_target(row["affiliate_url"]):
+                return self._send(404, share_page.render_not_found(labels()).encode("utf-8"),
+                                  "text/html; charset=utf-8")
+            # HEAD is something checking the link, not a person opening it.
+            if not self._head_only:
+                share_links.record_click(conn, row["request_id"], agent)
+                conn.commit()
+
+        self._extra_headers = [("Cache-Control", "no-store"),
+                               ("Referrer-Policy", "no-referrer-when-downgrade")]
+        if agent == share_links.AGENT_BROWSER:
+            self._extra_headers.append(("Location", row["affiliate_url"]))
+            return self._send(302, b"", "text/plain; charset=utf-8")
+
+        try:
+            product = json.loads(row["estimate_detail"] or "{}")
+        except ValueError:
+            product = {}
+        base = self.cfg.public_base_url or f"https://{self.headers.get('Host', '')}"
+        page = share_page.render_guide(
+            labels(), f"{base.rstrip('/')}/s/{code}", row["affiliate_url"],
+            row["platform"], agent_header, product if isinstance(product, dict) else {})
+        return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
 
     def _shopee_smart_resolve(self):
         """Unified Smart Resolve: 12h on-demand cache refresh + instant affiliate URL reuse."""
@@ -2991,10 +3052,12 @@ class _Handler(BaseHTTPRequestHandler):
                         (item_id,),
                     )
                     ledger.mark_link_delivered(conn, own["request_id"])
-                    conn.commit()
-                    return self._json(_cache_payload(
+                    payload = _cache_payload(
                         cached_row, own, rate, source="cache_instant",
-                        age_hours=round(age_hours, 1)))
+                        age_hours=round(age_hours, 1))
+                    self._add_share_url(conn, payload)
+                    conn.commit()
+                    return self._json(payload)
 
                 # Stale numbers: refresh price and commission, keep the link.
                 try:
@@ -3030,10 +3093,12 @@ class _Handler(BaseHTTPRequestHandler):
                         increment_count=True,
                     )
                     ledger.mark_link_delivered(conn, own["request_id"])
-                    conn.commit()
-                    return self._json(_cache_payload(
+                    payload = _cache_payload(
                         new_cached, own, rate, source="cache_refreshed",
-                        age_hours=0.0))
+                        age_hours=0.0)
+                    self._add_share_url(conn, payload)
+                    conn.commit()
+                    return self._json(payload)
 
         # No link of this customer's own yet: make one for them.
         return self._shopee_convert()

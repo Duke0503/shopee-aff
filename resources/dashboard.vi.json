@@ -300,5 +300,18 @@
   "guide_policy_split_badge": "Cam kết phân chia minh bạch",
   "guide_policy_split_title": "Quy tắc 8 : 2 • Bạn nhận 8 phần, Admin 2 phần",
   "guide_policy_split_desc": "Toàn bộ số tiền hoa hồng thực tế sàn thanh toán cho đơn hàng của bạn sẽ được chia trọn vẹn 80% về tài khoản ngân hàng của bạn. 20% còn lại dùng để vận hành hệ thống máy chủ và bot hỗ trợ 24/7.",
-  "guide_policy_split_alt": "Cam kết tỷ lệ 8:2 Hoàn Tiền DP"
+  "guide_policy_split_alt": "Cam kết tỷ lệ 8:2 Hoàn Tiền DP",
+  "open_title": "Link hoàn tiền {platform}",
+  "open_preview_description": "Link hoàn tiền {platform}: mua như bình thường, nhận lại tiền sau khi sàn duyệt đơn.",
+  "open_in_app_heading": "Mở bằng trình duyệt để được hoàn tiền",
+  "open_in_app_body": "Bạn đang mở link ngay trong Zalo. {platform} chỉ ghi nhận hoàn tiền khi link được mở bằng trình duyệt (Chrome hoặc Safari).",
+  "open_button_android": "Mở bằng Chrome",
+  "open_button_ios": "Mở bằng Safari",
+  "open_android_steps": "Không tự mở được? Bấm dấu ⋮ hoặc ⋯ ở góc trên bên phải, chọn \"Mở bằng trình duyệt\".",
+  "open_ios_steps": "Nút trên không chạy? Bấm dấu ⋯ ở góc trên bên phải, chọn \"Mở bằng trình duyệt\" (hoặc \"Mở trong Safari\").",
+  "open_copy": "Sao chép link",
+  "open_copied": "Đã sao chép, dán vào Chrome hoặc Safari nhé",
+  "open_stay": "Vẫn mở tại đây (có thể không được hoàn tiền)",
+  "open_not_found_title": "Link không tồn tại",
+  "open_not_found_body": "Link này không đúng hoặc chưa sẵn sàng. Bạn nhắn lại link sản phẩm cho mình trên Zalo để lấy link mới nhé."
 }

@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Protocol
 
-from ..ledger import campaigns, payouts, repository as ledger
+from ..ledger import campaigns, payouts, share_links, repository as ledger
 from ..messaging import templates as messages
 from ..core import audit
 from ..core.policy import SHOPEE_COMMISSION_CAP_VND as CAP, round_dong
@@ -136,8 +136,12 @@ def _pct(value: float) -> str:
 def deliver_ready_links(
     db_path: Path, bot: Sender, cashback_rate: float, payout_window: str,
     bridge=None, third_party: bool = True, reduced_rate: float | None = None,
+    share_base: str = "",
 ) -> int:
     """Send links nobody collected. Idempotent via notified_at.
+
+    With share_base the message carries our short link rather than the
+    affiliate link itself -- see ledger/share_links.py for why.
 
     Whoever hands a link to the customer (the assistant in chat, the web
     page) marks it delivered. What is left unmarked after ASSISTANT_WAIT
@@ -175,6 +179,10 @@ def deliver_ready_links(
     for row in rows:
         from ..shopee import commission as commission_lookup
 
+        with ledger.connect(db_path) as conn:
+            link = (share_links.url_for(conn, share_base, row["request_id"])
+                    or row["affiliate_url"])
+
         # Reuse a breakdown worked out on an earlier pass; only ask a
         # source when there is nothing stored yet.
         estimate = (
@@ -203,7 +211,7 @@ def deliver_ready_links(
             # customer only finds out after they have bought.
             text = messages.render(
                 "link_ready_no_commission",
-                link=row["affiliate_url"],
+                link=link,
                 product=_short(estimate.name) or "San pham",
                 price=_vnd(estimate.price),
             )
@@ -222,7 +230,7 @@ def deliver_ready_links(
             cb = round_dong(net_comm * cashback_rate)
             text = messages.render(
                 "link_ready",
-                link=row["affiliate_url"],
+                link=link,
                 product=_short(estimate.name),
                 price=_vnd(estimate.price),
                 commission=_vnd(raw_comm),
@@ -244,7 +252,7 @@ def deliver_ready_links(
             # cheated.
             text = messages.render(
                 "link_ready_no_estimate",
-                link=row["affiliate_url"],
+                link=link,
                 rate=f"{cashback_rate:.0%}",
                 tax_clause=tax_clause,
                 days=payout_window,

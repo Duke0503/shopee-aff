@@ -458,6 +458,13 @@ function extractTextAndUrls(data) {
         return;
       }
 
+      // Our own short link when the backend gave one. Tapped inside Zalo it
+      // lands on our page, which gets the customer into a real browser
+      // before Shopee: opened in Zalo's in-app browser, the purchase is not
+      // credited (see src/cashback/web/share_page.py).
+      const linkUrl = productData?.share_url || resolveRes.share_url || affUrl;
+      const openHint = linkUrl !== affUrl && wording.link_open_hint ? `${wording.link_open_hint}\n\n` : "";
+
       // A link made for this customer just now arrives with a name at most
       // (link-status carries no figures), so a name alone is not enough to
       // skip the preview: without it the reply goes out with no price and
@@ -510,7 +517,8 @@ function extractTextAndUrls(data) {
           tagPrefix +
           `🍜 ${readyTitle}\n\n` +
           storeSection +
-          `🔗 ${affUrl}\n\n` +
+          `🔗 ${linkUrl}\n\n` +
+          openHint +
           `🎁 Bạn sẽ nhận 80% hoa hồng tích lũy của đơn sau khi giao hàng thành công (Shopee áp dụng trần hoa hồng cho từng quán)!\n` +
           groupOrderTip +
           `\n👉 ${actionTitle}.\n` +
@@ -563,7 +571,8 @@ function extractTextAndUrls(data) {
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
           (productData.name ? `📦 ${productData.name}\n` : "") +
-          `🔗 ${affUrl}\n\n` +
+          `🔗 ${linkUrl}\n\n` +
+          openHint +
           `📊 Hoa hồng hiện tại:\n` +
           `${commissionSection}\n\n` +
           `🎁 ${payoutLine}\n\n` +
@@ -573,7 +582,8 @@ function extractTextAndUrls(data) {
         replyText =
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
-          `🔗 ${affUrl}\n\n` +
+          `🔗 ${linkUrl}\n\n` +
+          openHint +
           `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       }

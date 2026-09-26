@@ -1,4 +1,5 @@
 {
+  "link_open_hint": "📲 Bấm link ngay trong Zalo sẽ không được ghi nhận: khi trang mở ra, chọn \"Mở bằng Chrome/Safari\" (hoặc bấm ⋯ → \"Mở bằng trình duyệt\") rồi mới mua nhé.",
   "campaign_link_total": " → tổng dự kiến {total}",
   "campaign_rule_per_customer": "Mỗi người tối đa {cap} suất; thưởng chuyển cùng tiền hoàn khi sàn duyệt đơn",
   "campaign_rule_unlimited": "Mỗi đơn 1 suất, 1 người có thể giành nhiều suất; thưởng chuyển cùng tiền hoàn khi sàn duyệt đơn",

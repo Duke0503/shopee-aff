@@ -195,6 +195,21 @@ tiếng Việt: chúng thuộc `resources/messages.vi.json` (xem
 `order_identity_product`). Kiểm bằng cách quét ký tự `> 0x2100` trong
 `src/`.
 
+**Link gửi trong chat là link của mình, không phải link Shopee.** Từ
+26/9/2026, đơn mua sau khi bấm link affiliate ngay trong trình duyệt của
+Zalo không được Shopee ghi nhận. Nên assistant và tin báo link muộn gửi
+`hoantiendp.com/s/<mã>` (`ledger/share_links.py`, `web/share_page.py`):
+trình duyệt thật thì chuyển thẳng (302) sang link affiliate; trong Zalo
+thì Android tự mở Chrome, iPhone hiện hướng dẫn "Mở bằng trình duyệt"
+(iOS không cho trang tự thoát). Mỗi mã thuộc đúng một yêu cầu tạo link,
+tức một khách, và là chuỗi ngẫu nhiên, không suy ra từ `request_id`. Lượt
+bấm ghi vào `link_clicks` (bot xem trước link không tính). Web vẫn hiện
+link affiliate như cũ vì khách web đã ở trình duyệt thật.
+`PUBLIC_BASE_URL` rỗng thì quay về gửi link affiliate; bản dev phải để
+rỗng. Chữ trên trang nằm ở các khoá `open_*` trong
+`resources/dashboard.vi.json`, sửa là đổi ngay. Test:
+`tests/test_share_links.py`.
+
 **Danh sách tên miền Shopee phải nằm ở một chỗ duy nhất**
 (`shopee/dashboard_lookup.py`). Đã từng có hai bản sao lệch nhau và link
 `shp.ee` bị coi là tin nhắn thường suốt một buổi.

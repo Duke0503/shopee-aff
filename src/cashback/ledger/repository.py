@@ -261,6 +261,9 @@ _LATER_COLUMNS = {
         # about it.
         "attempts": "INTEGER NOT NULL DEFAULT 0",
         "platform": "TEXT NOT NULL DEFAULT 'shopee'",
+        # The code in our own short link (/s/<code>), made on first use.
+        # See ledger/share_links.py.
+        "share_code": "TEXT",
     },
     # The last status the customer was actually told about. Compared with
     # `status` to find who is owed an update, which makes the notifier safe
@@ -333,9 +336,24 @@ CREATE INDEX IF NOT EXISTS idx_award_order_lookup ON campaign_awards(order_id);
 """
 
 
+_SHARE_DDL = """
+-- Each time a person opened one of our short links. Previews fetched by
+-- bots are not recorded. Evidence for "I clicked your link", and the
+-- click-to-order rate.
+CREATE TABLE IF NOT EXISTS link_clicks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id  TEXT NOT NULL,
+    clicked_at  TEXT NOT NULL,
+    agent       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_clicks_request ON link_clicks(request_id);
+"""
+
+
 def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SESSIONS_DDL)
     conn.executescript(_CAMPAIGNS_DDL)
+    conn.executescript(_SHARE_DDL)
 
 
 def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) -> None:
@@ -356,6 +374,8 @@ def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) ->
     conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_platform ON orders(platform)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_req_platform ON link_requests(platform)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_cache_canonical ON products_cache(canonical_url)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_req_share_code"
+                 " ON link_requests(share_code) WHERE share_code IS NOT NULL")
 
 
 # The name a customer signs in with and reads back to us. customer_id is

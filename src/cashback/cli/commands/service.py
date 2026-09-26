@@ -154,7 +154,8 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                 cfg.db_path, sender, cfg.advertised_cashback_rate,
                 PAYOUT_WINDOW_TEXT, bridge=bridge,
                 third_party=cfg.third_party_fallback,
-                reduced_rate=cfg.reduced_cashback_rate)),
+                reduced_rate=cfg.reduced_cashback_rate,
+                share_base=cfg.public_base_url)),
         )
         while not stop.wait(NOTIFY_INTERVAL_SECONDS):
             for name, step in steps:
