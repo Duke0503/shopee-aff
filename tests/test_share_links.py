@@ -144,13 +144,23 @@ class TestTheProductPage:
                                "package=com.android.chrome")
         assert "S.browser_fallback_url=https%3A%2F%2Fexample.test%2Fs%2F" in href
         assert f'href="{BASE}/s/{code}/go"' in page          # "buy here anyway"
-        assert 'id="veil"' not in page
+        assert 'id="hint"' not in page
         assert _clicks(db) == ["in_app"]
 
     def test_in_zalo_on_iphone_the_button_tries_safari_and_the_menu_is_pointed_at(self, server, db, code):
         page = _get(server, f"/s/{code}", ZALO_IOS)[2]
         assert _buy_href(page) == f"x-safari-{BASE}/s/{code}/go"
-        assert 'id="veil" class="on"' in page
+        assert 'class="hint" id="hint"' in page
+
+    def test_the_button_comes_before_the_campaign_and_the_details(self, server, db, code):
+        from cashback.ledger import campaigns
+        with ledger.connect(db) as conn:
+            campaigns.create(conn, "t", "Trung Thu", "2026-01-01T00:00:00+07:00",
+                             "2099-01-01T00:00:00+07:00", 20, 20_000)
+        page = _get(server, f"/s/{code}", DESKTOP)[2]
+        body = page[page.index("<body"):]
+        assert body.index('class="cash"') < body.index('class="cta"') < body.index('class="event"')
+        assert body.index('class="event"') < body.index("<details>")
 
     def test_a_preview_bot_gets_the_card_and_is_not_a_click(self, server, db, code):
         status, _, page = _get(server, f"/s/{code}", PREVIEW_BOT)
@@ -171,9 +181,10 @@ class TestTheProductPage:
     def test_every_word_on_the_page_comes_from_the_labels(self, server, code):
         words = dashboard.labels()
         page = _get(server, f"/s/{code}", ZALO_IOS)[2]
-        for key in ("open_brand", "open_in_app_title", "open_tips_title", "open_tip_1", "open_veil_close"):
-            assert words[key] in page, key
-        assert words["open_buy_ios"].replace("{platform}", "Shopee") in page
+        for key in ("open_brand", "open_cashback_label", "open_tips_title", "open_tip_1",
+                    "open_breakdown_title", "open_veil_ios"):
+            assert __import__("html").escape(words[key]) in page, key
+        assert words["open_buy"].replace("{platform}", "Shopee") in page
 
     def test_a_link_without_figures_finds_them_in_the_product_cache(self, server, db):
         with ledger.connect(db) as conn:
