@@ -45,6 +45,7 @@ tin ghim copy dán thẳng vào Zalo.
 |---|---|
 | [`runbook.md`](03-operations/runbook.md) | Hệ thống chạy thế nào, làm gì hằng ngày |
 | [`group-setup.md`](03-operations/group-setup.md) | Dựng nhóm: tin ghim, 11 bước của khách, admin bấm gì |
+| [`deploy.md`](03-operations/deploy.md) | Dựng server trên máy mới, chuyển máy, cập nhật bản chạy thật |
 
 ### 04 — Tham chiếu
 
