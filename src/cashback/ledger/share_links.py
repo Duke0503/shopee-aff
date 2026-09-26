@@ -29,6 +29,8 @@ CODE_LENGTH = 8
 _ALPHABET = string.ascii_letters + string.digits
 
 AGENT_BROWSER, AGENT_IN_APP, AGENT_BOT = "browser", "in_app", "bot"
+# Not an agent: the buy button was tapped (/s/<code>/go).
+BUY = "buy"
 
 
 def code_for(conn: sqlite3.Connection, request_id: str) -> str | None:
@@ -64,7 +66,8 @@ def find(conn: sqlite3.Connection, code: str) -> sqlite3.Row | None:
     if not code or len(code) != CODE_LENGTH or not code.isalnum():
         return None
     return conn.execute(
-        "SELECT r.request_id, r.affiliate_url, r.estimate_detail, r.platform"
+        "SELECT r.request_id, r.customer_id, r.source_url, r.affiliate_url,"
+        "       r.estimate_detail, r.platform"
         "  FROM link_requests r WHERE r.share_code=?"
         "   AND r.affiliate_url IS NOT NULL AND r.affiliate_url != ''",
         (code,)).fetchone()

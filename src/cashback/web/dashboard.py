@@ -762,7 +762,8 @@ class _Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
 
         if path.startswith("/s/"):
-            return self._open_share_link(path[3:].strip("/"))
+            code, _, action = path[3:].strip("/").partition("/")
+            return self._open_share_link(code, go=(action == "go"))
 
         if path == "/api/payouts":
             if not self.from_loopback and not self._session_is_staff():
@@ -2958,9 +2959,9 @@ class _Handler(BaseHTTPRequestHandler):
         if url:
             payload["share_url"] = url
 
-    def _open_share_link(self, code: str):
-        """/s/<code>: redirect a real browser, guide an in-app one."""
-        from ..ledger import share_links
+    def _open_share_link(self, code: str, go: bool = False):
+        """/s/<code>: the product page. /s/<code>/go: on to the affiliate link."""
+        from ..ledger import campaigns, share_links
         from . import share_page
 
         agent_header = self.headers.get("User-Agent") or ""
@@ -2972,24 +2973,96 @@ class _Handler(BaseHTTPRequestHandler):
                                   "text/html; charset=utf-8")
             # HEAD is something checking the link, not a person opening it.
             if not self._head_only:
-                share_links.record_click(conn, row["request_id"], agent)
+                share_links.record_click(
+                    conn, row["request_id"],
+                    share_links.BUY if go and agent != share_links.AGENT_BOT else agent)
                 conn.commit()
+            if not go:
+                product = self._share_product(conn, row)
+                house = ledger.is_house(conn, row["customer_id"])
+                offer = None if house else campaigns.offer_for(
+                    conn, row["customer_id"], row["platform"] or "shopee")
 
         self._extra_headers = [("Cache-Control", "no-store"),
                                ("Referrer-Policy", "no-referrer-when-downgrade")]
-        if agent == share_links.AGENT_BROWSER:
+        if go:
             self._extra_headers.append(("Location", row["affiliate_url"]))
             return self._send(302, b"", "text/plain; charset=utf-8")
 
+        if offer:
+            offer = {**offer, "bonus_formatted": _vnd(offer["bonus"])}
+        words = labels()
+        base = self.cfg.public_base_url or f"https://{self.headers.get('Host', '')}"
+        page = share_page.render(
+            words, page_url=f"{base.rstrip('/')}/s/{code}", target=row["affiliate_url"],
+            platform=row["platform"], agent=agent, user_agent=agent_header,
+            product=product, house=house, offer=offer,
+            zalo_url=words.get("open_zalo_url", ""))
+        return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _share_product(self, conn, row) -> dict:
+        """Name, picture, price and cashback for a link's product page.
+
+        The request's own breakdown first. A link handed out before the
+        product was looked up has none, so fall back to the product cache
+        (resolving a short source link once) and keep what was found on the
+        request, so the next visit is a plain read.
+        """
         try:
             product = json.loads(row["estimate_detail"] or "{}")
         except ValueError:
             product = {}
-        base = self.cfg.public_base_url or f"https://{self.headers.get('Host', '')}"
-        page = share_page.render_guide(
-            labels(), f"{base.rstrip('/')}/s/{code}", row["affiliate_url"],
-            row["platform"], agent_header, product if isinstance(product, dict) else {})
-        return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+        if not isinstance(product, dict):
+            product = {}
+        if product.get("name") and (product.get("price") or product.get("cashback")):
+            return self._format_product(product)
+        if (row["platform"] or "shopee") != "shopee":
+            return self._format_product(product)
+
+        from ..shopee.dashboard_lookup import parse_url, is_short_link, resolve_short_link
+        source = row["source_url"] or ""
+        try:
+            if is_short_link(source):
+                source = resolve_short_link(source)
+            parsed = parse_url(source)
+        except Exception:
+            parsed = None
+        cached = ledger.get_product_cache(conn, parsed[2]) if parsed else None
+        if not cached or not cached["name"]:
+            return self._format_product(product)
+        found = {
+            "name": cached["name"], "price": cached["price"] or 0,
+            "price_formatted": cached["price_formatted"] or "",
+            "shopee_rate": cached["shopee_rate"] or 0, "seller_rate": cached["seller_rate"] or 0,
+            "shopee_part": cached["shopee_part"] or 0,
+            "shopee_part_formatted": cached["shopee_part_formatted"] or "",
+            "seller_part": cached["seller_part"] or 0,
+            "seller_part_formatted": cached["seller_part_formatted"] or "",
+            "commission": cached["total_commission"] or 0,
+            "total_commission": cached["total_commission"] or 0,
+            "is_capped": bool(cached["is_capped"]),
+            "cashback": cached["cashback"] or 0,
+            "cashback_formatted": cached["cashback_formatted"] or "",
+            "rate_percent": cached["rate_percent"] or f"{self.cfg.advertised_cashback_rate:.0%}",
+            "image_url": cached["image_url"] or "", "source": "shopee",
+            "item_id": str(parsed[2]),
+        }
+        merged = {**found, **{k: v for k, v in product.items() if v}}
+        conn.execute("UPDATE link_requests SET estimate_detail=? WHERE request_id=?",
+                     (json.dumps(merged, ensure_ascii=False), row["request_id"]))
+        conn.commit()
+        return self._format_product(merged)
+
+    def _format_product(self, product: dict) -> dict:
+        """Fill in the money strings a stored breakdown may lack."""
+        out = dict(product)
+        for amount, text in (("price", "price_formatted"), ("cashback", "cashback_formatted"),
+                             ("shopee_part", "shopee_part_formatted"),
+                             ("seller_part", "seller_part_formatted")):
+            if out.get(amount) and not out.get(text):
+                out[text] = _vnd(out[amount])
+        out.setdefault("rate_percent", f"{self.cfg.advertised_cashback_rate:.0%}")
+        return out
 
     def _shopee_smart_resolve(self):
         """Unified Smart Resolve: 12h on-demand cache refresh + instant affiliate URL reuse."""

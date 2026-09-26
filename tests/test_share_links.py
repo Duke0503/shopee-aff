@@ -105,53 +105,113 @@ def _clicks(db):
         return [r[0] for r in conn.execute("SELECT agent FROM link_clicks ORDER BY id")]
 
 
+DETAIL = {"name": "Tu Giay Thong Minh", "image_url": "https://cf.shopee.vn/file/abc",
+          "price": 199_000, "shopee_rate": 2.5, "shopee_part": 4_975,
+          "cashback": 3_543, "rate_percent": "80%"}
+
+
 @pytest.fixture
 def code(db):
     with ledger.connect(db) as conn:
-        rid = _request(conn, detail={"name": "Tu Giay Thong Minh",
-                                     "image_url": "https://cf.shopee.vn/file/abc"})
+        rid = _request(conn, detail=DETAIL)
         return share_links.code_for(conn, rid)
 
 
-class TestTheShortLink:
-    def test_a_real_browser_is_redirected(self, server, db, code):
-        status, headers, _ = _get(server, f"/s/{code}", DESKTOP)
-        assert status == 302 and headers["Location"] == AFF
+def _buy_href(page):
+    import html as _html
+    return _html.unescape(re.search(r'<a class="(?:btn|ghost)" href="([^"]+)" rel="nofollow"', page).group(1))
+
+
+class TestTheProductPage:
+    def test_everyone_sees_the_product_first(self, server, db, code):
+        status, _, page = _get(server, f"/s/{code}", DESKTOP)
+        assert status == 200
+        assert "Tu Giay Thong Minh" in page and "https://cf.shopee.vn/file/abc" in page
+        assert "199.000" in page and "3.543" in page and "4.975" in page
         assert _clicks(db) == ["browser"]
 
-    def test_zalo_on_iphone_is_shown_how_to_get_out(self, server, db, code):
-        status, _, page = _get(server, f"/s/{code}", ZALO_IOS)
-        assert status == 200
-        assert f"x-safari-{BASE}/s/{code}" in page
-        assert "Tu Giay Thong Minh" in page and 'og:image' in page
-        assert "intent://" not in page.split("<script>")[0]
+    def test_the_buy_button_goes_through_go_to_the_affiliate_link(self, server, db, code):
+        page = _get(server, f"/s/{code}", DESKTOP)[2]
+        assert _buy_href(page) == f"{BASE}/s/{code}/go"
+        status, headers, _ = _get(server, f"/s/{code}/go", DESKTOP)
+        assert status == 302 and headers["Location"] == AFF
+        assert _clicks(db) == ["browser", "buy"]
+
+    def test_in_zalo_on_android_the_button_opens_chrome(self, server, db, code):
+        page = _get(server, f"/s/{code}", ZALO_ANDROID)[2]
+        href = _buy_href(page)
+        assert href.startswith(f"intent://example.test/s/{code}/go#Intent;scheme=https;"
+                               "package=com.android.chrome")
+        assert "S.browser_fallback_url=https%3A%2F%2Fexample.test%2Fs%2F" in href
+        assert f'href="{BASE}/s/{code}/go"' in page          # "buy here anyway"
+        assert 'id="veil"' not in page
         assert _clicks(db) == ["in_app"]
 
-    def test_zalo_on_android_is_sent_to_chrome(self, server, db, code):
-        status, _, page = _get(server, f"/s/{code}", ZALO_ANDROID)
-        assert status == 200
-        assert f"intent://example.test/s/{code}#Intent;scheme=https;package=com.android.chrome" in page
-        assert "S.browser_fallback_url=https%3A%2F%2Fs.shopee.vn%2Faff123" in page
-        assert AFF in page       # the "open it here anyway" link
+    def test_in_zalo_on_iphone_the_button_tries_safari_and_the_menu_is_pointed_at(self, server, db, code):
+        page = _get(server, f"/s/{code}", ZALO_IOS)[2]
+        assert _buy_href(page) == f"x-safari-{BASE}/s/{code}/go"
+        assert 'id="veil" class="on"' in page
 
     def test_a_preview_bot_gets_the_card_and_is_not_a_click(self, server, db, code):
         status, _, page = _get(server, f"/s/{code}", PREVIEW_BOT)
         assert status == 200 and 'og:title" content="Tu Giay Thong Minh"' in page
+        assert _get(server, f"/s/{code}/go", PREVIEW_BOT)[0] == 302
         assert _clicks(db) == []
 
     def test_unknown_or_unsafe_codes_are_404(self, server, db, code):
         assert _get(server, "/s/AAAAAAAA", DESKTOP)[0] == 404
+        assert _get(server, "/s/AAAAAAAA/go", DESKTOP)[0] == 404
         assert _get(server, "/s/../../etc", DESKTOP)[0] == 404
         with ledger.connect(db) as conn:
             conn.execute("UPDATE link_requests SET affiliate_url='javascript:alert(1)'")
         assert _get(server, f"/s/{code}", DESKTOP)[0] == 404
+        assert _get(server, f"/s/{code}/go", DESKTOP)[0] == 404
         assert _clicks(db) == []
 
     def test_every_word_on_the_page_comes_from_the_labels(self, server, code):
         words = dashboard.labels()
         page = _get(server, f"/s/{code}", ZALO_IOS)[2]
-        assert words["open_in_app_heading"] in page
-        assert words["open_button_ios"] in page
+        for key in ("open_brand", "open_in_app_title", "open_tips_title", "open_tip_1", "open_veil_close"):
+            assert words[key] in page, key
+        assert words["open_buy_ios"].replace("{platform}", "Shopee") in page
+
+    def test_a_link_without_figures_finds_them_in_the_product_cache(self, server, db):
+        with ledger.connect(db) as conn:
+            ledger.add_customer(conn, "111", zalo_user_id="111")
+            ledger.record_link_request(conn, "R26092600007", "111",
+                                       "https://shopee.vn/product/166586877/10096389022", None, 1, "zalo")
+            ledger.attach_affiliate_url(conn, "R26092600007", AFF, 1)
+            ledger.upsert_product_cache(conn, item_id="10096389022", name="Ke De Giay",
+                                        price=250_000, price_formatted="250.000d",
+                                        cashback=7_000, cashback_formatted="7.000d")
+            code = share_links.code_for(conn, "R26092600007")
+        page = _get(server, f"/s/{code}", DESKTOP)[2]
+        assert "Ke De Giay" in page and "250.000d" in page and "7.000d" in page
+        with ledger.connect(db) as conn:     # kept, so the next visit is a plain read
+            detail = json.loads(conn.execute("SELECT estimate_detail FROM link_requests"
+                                             " WHERE request_id='R26092600007'").fetchone()[0])
+        assert detail["name"] == "Ke De Giay"
+
+    def test_a_house_link_promises_no_cashback(self, server, db):
+        with ledger.connect(db) as conn:
+            ledger.record_link_request(conn, "R26092600008", ledger.HOUSE_CUSTOMER_ID,
+                                       "https://shopee.vn/x", None, 1, "web")
+            ledger.attach_affiliate_url(conn, "R26092600008", AFF, 1)
+            conn.execute("UPDATE link_requests SET estimate_detail=? WHERE request_id='R26092600008'",
+                         (json.dumps(DETAIL),))
+            code = share_links.code_for(conn, "R26092600008")
+        words = dashboard.labels()
+        page = _get(server, f"/s/{code}", DESKTOP)[2]
+        assert words["open_house_title"] in page and words["open_zalo_url"] in page
+        assert "3.543" not in page
+
+    def test_a_running_campaign_is_mentioned(self, server, db, code, monkeypatch):
+        from cashback.ledger import campaigns
+        with ledger.connect(db) as conn:
+            campaigns.create(conn, "t", "Trung Thu", "2026-01-01T00:00:00+07:00",
+                             "2099-01-01T00:00:00+07:00", 20, 20_000)
+        page = _get(server, f"/s/{code}", DESKTOP)[2]
+        assert "Trung Thu" in page and "20.000" in page
 
     def test_link_status_hands_out_the_short_link(self, server, db, code):
         status, _, body = _get(server, "/api/shopee/link-status?request_id=R26092600001",
@@ -221,6 +281,6 @@ class TestWhatTheAssistantGets:
 
     def test_a_head_request_is_not_a_click(self, server, db, code):
         c = http.client.HTTPConnection("127.0.0.1", server, timeout=10)
-        c.request("HEAD", f"/s/{code}", headers={"User-Agent": DESKTOP})
+        c.request("HEAD", f"/s/{code}/go", headers={"User-Agent": DESKTOP})
         assert c.getresponse().status == 302
         assert _clicks(db) == []
