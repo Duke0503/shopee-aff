@@ -148,6 +148,17 @@ class LinkStepError(RuntimeError):
 
     def __init__(self, step: int, why: str, state: str, hint: str):
         self.step, self.why, self.state, self.hint = step, why, state, hint
+        low = why.lower()
+        # The page's fault, not the link's: it never loaded, lost a field,
+        # or stopped answering. Such a failure must not count against the
+        # customer's request -- three of them and the customer is told their
+        # link failed when nothing was wrong with it (28/9/2026: a tab idle
+        # for three hours was still rendering when the first link came in).
+        self.page_level = (
+            step == 1
+            or "not found" in low
+            or any(m in low for m in ("no result for", "job_timeout", "execute_script_timeout"))
+        )
         super().__init__(
             f"[step {step}/4: {STEPS[step]}] {why} || page: {state}"
             + (f" || likely: {hint}" if hint else ""))
@@ -311,23 +322,60 @@ def _open_page(bridge: Bridge, settle_ms: int) -> None:
     already_there = CUSTOM_LINK_URL.rstrip("/") in here
 
     if not already_there:
-        bridge.submit(
-            Job(connector=CONNECTOR, action="navigate",
-                params={"url": CUSTOM_LINK_URL}),
-            timeout=90,
-        )
-        _pause(bridge, settle_ms)
-    else:
-        # The form is live already; this is only breathing room for any
-        # in-flight render from the last pass.
-        _pause(bridge, 300)
+        _navigate(bridge)
 
-    stuck = blocked_by_verification(bridge)
-    if stuck:
-        raise _fail(bridge, 1,
-                    "Shopee is asking this session to pass a verification check. "
-                    "Open the pinned tab and drag the slider, then it resumes by "
-                    f"itself. ({stuck[:90]})")
+    # The right URL is not a ready page. After hours idle, Chrome can still
+    # be rendering Shopee's app when the next link arrives: the URL matches,
+    # the form is not there yet. Wait for the form itself; if it never
+    # comes, reload once and wait again.
+    for attempt in (1, 2):
+        stuck = blocked_by_verification(bridge)
+        if stuck:
+            raise _fail(bridge, 1,
+                        "Shopee is asking this session to pass a verification check. "
+                        "Open the pinned tab and drag the slider, then it resumes by "
+                        f"itself. ({stuck[:90]})")
+        if _wait_for_form(bridge, FORM_WAIT_SECONDS[attempt - 1]):
+            return
+        if attempt == 1:
+            _navigate(bridge)
+    raise _fail(bridge, 1, "the link form never appeared, even after a reload")
+
+
+# How long to wait for the form: first as the page stands, then after a reload.
+FORM_WAIT_SECONDS = (12, 20)
+
+_FORM_READY_TEMPLATE = """
+(() => {
+  const wanted = new RegExp(%(label)s, 'i');
+  const box = !!document.querySelector(%(textarea)s);
+  const button = [...document.querySelectorAll('button')].some(b => wanted.test(b.innerText || ''));
+  return { ready: box && button };
+})()
+"""
+
+
+def _navigate(bridge: Bridge) -> None:
+    bridge.submit(
+        Job(connector=CONNECTOR, action="navigate", params={"url": CUSTOM_LINK_URL}),
+        timeout=90,
+    )
+
+
+def _wait_for_form(bridge: Bridge, seconds: float) -> bool:
+    """True once the link box and the submit button are both on the page."""
+    code = _FORM_READY_TEMPLATE % {"label": json.dumps(SUBMIT_BUTTON_TEXT),
+                                   "textarea": json.dumps(SOURCE_TEXTAREA)}
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            if _js(bridge, code, timeout=20).get("ready"):
+                return True
+        except RuntimeError:
+            pass   # a page mid-load can refuse a script; keep looking
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.5)
 
 
 def convert_chunk(
@@ -436,6 +484,21 @@ def generate(bridge: Bridge, jobs: list[dict]) -> list[dict]:
                 links = convert_chunk(
                     bridge, [job["source_url"] for job in chunk], sub_ids
                 )
+            except LinkStepError as exc:
+                if exc.page_level:
+                    # The page broke, not these links. Keep what this pass
+                    # already made; hand the rest back to be retried
+                    # without counting an attempt against anyone.
+                    done = {r["request_id"] for r in results}
+                    results.extend(
+                        {"request_id": job["request_id"], "retry": True, "error": str(exc)}
+                        for job in jobs if job["request_id"] not in done)
+                    return results
+                for job in chunk:
+                    results.append(
+                        {"request_id": job["request_id"], "error": str(exc)}
+                    )
+                continue
             except (RuntimeError, ValueError) as exc:
                 for job in chunk:
                     results.append(

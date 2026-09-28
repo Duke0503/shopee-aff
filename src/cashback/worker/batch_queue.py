@@ -136,6 +136,12 @@ def apply_results(db_path: Path, results: list[dict]) -> dict:
 
             release(request_id)
 
+            # The page failed, not this link: back in the queue, no attempt
+            # counted (see LinkStepError.page_level).
+            if item.get("retry"):
+                skipped += 1
+                continue
+
             affiliate_url = (item.get("affiliate_url") or "").strip()
             if item.get("error") or not affiliate_url:
                 failed += 1

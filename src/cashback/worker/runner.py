@@ -91,7 +91,7 @@ def run_one_pass(
         if totals.failing_streak >= FAILING_ALERT_AFTER:
             log.warning(f"LINKS WORKING AGAIN after {totals.failing_streak} failed pass(es)")
         totals.failing_streak = 0
-    elif outcome["failed"]:
+    elif any(i.get("error") for i in results):
         _note_failure(totals, next((i["error"] for i in results if i.get("error")), "?"))
     return len(jobs)
 
