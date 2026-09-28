@@ -196,6 +196,31 @@ sẽ mất, nên chỉ làm khi thật cần.
 
 ---
 
+## 7b. Chạy trên macOS
+
+`start.bat` và các script `.ps1` chỉ chạy trên Windows. Trên Mac, bật từng
+phần trong một cửa sổ Terminal riêng:
+
+```bash
+uv run cashback serve                         # [1] backend
+cd zalo_assistant && node assistant_worker.js # [2] assistant
+./scripts/start-browser.sh                    # [4] Chrome + extension
+```
+
+(Tunnel `[3]`: chạy `cloudflared` với token trong `.env`, giống
+`scripts/start-tunnel.ps1`.)
+
+**Chrome phải mở bằng `./scripts/start-browser.sh`**, không mở Chrome như
+bình thường. Script bật Chrome với các cờ chặn việc Chrome tự làm chậm hoặc
+đóng băng tab chạy nền. Thiếu các cờ đó, tab Shopee Affiliate bị làm chậm
+và mọi link đều hỏng với lỗi `execute_script_timeout` ở bước 1. Nếu Chrome
+của hồ sơ này đang mở sẵn thì thoát hẳn (Cmd+Q) rồi mới chạy script, vì cờ
+chỉ có tác dụng khi Chrome khởi động mới.
+
+Không để Mac ngủ: System Settings → Displays/Energy → tắt "Put hard disks
+to sleep" và cho phép không ngủ khi cắm sạc, hoặc chạy `caffeinate -dims`
+trong một Terminal.
+
 ## 8. Việc định kỳ
 
 - [ ] `uv run cashback audit --scan` trước mỗi đợt chuyển tiền.

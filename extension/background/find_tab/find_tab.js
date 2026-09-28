@@ -7,7 +7,9 @@ const _pending     = new Map(); // scoped tab id -> Promise<tab> -- prevents con
 async function init_tab(tabId) {
   if (_initialized.has(tabId)) return;
   _initialized.add(tabId);
-  chrome.tabs.update(tabId, { pinned: true }).catch(() => {});
+  // Pinned, and never discarded by Memory Saver: a discarded tab has no
+  // page to run a script in, and every job on it times out.
+  chrome.tabs.update(tabId, { pinned: true, autoDiscardable: false }).catch(() => {});
 }
 
 async function recover_tab(hosts, owned, id) {

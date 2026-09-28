@@ -73,48 +73,46 @@ _CLICK_TEMPLATE = """
 """
 
 # The result lands in a disabled textarea, so read .value, not .innerText.
-# Poll rather than sleeping a fixed time: the page is sometimes instant and
-# sometimes takes several seconds.
 # The result box is only trusted when it holds something DIFFERENT from
 # what was in it before this submission. Waiting for "not empty" was
 # enough only because every pass used to reload the page and wipe it; the
 # moment that reload was skipped, the previous customer's link was still
 # sitting there and got read back as this customer's answer.
-_READ_TEMPLATE = """
+# One look per call, no waiting inside the page -- see _pause for why page
+# timers cannot be trusted. _read_result polls this from Python.
+_READ_ONCE_TEMPLATE = """
 (() => {
-  const deadline = Date.now() + %(timeout_ms)d;
-  const start = Date.now();
   const previous = %(previous)s;
-  const read = () => {
-    const el = document.querySelector(%(result)s);
-    const text = (el && el.value) ? el.value.trim() : '';
-    if (!text || !/shopee/i.test(text)) return '';
-    if (text === previous) return '';        // still the last answer
-    return text;
-  };
-  const checkError = () => {
-    const errEl = document.querySelector('.ant-form-item-explain-error, .ant-message-error, .ant-notification-notice-error, .ant-alert-error');
-    if (errEl && errEl.innerText && errEl.innerText.trim()) {
-      return errEl.innerText.trim();
-    }
-    return '';
-  };
-  return new Promise(resolve => {
-    const tick = () => {
-      const found = read();
-      if (found) return resolve({ ok: true, links: found.split(/\\r?\\n/)
-        .map(s => s.trim()).filter(Boolean) });
-      if (Date.now() - start > 2000) {
-        const errMsg = checkError();
-        if (errMsg) return resolve({ ok: false, why: 'shopee_error: ' + errMsg });
-      }
-      if (Date.now() > deadline) return resolve({ ok: false, why: 'timed out waiting for a result' });
-      setTimeout(tick, 300);
-    };
-    tick();
-  });
+  const el = document.querySelector(%(result)s);
+  const text = (el && el.value) ? el.value.trim() : '';
+  if (text && /shopee/i.test(text) && text !== previous) {
+    return { ok: true, links: text.split(/\\r?\\n/).map(s => s.trim()).filter(Boolean) };
+  }
+  const errEl = document.querySelector('.ant-form-item-explain-error, .ant-message-error, .ant-notification-notice-error, .ant-alert-error');
+  const err = errEl && errEl.innerText ? errEl.innerText.trim() : '';
+  return { ok: false, error: err };
 })()
 """
+
+
+def _read_result(bridge: Bridge, previous: str, timeout_ms: int) -> dict:
+    """Poll the result box until a new link shows, Shopee shows an error,
+    or time runs out. Same answers as the old in-page loop."""
+    code = _READ_ONCE_TEMPLATE % {"result": json.dumps(RESULT_FIELD),
+                                  "previous": json.dumps(previous)}
+    start = time.monotonic()
+    deadline = start + timeout_ms / 1000
+    while True:
+        seen = _js(bridge, code, timeout=20)
+        if seen.get("ok"):
+            return seen
+        # An error line can linger from the previous submission for a moment.
+        if seen.get("error") and time.monotonic() - start > 2:
+            return {"ok": False, "why": "shopee_error: " + seen["error"]}
+        if time.monotonic() > deadline:
+            return {"ok": False, "why": "timed out waiting for a result"}
+        time.sleep(0.3)
+
 
 _CLEAR_TEMPLATE = """
 (() => {
@@ -160,7 +158,7 @@ _PAGE_STATE_TEMPLATE = """
   const has = sel => !!document.querySelector(sel);
   const subs = %(sub_fields)s.filter(has).length;
   const buttons = [...document.querySelectorAll('button')]
-    .map(b => (b.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30))
+    .map(b => (b.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 30))
     .filter(Boolean).slice(0, 8);
   const errors = [...document.querySelectorAll(
       '.ant-form-item-explain-error, .ant-message-error, .ant-notification-notice-error, .ant-alert-error')]
@@ -259,7 +257,17 @@ def _js(bridge: Bridge, code: str, timeout: float = 60) -> dict:
 
 
 def _pause(bridge: Bridge, ms: int) -> None:
-    _js(bridge, f"new Promise(r => setTimeout(r, {ms}))", timeout=ms / 1000 + 20)
+    """Wait here, not in the page.
+
+    A page timer in a tab Chrome considers hidden is throttled to once a
+    minute (intensive wake-up throttling): a 3.5 second pause inside the
+    page took over a minute, every step timed out, and every link failed.
+    That is what happened on the Mac, where Chrome ran without the
+    anti-throttling flags start-browser.ps1 passes. Sleeping in Python
+    does not depend on how Chrome was started. `bridge` stays in the
+    signature so callers need not change.
+    """
+    time.sleep(ms / 1000)
 
 
 # Shopee parks a session it distrusts on one of these instead of the page
@@ -383,14 +391,7 @@ def _convert(bridge: Bridge, urls: list[str], sub_ids: list[str],
 
     at[0] = 4
 
-    read = _js(
-        bridge,
-        _READ_TEMPLATE
-        % {"result": json.dumps(RESULT_FIELD),
-           "previous": json.dumps(previous),
-           "timeout_ms": result_timeout_ms},
-        timeout=result_timeout_ms / 1000 + 30,
-    )
+    read = _read_result(bridge, previous, result_timeout_ms)
     if not read.get("ok"):
         raise _fail(bridge, 4, f"no link came back: {read.get('why')}")
 

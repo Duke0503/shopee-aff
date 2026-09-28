@@ -210,6 +210,17 @@ rỗng. Chữ trên trang nằm ở các khoá `open_*` trong
 `resources/dashboard.vi.json`, sửa là đổi ngay. Test:
 `tests/test_share_links.py`.
 
+**Đừng chờ bên trong trang Shopee.** Chrome làm chậm timer của tab nó coi
+là ẩn xuống một lần mỗi phút. Ngày 28/9/2026 prod chuyển sang Mac, mở
+Chrome không có cờ chống throttle, và `setTimeout` 3,5 giây trong trang
+thành hơn một phút: mọi link hỏng với `execute_script_timeout`. Giờ việc
+chờ (`_pause`) và việc hỏi kết quả (`_read_result`) chạy bên Python, mỗi
+lần chỉ nhìn trang một cái. Extension còn đánh dấu tab không được discard
+và đánh thức tab trước khi chạy script. Trên Mac, mở Chrome bằng
+`scripts/start-browser.sh`. Script trong trang là JavaScript nằm trong
+chuỗi Python: viết `\\r?\\n` chứ không phải `\r?\n` (thiếu một gạch là xuống dòng thật), test
+`TestThePageScriptsParse` chạy `node --check` từng script.
+
 **Danh sách tên miền Shopee phải nằm ở một chỗ duy nhất**
 (`shopee/dashboard_lookup.py`). Đã từng có hai bản sao lệch nhau và link
 `shp.ee` bị coi là tin nhắn thường suốt một buổi.

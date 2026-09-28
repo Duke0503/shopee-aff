@@ -1,6 +1,17 @@
 export const tabless = false;
 import { cdp } from '../../background/cdp.js';
 import { tab_storage } from '../../background/find_tab/tab_storage.js';
+import { wait_load } from '../../background/wait_load.js';
+
+// A tab Chrome froze or discarded answers nothing, and the job times out
+// with no hint why. Bring it back before running anything in it.
+async function wake(tab) {
+  if (tab.discarded) {
+    await chrome.tabs.reload(tab.id);
+    await wait_load(tab.id).catch(() => {});
+  }
+  await cdp.send(tab.id, 'Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
+}
 
 function with_timeout(promise, ms, label) {
   let timer;
@@ -17,6 +28,7 @@ export async function execute_script(tab, { code, tabid, _job_timeout_ms }) {
   const timeout = Math.max(1000, Number(_job_timeout_ms ?? 30_000) || 30_000);
   await cdp.attach(tab.id);
   try {
+    await wake(tab);
     let outcome;
     try {
       outcome = await with_timeout(cdp.send(tab.id, 'Runtime.evaluate', {

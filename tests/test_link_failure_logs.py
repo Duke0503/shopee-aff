@@ -37,7 +37,7 @@ class ScriptedBridge:
             return {"result": self.fill}
         if "wanted.test" in code:
             return {"result": self.click}
-        if "deadline" in code:
+        if "errEl" in code and "password_box" not in code:
             return {"result": self.read}
         return {"result": {"ok": True, "v": "", "href": self.state["href"]}}
 
@@ -74,7 +74,7 @@ class TestEveryFailureSaysWhereAndWhy:
         assert "[step 3/4" in text and "Tao link moi" in text and "SUBMIT_BUTTON_TEXT" in text
 
     def test_shopee_refusing_is_reported_with_its_own_words(self):
-        bridge = ScriptedBridge(read={"ok": False, "why": "shopee_error: Link khong hop le"},
+        bridge = ScriptedBridge(read={"ok": False, "error": "Link khong hop le"},
                                 state={"errors": ["Link khong hop le"]})
         with pytest.raises(gen.LinkStepError) as err:
             _convert(bridge)
@@ -109,3 +109,28 @@ class TestARunOfFailuresIsShouted:
             runner._note_failure(totals, "boom")
         assert "LINKS ARE FAILING: 3 pass(es) in a row" in caplog.text
         assert "boom" in caplog.text
+
+
+class TestThePageScriptsParse:
+    """The scripts are JavaScript inside Python strings: one escape too few
+    ("\r?\n" written as "\r?\n") puts a raw line break inside a regex, the
+    page rejects the whole script, and every link fails at that step."""
+
+    @pytest.mark.parametrize("name", ["_PAGE_STATE_TEMPLATE", "_READ_ONCE_TEMPLATE",
+                                      "_FILL_TEMPLATE", "_CLICK_TEMPLATE", "_CLEAR_TEMPLATE"])
+    def test_node_accepts_it(self, name, tmp_path):
+        import json
+        import shutil
+        import subprocess
+        if not shutil.which("node"):
+            pytest.skip("node not installed")
+        values = {"sub_fields": json.dumps(["#a"]), "textarea": json.dumps("t"),
+                  "result": json.dumps("r"), "previous": json.dumps(""), "label": json.dumps("x"),
+                  "payload": json.dumps({"urls": ["u"], "sub_ids": ["a"]}),
+                  "all_fields": json.dumps(["x"])}
+        template = getattr(gen, name)
+        code = template % {k: v for k, v in values.items() if f"%({k})" in template}
+        script = tmp_path / "page.js"
+        script.write_text("const f = () => " + code.strip() + ";\n", encoding="utf-8")
+        run = subprocess.run(["node", "--check", str(script)], capture_output=True, text=True)
+        assert run.returncode == 0, run.stderr
