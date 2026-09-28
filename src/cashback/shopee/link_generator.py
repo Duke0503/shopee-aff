@@ -135,6 +135,111 @@ _CLEAR_TEMPLATE = """
 """
 
 
+STEPS = {1: "open the Custom Link page", 2: "fill the form",
+         3: "press the submit button", 4: "read the link back"}
+
+
+class LinkStepError(RuntimeError):
+    """A failed step, with what the page looked like when it failed.
+
+    "could not fill the form: source textarea not found" says nothing
+    about why. The page state beside it usually does: a login page, a
+    verification page, a form whose fields were renamed, a button whose
+    label changed. Read one of these lines before touching any code.
+    """
+
+    def __init__(self, step: int, why: str, state: str, hint: str):
+        self.step, self.why, self.state, self.hint = step, why, state, hint
+        super().__init__(
+            f"[step {step}/4: {STEPS[step]}] {why} || page: {state}"
+            + (f" || likely: {hint}" if hint else ""))
+
+
+_PAGE_STATE_TEMPLATE = """
+(() => {
+  const has = sel => !!document.querySelector(sel);
+  const subs = %(sub_fields)s.filter(has).length;
+  const buttons = [...document.querySelectorAll('button')]
+    .map(b => (b.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30))
+    .filter(Boolean).slice(0, 8);
+  const errors = [...document.querySelectorAll(
+      '.ant-form-item-explain-error, .ant-message-error, .ant-notification-notice-error, .ant-alert-error')]
+    .map(e => (e.innerText || '').trim().slice(0, 80)).filter(Boolean).slice(0, 3);
+  return {
+    href: location.href,
+    title: (document.title || '').slice(0, 60),
+    password_box: has('input[type=password]'),
+    textarea: has(%(textarea)s),
+    result: has(%(result)s),
+    subs: subs,
+    buttons: buttons,
+    errors: errors,
+  };
+})()
+"""
+
+
+def page_state(bridge: Bridge) -> dict:
+    """What the tab shows right now. Never raises: it runs on the way out
+    of a failure, and must not hide the failure behind its own."""
+    try:
+        return _js(bridge, _PAGE_STATE_TEMPLATE % {
+            "sub_fields": json.dumps(SUB_ID_FIELDS),
+            "textarea": json.dumps(SOURCE_TEXTAREA),
+            "result": json.dumps(RESULT_FIELD),
+        }, timeout=20)
+    except Exception as exc:  # noqa: BLE001 - diagnostics only
+        return {"unavailable": str(exc)[:120]}
+
+
+def _describe(state: dict) -> str:
+    if "unavailable" in state:
+        return f"unavailable ({state['unavailable']})"
+    found = lambda ok: "found" if ok else "MISSING"  # noqa: E731
+    return (f"url={state.get('href', '?')} title={state.get('title', '')!r} "
+            f"textarea={found(state.get('textarea'))} result_box={found(state.get('result'))} "
+            f"sub_id_fields={state.get('subs', 0)}/{len(SUB_ID_FIELDS)} "
+            f"buttons={state.get('buttons', [])}"
+            + (f" page_errors={state['errors']}" if state.get("errors") else ""))
+
+
+def _hint(step: int, why: str, state: dict) -> str:
+    href = str(state.get("href") or "")
+    low = why.lower()
+    if "unavailable" in state or "no result for" in low or "job_timeout" in low:
+        return ("the extension or the tab stopped answering: reload the Shopee Affiliate "
+                "tab in Chrome [4]; if that fails restart Chrome [4] and backend [1]")
+    if any(m in href for m in VERIFICATION_MARKERS):
+        return "Shopee wants a verification check: drag the slider in Chrome [4]"
+    if state.get("password_box") or any(m in href for m in ("/login", "/signin", "passport", "/account")):
+        return "the tab is on a login page: log in to affiliate.shopee.vn in Chrome [4]"
+    if CUSTOM_LINK_URL.rstrip("/") not in href:
+        return f"the tab is not on {CUSTOM_LINK_URL}: open it in Chrome [4]"
+    if step == 2 and not state.get("textarea"):
+        return ("on the right page but the link box is gone: Shopee probably changed the page; "
+                "update SOURCE_TEXTAREA in shopee/page_selectors.py")
+    if step == 2 and state.get("subs", 0) < len(SUB_ID_FIELDS):
+        return ("some sub_id fields are missing: Shopee changed the form; "
+                "update SUB_ID_FIELDS in shopee/page_selectors.py")
+    if step == 3 and "not found" in low:
+        return (f"no button matches {SUBMIT_BUTTON_TEXT!r} (buttons on the page are listed above): "
+                "update SUBMIT_BUTTON_TEXT in shopee/page_selectors.py")
+    if step == 3 and "disabled" in low:
+        return "the form refused the input (see page_errors); a product link may be invalid"
+    if step == 4 and "shopee_error" in low:
+        return "Shopee itself refused (message above): often a product not in the affiliate program"
+    if step == 4 and not state.get("result"):
+        return "the result box is gone: update RESULT_FIELD in shopee/page_selectors.py"
+    if step == 4:
+        return "Shopee answered nothing in time: slow page or rate limiting; it retries by itself"
+    return ""
+
+
+def _fail(bridge: Bridge, step: int, why: str) -> LinkStepError:
+    state = page_state(bridge)
+    return LinkStepError(step, why, _describe(state), _hint(step, why, state))
+
+
 def _js(bridge: Bridge, code: str, timeout: float = 60) -> dict:
     try:
         value = bridge.submit(
@@ -185,6 +290,15 @@ def open_page(bridge: Bridge, settle_ms: int = 3500) -> None:
     Skipping it is most of the difference between a customer waiting eight
     seconds and waiting four.
     """
+    try:
+        _open_page(bridge, settle_ms)
+    except LinkStepError:
+        raise
+    except RuntimeError as exc:
+        raise _fail(bridge, 1, str(exc)) from exc
+
+
+def _open_page(bridge: Bridge, settle_ms: int) -> None:
     here = _js(bridge, "({href: location.href})").get("href") or ""
     already_there = CUSTOM_LINK_URL.rstrip("/") in here
 
@@ -202,11 +316,10 @@ def open_page(bridge: Bridge, settle_ms: int = 3500) -> None:
 
     stuck = blocked_by_verification(bridge)
     if stuck:
-        raise RuntimeError(
-            "Shopee is asking this session to pass a verification check. "
-            "Open the pinned tab and drag the slider, then it resumes by "
-            f"itself. ({stuck[:90]})"
-        )
+        raise _fail(bridge, 1,
+                    "Shopee is asking this session to pass a verification check. "
+                    "Open the pinned tab and drag the slider, then it resumes by "
+                    f"itself. ({stuck[:90]})")
 
 
 def convert_chunk(
@@ -223,6 +336,19 @@ def convert_chunk(
     for value in sub_ids:
         assert_valid_sub_id(value)
 
+    at = [2]   # the step running, for a bridge failure in the middle of one
+    try:
+        return _convert(bridge, urls, sub_ids, result_timeout_ms, at)
+    except LinkStepError:
+        raise
+    except RuntimeError as exc:
+        # A bridge failure (timeout, script error) rather than a step that
+        # answered "no": label it with the step it happened in.
+        raise _fail(bridge, at[0], str(exc)) from exc
+
+
+def _convert(bridge: Bridge, urls: list[str], sub_ids: list[str],
+             result_timeout_ms: int, at: list[int]) -> list[str]:
     # Whatever is in the result box belongs to the previous submission.
     # Read it first so the new answer can be told apart from it, then
     # clear it along with the inputs.
@@ -245,13 +371,17 @@ def convert_chunk(
         },
     )
     if not filled.get("ok"):
-        raise RuntimeError(f"could not fill the form: {filled.get('why')}")
+        raise _fail(bridge, 2, f"could not fill the form: {filled.get('why')}")
+
+    at[0] = 3
 
     _pause(bridge, 500)
 
     clicked = _js(bridge, _CLICK_TEMPLATE % {"label": json.dumps(SUBMIT_BUTTON_TEXT)})
     if not clicked.get("ok"):
-        raise RuntimeError(f"could not submit: {clicked.get('why')}")
+        raise _fail(bridge, 3, f"could not submit: {clicked.get('why')}")
+
+    at[0] = 4
 
     read = _js(
         bridge,
@@ -262,7 +392,7 @@ def convert_chunk(
         timeout=result_timeout_ms / 1000 + 30,
     )
     if not read.get("ok"):
-        raise RuntimeError(f"no link came back: {read.get('why')}")
+        raise _fail(bridge, 4, f"no link came back: {read.get('why')}")
 
     links = read.get("links") or []
     if len(links) != len(urls):

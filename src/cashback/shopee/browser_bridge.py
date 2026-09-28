@@ -64,6 +64,26 @@ class Job:
         }
 
 
+
+_last_token_warning = 0.0
+
+
+def _warn_bad_token() -> None:
+    """The extension is knocking with the wrong secret. It retries every
+    few seconds, so say it once a minute, not every time."""
+    global _last_token_warning
+    import time as _time
+    now = _time.monotonic()
+    if now - _last_token_warning < 60:
+        return
+    _last_token_warning = now
+    import logging
+    logging.getLogger(__name__).warning(
+        "extension rejected: its bridge_token (extension/background/base_url.js) does not match"
+        " BRIDGE_TOKEN in .env. Run `uv run cashback setup-token`, then restart backend [1]"
+        " and reload the extension in chrome://extensions.")
+
+
 class Bridge:
     """Job queue plus result rendezvous, shared by the HTTP handler."""
 
@@ -196,6 +216,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if not self._authorised():
+            _warn_bad_token()
             return self._send(401, {"error": "bad token"})
 
         path = self.path.split("?", 1)[0].rstrip("/") or "/"

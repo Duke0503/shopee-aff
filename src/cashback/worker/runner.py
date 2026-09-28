@@ -29,6 +29,9 @@ class Totals:
     passes: int = 0
     generated: int = 0
     failed: int = 0
+    # Passes in a row that produced no link. One failure is noise; a run of
+    # them means every customer is getting "could not make your link".
+    failing_streak: int = 0
 
     def line(self) -> str:
         return (
@@ -70,6 +73,7 @@ def run_one_pass(
         # the batch until the lease times out.
         for job in jobs:
             queue_batch.release(job["request_id"])
+        _note_failure(totals, str(exc))
         log.info(f"pass failed, will retry: {exc}")
         return len(jobs)
 
@@ -83,7 +87,23 @@ def run_one_pass(
     for item in results:
         if item.get("error"):
             log.info(f"{item['request_id']}: {item['error']}")
+    if outcome["stored"]:
+        if totals.failing_streak >= FAILING_ALERT_AFTER:
+            log.warning(f"LINKS WORKING AGAIN after {totals.failing_streak} failed pass(es)")
+        totals.failing_streak = 0
+    elif outcome["failed"]:
+        _note_failure(totals, next((i["error"] for i in results if i.get("error")), "?"))
     return len(jobs)
+
+
+FAILING_ALERT_AFTER = 3
+
+
+def _note_failure(totals: Totals, error: str) -> None:
+    totals.failing_streak += 1
+    if totals.failing_streak >= FAILING_ALERT_AFTER:
+        log.warning(f"LINKS ARE FAILING: {totals.failing_streak} pass(es) in a row made no link."
+                    f" Customers are being told their link failed. Last error: {error}")
 
 
 def loop(

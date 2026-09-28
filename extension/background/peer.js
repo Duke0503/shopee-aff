@@ -41,7 +41,10 @@ async function run_job(job) {
     await post_result(job.id, { ok: true, value: value ?? null });
   } catch (e) {
     await post_result(job.id, { ok: false, error: e.message });
-    console.error('[cashback] job error:', job.action, e);
+    // The backend log carries the step and the page state; this line is for
+    // someone looking at chrome://extensions.
+    console.error(`[cashback] job error: ${job.connector}.${job.action} failed: ${e.message}`,
+                  { params: job.params, timeout_ms: job.timeout_ms });
   }
 }
 
@@ -62,13 +65,24 @@ async function poll() {
           headers: { 'X-Bridge-Token': bridge_token },
           signal: AbortSignal.timeout(26000),
         });
+        if (resp.status === 401) {
+          console.error('[cashback] backend rejected this extension (401 bad token): '
+            + 'bridge_token in base_url.js does not match BRIDGE_TOKEN in .env. '
+            + 'Run `uv run cashback setup-token`, restart the backend, reload the extension.');
+          await new Promise(r => setTimeout(r, 30000));
+          continue;
+        }
         if (resp.status === 200) {
           const job = await resp.json();
           void job_scheduler.enqueue(job).catch(e => {
             console.error('[cashback] scheduler error:', job?.action, e);
           });
         }
-      } catch {
+      } catch (e) {
+        if (e?.name !== 'TimeoutError') {
+          console.warn(`[cashback] cannot reach the backend at ${base}: ${e?.message || e}. `
+            + 'Is backend [1] running?');
+        }
         await new Promise(r => setTimeout(r, 3000));
       }
     }
