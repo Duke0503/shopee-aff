@@ -349,11 +349,35 @@ CREATE TABLE IF NOT EXISTS link_clicks (
 CREATE INDEX IF NOT EXISTS idx_clicks_request ON link_clicks(request_id);
 """
 
+_FNB_VOUCHERS_DDL = """
+CREATE TABLE IF NOT EXISTS fnb_vouchers (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand         TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    voucher_type  TEXT NOT NULL DEFAULT 'counter',
+    code          TEXT,
+    barcode_url   TEXT,
+    affiliate_url TEXT,
+    discount_text TEXT,
+    min_order     INTEGER DEFAULT 0,
+    start_date    TEXT,
+    end_date      TEXT,
+    is_hot        INTEGER DEFAULT 0,
+    is_active     INTEGER DEFAULT 1,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fnb_brand_active ON fnb_vouchers(brand, is_active);
+CREATE INDEX IF NOT EXISTS idx_fnb_hot ON fnb_vouchers(is_hot, is_active);
+"""
+
 
 def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SESSIONS_DDL)
     conn.executescript(_CAMPAIGNS_DDL)
     conn.executescript(_SHARE_DDL)
+    conn.executescript(_FNB_VOUCHERS_DDL)
 
 
 def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) -> None:
@@ -1242,4 +1266,222 @@ def upsert_featured_deal(
                 sort_order, timestamp, timestamp,
             ),
         )
+
+
+def get_fnb_vouchers(
+    conn: sqlite3.Connection,
+    brand: str | None = None,
+    voucher_type: str | None = None,
+    only_active: bool = True,
+) -> list[sqlite3.Row]:
+    query = "SELECT * FROM fnb_vouchers WHERE 1=1"
+    params: list[Any] = []
+    if only_active:
+        query += " AND is_active = 1"
+    if brand:
+        query += " AND brand = ?"
+        params.append(brand.lower())
+    if voucher_type:
+        query += " AND voucher_type = ?"
+        params.append(voucher_type.lower())
+    query += " ORDER BY is_hot DESC, id ASC"
+    return conn.execute(query, params).fetchall()
+
+
+def get_fnb_voucher_by_id(
+    conn: sqlite3.Connection, voucher_id: int
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM fnb_vouchers WHERE id = ?", (voucher_id,)
+    ).fetchone()
+
+
+def upsert_fnb_voucher(
+    conn: sqlite3.Connection,
+    brand: str,
+    title: str,
+    description: str = "",
+    voucher_type: str = "counter",
+    code: str = "",
+    barcode_url: str = "",
+    affiliate_url: str = "",
+    discount_text: str = "",
+    min_order: int = 0,
+    start_date: str = "",
+    end_date: str = "",
+    is_hot: int = 0,
+    is_active: int = 1,
+    voucher_id: int | None = None,
+) -> int:
+    timestamp = now()
+    if voucher_id:
+        conn.execute(
+            """
+            UPDATE fnb_vouchers SET
+                brand = ?, title = ?, description = ?, voucher_type = ?,
+                code = ?, barcode_url = ?, affiliate_url = ?, discount_text = ?,
+                min_order = ?, start_date = ?, end_date = ?, is_hot = ?,
+                is_active = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                brand.lower(), title, description, voucher_type.lower(),
+                code, barcode_url, affiliate_url, discount_text,
+                min_order, start_date, end_date, is_hot,
+                is_active, timestamp, voucher_id,
+            ),
+        )
+        return voucher_id
+    else:
+        cur = conn.execute(
+            """
+            INSERT INTO fnb_vouchers (
+                brand, title, description, voucher_type,
+                code, barcode_url, affiliate_url, discount_text,
+                min_order, start_date, end_date, is_hot,
+                is_active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                brand.lower(), title, description, voucher_type.lower(),
+                code, barcode_url, affiliate_url, discount_text,
+                min_order, start_date, end_date, is_hot,
+                is_active, timestamp, timestamp,
+            ),
+        )
+        return cur.lastrowid
+
+
+def seed_fnb_vouchers_if_empty(conn: sqlite3.Connection) -> int:
+    count = conn.execute("SELECT COUNT(*) FROM fnb_vouchers").fetchone()[0]
+    if count > 0:
+        return 0
+
+    defaults = [
+        # Highlands Coffee
+        {
+            "brand": "highlands",
+            "title": "Mua 1 Tặng 1 (Trà sen vàng / Freeze / Phindi)",
+            "description": "Áp dụng khi mua đồ uống size L, tặng 1 đồ uống size S/M cùng loại hoặc tương đương tại quầy.",
+            "voucher_type": "counter",
+            "code": "HLM1T1",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/highlands-m1t1.png",
+            "affiliate_url": "https://hoantiendp.com/v/highlands-m1t1",
+            "discount_text": "Mua 1 Tặng 1",
+            "min_order": 55000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 30.000đ cho hoá đơn từ 99.000đ",
+            "description": "Áp dụng cho toàn bộ menu nước và bánh tại tất cả chi nhánh Highlands Coffee toàn quốc.",
+            "voucher_type": "counter",
+            "code": "HL30K",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/highlands-30k.png",
+            "affiliate_url": "https://hoantiendp.com/v/highlands-30k",
+            "discount_text": "Giảm 30K",
+            "min_order": 99000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+        {
+            "brand": "highlands",
+            "title": "Đồng giá 39.000đ Freeze & Phindi cỡ M",
+            "description": "Ưu đãi trải nghiệm các dòng Freeze và Phindi best-seller tại quầy hoặc mang đi.",
+            "voucher_type": "counter",
+            "code": "HL39K",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/highlands-39k.png",
+            "affiliate_url": "https://hoantiendp.com/v/highlands-39k",
+            "discount_text": "Đồng giá 39K",
+            "min_order": 39000,
+            "end_date": "2026-12-31",
+            "is_hot": 0,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 50.000đ + Hoàn 80% khi đặt ShopeeFood",
+            "description": "Nhập mã quán trên ShopeeFood và nhận hoàn tiền 80% hoa hồng tích luỹ từ bot.",
+            "voucher_type": "shopeefood",
+            "code": "SPFHL50K",
+            "barcode_url": "",
+            "affiliate_url": "https://hoantiendp.com/fnb/highlands",
+            "discount_text": "Giảm 50K + Hoàn 80%",
+            "min_order": 120000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+        # The Coffee House
+        {
+            "brand": "thecoffeehouse",
+            "title": "Giảm 20% tổng hoá đơn từ 90.000đ (Hi-Tea & Cà phê)",
+            "description": "Áp dụng tại tất cả cửa hàng The Coffee House hoặc đặt qua ứng dụng TCH.",
+            "voucher_type": "counter",
+            "code": "TCH20PCT",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/tch-20pct.png",
+            "affiliate_url": "https://hoantiendp.com/v/tch-20pct",
+            "discount_text": "Giảm 20%",
+            "min_order": 90000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+        {
+            "brand": "thecoffeehouse",
+            "title": "Mua 2 Tặng 1 (Áp dụng Trà Trái Cây & Cà Phê)",
+            "description": "Tặng 1 ly nước cùng cỡ khi mua 2 ly nước bất kỳ trong cùng một hoá đơn.",
+            "voucher_type": "counter",
+            "code": "TCHM2T1",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/tch-m2t1.png",
+            "affiliate_url": "https://hoantiendp.com/v/tch-m2t1",
+            "discount_text": "Mua 2 Tặng 1",
+            "min_order": 90000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+        {
+            "brand": "thecoffeehouse",
+            "title": "Combo Bánh Mì / Bánh Ngọt + Cà Phê chỉ từ 49.000đ",
+            "description": "Bữa sáng năng lượng với cà phê phin/espresso và bánh ngọt tươi mỗi ngày.",
+            "voucher_type": "counter",
+            "code": "TCHCOMBO49",
+            "barcode_url": "https://hoantiendp.com/static/vouchers/tch-combo49.png",
+            "affiliate_url": "https://hoantiendp.com/v/tch-combo49",
+            "discount_text": "Combo 49K",
+            "min_order": 49000,
+            "end_date": "2026-12-31",
+            "is_hot": 0,
+        },
+        {
+            "brand": "thecoffeehouse",
+            "title": "Freeship 0đ + Hoàn 80% The Coffee House ShopeeFood",
+            "description": "Gửi link quán The Coffee House ShopeeFood vào Zalo Bot để nhận link hoàn tiền 80%.",
+            "voucher_type": "shopeefood",
+            "code": "SPFTCHFREE",
+            "barcode_url": "",
+            "affiliate_url": "https://hoantiendp.com/fnb/thecoffeehouse",
+            "discount_text": "Freeship + Hoàn 80%",
+            "min_order": 70000,
+            "end_date": "2026-12-31",
+            "is_hot": 1,
+        },
+    ]
+
+    for v in defaults:
+        upsert_fnb_voucher(
+            conn,
+            brand=v["brand"],
+            title=v["title"],
+            description=v["description"],
+            voucher_type=v["voucher_type"],
+            code=v["code"],
+            barcode_url=v["barcode_url"],
+            affiliate_url=v["affiliate_url"],
+            discount_text=v["discount_text"],
+            min_order=v["min_order"],
+            end_date=v["end_date"],
+            is_hot=v["is_hot"],
+            is_active=1,
+        )
+    return len(defaults)
+
 

@@ -814,6 +814,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._tiktok_topdeal()
         if path in ("/api/deals", "/api/shopee/deals"):
             return self._deals()
+        if path == "/api/fnb/vouchers":
+            return self._fnb_vouchers()
+        if path == "/api/fnb/deals-of-the-day":
+            return self._fnb_deals_of_the_day()
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
@@ -930,6 +934,10 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._bot_customer_auth()
+        if path == "/api/fnb/admin/voucher":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._admin_upsert_fnb_voucher()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -3295,6 +3303,84 @@ class _Handler(BaseHTTPRequestHandler):
                     "url": r["url"],
                 })
             return self._json({"ok": True, "deals": deals})
+
+    def _fnb_vouchers(self):
+        """Return F&B vouchers (Highlands, The Coffee House), optionally filtered by brand and type."""
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        brand = (qs.get("brand") or [None])[0]
+        v_type = (qs.get("type") or [None])[0]
+        with ledger.connect(self.cfg.db_path) as conn:
+            ledger.seed_fnb_vouchers_if_empty(conn)
+            rows = ledger.get_fnb_vouchers(conn, brand=brand, voucher_type=v_type, only_active=True)
+            vouchers = []
+            for r in rows:
+                vouchers.append({
+                    "id": r["id"],
+                    "brand": r["brand"],
+                    "title": r["title"],
+                    "description": r["description"] or "",
+                    "voucherType": r["voucher_type"],
+                    "code": r["code"] or "",
+                    "barcodeUrl": r["barcode_url"] or "",
+                    "affiliateUrl": r["affiliate_url"] or "",
+                    "discountText": r["discount_text"] or "",
+                    "minOrder": r["min_order"] or 0,
+                    "minOrderFormatted": _vnd(r["min_order"] or 0),
+                    "startDate": r["start_date"] or "",
+                    "endDate": r["end_date"] or "",
+                    "isHot": bool(r["is_hot"]),
+                })
+            return self._json({"ok": True, "vouchers": vouchers})
+
+    def _fnb_deals_of_the_day(self):
+        """Return top hot F&B deals for broadcast or highlight banners."""
+        with ledger.connect(self.cfg.db_path) as conn:
+            ledger.seed_fnb_vouchers_if_empty(conn)
+            rows = conn.execute(
+                "SELECT * FROM fnb_vouchers WHERE is_active = 1 AND is_hot = 1 ORDER BY brand ASC, id ASC"
+            ).fetchall()
+            deals = []
+            for r in rows:
+                deals.append({
+                    "id": r["id"],
+                    "brand": r["brand"],
+                    "title": r["title"],
+                    "description": r["description"] or "",
+                    "code": r["code"] or "",
+                    "discountText": r["discount_text"] or "",
+                    "affiliateUrl": r["affiliate_url"] or "",
+                })
+            return self._json({"ok": True, "deals": deals})
+
+    def _admin_upsert_fnb_voucher(self):
+        """Admin endpoint to add or update an F&B voucher."""
+        body = self._body()
+        brand = str(body.get("brand") or "").strip().lower()
+        title = str(body.get("title") or "").strip()
+        if not brand or not title:
+            return self._json({"ok": False, "message": "missing_fields"}, 400)
+        with ledger.connect(self.cfg.db_path) as conn:
+            v_id = ledger.upsert_fnb_voucher(
+                conn,
+                brand=brand,
+                title=title,
+                description=str(body.get("description") or "").strip(),
+                voucher_type=str(body.get("voucher_type") or "counter").strip().lower(),
+                code=str(body.get("code") or "").strip().upper(),
+                barcode_url=str(body.get("barcode_url") or "").strip(),
+                affiliate_url=str(body.get("affiliate_url") or "").strip(),
+                discount_text=str(body.get("discount_text") or "").strip(),
+                min_order=int(body.get("min_order") or 0),
+                start_date=str(body.get("start_date") or "").strip(),
+                end_date=str(body.get("end_date") or "").strip(),
+                is_hot=1 if body.get("is_hot") else 0,
+                is_active=1 if body.get("is_active", True) else 0,
+                voucher_id=body.get("id"),
+            )
+            conn.commit()
+            return self._json({"ok": True, "voucher_id": v_id})
 
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 

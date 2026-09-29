@@ -932,6 +932,9 @@ function extractTextAndUrls(data) {
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
           `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
           `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
+          `• /highlands: Săn voucher & mã Mua 1 Tặng 1 Highlands Coffee\n` +
+          `• /tch: Săn voucher & mã giảm giá The Coffee House\n` +
+          `• /voucher: Tổng hợp mã ưu đãi trà & cà phê hôm nay\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
           `• /web: Website tra cứu đơn & cập nhật STK ngân hàng\n\n` +
           `💡 Lưu ý: Vui lòng nhắn tin riêng cho mình khi gõ /id và /matkhau để bảo mật tài khoản!`;
@@ -956,6 +959,9 @@ function extractTextAndUrls(data) {
           "/id",
           "/matkhau",
           "/sodu",
+          "/highlands",
+          "/tch",
+          "/voucher",
           "/chinhsach",
           "/web",
         ];
@@ -979,6 +985,91 @@ function extractTextAndUrls(data) {
           message.threadId,
           message.type
         );
+      } else if (
+        ["/highlands", "!highlands", "/hl", "!hl", "/highland", "!highland",
+         "/tch", "!tch", "/thecoffeehouse", "!thecoffeehouse", "/coffeehouse", "!coffeehouse",
+         "/coffee", "!coffee", "/caphe", "!caphe", "/voucher", "!voucher", "/uudai", "!uudai", "/fnb", "!fnb"].includes(cmd)
+      ) {
+        const isHighlandsCmd = ["/highlands", "!highlands", "/hl", "!hl", "/highland", "!highland"].includes(cmd);
+        const isTchCmd = ["/tch", "!tch", "/thecoffeehouse", "!thecoffeehouse", "/coffeehouse", "!coffeehouse"].includes(cmd);
+        const brand = isHighlandsCmd ? "highlands" : (isTchCmd ? "thecoffeehouse" : "");
+
+        try {
+          const queryParam = brand ? `?brand=${brand}` : "";
+          const vRes = await fetch(`${config.MAIN_API_URL}/api/fnb/vouchers${queryParam}`).then(r => r.json()).catch(() => null);
+          const vouchers = (vRes && vRes.ok && Array.isArray(vRes.vouchers)) ? vRes.vouchers : [];
+
+          const tagText = isGroup && senderUid ? `@${senderName}` : "";
+          const tagPrefix = tagText ? `${tagText}\n` : "";
+
+          let brandTitle = "HIGHLANDS COFFEE";
+          let brandEmoji = "☕";
+          if (isTchCmd) {
+            brandTitle = "THE COFFEE HOUSE";
+            brandEmoji = "🏠";
+          } else if (!isHighlandsCmd) {
+            brandTitle = "HIGHLANDS & THE COFFEE HOUSE";
+            brandEmoji = "🥤";
+          }
+
+          let reply = tagPrefix + `${brandEmoji} MÃ GIẢM GIÁ & VOUCHER ${brandTitle} HÔM NAY 🎁\n\n`;
+
+          const counterVouchers = vouchers.filter(v => v.voucherType === "counter");
+          const foodVouchers = vouchers.filter(v => v.voucherType === "shopeefood");
+
+          if (counterVouchers.length > 0) {
+            reply += `🔥 ƯU ĐÃI DÙNG TẠI QUẦY (Đưa nhân viên quét mã):\n`;
+            counterVouchers.slice(0, 3).forEach((v, idx) => {
+              reply += `${idx + 1}. 🏷️ ${v.title}\n`;
+              if (v.code) reply += `   👉 Mã Code: ${v.code}\n`;
+              if (v.description) reply += `   📝 ${v.description}\n`;
+              reply += `\n`;
+            });
+          }
+
+          if (foodVouchers.length > 0) {
+            reply += `🛵 ĐẶT GIAO TẬN NƠI (ShopeeFood Hoàn 80% Hoa Hồng):\n`;
+            foodVouchers.slice(0, 2).forEach((v) => {
+              reply += `• 🍜 ${v.title}\n`;
+              if (v.description) reply += `  👉 ${v.description}\n`;
+            });
+            reply += `\n💡 Mẹo đặt món: Bạn chỉ cần gửi link quán ${isTchCmd ? "The Coffee House" : "Highlands Coffee"} trên ShopeeFood vào đây, bot sẽ tạo link hoàn tiền 80% hoa hồng tích luỹ ngay lập tức!\n\n`;
+          }
+
+          reply += `🌐 Cập nhật thêm nhiều mã mới mỗi ngày tại: https://hoantiendp.com`;
+
+          const mentions = tagText
+            ? [{ uid: String(senderUid), pos: 0, len: tagText.length }]
+            : undefined;
+
+          const boldTargets = [
+            `MÃ GIẢM GIÁ & VOUCHER ${brandTitle} HÔM NAY`,
+            "ƯU ĐÃI DÙNG TẠI QUẦY",
+            "ĐẶT GIAO TẬN NƠI",
+            "ShopeeFood Hoàn 80% Hoa Hồng",
+            "Mẹo đặt món:",
+            "https://hoantiendp.com",
+          ];
+
+          const styles = [];
+          for (const target of boldTargets) {
+            const start = reply.indexOf(target);
+            if (start !== -1) styles.push({ start, len: target.length, st: "b" });
+          }
+          styles.sort((a, b) => a.start - b.start);
+
+          await api.sendMessage(
+            {
+              msg: reply,
+              mentions: mentions,
+              styles: styles.length > 0 ? styles : undefined,
+            },
+            message.threadId,
+            message.type
+          );
+        } catch (err) {
+          console.error("[F&B Voucher Command Error]:", err);
+        }
       } else if (cmd === "/web" || cmd === "!web") {
         const tagText = isGroup && senderUid ? `@${senderName}` : "";
         const tagPrefix = tagText ? `${tagText}\n` : "";
