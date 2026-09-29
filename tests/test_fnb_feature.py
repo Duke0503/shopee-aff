@@ -54,7 +54,7 @@ class TestFnbProvider:
             tch_vouchers=[{"title": "Giảm 20%", "discount_text": "20%"}],
         )
 
-        assert "MUA 1 TẶNG 1" in tue_msg
+        assert "ƯU ĐÃI CÀ PHÊ & TRÀ HÔM NAY" in tue_msg
         assert "Thứ Ba" in tue_msg
         assert "8:30" not in tue_msg  # 8:30 removed as requested
         assert "[8:30 AM]" not in tue_msg
@@ -76,7 +76,7 @@ class TestFnbProvider:
         assert "8:30" not in fri_msg
         assert "HƯỚNG DẪN 3 BƯỚC DÙNG TẠI QUẦY & NHẬN HOÀN TIỀN" in fri_msg
         assert "ShopeeFood" not in fri_msg
-        assert "Bấm link bên dưới để xem & nhận các mã ưu đãi" in fri_msg
+        assert "Mini App Highlands trên Zalo" in fri_msg
 
 
 class TestFnbReconciliation:

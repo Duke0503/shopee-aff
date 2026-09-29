@@ -162,20 +162,11 @@ def build_fnb_daily_announcement(
     day_names = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
     day_str = day_names[weekday]
 
-    is_m1t1_day = weekday in (1, 3)  # Tuesday or Thursday
-
-    if is_m1t1_day:
-        header = f"🔥 SĂN VOUCHER MUA 1 TẶNG 1 HIGHLANDS & GIẢM GIÁ THE COFFEE HOUSE! ☕🏠\n\n"
-        intro = (
-            f"Chào cả nhà buổi sáng! Hôm nay là {day_str}, Highlands Coffee có ưu đãi "
-            f"MUA 1 TẶNG 1 và The Coffee House có nhiều mã giảm giá đồ uống tại quầy:\n\n"
-        )
-    else:
-        header = f"☕ ƯU ĐÃI CÀ PHÊ & TRÀ HÔM NAY: HIGHLANDS COFFEE & THE COFFEE HOUSE 🎁\n\n"
-        intro = (
-            f"Chào cả nhà buổi sáng {day_str}! Khởi đầu ngày mới tỉnh táo "
-            f"với loạt ưu đãi đồ uống dùng tại quầy cực hot hôm nay:\n\n"
-        )
+    header = f"☕ ƯU ĐÃI CÀ PHÊ & TRÀ HÔM NAY: HIGHLANDS COFFEE & THE COFFEE HOUSE 🎁\n\n"
+    intro = (
+        f"Chào cả nhà buổi sáng {day_str}! Khởi đầu ngày mới với ưu đãi đồ uống "
+        f"dùng tại quầy & tích lũy hoàn tiền cùng bot:\n\n"
+    )
 
     # Format Highlands vouchers only if specific vouchers are supplied
     if highlands_vouchers:
@@ -194,7 +185,7 @@ def build_fnb_daily_announcement(
     else:
         hl_vouchers = (
             f"☕ HIGHLANDS COFFEE:\n"
-            f"👉 Bấm link bên dưới để xem & nhận các mã ưu đãi dùng tại quầy hôm nay.\n\n"
+            f"👉 Bấm link nhận mã để mở Mini App Highlands trên Zalo, chọn và lưu mã ưu đãi đang mở hôm nay.\n\n"
         )
 
     # Format The Coffee House vouchers only if specific vouchers are supplied
@@ -214,7 +205,7 @@ def build_fnb_daily_announcement(
     else:
         tch_vouchers_block = (
             f"🏠 THE COFFEE HOUSE:\n"
-            f"👉 Bấm link bên dưới để xem & nhận các mã ưu đãi dùng tại quầy hôm nay.\n\n"
+            f"👉 Bấm link nhận mã để xem & lưu các mã ưu đãi dùng tại quầy đang áp dụng hôm nay.\n\n"
         )
 
     steps_guide = (
