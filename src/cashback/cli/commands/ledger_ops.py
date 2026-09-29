@@ -514,7 +514,15 @@ def cmd_broadcast_fnb(cfg: Config, args: argparse.Namespace) -> int:
     now_vn = datetime.now(tz_vn)
     today_str = now_vn.strftime("%Y-%m-%d")
 
-    text = build_fnb_daily_announcement(now_vn)
+    with ledger.connect(cfg.db_path) as conn:
+        hl_vouchers = [dict(r) for r in ledger.get_fnb_vouchers(conn, brand="highlands", voucher_type="counter", only_active=True)]
+        tch_vouchers = [dict(r) for r in ledger.get_fnb_vouchers(conn, brand="thecoffeehouse", voucher_type="counter", only_active=True)]
+
+    text = build_fnb_daily_announcement(
+        dt=now_vn,
+        highlands_vouchers=hl_vouchers,
+        tch_vouchers=tch_vouchers,
+    )
     print(f"Target group : {args.group}")
     print(f"Current time : {now_vn.strftime('%Y-%m-%d %H:%M:%S')} (UTC+7)")
     print("-" * 60)

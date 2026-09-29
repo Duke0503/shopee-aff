@@ -141,11 +141,14 @@ def build_fnb_daily_announcement(
     dt: Optional[datetime] = None,
     custom_highlands_link: Optional[str] = None,
     custom_tch_link: Optional[str] = None,
+    highlands_vouchers: Optional[list[dict]] = None,
+    tch_vouchers: Optional[list[dict]] = None,
 ) -> str:
-    """Build the official 8:30 AM daily announcement for Highlands & The Coffee House.
+    """Build the daily promotional announcement for Highlands & The Coffee House.
 
-    Includes brand vouchers, 3-step redemption guide, and direct instructions.
-    On Tuesdays and Thursdays, highlights Highlands' Buy 1 Get 1 (M1T1) opening.
+    Includes brand vouchers (only if specific vouchers are provided),
+    3-step redemption guide, and direct instructions.
+    On Tuesdays and Thursdays, highlights Highlands' Buy 1 Get 1 (M1T1).
     """
     if dt is None:
         tz_vn = timezone(timedelta(hours=7))
@@ -162,36 +165,57 @@ def build_fnb_daily_announcement(
     is_m1t1_day = weekday in (1, 3)  # Tuesday or Thursday
 
     if is_m1t1_day:
-        header = f"🔥 [8:30 AM] SĂN VOUCHER MUA 1 TẶNG 1 HIGHLANDS & GIẢM 20% THE COFFEE HOUSE! ☕🏠\n\n"
+        header = f"🔥 SĂN VOUCHER MUA 1 TẶNG 1 HIGHLANDS & GIẢM GIÁ THE COFFEE HOUSE! ☕🏠\n\n"
         intro = (
-            f"Chào cả nhà buổi sáng! Hôm nay là {day_str}, Highlands Coffee vừa mở cổng phát voucher "
-            f"MUA 1 TẶNG 1 và The Coffee House tung hàng loạt ưu đãi đồ uống giảm giá sâu:\n\n"
-        )
-        hl_vouchers = (
-            f"☕ HIGHLANDS COFFEE (Cổng mở lúc 8:30 sáng nay):\n"
-            f"• 🎁 MUA 1 TẶNG 1 (Trà sen vàng / Freeze / Phindi size L tặng S/M)\n"
-            f"• 🏷️ Giảm 30.000đ cho hóa đơn từ 99.000đ\n"
-            f"• 🥐 Combo Cà phê phin + Bánh chỉ từ 39.000đ\n\n"
+            f"Chào cả nhà buổi sáng! Hôm nay là {day_str}, Highlands Coffee có ưu đãi "
+            f"MUA 1 TẶNG 1 và The Coffee House có nhiều mã giảm giá đồ uống tại quầy:\n\n"
         )
     else:
-        header = f"☕ [8:30 AM] ƯU ĐÃI CÀ PHÊ & TRÀ SÁNG NAY: HIGHLANDS COFFEE & THE COFFEE HOUSE 🎁\n\n"
+        header = f"☕ ƯU ĐÃI CÀ PHÊ & TRÀ HÔM NAY: HIGHLANDS COFFEE & THE COFFEE HOUSE 🎁\n\n"
         intro = (
-            f"Chào cả nhà buổi sáng {day_str}! Khởi đầu ngày mới tỉnh táo và tiết kiệm "
-            f"với loạt ưu đãi dùng tại quầy cực hot hôm nay:\n\n"
-        )
-        hl_vouchers = (
-            f"☕ HIGHLANDS COFFEE:\n"
-            f"• 🏷️ Giảm 30.000đ cho hóa đơn từ 99.000đ\n"
-            f"• 🥐 Combo Cà phê phin + Bánh chỉ từ 39.000đ\n"
-            f"• 🎁 Tặng 1 ly cùng size khi mua hóa đơn từ 119.000đ\n\n"
+            f"Chào cả nhà buổi sáng {day_str}! Khởi đầu ngày mới tỉnh táo "
+            f"với loạt ưu đãi đồ uống dùng tại quầy cực hot hôm nay:\n\n"
         )
 
-    tch_vouchers = (
-        f"🏠 THE COFFEE HOUSE:\n"
-        f"• 🏷️ Giảm 20% toàn bộ đồ uống trên menu\n"
-        f"• 🎁 Mua 2 Tặng 1 Trà sữa & Macchiato\n"
-        f"• 🍿 Combo Nước + Bánh/Snack chỉ 49.000đ\n\n"
-    )
+    # Format Highlands vouchers only if specific vouchers are supplied
+    if highlands_vouchers:
+        hl_lines = []
+        for v in highlands_vouchers:
+            title = v.get("title") or ""
+            desc = v.get("discount_text") or v.get("description") or ""
+            code = v.get("code") or ""
+            line = f"• {title}"
+            if code:
+                line += f" (Mã: {code})"
+            elif desc:
+                line += f" ({desc})"
+            hl_lines.append(line)
+        hl_vouchers = f"☕ HIGHLANDS COFFEE:\n" + "\n".join(hl_lines) + "\n\n"
+    else:
+        hl_vouchers = (
+            f"☕ HIGHLANDS COFFEE:\n"
+            f"👉 Bấm link bên dưới để xem & nhận các mã ưu đãi dùng tại quầy hôm nay.\n\n"
+        )
+
+    # Format The Coffee House vouchers only if specific vouchers are supplied
+    if tch_vouchers:
+        tch_lines = []
+        for v in tch_vouchers:
+            title = v.get("title") or ""
+            desc = v.get("discount_text") or v.get("description") or ""
+            code = v.get("code") or ""
+            line = f"• {title}"
+            if code:
+                line += f" (Mã: {code})"
+            elif desc:
+                line += f" ({desc})"
+            tch_lines.append(line)
+        tch_vouchers_block = f"🏠 THE COFFEE HOUSE:\n" + "\n".join(tch_lines) + "\n\n"
+    else:
+        tch_vouchers_block = (
+            f"🏠 THE COFFEE HOUSE:\n"
+            f"👉 Bấm link bên dưới để xem & nhận các mã ưu đãi dùng tại quầy hôm nay.\n\n"
+        )
 
     steps_guide = (
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -210,4 +234,4 @@ def build_fnb_daily_announcement(
         f"• The Coffee House: {tch_link}"
     )
 
-    return header + intro + hl_vouchers + tch_vouchers + steps_guide + call_to_action
+    return header + intro + hl_vouchers + tch_vouchers_block + steps_guide + call_to_action

@@ -283,9 +283,15 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                     last_sent = ledger.get_system_kv(conn, "last_fnb_broadcast_date")
                     if last_sent == today_str:
                         continue  # Already broadcasted today
+                    hl_vouchers = [dict(r) for r in ledger.get_fnb_vouchers(conn, brand="highlands", voucher_type="counter", only_active=True)]
+                    tch_vouchers = [dict(r) for r in ledger.get_fnb_vouchers(conn, brand="thecoffeehouse", voucher_type="counter", only_active=True)]
 
-                text = build_fnb_daily_announcement(now_vn)
-                log.info(f"[fnb] Firing 08:30 AM daily broadcast for {today_str}...")
+                text = build_fnb_daily_announcement(
+                    dt=now_vn,
+                    highlands_vouchers=hl_vouchers,
+                    tch_vouchers=tch_vouchers,
+                )
+                log.info(f"[fnb] Firing daily broadcast for {today_str}...")
                 try:
                     res = sender.broadcast(text, group="main", mention_all="@All" in text)
                     with ledger.connect(cfg.db_path) as conn:

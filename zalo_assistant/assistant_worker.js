@@ -1006,16 +1006,19 @@ function extractTextAndUrls(data) {
             let dmMsg = `${brandEmoji} LINK VOUCHER ${brandTitle} CỦA BẠN (DÙNG TẠI QUẦY) 🎁\n\n`;
             dmMsg += `👉 Link nhận mã ưu đãi của bạn:\n${shortLink}\n\n`;
 
-            if (isHighlandsCmd) {
-              dmMsg += `🔥 Các ưu đãi hot Highlands hôm nay:\n`;
-              dmMsg += `• 🎁 Mua 1 Tặng 1 (Trà sen vàng / Freeze / Phindi - Thứ 3 & Thứ 5)\n`;
-              dmMsg += `• 🏷️ Giảm 30.000đ cho hóa đơn từ 99.000đ\n`;
-              dmMsg += `• 🥐 Combo Cà phê phin + Bánh chỉ từ 39.000đ\n\n`;
-            } else {
-              dmMsg += `🔥 Các ưu đãi hot The Coffee House hôm nay:\n`;
-              dmMsg += `• 🏷️ Giảm 20% toàn bộ đồ uống trên menu\n`;
-              dmMsg += `• 🎁 Mua 2 Tặng 1 Trà sữa & Macchiato\n`;
-              dmMsg += `• 🍿 Combo Nước + Bánh/Snack chỉ 49.000đ\n\n`;
+            // Fetch specific vouchers from backend if configured
+            const vRes = await fetch(`${config.MAIN_API_URL}/api/fnb/vouchers?brand=${brand}&type=counter`).then(r => r.json()).catch(() => null);
+            const activeVouchers = (vRes && vRes.ok && Array.isArray(vRes.vouchers)) ? vRes.vouchers : [];
+
+            if (activeVouchers.length > 0) {
+              dmMsg += `🔥 Các ưu đãi cụ thể đang áp dụng:\n`;
+              activeVouchers.slice(0, 3).forEach((v, idx) => {
+                let vLine = `${idx + 1}. 🏷️ ${v.title}`;
+                if (v.code) vLine += ` (Mã: ${v.code})`;
+                else if (v.discountText) vLine += ` (${v.discountText})`;
+                dmMsg += `${vLine}\n`;
+              });
+              dmMsg += `\n`;
             }
 
             dmMsg += `📋 3 BƯỚC ĐỂ ĐƯỢC GIẢM GIÁ & NHẬN TIỀN HOÀN:\n`;
@@ -1052,15 +1055,9 @@ function extractTextAndUrls(data) {
             // General /voucher summary
             let reply = `🎁 TỔNG HỢP VOUCHER ĐỒ UỐNG TẠI QUẦY HÔM NAY 🥤\n\n`;
             reply += `☕ 1. HIGHLANDS COFFEE:\n`;
-            reply += `• Mua 1 Tặng 1 (Trà sen vàng / Freeze / Phindi - Thứ 3 & Thứ 5)\n`;
-            reply += `• Giảm 30.000đ cho đơn từ 99.000đ\n`;
-            reply += `• Combo Cà phê phin + Bánh chỉ từ 39.000đ\n`;
             reply += `👉 Nhắn tin riêng cho bot hoặc gõ /highlands để nhận link voucher cá nhân (+ hoàn ~7.000đ).\n\n`;
 
             reply += `🏠 2. THE COFFEE HOUSE:\n`;
-            reply += `• Giảm 20% toàn menu thức uống\n`;
-            reply += `• Mua 2 Tặng 1 Trà sữa & Macchiato\n`;
-            reply += `• Combo Nước + Bánh/Snack chỉ 49.000đ\n`;
             reply += `👉 Nhắn tin riêng cho bot hoặc gõ /tch để nhận link voucher cá nhân (+ hoàn ~8.000đ).\n\n`;
 
             reply += `📋 Cách dùng tại quầy: Mở link lấy mã vạch -> Đưa thu ngân quét -> Nhận giảm giá trực tiếp + Tự động tích lũy tiền hoàn vào bot!`;

@@ -1407,19 +1407,6 @@ def seed_fnb_vouchers_if_empty(conn: sqlite3.Connection) -> int:
             "end_date": "2026-12-31",
             "is_hot": 0,
         },
-        {
-            "brand": "highlands",
-            "title": "Giảm 50.000đ + Hoàn 80% khi đặt ShopeeFood",
-            "description": "Nhập mã quán trên ShopeeFood và nhận hoàn tiền 80% hoa hồng tích luỹ từ bot.",
-            "voucher_type": "shopeefood",
-            "code": "SPFHL50K",
-            "barcode_url": "",
-            "affiliate_url": "https://hoantiendp.com/fnb/highlands",
-            "discount_text": "Giảm 50K + Hoàn 80%",
-            "min_order": 120000,
-            "end_date": "2026-12-31",
-            "is_hot": 1,
-        },
         # The Coffee House
         {
             "brand": "thecoffeehouse",
@@ -1459,19 +1446,6 @@ def seed_fnb_vouchers_if_empty(conn: sqlite3.Connection) -> int:
             "min_order": 49000,
             "end_date": "2026-12-31",
             "is_hot": 0,
-        },
-        {
-            "brand": "thecoffeehouse",
-            "title": "Freeship 0đ + Hoàn 80% The Coffee House ShopeeFood",
-            "description": "Gửi link quán The Coffee House ShopeeFood vào Zalo Bot để nhận link hoàn tiền 80%.",
-            "voucher_type": "shopeefood",
-            "code": "SPFTCHFREE",
-            "barcode_url": "",
-            "affiliate_url": "https://hoantiendp.com/fnb/thecoffeehouse",
-            "discount_text": "Freeship + Hoàn 80%",
-            "min_order": 70000,
-            "end_date": "2026-12-31",
-            "is_hot": 1,
         },
     ]
 

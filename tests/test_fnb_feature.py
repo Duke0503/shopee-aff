@@ -45,28 +45,38 @@ class TestFnbProvider:
         assert res_tch["short_link"] == TCH_DEFAULT_SHORT
         assert res_tch["fallback"] is True
 
-    def test_announcement_contains_3_step_guide_and_no_shopeefood(self):
+    def test_announcement_contains_3_step_guide_and_no_shopeefood_and_no_830(self):
         # Tuesday (weekday = 1) -> Mua 1 Tặng 1
         tue_dt = datetime(2026, 9, 29, 8, 30, tzinfo=timezone(timedelta(hours=7)))
-        tue_msg = build_fnb_daily_announcement(tue_dt)
+        tue_msg = build_fnb_daily_announcement(
+            tue_dt,
+            highlands_vouchers=[{"title": "Mua 1 Tặng 1", "code": "HLM1T1"}],
+            tch_vouchers=[{"title": "Giảm 20%", "discount_text": "20%"}],
+        )
 
         assert "MUA 1 TẶNG 1" in tue_msg
         assert "Thứ Ba" in tue_msg
+        assert "8:30" not in tue_msg  # 8:30 removed as requested
+        assert "[8:30 AM]" not in tue_msg
+        assert "HLM1T1" in tue_msg
+        assert "Giảm 20%" in tue_msg
         assert "HƯỚNG DẪN 3 BƯỚC DÙNG TẠI QUẦY & NHẬN HOÀN TIỀN" in tue_msg
         assert "1️⃣ Lấy mã" in tue_msg
         assert "2️⃣ Áp dụng" in tue_msg
         assert "3️⃣ Nhận tiền hoàn" in tue_msg
         assert "/highlands" in tue_msg
         assert "/tch" in tue_msg
-        assert "ShopeeFood" not in tue_msg  # ShopeeFood excluded as requested
+        assert "ShopeeFood" not in tue_msg  # ShopeeFood excluded
 
-        # Friday (weekday = 4) -> Daily combo
+        # Friday (weekday = 4) -> Daily combo without specific vouchers
         fri_dt = datetime(2026, 10, 2, 8, 30, tzinfo=timezone(timedelta(hours=7)))
-        fri_msg = build_fnb_daily_announcement(fri_dt)
+        fri_msg = build_fnb_daily_announcement(fri_dt, highlands_vouchers=[], tch_vouchers=[])
 
         assert "Thứ Sáu" in fri_msg
+        assert "8:30" not in fri_msg
         assert "HƯỚNG DẪN 3 BƯỚC DÙNG TẠI QUẦY & NHẬN HOÀN TIỀN" in fri_msg
         assert "ShopeeFood" not in fri_msg
+        assert "Bấm link bên dưới để xem & nhận các mã ưu đãi" in fri_msg
 
 
 class TestFnbReconciliation:
