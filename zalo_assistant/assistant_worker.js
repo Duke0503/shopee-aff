@@ -1019,6 +1019,17 @@ function extractTextAndUrls(data) {
                 dmMsg += `${vLine}\n`;
               });
               dmMsg += `\n`;
+            } else {
+              dmMsg += `🎁 Quyền lợi nhận được khi mở link:\n`;
+              if (isHighlandsCmd) {
+                dmMsg += `• Giảm giá trực tiếp theo hóa đơn (10k - 30k) hoặc combo nước + bánh.\n`;
+                dmMsg += `• Quà tặng thành viên Highlands Mini App.\n`;
+                dmMsg += `• ĐẶC BIỆT: Tặng thêm ~${cashEst} hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
+              } else {
+                dmMsg += `• Voucher giảm giá đồ uống trực tiếp tại quầy.\n`;
+                dmMsg += `• Ưu đãi dùng thử món mới & quà tặng thành viên.\n`;
+                dmMsg += `• ĐẶC BIỆT: Tặng thêm ~${cashEst} hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
+              }
             }
 
             dmMsg += `📋 3 BƯỚC ĐỂ ĐƯỢC GIẢM GIÁ & NHẬN TIỀN HOÀN:\n`;

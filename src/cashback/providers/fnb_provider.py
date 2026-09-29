@@ -185,7 +185,9 @@ def build_fnb_daily_announcement(
     else:
         hl_vouchers = (
             f"☕ HIGHLANDS COFFEE:\n"
-            f"👉 Bấm link nhận mã để mở Mini App Highlands trên Zalo, chọn và lưu mã ưu đãi đang mở hôm nay.\n\n"
+            f"• Ưu đãi tại quầy: Giảm tiền trực tiếp theo hóa đơn, combo nước + bánh & quà thành viên Zalo.\n"
+            f"• Hoàn tiền độc quyền từ bot: Tặng thêm ~7.000đ vào ví bot khi thanh toán thành công!\n"
+            f"👉 Bấm link nhận mã mở Mini App Highlands trên Zalo & lưu mã áp dụng hôm nay.\n\n"
         )
 
     # Format The Coffee House vouchers only if specific vouchers are supplied
@@ -205,7 +207,9 @@ def build_fnb_daily_announcement(
     else:
         tch_vouchers_block = (
             f"🏠 THE COFFEE HOUSE:\n"
-            f"👉 Bấm link nhận mã để xem & lưu các mã ưu đãi dùng tại quầy đang áp dụng hôm nay.\n\n"
+            f"• Ưu đãi tại quầy: Voucher giảm giá đồ uống, ưu đãi món mới & quà tặng độc quyền.\n"
+            f"• Hoàn tiền độc quyền từ bot: Tặng thêm ~8.000đ vào ví bot khi thanh toán thành công!\n"
+            f"👉 Bấm link để xem & lấy mã vạch giảm giá tại quầy đang áp dụng hôm nay.\n\n"
         )
 
     steps_guide = (
