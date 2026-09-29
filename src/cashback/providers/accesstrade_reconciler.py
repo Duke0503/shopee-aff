@@ -193,10 +193,26 @@ def normalize_transactions(rows: list[dict[str, Any]]) -> list[NormalizedOrder]:
         else:
             status, approved = "awaiting_approval", None
 
+        merchant = str(lines[0].get("merchant") or "").lower()
+        if "highland" in merchant:
+            plat = "highlands"
+        elif "thecoffeehouse" in merchant or "coffeehouse" in merchant:
+            plat = "thecoffeehouse"
+        elif "lazada" in merchant:
+            plat = "lazada"
+        else:
+            plat = "tiktok"
+
+        # If value is 0 (voucher redemption / CPA campaign), try transaction_value or commission
+        if value == 0:
+            value = sum(amount(l, "transaction_value") for l in lines)
+            if value == 0 and commission > 0:
+                value = round(commission)
+
         reason = next((l.get("reason_rejected") for l in lines if l.get("reason_rejected")), None)
         orders.append(NormalizedOrder(
             order_id=order_id,
-            platform="tiktok",
+            platform=plat,
             customer_id=customer_id,
             request_id=request_id,
             order_value=round(value),
@@ -281,7 +297,7 @@ def sync_accesstrade_orders(
                     request_id=valid_req_id,
                     order_value=order.order_value,
                     estimated_commission=order.estimated_commission,
-                    platform="tiktok",
+                    platform=order.platform or "tiktok",
                 )
                 summary.orders_new += 1
                 existing = ledger.get_order(conn, order.order_id)
@@ -326,8 +342,9 @@ def sync_accesstrade_orders(
                     summary.skipped += 1
 
             elif order.status == "rejected" and current_status != "rejected":
+                default_reason = "Cancelled on TikTok Shop" if order.platform == "tiktok" else "Cancelled / Not redeemed"
                 ok = ledger.mark_rejected(
-                    conn, order.order_id, order.rejection_reason or "Cancelled on TikTok Shop"
+                    conn, order.order_id, order.rejection_reason or default_reason
                 )
                 if ok:
                     summary.rejected += 1

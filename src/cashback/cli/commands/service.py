@@ -264,6 +264,36 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             except Exception as exc:
                 log.exception(f"[backup] failed: {exc}")
 
+    def fnb_broadcast_loop() -> None:
+        """Daily 08:30 AM announcement for Highlands Coffee & The Coffee House vouchers."""
+        from datetime import datetime, timezone, timedelta
+        from ...providers.fnb_provider import build_fnb_daily_announcement
+
+        log.info("[fnb] daily broadcast loop started (scheduled for 08:30 AM Asia/Ho_Chi_Minh)")
+        tz_vn = timezone(timedelta(hours=7))
+        while not stop.is_set():
+            if stop.wait(20):
+                return
+            now_vn = datetime.now(tz_vn)
+            today_str = now_vn.strftime("%Y-%m-%d")
+
+            # Check if current time is 08:30 (between 08:30:00 and 08:30:59)
+            if now_vn.hour == 8 and now_vn.minute == 30:
+                with ledger.connect(cfg.db_path) as conn:
+                    last_sent = ledger.get_system_kv(conn, "last_fnb_broadcast_date")
+                    if last_sent == today_str:
+                        continue  # Already broadcasted today
+
+                text = build_fnb_daily_announcement(now_vn)
+                log.info(f"[fnb] Firing 08:30 AM daily broadcast for {today_str}...")
+                try:
+                    res = sender.broadcast(text, group="main", mention_all="@All" in text)
+                    with ledger.connect(cfg.db_path) as conn:
+                        ledger.set_system_kv(conn, "last_fnb_broadcast_date", today_str)
+                    log.info(f"[fnb] Daily broadcast sent successfully: {res}")
+                except Exception as exc:
+                    log.error(f"[fnb] Failed to send daily broadcast: {exc}")
+
     def guarded(name: str, loop):
         """Run a loop so that one bad pass cannot end it for good.
 
@@ -288,6 +318,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     threads = [
         threading.Thread(target=guarded("notify", notify_loop), daemon=True),
         threading.Thread(target=guarded("backup", backup_loop), daemon=True),
+        threading.Thread(target=guarded("fnb_broadcast", fnb_broadcast_loop), daemon=True),
     ]
     if cfg.accesstrade_api_key:
         threads.append(threading.Thread(

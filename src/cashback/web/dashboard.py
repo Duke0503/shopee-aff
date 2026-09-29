@@ -818,6 +818,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._fnb_vouchers()
         if path == "/api/fnb/deals-of-the-day":
             return self._fnb_deals_of_the_day()
+        if path == "/api/fnb/link":
+            return self._fnb_link()
         if path == "/api/me":
             customer_id = self._session_customer()
             if customer_id is None:
@@ -3353,6 +3355,26 @@ class _Handler(BaseHTTPRequestHandler):
                     "affiliateUrl": r["affiliate_url"] or "",
                 })
             return self._json({"ok": True, "deals": deals})
+
+    def _fnb_link(self):
+        """Generate a personalized affiliate link for Highlands Coffee or The Coffee House."""
+        from urllib.parse import parse_qs, urlparse
+        from ..providers.fnb_provider import create_fnb_link
+
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        brand = (qs.get("brand") or ["highlands"])[0]
+        customer_id = (qs.get("customer_id") or [""])[0]
+        request_id = (qs.get("request_id") or [""])[0] or None
+
+        res = create_fnb_link(
+            api_key=self.cfg.accesstrade_api_key,
+            brand=brand,
+            customer_id=customer_id,
+            request_id=request_id,
+            base_url=self.cfg.accesstrade_base_url,
+        )
+        return self._json(res)
 
     def _admin_upsert_fnb_voucher(self):
         """Admin endpoint to add or update an F&B voucher."""

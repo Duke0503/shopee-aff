@@ -372,12 +372,21 @@ CREATE INDEX IF NOT EXISTS idx_fnb_brand_active ON fnb_vouchers(brand, is_active
 CREATE INDEX IF NOT EXISTS idx_fnb_hot ON fnb_vouchers(is_hot, is_active);
 """
 
+_SYSTEM_KV_DDL = """
+CREATE TABLE IF NOT EXISTS system_kv (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL
+);
+"""
+
 
 def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SESSIONS_DDL)
     conn.executescript(_CAMPAIGNS_DDL)
     conn.executescript(_SHARE_DDL)
     conn.executescript(_FNB_VOUCHERS_DDL)
+    conn.executescript(_SYSTEM_KV_DDL)
 
 
 def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) -> None:
@@ -1483,5 +1492,23 @@ def seed_fnb_vouchers_if_empty(conn: sqlite3.Connection) -> int:
             is_active=1,
         )
     return len(defaults)
+
+
+def get_system_kv(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    """Retrieve a system setting or state value by key."""
+    row = conn.execute("SELECT value FROM system_kv WHERE key = ?", (key,)).fetchone()
+    return row[0] if row else default
+
+
+def set_system_kv(conn: sqlite3.Connection, key: str, value: str) -> None:
+    """Set or update a system setting or state value by key."""
+    conn.execute(
+        """
+        INSERT INTO system_kv (key, value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+        """,
+        (key, str(value), now()),
+    )
 
 

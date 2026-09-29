@@ -502,6 +502,46 @@ def cmd_announce(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_broadcast_fnb(cfg: Config, args: argparse.Namespace) -> int:
+    """Send or preview the daily 8:30 AM Highlands & The Coffee House broadcast."""
+    from datetime import datetime, timezone, timedelta
+    from ...messaging.assistant_bridge import AssistantError, AssistantSender
+    from ...providers.fnb_provider import build_fnb_daily_announcement
+
+    ledger.initialise(cfg.db_path)
+
+    tz_vn = timezone(timedelta(hours=7))
+    now_vn = datetime.now(tz_vn)
+    today_str = now_vn.strftime("%Y-%m-%d")
+
+    text = build_fnb_daily_announcement(now_vn)
+    print(f"Target group : {args.group}")
+    print(f"Current time : {now_vn.strftime('%Y-%m-%d %H:%M:%S')} (UTC+7)")
+    print("-" * 60)
+    print(text)
+    print("-" * 60)
+
+    if args.dry_run:
+        print("[dry-run] Broadcast previewed; nothing sent.")
+        return 0
+
+    if not args.send:
+        print("Nothing sent. Re-run with --send to broadcast.")
+        return 0
+
+    try:
+        sender = AssistantSender(cfg.assistant_url, cfg.assistant_token, timeout=90)
+        res = sender.broadcast(text, group=args.group, mention_all="@All" in text)
+        if args.group == "main":
+            with ledger.connect(cfg.db_path) as conn:
+                ledger.set_system_kv(conn, "last_fnb_broadcast_date", today_str)
+        print(f"Broadcast sent successfully to {args.group}: {res}")
+    except AssistantError as exc:
+        print(f"Broadcast failed: {exc}")
+        return 1
+    return 0
+
+
 def cmd_campaign_status(cfg: Config, args: argparse.Namespace) -> int:
     """Who holds which slot right now. Settles the slots first."""
     from ...ledger import campaigns

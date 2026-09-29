@@ -928,16 +928,15 @@ function extractTextAndUrls(data) {
           `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên sàn Shopee hoặc TikTok Shop.\n` +
           `4️⃣ Nhắn tin riêng cho mình gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
           `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n` +
-          `📌 Các lệnh hỗ trợ:\n` +
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
           `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
           `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
-          `• /highlands: Săn voucher & mã Mua 1 Tặng 1 Highlands Coffee\n` +
-          `• /tch: Săn voucher & mã giảm giá The Coffee House\n` +
+          `• /highlands: Nhận voucher & mã Mua 1 Tặng 1 Highlands Coffee (gửi link riêng qua inbox)\n` +
+          `• /tch: Nhận voucher & mã giảm giá The Coffee House (gửi link riêng qua inbox)\n` +
           `• /voucher: Tổng hợp mã ưu đãi trà & cà phê hôm nay\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
           `• /web: Website tra cứu đơn & cập nhật STK ngân hàng\n\n` +
-          `💡 Lưu ý: Vui lòng nhắn tin riêng cho mình khi gõ /id và /matkhau để bảo mật tài khoản!`;
+          `💡 Lưu ý: Khi gõ /highlands hoặc /tch, bot sẽ gửi link voucher riêng kèm hướng dẫn qua tin nhắn riêng (inbox) để bạn tiện mở mã vạch tại quầy!`;
 
         const mentions = tagText
           ? [
@@ -995,78 +994,86 @@ function extractTextAndUrls(data) {
         const brand = isHighlandsCmd ? "highlands" : (isTchCmd ? "thecoffeehouse" : "");
 
         try {
-          const queryParam = brand ? `?brand=${brand}` : "";
-          const vRes = await fetch(`${config.MAIN_API_URL}/api/fnb/vouchers${queryParam}`).then(r => r.json()).catch(() => null);
-          const vouchers = (vRes && vRes.ok && Array.isArray(vRes.vouchers)) ? vRes.vouchers : [];
+          if (brand) {
+            const brandTitle = isHighlandsCmd ? "HIGHLANDS COFFEE" : "THE COFFEE HOUSE";
+            const brandEmoji = isHighlandsCmd ? "☕" : "🏠";
+            const cashEst = isHighlandsCmd ? "7.000đ" : "8.000đ";
 
-          const tagText = isGroup && senderUid ? `@${senderName}` : "";
-          const tagPrefix = tagText ? `${tagText}\n` : "";
+            // Fetch personalized link from Python backend
+            const linkRes = await fetch(`${config.MAIN_API_URL}/api/fnb/link?brand=${brand}&customer_id=${senderUid}`).then(r => r.json()).catch(() => null);
+            const shortLink = linkRes?.short_link || (isHighlandsCmd ? "https://shorten.asia/ay4B1J76" : "https://shorten.asia/hd1SKkKf");
 
-          let brandTitle = "HIGHLANDS COFFEE";
-          let brandEmoji = "☕";
-          if (isTchCmd) {
-            brandTitle = "THE COFFEE HOUSE";
-            brandEmoji = "🏠";
-          } else if (!isHighlandsCmd) {
-            brandTitle = "HIGHLANDS & THE COFFEE HOUSE";
-            brandEmoji = "🥤";
+            let dmMsg = `${brandEmoji} LINK VOUCHER ${brandTitle} CỦA BẠN (DÙNG TẠI QUẦY) 🎁\n\n`;
+            dmMsg += `👉 Link nhận mã ưu đãi của bạn:\n${shortLink}\n\n`;
+
+            if (isHighlandsCmd) {
+              dmMsg += `🔥 Các ưu đãi hot Highlands hôm nay:\n`;
+              dmMsg += `• 🎁 Mua 1 Tặng 1 (Trà sen vàng / Freeze / Phindi - Thứ 3 & Thứ 5)\n`;
+              dmMsg += `• 🏷️ Giảm 30.000đ cho hóa đơn từ 99.000đ\n`;
+              dmMsg += `• 🥐 Combo Cà phê phin + Bánh chỉ từ 39.000đ\n\n`;
+            } else {
+              dmMsg += `🔥 Các ưu đãi hot The Coffee House hôm nay:\n`;
+              dmMsg += `• 🏷️ Giảm 20% toàn bộ đồ uống trên menu\n`;
+              dmMsg += `• 🎁 Mua 2 Tặng 1 Trà sữa & Macchiato\n`;
+              dmMsg += `• 🍿 Combo Nước + Bánh/Snack chỉ 49.000đ\n\n`;
+            }
+
+            dmMsg += `📋 3 BƯỚC ĐỂ ĐƯỢC GIẢM GIÁ & NHẬN TIỀN HOÀN:\n`;
+            dmMsg += `1️⃣ Bấm link trên để mở Mini App Zalo / Web -> Bấm "Lưu mã / Nhận mã" để hiện mã vạch (Barcode/QR).\n`;
+            dmMsg += `2️⃣ Đưa mã vạch trên màn hình điện thoại cho thu ngân quét trước khi thanh toán tiền tại quầy.\n`;
+            dmMsg += `3️⃣ Hóa đơn được trừ tiền trực tiếp + Tự động tích lũy ~${cashEst} hoàn tiền vào tài khoản bot! (Gõ /sodu để kiểm tra).\n\n`;
+            dmMsg += `💡 Mẹo: Bạn có thể lưu ảnh chụp màn hình mã vạch để quét nhanh khi đến quán nhé!`;
+
+            // Always send to private DM (1-1 chat)
+            await api.sendMessage(dmMsg, String(senderUid), ThreadType.User);
+
+            // If triggered inside a group, tag the user in the group and ask them to check DM
+            if (isGroup) {
+              const groupTagText = `@${senderName}`;
+              const groupNotify = `${brandEmoji} ${groupTagText} Mình đã gửi link nhận voucher ${brandTitle} kèm hướng dẫn dùng tại quầy vào tin nhắn riêng cho bạn rồi nhé! Bạn kiểm tra hộp thư Zalo với mình nha! 📩`;
+              const tagPos = groupNotify.indexOf(groupTagText);
+              const mentions = tagPos !== -1 ? [{ uid: String(senderUid), pos: tagPos, len: groupTagText.length }] : undefined;
+
+              const boldText = "tin nhắn riêng";
+              const bPos = groupNotify.indexOf(boldText);
+              const styles = bPos !== -1 ? [{ start: bPos, len: boldText.length, st: "b" }] : undefined;
+
+              await api.sendMessage(
+                {
+                  msg: groupNotify,
+                  mentions,
+                  styles,
+                },
+                message.threadId,
+                message.type
+              );
+            }
+          } else {
+            // General /voucher summary
+            let reply = `🎁 TỔNG HỢP VOUCHER ĐỒ UỐNG TẠI QUẦY HÔM NAY 🥤\n\n`;
+            reply += `☕ 1. HIGHLANDS COFFEE:\n`;
+            reply += `• Mua 1 Tặng 1 (Trà sen vàng / Freeze / Phindi - Thứ 3 & Thứ 5)\n`;
+            reply += `• Giảm 30.000đ cho đơn từ 99.000đ\n`;
+            reply += `• Combo Cà phê phin + Bánh chỉ từ 39.000đ\n`;
+            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /highlands để nhận link voucher cá nhân (+ hoàn ~7.000đ).\n\n`;
+
+            reply += `🏠 2. THE COFFEE HOUSE:\n`;
+            reply += `• Giảm 20% toàn menu thức uống\n`;
+            reply += `• Mua 2 Tặng 1 Trà sữa & Macchiato\n`;
+            reply += `• Combo Nước + Bánh/Snack chỉ 49.000đ\n`;
+            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /tch để nhận link voucher cá nhân (+ hoàn ~8.000đ).\n\n`;
+
+            reply += `📋 Cách dùng tại quầy: Mở link lấy mã vạch -> Đưa thu ngân quét -> Nhận giảm giá trực tiếp + Tự động tích lũy tiền hoàn vào bot!`;
+
+            if (isGroup && senderUid) {
+              const tagText = `@${senderName}\n`;
+              reply = tagText + reply;
+              const mentions = [{ uid: String(senderUid), pos: 0, len: tagText.length - 1 }];
+              await api.sendMessage({ msg: reply, mentions }, message.threadId, message.type);
+            } else {
+              await api.sendMessage(reply, message.threadId, message.type);
+            }
           }
-
-          let reply = tagPrefix + `${brandEmoji} MÃ GIẢM GIÁ & VOUCHER ${brandTitle} HÔM NAY 🎁\n\n`;
-
-          const counterVouchers = vouchers.filter(v => v.voucherType === "counter");
-          const foodVouchers = vouchers.filter(v => v.voucherType === "shopeefood");
-
-          if (counterVouchers.length > 0) {
-            reply += `🔥 ƯU ĐÃI DÙNG TẠI QUẦY (Đưa nhân viên quét mã):\n`;
-            counterVouchers.slice(0, 3).forEach((v, idx) => {
-              reply += `${idx + 1}. 🏷️ ${v.title}\n`;
-              if (v.code) reply += `   👉 Mã Code: ${v.code}\n`;
-              if (v.description) reply += `   📝 ${v.description}\n`;
-              reply += `\n`;
-            });
-          }
-
-          if (foodVouchers.length > 0) {
-            reply += `🛵 ĐẶT GIAO TẬN NƠI (ShopeeFood Hoàn 80% Hoa Hồng):\n`;
-            foodVouchers.slice(0, 2).forEach((v) => {
-              reply += `• 🍜 ${v.title}\n`;
-              if (v.description) reply += `  👉 ${v.description}\n`;
-            });
-            reply += `\n💡 Mẹo đặt món: Bạn chỉ cần gửi link quán ${isTchCmd ? "The Coffee House" : "Highlands Coffee"} trên ShopeeFood vào đây, bot sẽ tạo link hoàn tiền 80% hoa hồng tích luỹ ngay lập tức!\n\n`;
-          }
-
-          reply += `🌐 Cập nhật thêm nhiều mã mới mỗi ngày tại: https://hoantiendp.com`;
-
-          const mentions = tagText
-            ? [{ uid: String(senderUid), pos: 0, len: tagText.length }]
-            : undefined;
-
-          const boldTargets = [
-            `MÃ GIẢM GIÁ & VOUCHER ${brandTitle} HÔM NAY`,
-            "ƯU ĐÃI DÙNG TẠI QUẦY",
-            "ĐẶT GIAO TẬN NƠI",
-            "ShopeeFood Hoàn 80% Hoa Hồng",
-            "Mẹo đặt món:",
-            "https://hoantiendp.com",
-          ];
-
-          const styles = [];
-          for (const target of boldTargets) {
-            const start = reply.indexOf(target);
-            if (start !== -1) styles.push({ start, len: target.length, st: "b" });
-          }
-          styles.sort((a, b) => a.start - b.start);
-
-          await api.sendMessage(
-            {
-              msg: reply,
-              mentions: mentions,
-              styles: styles.length > 0 ? styles : undefined,
-            },
-            message.threadId,
-            message.type
-          );
         } catch (err) {
           console.error("[F&B Voucher Command Error]:", err);
         }

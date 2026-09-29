@@ -147,6 +147,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--group", choices=("test", "main"), default="test")
     p.add_argument("--send", action="store_true", help="send it (default: only show it)")
 
+    p = sub.add_parser("broadcast-fnb", help="daily 8:30 AM Highlands & The Coffee House broadcast")
+    p.add_argument("--group", choices=("test", "main"), default="test")
+    p.add_argument("--send", action="store_true", help="send it (default: only show it)")
+    p.add_argument("--dry-run", action="store_true", help="preview only")
+
     p = sub.add_parser(
         "backfill-products",
         help="find pictures and names for links saved without them")
@@ -282,6 +287,7 @@ def _handlers() -> dict:
         "campaign-create": ledger_ops.cmd_campaign_create,
         "campaign-status": ledger_ops.cmd_campaign_status,
         "announce": ledger_ops.cmd_announce,
+        "broadcast-fnb": ledger_ops.cmd_broadcast_fnb,
         "backfill-products": ledger_ops.cmd_backfill_products,
         "merge-customers": ledger_ops.cmd_merge_customers,
 
