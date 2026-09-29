@@ -96,3 +96,29 @@ class TestSync:
         sync_accesstrade_orders(cfg, transactions=_lines(sub1="9999999999999999999"))
         with ledger.connect(db) as conn:
             assert ledger.get_customer(conn, "9999999999999999999") is None
+
+    def test_estimated_commission_updates_when_accesstrade_calculates_it_later(self, cfg, db, merged_customer):
+        # Order first lands with commission = 0 (before AccessTrade runs its batch calculation)
+        zero_lines = [
+            {"transaction_id": "586230164791134201", "status": 0, "is_confirmed": 0,
+             "transaction_time": "2026-09-24T14:35:54", "reason_rejected": "", "product_quantity": 1,
+             "commission": 0.0, "product_price": 89999.0, "is_brand_bonus": False,
+             "_extra": {"sub_params": {"sub1": OLD_UID, "sub2": "R26092437902"}}},
+            {"transaction_id": "586230164791134201", "status": 0, "is_confirmed": 0,
+             "transaction_time": "2026-09-24T14:35:54", "reason_rejected": "", "product_quantity": 1,
+             "commission": 0.0, "product_price": 6299.0, "is_brand_bonus": True,
+             "_extra": {"sub_params": {"sub1": OLD_UID, "sub2": "R26092437902"}}},
+        ]
+        s1 = sync_accesstrade_orders(cfg, transactions=zero_lines)
+        assert s1.orders_new == 1
+        with ledger.connect(db) as conn:
+            order = ledger.get_order(conn, "586230164791134201")
+            assert order["estimated_commission"] == 0
+
+        # Later, AccessTrade updates the bonus line with commission = 4042
+        s2 = sync_accesstrade_orders(cfg, transactions=_lines())
+        assert s2.orders_updated == 1
+        with ledger.connect(db) as conn:
+            order = ledger.get_order(conn, "586230164791134201")
+            assert order["estimated_commission"] == 4_042
+

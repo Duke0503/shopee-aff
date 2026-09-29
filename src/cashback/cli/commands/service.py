@@ -243,9 +243,10 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             summary = sync_accesstrade_orders(cfg)
             if summary.error:
                 log.info(f"[accesstrade] {summary.error}")
-            elif summary.orders_new or summary.approved or summary.rejected or summary.needs_review:
+            elif summary.orders_new or summary.orders_updated or summary.approved or summary.rejected or summary.needs_review:
                 log.info(
                     f"[accesstrade] {summary.rows_read} order(s): {summary.orders_new} new, "
+                    f"{summary.orders_updated} updated, "
                     f"{summary.approved} approved, {summary.rejected} rejected, "
                     f"{summary.needs_review} need a human")
             if stop.wait(cfg.reconcile_interval_minutes * 60):

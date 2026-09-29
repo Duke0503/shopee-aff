@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 class ReconcileSummary:
     rows_read: int = 0
     orders_new: int = 0
+    orders_updated: int = 0
     approved: int = 0
     rejected: int = 0
     skipped: int = 0
@@ -294,6 +295,23 @@ def sync_accesstrade_orders(
                 summary.skipped += 1
                 continue
 
+            # If the order is still awaiting approval, update estimated_commission / order_value if changed
+            updated_estimate = False
+            if existing["status"] == "awaiting_approval":
+                new_est = order.estimated_commission
+                new_val = order.order_value
+                old_est = existing["estimated_commission"]
+                old_val = existing["order_value"]
+                if (new_est is not None and new_est != old_est) or (new_val is not None and new_val != old_val):
+                    conn.execute(
+                        "UPDATE orders SET estimated_commission = ?, order_value = ?, updated_at = ?"
+                        " WHERE order_id = ?",
+                        (new_est, new_val, ledger.now(), order.order_id),
+                    )
+                    summary.orders_updated += 1
+                    updated_estimate = True
+                    existing = ledger.get_order(conn, order.order_id)
+
             current_status = existing["status"]
 
             if order.status == "approved" and current_status != "approved":
@@ -315,7 +333,7 @@ def sync_accesstrade_orders(
                     summary.rejected += 1
                 else:
                     summary.skipped += 1
-            else:
+            elif not updated_estimate:
                 summary.skipped += 1
 
         conn.commit()

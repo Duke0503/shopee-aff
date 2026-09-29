@@ -326,6 +326,7 @@ def cmd_sync_accesstrade(cfg: Config, args: argparse.Namespace) -> int:
 
     print(f"Orders read from AccessTrade: {summary.rows_read}")
     print(f"  New orders inserted:        {summary.orders_new}")
+    print(f"  Orders updated:             {summary.orders_updated}")
     print(f"  Orders newly approved:      {summary.approved}")
     print(f"  Orders newly rejected:      {summary.rejected}")
     print(f"  Orders unchanged/skipped:   {summary.skipped}")
