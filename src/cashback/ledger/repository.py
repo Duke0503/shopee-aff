@@ -1362,8 +1362,98 @@ def upsert_fnb_voucher(
 
 
 def seed_fnb_vouchers_if_empty(conn: sqlite3.Connection) -> int:
-    """Only real vouchers manually configured or added by admin are stored."""
-    return 0
+    """Seed verified official vouchers from Highlands Redeem Zalo campaign."""
+    count = conn.execute("SELECT COUNT(*) FROM fnb_vouchers").fetchone()[0]
+    if count > 0:
+        return 0
+
+    vouchers = [
+        {
+            "brand": "highlands",
+            "title": "Mua 1 Tặng 1 (Flash Sale Thứ 3 & Thứ 5)",
+            "description": "Mua 1 ly lớn (L) Trà/Freeze/MatchaĐI, tặng 1 ly nhỏ (S) PhinĐI Choco/Kem Sữa. Áp dụng Thứ 3 & Thứ 5.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_B1G1",
+            "discount_text": "Mua 1 ly lớn tặng 1 ly nhỏ",
+            "min_order": 0,
+            "is_hot": 1,
+        },
+        {
+            "brand": "highlands",
+            "title": "Mua 2 ly lớn tặng 1 ly nhỏ",
+            "description": "Mua 2 ly lớn (L) Trà/Freeze/MatchaĐI tặng 1 ly nhỏ (S) PhinĐI/Kem Sữa/Phin Đen/Bạc Xỉu.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_Buy2LgetS",
+            "discount_text": "Mua 2 ly lớn tặng 1 ly nhỏ",
+            "min_order": 0,
+            "is_hot": 1,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 30.000đ cho hóa đơn từ 135.000đ",
+            "description": "Áp dụng Cà Phê/Trà/Freeze/PhinĐI/Bánh cho hóa đơn từ 135K tại quầy.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_30KOFF135K",
+            "discount_text": "Giảm 30K bill 135K",
+            "min_order": 135000,
+            "is_hot": 0,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 40.000đ cho hóa đơn từ 169.000đ",
+            "description": "Áp dụng Cà Phê/Trà/Freeze/PhinĐI/Bánh cho hóa đơn từ 169K tại quầy.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_40KOFF169K",
+            "discount_text": "Giảm 40K bill 169K",
+            "min_order": 169000,
+            "is_hot": 0,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 50.000đ cho hóa đơn từ 199.000đ",
+            "description": "Áp dụng Cà Phê/Trà/Freeze/PhinĐI/Bánh cho hóa đơn từ 199K tại quầy.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_50KOFF199K",
+            "discount_text": "Giảm 50K bill 199K",
+            "min_order": 199000,
+            "is_hot": 0,
+        },
+        {
+            "brand": "highlands",
+            "title": "Giảm 65.000đ cho hóa đơn từ 249.000đ",
+            "description": "Áp dụng Cà Phê/Trà/Freeze/PhinĐI/Bánh cho hóa đơn từ 249K tại quầy.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_65KOFF249K",
+            "discount_text": "Giảm 65K bill 249K",
+            "min_order": 249000,
+            "is_hot": 0,
+        },
+        {
+            "brand": "highlands",
+            "title": "Tặng 1 bánh ngọt 29K cho hóa đơn từ 139.000đ",
+            "description": "Tặng Croissant/Bánh Chuối/Bánh Su Kem cho hóa đơn từ 139K.",
+            "voucher_type": "counter",
+            "code": "NWDC.AFF_HCM.Freecake29k",
+            "discount_text": "Tặng bánh 29K bill 139K",
+            "min_order": 139000,
+            "is_hot": 0,
+        },
+    ]
+
+    for v in vouchers:
+        upsert_fnb_voucher(
+            conn,
+            brand=v["brand"],
+            title=v["title"],
+            description=v["description"],
+            voucher_type=v["voucher_type"],
+            code=v["code"],
+            discount_text=v["discount_text"],
+            min_order=v["min_order"],
+            is_hot=v["is_hot"],
+            is_active=1,
+        )
+    return len(vouchers)
 
 
 def get_system_kv(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

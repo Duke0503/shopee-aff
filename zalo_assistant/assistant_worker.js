@@ -997,7 +997,6 @@ function extractTextAndUrls(data) {
           if (brand) {
             const brandTitle = isHighlandsCmd ? "HIGHLANDS COFFEE" : "THE COFFEE HOUSE";
             const brandEmoji = isHighlandsCmd ? "☕" : "🏠";
-            const cashEst = isHighlandsCmd ? "7.000đ" : "8.000đ";
 
             // Fetch personalized link from Python backend
             const linkRes = await fetch(`${config.MAIN_API_URL}/api/fnb/link?brand=${brand}&customer_id=${senderUid}`).then(r => r.json()).catch(() => null);
@@ -1024,18 +1023,18 @@ function extractTextAndUrls(data) {
               if (isHighlandsCmd) {
                 dmMsg += `• Giảm giá trực tiếp theo hóa đơn (10k - 30k) hoặc combo nước + bánh.\n`;
                 dmMsg += `• Quà tặng thành viên Highlands Mini App.\n`;
-                dmMsg += `• ĐẶC BIỆT: Tặng thêm ~${cashEst} hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
+                dmMsg += `• ĐẶC BIỆT: Tự động tích lũy hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
               } else {
                 dmMsg += `• Voucher giảm giá đồ uống trực tiếp tại quầy.\n`;
                 dmMsg += `• Ưu đãi dùng thử món mới & quà tặng thành viên.\n`;
-                dmMsg += `• ĐẶC BIỆT: Tặng thêm ~${cashEst} hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
+                dmMsg += `• ĐẶC BIỆT: Tự động tích lũy hoàn tiền vào ví bot sau khi thanh toán!\n\n`;
               }
             }
 
             dmMsg += `📋 3 BƯỚC ĐỂ ĐƯỢC GIẢM GIÁ & NHẬN TIỀN HOÀN:\n`;
             dmMsg += `1️⃣ Bấm link trên để mở Mini App Zalo / Web -> Bấm "Lưu mã / Nhận mã" để hiện mã vạch (Barcode/QR).\n`;
             dmMsg += `2️⃣ Đưa mã vạch trên màn hình điện thoại cho thu ngân quét trước khi thanh toán tiền tại quầy.\n`;
-            dmMsg += `3️⃣ Hóa đơn được trừ tiền trực tiếp + Tự động tích lũy ~${cashEst} hoàn tiền vào tài khoản bot! (Gõ /sodu để kiểm tra).\n\n`;
+            dmMsg += `3️⃣ Hóa đơn được trừ tiền trực tiếp + Tự động tích lũy hoàn tiền vào tài khoản bot! (Gõ /sodu để kiểm tra).\n\n`;
             dmMsg += `💡 Mẹo: Bạn có thể lưu ảnh chụp màn hình mã vạch để quét nhanh khi đến quán nhé!`;
 
             // Always send to private DM (1-1 chat)
@@ -1066,10 +1065,10 @@ function extractTextAndUrls(data) {
             // General /voucher summary
             let reply = `🎁 TỔNG HỢP VOUCHER ĐỒ UỐNG TẠI QUẦY HÔM NAY 🥤\n\n`;
             reply += `☕ 1. HIGHLANDS COFFEE:\n`;
-            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /highlands để nhận link voucher cá nhân (+ hoàn ~7.000đ).\n\n`;
+            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /highlands để nhận link voucher cá nhân (+ tích lũy hoàn tiền).\n\n`;
 
             reply += `🏠 2. THE COFFEE HOUSE:\n`;
-            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /tch để nhận link voucher cá nhân (+ hoàn ~8.000đ).\n\n`;
+            reply += `👉 Nhắn tin riêng cho bot hoặc gõ /tch để nhận link voucher cá nhân (+ tích lũy hoàn tiền).\n\n`;
 
             reply += `📋 Cách dùng tại quầy: Mở link lấy mã vạch -> Đưa thu ngân quét -> Nhận giảm giá trực tiếp + Tự động tích lũy tiền hoàn vào bot!`;
 

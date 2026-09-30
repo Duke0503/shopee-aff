@@ -186,7 +186,7 @@ def build_fnb_daily_announcement(
         hl_vouchers = (
             f"☕ HIGHLANDS COFFEE:\n"
             f"• Ưu đãi tại quầy: Giảm tiền trực tiếp theo hóa đơn, combo nước + bánh & quà thành viên Zalo.\n"
-            f"• Hoàn tiền độc quyền từ bot: Tặng thêm ~7.000đ vào ví bot khi thanh toán thành công!\n"
+            f"• Hoàn tiền độc quyền từ bot: Tự động tích lũy hoàn tiền vào tài khoản bot khi thanh toán thành công!\n"
             f"👉 Bấm link nhận mã mở Mini App Highlands trên Zalo & lưu mã áp dụng hôm nay.\n\n"
         )
 
@@ -208,7 +208,7 @@ def build_fnb_daily_announcement(
         tch_vouchers_block = (
             f"🏠 THE COFFEE HOUSE:\n"
             f"• Ưu đãi tại quầy: Voucher giảm giá đồ uống, ưu đãi món mới & quà tặng độc quyền.\n"
-            f"• Hoàn tiền độc quyền từ bot: Tặng thêm ~8.000đ vào ví bot khi thanh toán thành công!\n"
+            f"• Hoàn tiền độc quyền từ bot: Tự động tích lũy hoàn tiền vào tài khoản bot khi thanh toán thành công!\n"
             f"👉 Bấm link để xem & lấy mã vạch giảm giá tại quầy đang áp dụng hôm nay.\n\n"
         )
 
@@ -217,7 +217,7 @@ def build_fnb_daily_announcement(
         f"📋 HƯỚNG DẪN 3 BƯỚC DÙNG TẠI QUẦY & NHẬN HOÀN TIỀN:\n"
         f"1️⃣ Lấy mã: Nhắn riêng cho bot hoặc gõ /highlands hay /tch -> Bấm link nhận mã mở Mini App Zalo / Web -> Bấm 'Lưu mã' để hiện mã vạch (Barcode/QR).\n"
         f"2️⃣ Áp dụng: Đưa mã vạch trên màn hình điện thoại cho thu ngân quét trước khi thanh toán tiền tại quầy.\n"
-        f"3️⃣ Nhận tiền hoàn: Hóa đơn được giảm giá ngay lập tức + Tự động tích lũy ~7.000đ - 8.000đ hoàn tiền vào tài khoản bot! (Gõ /sodu để kiểm tra).\n\n"
+        f"3️⃣ Nhận tiền hoàn: Hóa đơn được giảm giá ngay lập tức + Tự động tích lũy hoàn tiền vào tài khoản bot! (Gõ /sodu để kiểm tra).\n\n"
     )
 
     call_to_action = (
