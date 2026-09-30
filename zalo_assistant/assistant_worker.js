@@ -425,7 +425,8 @@ function extractTextAndUrls(data) {
       // Nếu sản phẩm mới tinh chưa từng có (ready: false), chờ extension/worker tạo link (tối đa 28s)
       if (!affUrl && resolveRes.request_id) {
         console.log(`[${platformLabel} Link] Sản phẩm mới, chờ worker chuyển đổi link (request_id: ${resolveRes.request_id})...`);
-        const maxAttempts = 35; // 35 * 800ms = 28s
+        // Tăng thời gian chờ lên 65 lần x 0.8s = 52s để đồng bộ với backend & extension (tránh báo lỗi giả khi hệ thống đang xử lý)
+        const maxAttempts = 65; // 65 * 800ms = 52s
         for (let i = 0; i < maxAttempts; i++) {
           await sleep(800);
           try {
@@ -645,19 +646,25 @@ function extractTextAndUrls(data) {
   const handleShopeeLink = handleProductLink;
 
   // LẮNG NGHE SỰ KIỆN QUA WEBSOCKET
+  let reconnectAttempts = 0;
+
   api.listener.on("connected", () => {
+    reconnectAttempts = 0;
     console.log("[Listener] Kết nối WebSocket Zalo thành công. Đang lắng nghe 24/7...");
   });
 
   api.listener.on("closed", (code, reason) => {
-    console.warn(`[Listener] WebSocket đóng (${code}): ${reason}. Sẽ tự động kết nối lại sau 3s...`);
+    reconnectAttempts++;
+    // Exponential backoff: 3s, 6s, 12s, 24s, tối đa 30s để tránh spam kết nối khi bị xung đột session
+    const delaySec = Math.min(30, 3 * Math.pow(2, Math.min(reconnectAttempts - 1, 4)));
+    console.warn(`[Listener] WebSocket đóng (${code}): ${reason}. Thử kết nối lại lần ${reconnectAttempts} sau ${delaySec}s...`);
     setTimeout(() => {
       try {
         api.listener.start({ retryOnClose: true });
       } catch (err) {
         console.error("[Listener Reconnect Error]:", err.message);
       }
-    }, 3000);
+    }, delaySec * 1000);
   });
 
   api.listener.on("error", (err) => {

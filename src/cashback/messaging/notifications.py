@@ -41,7 +41,7 @@ NOT_HOUSE = "COALESCE(c.role, 'user') != 'house'"
 # The assistant waits this long for a link itself and answers in the chat
 # the customer used. A link collected in that time is marked delivered; one
 # still unclaimed after it is the assistant having given up, and ours to send.
-ASSISTANT_WAIT = timedelta(seconds=35)
+ASSISTANT_WAIT = timedelta(seconds=55)
 
 # Past this, a link or an apology is news nobody is waiting for. Sending a
 # pile of them after an outage reads as spam, so they are marked and dropped.
