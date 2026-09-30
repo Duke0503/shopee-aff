@@ -321,11 +321,13 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                         return
         return run
 
+    ENABLE_FNB_BROADCAST = False  # Temporarily disabled per user request
     threads = [
         threading.Thread(target=guarded("notify", notify_loop), daemon=True),
         threading.Thread(target=guarded("backup", backup_loop), daemon=True),
-        threading.Thread(target=guarded("fnb_broadcast", fnb_broadcast_loop), daemon=True),
     ]
+    if ENABLE_FNB_BROADCAST:
+        threads.append(threading.Thread(target=guarded("fnb_broadcast", fnb_broadcast_loop), daemon=True))
     if cfg.accesstrade_api_key:
         threads.append(threading.Thread(
             target=guarded("accesstrade", accesstrade_loop), daemon=True))

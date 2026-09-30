@@ -931,12 +931,8 @@ function extractTextAndUrls(data) {
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
           `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
           `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
-          `• /highlands: Nhận voucher & mã Mua 1 Tặng 1 Highlands Coffee (gửi link riêng qua inbox)\n` +
-          `• /tch: Nhận voucher & mã giảm giá The Coffee House (gửi link riêng qua inbox)\n` +
-          `• /voucher: Tổng hợp mã ưu đãi trà & cà phê hôm nay\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
-          `• /web: Website tra cứu đơn & cập nhật STK ngân hàng\n\n` +
-          `💡 Lưu ý: Khi gõ /highlands hoặc /tch, bot sẽ gửi link voucher riêng kèm hướng dẫn qua tin nhắn riêng (inbox) để bạn tiện mở mã vạch tại quầy!`;
+          `• /web: Website tra cứu đơn & cập nhật STK ngân hàng`;
 
         const mentions = tagText
           ? [
@@ -989,6 +985,18 @@ function extractTextAndUrls(data) {
          "/tch", "!tch", "/thecoffeehouse", "!thecoffeehouse", "/coffeehouse", "!coffeehouse",
          "/coffee", "!coffee", "/caphe", "!caphe", "/voucher", "!voucher", "/uudai", "!uudai", "/fnb", "!fnb"].includes(cmd)
       ) {
+        const ENABLE_FNB_FEATURE = false; // Tạm ẩn theo yêu cầu
+        if (!ENABLE_FNB_FEATURE) {
+          const pauseMsg = "☕ Tính năng ưu đãi đồ uống tại quầy hiện đang được tạm ẩn để nâng cấp. Bạn vui lòng quay lại sau nhé!";
+          if (isGroup && senderUid) {
+            const tagText = `@${senderName}\n`;
+            await api.sendMessage({ msg: tagText + pauseMsg, mentions: [{ uid: String(senderUid), pos: 0, len: tagText.length - 1 }] }, message.threadId, message.type);
+          } else {
+            await api.sendMessage(pauseMsg, message.threadId, message.type);
+          }
+          return;
+        }
+
         const isHighlandsCmd = ["/highlands", "!highlands", "/hl", "!hl", "/highland", "!highland"].includes(cmd);
         const isTchCmd = ["/tch", "!tch", "/thecoffeehouse", "!thecoffeehouse", "/coffeehouse", "!coffeehouse"].includes(cmd);
         const brand = isHighlandsCmd ? "highlands" : (isTchCmd ? "thecoffeehouse" : "");
