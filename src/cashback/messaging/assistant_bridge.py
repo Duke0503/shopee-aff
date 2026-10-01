@@ -35,13 +35,15 @@ class AssistantSender:
                                    "message": text})
 
     def broadcast(self, text: str, group: str = "test", image_path: str | None = None,
-                  mention_all: bool = False) -> dict:
+                  mention_all: bool = False, mentions: list | None = None) -> dict:
         """One announcement to a group: "test" rehearses it in the test
         group, "main" is the real one. The picture goes first, as a message
         of its own, because Zalo cuts a caption under an image short."""
         payload = {"message": text, "group": group, "mentionAll": mention_all}
         if image_path:
             payload |= {"imagePath": image_path, "imageFirst": True}
+        if mentions:
+            payload["mentions"] = mentions
         return self._post("/api/broadcast", payload)
 
     def _post(self, path: str, payload: dict) -> dict:

@@ -1444,7 +1444,7 @@ function extractTextAndUrls(data) {
             results.push(await api.sendMessage({ msg: "", attachments }, groupId, ThreadType.Group));
           }
           if (text) {
-            const mentions = [];
+            const mentions = Array.isArray(payload.mentions) ? [...payload.mentions] : [];
             const allPos = payload.mentionAll ? text.indexOf("@All") : -1;
             if (allPos !== -1) mentions.push({ pos: allPos, uid: "-1", len: 4 });
             const msg = { msg: text };

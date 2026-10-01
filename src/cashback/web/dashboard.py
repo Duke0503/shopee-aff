@@ -46,7 +46,7 @@ from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from ..core import accounts
+from ..core import accounts, banks
 from ..core.config import PROJECT_ROOT, Config
 from ..core.policy import round_dong
 from ..ledger import payouts
@@ -782,6 +782,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_employees()
         if path == "/api/admin/orders":
             return self._admin_orders()
+        if path == "/api/admin/payments":
+            return self._admin_payments()
         if path == "/api/admin/products":
             return self._admin_products()
         if path == "/api/admin/logs":
@@ -900,6 +902,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_mark_paid()
         if path == "/api/admin/transfers":
             return self._admin_record_transfer()
+        if path == "/api/admin/payments/confirm":
+            return self._admin_payment_confirm()
+        if path == "/api/admin/payments/ask-bank":
+            return self._admin_payment_ask_bank()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -2313,6 +2319,364 @@ class _Handler(BaseHTTPRequestHandler):
             "ok": True,
             "message": f"Đã ghi nhận chuyển khoản {amount:,}đ cho {customer_id}",
             "transfer_id": transfer_id
+        })
+
+    def _admin_payments(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        rate = self.cfg.advertised_cashback_rate
+        cat = banks.load()
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            from ..ledger import campaigns
+
+            order_rows = conn.execute("""
+                SELECT o.order_id, o.customer_id, o.order_value, o.estimated_commission,
+                       o.approved_commission, o.cashback_amount, o.status, o.recorded_at,
+                       o.approved_at, o.paid_at, COALESCE(o.platform, 'shopee') as platform,
+                       r.source_url, r.affiliate_url, r.estimate_detail,
+                       c.display_name, c.customer_code, c.zalo_user_id,
+                       c.bank_name, c.bank_account, c.account_holder
+                  FROM orders o
+                  JOIN customers c ON c.customer_id = o.customer_id
+                  LEFT JOIN link_requests r ON r.request_id = o.request_id
+                 WHERE o.status != 'rejected' AND o.paid_at IS NULL
+                   AND COALESCE(c.role, 'user') != 'house'
+                 ORDER BY COALESCE(o.approved_at, o.recorded_at) DESC
+            """).fetchall()
+
+            transfer_rows = conn.execute("""
+                SELECT pt.id, pt.customer_id, pt.amount, pt.transfer_code, pt.note,
+                       pt.proof_image, pt.order_ids, pt.notify_mode, pt.notified_at,
+                       pt.target_group, pt.created_at, pt.created_by,
+                       c.customer_code, c.display_name, c.bank_name, c.bank_account
+                  FROM payment_transfers pt
+                  LEFT JOIN customers c ON c.customer_id = pt.customer_id
+                 ORDER BY pt.created_at DESC
+                 LIMIT 100
+            """).fetchall()
+
+            customers_map: dict[str, dict] = {}
+            for r in order_rows:
+                cid = r["customer_id"]
+                if cid not in customers_map:
+                    bank_raw = (r["bank_name"] or "").strip()
+                    bank_acc = (r["bank_account"] or "").strip()
+                    acc_holder = (r["account_holder"] or "").strip()
+
+                    matched_bank = banks.find(bank_raw, cat) if bank_raw else None
+                    if not bank_acc or not bank_raw:
+                        bank_status = "missing"
+                    elif not matched_bank:
+                        bank_status = "invalid_bank"
+                    elif not banks.transfer_supported(matched_bank):
+                        bank_status = "unsupported"
+                    else:
+                        bank_status = "valid"
+
+                    bank_info = None
+                    if matched_bank:
+                        bank_info = {
+                            "name": matched_bank.get("name"),
+                            "shortName": matched_bank.get("shortName"),
+                            "bin": matched_bank.get("bin"),
+                            "logo": matched_bank.get("logo"),
+                            "code": matched_bank.get("code"),
+                        }
+
+                    customers_map[cid] = {
+                        "customer_id": cid,
+                        "display_name": r["display_name"] or "",
+                        "customer_code": r["customer_code"] or "",
+                        "zalo_user_id": r["zalo_user_id"] or cid,
+                        "bank_name": bank_raw,
+                        "bank_account": bank_acc,
+                        "account_holder": acc_holder,
+                        "bank_status": bank_status,
+                        "bank_info": bank_info,
+                        "payable_amount": 0,
+                        "awaiting_amount": 0,
+                        "bonus": 0,
+                        "total_unpaid": 0,
+                        "order_count": 0,
+                        "order_ids": [],
+                        "orders": [],
+                    }
+
+                cust_entry = customers_map[cid]
+                comm = r["approved_commission"] or r["estimated_commission"] or 0
+                cb = r["cashback_amount"]
+                if cb is None:
+                    plat = r["platform"] or "shopee"
+                    fee_factor = (1 - 0.10 - 0.0098) if plat == "shopee" else (1 - 0.10)
+                    net_comm = round_dong(comm * fee_factor)
+                    cb = round_dong(net_comm * rate)
+
+                p_name, _ = _resolve_product_info(
+                    conn, r["estimate_detail"], r["affiliate_url"], r["source_url"]
+                )
+
+                order_dict = {
+                    "order_id": r["order_id"],
+                    "order_value": r["order_value"],
+                    "cashback_amount": cb,
+                    "status": r["status"],
+                    "recorded_at": r["recorded_at"],
+                    "approved_at": r["approved_at"],
+                    "platform": r["platform"],
+                    "product": p_name or "Sản phẩm",
+                }
+                cust_entry["orders"].append(order_dict)
+                cust_entry["order_ids"].append(r["order_id"])
+                cust_entry["order_count"] += 1
+
+                if r["status"] == "approved":
+                    cust_entry["payable_amount"] += cb
+                elif r["status"] == "awaiting_approval":
+                    cust_entry["awaiting_amount"] += cb
+
+            payables = []
+            for cid, entry in customers_map.items():
+                entry["bonus"] = campaigns.bonus_owed(conn, entry["order_ids"])
+                entry["payable_amount"] += entry["bonus"]
+                entry["total_unpaid"] = entry["payable_amount"] + entry["awaiting_amount"]
+
+                ref = f"Hoan tien Shopee {entry['customer_code'] or entry['customer_id']}"
+                entry["reference"] = ref
+
+                qr_amount = entry["payable_amount"] if entry["payable_amount"] > 0 else entry["awaiting_amount"]
+                if entry["bank_status"] == "valid" and entry["bank_info"] and qr_amount > 0:
+                    params = urllib.parse.urlencode({
+                        "amount": qr_amount,
+                        "addInfo": ref,
+                        "accountName": entry["account_holder"] or "",
+                    })
+                    entry["qr_url"] = (
+                        f"https://img.vietqr.io/image/{entry['bank_info']['bin']}-{entry['bank_account']}"
+                        f"-compact2.png?{params}"
+                    )
+                else:
+                    entry["qr_url"] = None
+
+                last_tx = conn.execute("""
+                    SELECT id, amount, transfer_code, note, notify_mode, notified_at, target_group, created_at
+                      FROM payment_transfers
+                     WHERE customer_id = ?
+                     ORDER BY created_at DESC
+                     LIMIT 1
+                """, (cid,)).fetchone()
+                entry["last_transfer"] = dict(last_tx) if last_tx else None
+
+                if entry["payable_amount"] > 0:
+                    if entry["bank_status"] == "valid":
+                        entry["payout_status"] = "ready"
+                    else:
+                        entry["payout_status"] = "needs_bank"
+                elif entry["awaiting_amount"] > 0:
+                    if entry["bank_status"] == "valid":
+                        entry["payout_status"] = "awaiting"
+                    else:
+                        entry["payout_status"] = "needs_bank"
+                else:
+                    entry["payout_status"] = "settled"
+
+                payables.append(entry)
+
+            payables.sort(key=lambda p: (
+                1 if p["payable_amount"] > 0 else (2 if p["awaiting_amount"] > 0 else 3),
+                -p["payable_amount"],
+                -p["awaiting_amount"]
+            ))
+
+            transfers_list = [dict(r) for r in transfer_rows]
+
+            total_payable = sum(p["payable_amount"] for p in payables)
+            total_awaiting = sum(p["awaiting_amount"] for p in payables)
+            ready_users = sum(1 for p in payables if p["payout_status"] == "ready")
+            needs_bank_users = sum(1 for p in payables if p["payout_status"] == "needs_bank")
+            total_transferred = sum((t.get("amount") or 0) for t in transfers_list)
+
+            summary = {
+                "total_payable": total_payable,
+                "total_awaiting": total_awaiting,
+                "ready_users": ready_users,
+                "needs_bank_users": needs_bank_users,
+                "total_transferred": total_transferred,
+                "total_transfers_count": len(transfers_list),
+            }
+
+            return self._json({
+                "ok": True,
+                "summary": summary,
+                "payables": payables,
+                "transfers": transfers_list,
+            })
+
+    def _admin_payment_confirm(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        customer_id = str(body.get("customer_id") or "").strip()
+        if not customer_id:
+            return self._json({"ok": False, "message": "Thiếu mã khách hàng (customer_id)"}, 400)
+
+        try:
+            amount = int(body.get("amount") or 0)
+        except (ValueError, TypeError):
+            amount = 0
+
+        if amount <= 0:
+            return self._json({"ok": False, "message": "Số tiền chi trả phải lớn hơn 0"}, 400)
+
+        transfer_code = str(body.get("transfer_code") or "").strip()
+        note = str(body.get("note") or "").strip()
+        proof_image = str(body.get("proof_image") or "").strip()
+        order_ids = body.get("order_ids")
+        order_ids_str = ",".join(str(o) for o in order_ids) if isinstance(order_ids, list) else (str(order_ids) if order_ids else "")
+        notify_mode = str(body.get("notify_mode") or "both").lower()  # "dm", "group", "both", "none"
+        target_group = str(body.get("target_group") or "test").lower() # "test" or "main"
+        include_awaiting = bool(body.get("include_awaiting", False))
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            c_row = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (customer_id,)).fetchone()
+            if not c_row:
+                return self._json({"ok": False, "message": "Không tìm thấy khách hàng"}, 404)
+            c_dict = dict(c_row)
+
+            cur = conn.execute("""
+                INSERT INTO payment_transfers (
+                    customer_id, amount, transfer_code, note, proof_image,
+                    order_ids, notify_mode, notified_at, target_group, created_at, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), ?)
+            """, (customer_id, amount, transfer_code, note, proof_image,
+                  order_ids_str, notify_mode, target_group, cust_id))
+            transfer_id = cur.lastrowid
+
+            marked_count = 0
+            if order_ids and isinstance(order_ids, list):
+                for oid in order_ids:
+                    res = conn.execute("""
+                        UPDATE orders
+                           SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                         WHERE order_id = ? AND customer_id = ?
+                    """, (str(oid), customer_id))
+                    marked_count += res.rowcount
+            else:
+                status_clause = "status IN ('approved', 'awaiting_approval')" if include_awaiting else "status = 'approved'"
+                res = conn.execute(f"""
+                    UPDATE orders
+                       SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                     WHERE customer_id = ? AND {status_clause} AND paid_at IS NULL
+                """, (customer_id,))
+                marked_count = res.rowcount
+
+            conn.commit()
+
+        from ..messaging.assistant_bridge import AssistantError, AssistantSender
+        sender = AssistantSender(self.cfg.assistant_url, self.cfg.assistant_token)
+
+        display_name = c_dict.get("display_name") or customer_id
+        customer_code = c_dict.get("customer_code") or customer_id
+        zalo_uid = c_dict.get("zalo_user_id") or customer_id
+        bank_name = c_dict.get("bank_name") or "Ngân hàng"
+        bank_acc = c_dict.get("bank_account") or ""
+        reference = f"Hoan tien Shopee {customer_code}"
+        vnd_amount = _vnd(amount)
+
+        notifications_log = {}
+
+        if notify_mode in ("dm", "both"):
+            dm_text = (
+                f"🎉 CHÚC MỪNG BẠN ĐÃ ĐƯỢC HOÀN TIỀN! 🎉\n\n"
+                f"Admin vừa chuyển khoản hoàn tiền cho bạn:\n"
+                f"💰 Số tiền: {vnd_amount}\n"
+                f"🏦 Ngân hàng: {bank_name} ({bank_acc})\n"
+                f"🏷️ Nội dung CK: {reference}\n"
+                f"📦 Số đơn hoàn tất: {marked_count} đơn\n\n"
+                f"Cảm ơn bạn đã tin tưởng và đồng hành cùng Hoàn Tiền Shopping Dp! Tiếp tục gửi link để nhận thêm nhiều ưu đãi hoàn tiền bạn nhé! 🛍️✨"
+            )
+            try:
+                sender.send(zalo_uid, dm_text)
+                notifications_log["dm"] = "sent"
+            except AssistantError as err:
+                notifications_log["dm"] = f"failed: {err}"
+
+        if notify_mode in ("group", "both"):
+            group_text = (
+                f"🎉 THÔNG BÁO CHI TRẢ HOÀN TIỀN THÀNH CÔNG! 🎉\n\n"
+                f"Xin chúc mừng thành viên {display_name} ({customer_code}) vừa được admin chuyển khoản thành công khoản tiền hoàn:\n"
+                f"💰 Số tiền: {vnd_amount}\n"
+                f"📦 Số đơn đã tất toán: {marked_count} đơn\n\n"
+                f"Cảm ơn bạn đã mua sắm thông minh và tích lũy tiền hoàn cùng nhóm! 👏\n"
+                f"👉 Cả nhà hãy tiếp tục gửi link Shopee / TikTok vào đây để nhận hoàn tiền tới 80% nhé! 🚀💵"
+            )
+            mentions = []
+            if zalo_uid and str(zalo_uid).isdigit():
+                pos = group_text.find(display_name)
+                if pos != -1:
+                    mentions.append({"pos": pos, "uid": str(zalo_uid), "len": len(display_name)})
+            try:
+                sender.broadcast(group_text, group=target_group, mentions=mentions)
+                notifications_log["group"] = f"sent_to_{target_group}"
+            except AssistantError as err:
+                notifications_log["group"] = f"failed: {err}"
+
+        return self._json({
+            "ok": True,
+            "message": f"Đã ghi nhận chi trả {vnd_amount} cho {display_name} thành công!",
+            "transfer_id": transfer_id,
+            "marked_orders": marked_count,
+            "notifications": notifications_log,
+        })
+
+    def _admin_payment_ask_bank(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        customer_id = str(body.get("customer_id") or "").strip()
+        custom_note = str(body.get("custom_note") or "").strip()
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            row = ledger.get_customer(conn, customer_id)
+            if not row:
+                return self._json({"ok": False, "message": "Khách hàng không tồn tại"}, 404)
+            c_dict = dict(row)
+
+        recipient = c_dict.get("zalo_user_id") or c_dict.get("customer_id")
+        if not recipient:
+            return self._json({"ok": False, "message": "Khách hàng không có Zalo UID"}, 400)
+
+        display_name = c_dict.get("display_name") or customer_id
+        from ..messaging.assistant_bridge import AssistantError, AssistantSender
+        sender = AssistantSender(self.cfg.assistant_url, self.cfg.assistant_token)
+
+        msg = (
+            f"👋 Chào bạn {display_name}, hệ thống Hoàn Tiền Shopping Dp xin thông báo:\n\n"
+            f"Bạn hiện có tiền hoàn đã được duyệt sẵn sàng để chuyển khoản! 💸\n"
+            f"Tuy nhiên, thông tin tài khoản ngân hàng nhận tiền của bạn hiện đang thiếu hoặc chưa chính xác.\n\n"
+            f"👉 Bạn vui lòng nhắn lại thông tin nhận tiền vào đây theo mẫu:\n"
+            f"STK: [Số tài khoản]\n"
+            f"Ngân hàng: [Tên ngân hàng]\n"
+            f"Chủ tài khoản: [Họ và tên viết hoa không dấu]\n\n"
+            f"Hoặc đăng nhập website để cập nhật thông tin ngân hàng nhé. Cảm ơn bạn! ❤️"
+        )
+        if custom_note:
+            msg += f"\n\n💬 Ghi chú từ admin: {custom_note}"
+
+        try:
+            sender.send(recipient, msg)
+        except AssistantError as exc:
+            return self._json({"ok": False, "message": f"Không thể gửi tin nhắn qua bot: {exc}"}, 500)
+
+        return self._json({
+            "ok": True,
+            "message": f"Đã gửi tin nhắn nhắc cung cấp STK tới {display_name} qua Zalo!"
         })
 
 

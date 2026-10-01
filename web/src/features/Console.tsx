@@ -11,12 +11,14 @@ import { EmployeesView } from "@/features/Admin/views/EmployeesView"
 import { OrdersView } from "@/features/Admin/views/OrdersView"
 import { ProductsView } from "@/features/Admin/views/ProductsView"
 import { LogsView } from "@/features/Admin/views/LogsView"
+import { PaymentsView } from "@/features/Admin/views/PaymentsView"
 import { Loader2 } from "lucide-react"
 
 function resolveTabFromPath(path: string): AdminTab {
   const clean = path.replace(/\/+$/, "").toLowerCase()
   if (clean.includes("/employee")) return "employees"
   if (clean.includes("/user")) return "users"
+  if (clean.includes("/payment")) return "payments"
   if (clean.includes("/order")) return "orders"
   if (clean.includes("/product")) return "products"
   if (clean.includes("/log")) return "logs"
@@ -126,6 +128,7 @@ export function Console() {
           isFetching={metricsQuery.isFetching}
           onRefresh={() => {
             queryClient.invalidateQueries({ queryKey: ["admin-metrics"] })
+            queryClient.invalidateQueries({ queryKey: ["admin-payments"] })
             queryClient.invalidateQueries({ queryKey: ["admin-orders"] })
             queryClient.invalidateQueries({ queryKey: ["admin-users"] })
             queryClient.invalidateQueries({ queryKey: ["admin-products"] })
@@ -166,6 +169,7 @@ export function Console() {
               )
             )}
 
+            {activeTab === "payments" && <PaymentsView />}
             {activeTab === "orders" && <OrdersView />}
             {activeTab === "users" && <UsersView />}
             {activeTab === "products" && <ProductsView />}

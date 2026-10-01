@@ -608,3 +608,109 @@ export const recordAdminTransfer = (data: {
   proof_image?: string
 }) => post("/api/admin/transfers", data)
 
+export interface AdminPaymentSummary {
+  total_payable: number
+  total_awaiting: number
+  ready_users: number
+  needs_bank_users: number
+  total_transferred: number
+  total_transfers_count: number
+}
+
+export interface AdminBankInfo {
+  name?: string
+  shortName?: string
+  bin?: string
+  logo?: string
+  code?: string
+}
+
+export interface AdminPaymentOrder {
+  order_id: string
+  order_value: number | null
+  cashback_amount: number | null
+  status: string
+  recorded_at: string | null
+  approved_at: string | null
+  platform: string
+  product: string
+}
+
+export interface AdminPaymentUser {
+  customer_id: string
+  display_name: string
+  customer_code: string
+  zalo_user_id: string
+  bank_name: string
+  bank_account: string
+  account_holder: string
+  bank_status: "valid" | "missing" | "invalid_bank" | "unsupported"
+  bank_info: AdminBankInfo | null
+  payable_amount: number
+  awaiting_amount: number
+  bonus: number
+  total_unpaid: number
+  order_count: number
+  order_ids: string[]
+  orders: AdminPaymentOrder[]
+  qr_url: string | null
+  reference: string
+  payout_status: "ready" | "needs_bank" | "awaiting" | "settled"
+  last_transfer: {
+    id: number
+    amount: number
+    transfer_code: string | null
+    note: string | null
+    notify_mode: string | null
+    notified_at: string | null
+    target_group: string | null
+    created_at: string
+  } | null
+}
+
+export interface AdminPaymentTransfer {
+  id: number
+  customer_id: string
+  customer_code: string | null
+  display_name: string | null
+  bank_name: string | null
+  bank_account: string | null
+  amount: number
+  transfer_code: string | null
+  note: string | null
+  proof_image: string | null
+  order_ids: string | null
+  notify_mode: "dm" | "group" | "both" | "none" | null
+  notified_at: string | null
+  target_group: "test" | "main" | null
+  created_at: string
+  created_by: string | null
+}
+
+export interface AdminPaymentsResponse {
+  ok: boolean
+  summary: AdminPaymentSummary
+  payables: AdminPaymentUser[]
+  transfers: AdminPaymentTransfer[]
+}
+
+export const fetchAdminPayments = () => get<AdminPaymentsResponse>("/api/admin/payments")
+
+export const confirmAdminPayment = (data: {
+  customer_id: string
+  amount: number
+  order_ids?: string[]
+  transfer_code?: string
+  note?: string
+  proof_image?: string
+  notify_mode?: "dm" | "group" | "both" | "none"
+  target_group?: "test" | "main"
+  include_awaiting?: boolean
+}) => post("/api/admin/payments/confirm", data)
+
+export const askCustomerBank = (data: {
+  customer_id: string
+  custom_note?: string
+}) => post("/api/admin/payments/ask-bank", data)
+
+

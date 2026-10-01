@@ -213,6 +213,9 @@ CREATE TABLE IF NOT EXISTS payment_transfers (
     note            TEXT,
     proof_image     TEXT,
     order_ids       TEXT,
+    notify_mode     TEXT,
+    notified_at     TEXT,
+    target_group    TEXT,
     created_at      TEXT NOT NULL,
     created_by      TEXT
 );
@@ -287,6 +290,11 @@ _LATER_COLUMNS = {
     },
     "products_cache": {
         "image_url": "TEXT",
+    },
+    "payment_transfers": {
+        "notify_mode": "TEXT",
+        "notified_at": "TEXT",
+        "target_group": "TEXT",
     },
 }
 

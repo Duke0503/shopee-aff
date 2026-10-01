@@ -9,9 +9,10 @@ import {
   Sparkles,
   ChevronRight,
   X,
+  CreditCard,
 } from "lucide-react"
 
-export type AdminTab = "dashboard" | "users" | "employees" | "orders" | "products" | "logs"
+export type AdminTab = "dashboard" | "users" | "employees" | "orders" | "payments" | "products" | "logs"
 
 interface AdminSidebarProps {
   activeTab: AdminTab
@@ -49,6 +50,12 @@ export function AdminSidebar({
     {
       group: "NGHIỆP VỤ & VẬN HÀNH",
       items: [
+        {
+          id: "payments" as AdminTab,
+          label: "Chi Trả & VietQR",
+          icon: CreditCard,
+          adminOnly: false,
+        },
         {
           id: "orders" as AdminTab,
           label: "Đơn Hàng",
