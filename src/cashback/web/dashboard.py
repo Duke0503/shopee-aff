@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import math
 import mimetypes
+import os
 import random
 import re
 import socket
@@ -906,6 +907,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_payment_confirm()
         if path == "/api/admin/payments/ask-bank":
             return self._admin_payment_ask_bank()
+        if path == "/api/admin/payments/upload-proof":
+            return self._admin_upload_proof()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -2574,6 +2577,39 @@ class _Handler(BaseHTTPRequestHandler):
                 """, (customer_id,))
                 marked_count = res.rowcount
 
+            # Calculate financial metrics for customer:
+            # 1. Total transferred all-time (including this transfer)
+            total_transferred = conn.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM payment_transfers WHERE customer_id = ?",
+                (customer_id,)
+            ).fetchone()[0]
+
+            # 2. Remaining unpaid balance (approved and awaiting)
+            rem_rows = conn.execute("""
+                SELECT status, cashback_amount, estimated_commission, approved_commission,
+                       COALESCE(platform, 'shopee') as platform
+                  FROM orders
+                 WHERE customer_id = ? AND paid_at IS NULL AND status IN ('approved', 'awaiting_approval')
+            """, (customer_id,)).fetchall()
+
+            rate = self.cfg.advertised_cashback_rate
+            rem_ready = 0
+            rem_awaiting = 0
+            for r in rem_rows:
+                st = r["status"]
+                cb = r["cashback_amount"]
+                if cb is None:
+                    comm = r["approved_commission"] or r["estimated_commission"] or 0
+                    plat = r["platform"] or "shopee"
+                    fee_factor = (1 - 0.10 - 0.0098) if plat == "shopee" else (1 - 0.10)
+                    net_comm = round_dong(comm * fee_factor)
+                    cb = round_dong(net_comm * rate)
+                if st == "approved":
+                    rem_ready += (cb or 0)
+                elif st == "awaiting_approval":
+                    rem_awaiting += (cb or 0)
+
+            remaining_unpaid = rem_ready + rem_awaiting
             conn.commit()
 
         from ..messaging.assistant_bridge import AssistantError, AssistantSender
@@ -2586,6 +2622,18 @@ class _Handler(BaseHTTPRequestHandler):
         bank_acc = c_dict.get("bank_account") or ""
         reference = str(body.get("reference") or body.get("transfer_memo") or customer_code).strip()
         vnd_amount = _vnd(amount)
+        vnd_total_transferred = _vnd(total_transferred)
+
+        if remaining_unpaid <= 0:
+            remaining_str = "0đ (Đã tất toán toàn bộ)"
+        elif rem_ready > 0 and rem_awaiting > 0:
+            remaining_str = f"{_vnd(remaining_unpaid)} ({_vnd(rem_ready)} sẵn sàng + {_vnd(rem_awaiting)} tạm tính)"
+        elif rem_awaiting > 0:
+            remaining_str = f"{_vnd(remaining_unpaid)} (đang chờ sàn duyệt)"
+        else:
+            remaining_str = f"{_vnd(remaining_unpaid)}"
+
+        proof_line = f"\n🧾 Ảnh biên lai chuyển khoản: {proof_image}" if proof_image else ""
 
         notifications_log = {}
 
@@ -2593,10 +2641,13 @@ class _Handler(BaseHTTPRequestHandler):
             dm_text = (
                 f"🎉 CHÚC MỪNG BẠN ĐÃ ĐƯỢC HOÀN TIỀN! 🎉\n\n"
                 f"Admin vừa chuyển khoản hoàn tiền cho bạn:\n"
-                f"💰 Số tiền: {vnd_amount}\n"
-                f"🏦 Ngân hàng: {bank_name} ({bank_acc})\n"
+                f"💰 Số tiền nhận đợt này: {vnd_amount}\n"
+                f"⏳ Số dư tích lũy còn lại: {remaining_str}\n"
+                f"💎 Tổng tiền hoàn đã nhận: {vnd_total_transferred}\n\n"
+                f"🏦 Ngân hàng nhận: {bank_name} ({bank_acc})\n"
                 f"🏷️ Nội dung CK: {reference}\n"
-                f"📦 Số đơn hoàn tất: {marked_count} đơn\n\n"
+                f"📦 Số đơn tất toán đợt này: {marked_count} đơn"
+                f"{proof_line}\n\n"
                 f"Cảm ơn bạn đã tin tưởng và đồng hành cùng Hoàn Tiền Shopping Dp! Tiếp tục gửi link để nhận thêm nhiều ưu đãi hoàn tiền bạn nhé! 🛍️✨"
             )
             try:
@@ -2609,8 +2660,10 @@ class _Handler(BaseHTTPRequestHandler):
             group_text = (
                 f"🎉 THÔNG BÁO CHI TRẢ HOÀN TIỀN THÀNH CÔNG! 🎉\n\n"
                 f"Xin chúc mừng thành viên {display_name} ({customer_code}) vừa được admin chuyển khoản thành công khoản tiền hoàn:\n"
-                f"💰 Số tiền: {vnd_amount}\n"
-                f"📦 Số đơn đã tất toán: {marked_count} đơn\n\n"
+                f"💰 Số tiền nhận đợt này: {vnd_amount}\n"
+                f"💎 Tổng tiền hoàn đã nhận: {vnd_total_transferred}\n"
+                f"📦 Số đơn đã tất toán: {marked_count} đơn"
+                f"{proof_line}\n\n"
                 f"Cảm ơn bạn đã mua sắm thông minh và tích lũy tiền hoàn cùng nhóm! 👏\n"
                 f"👉 Cả nhà hãy tiếp tục gửi link Shopee / TikTok vào đây để nhận hoàn tiền tới 80% nhé! 🚀💵"
             )
@@ -2677,6 +2730,88 @@ class _Handler(BaseHTTPRequestHandler):
         return self._json({
             "ok": True,
             "message": f"Đã gửi tin nhắn nhắc cung cấp STK tới {display_name} qua Zalo!"
+        })
+
+    def _admin_upload_proof(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        if not body:
+            return self._json({"ok": False, "message": "Dữ liệu không hợp lệ"}, 400)
+
+        # 1. Direct Google Drive link / external URL
+        gdrive_url = str(body.get("gdrive_url") or "").strip()
+        if gdrive_url:
+            return self._json({
+                "ok": True,
+                "url": gdrive_url,
+                "source": "gdrive",
+                "message": "Đã lưu link Google Drive thành công",
+            })
+
+        # 2. Base64 Image upload (from file selector or Clipboard Ctrl+V)
+        data_uri = str(body.get("data") or body.get("image") or "").strip()
+        if not data_uri:
+            return self._json({"ok": False, "message": "Thiếu dữ liệu ảnh"}, 400)
+
+        import base64
+        import uuid
+
+        header, _, encoded = data_uri.partition(",")
+        raw_b64 = encoded if encoded else header
+        try:
+            image_bytes = base64.b64decode(raw_b64)
+        except Exception as err:
+            return self._json({"ok": False, "message": f"Dữ liệu ảnh không hợp lệ: {err}"}, 400)
+
+        ext = ".jpg"
+        if "png" in header.lower():
+            ext = ".png"
+        elif "webp" in header.lower():
+            ext = ".webp"
+        elif "jpeg" in header.lower():
+            ext = ".jpg"
+
+        filename = f"proof_{int(time.time())}_{uuid.uuid4().hex[:6]}{ext}"
+        upload_dir = STATIC_DIR / "uploads" / "proofs"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        file_path = upload_dir / filename
+        file_path.write_bytes(image_bytes)
+
+        # Build accessible URL
+        host = self.headers.get("Host") or "127.0.0.1:8899"
+        proto = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+        public_url = f"{proto}://{host}/uploads/proofs/{filename}"
+
+        # If user configured Google Drive Webhook/API
+        gdrive_webhook = os.getenv("GDRIVE_WEBHOOK_URL")
+        if gdrive_webhook:
+            try:
+                import urllib.request
+                req_data = json.dumps({
+                    "filename": filename,
+                    "mimeType": "image/png" if ext == ".png" else "image/jpeg",
+                    "base64": raw_b64,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    gdrive_webhook,
+                    data=req_data,
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    if res_json.get("drive_url") or res_json.get("url"):
+                        public_url = res_json.get("drive_url") or res_json.get("url")
+            except Exception as err:
+                _log.warning("Google Drive webhook forward failed: %s", err)
+
+        return self._json({
+            "ok": True,
+            "url": public_url,
+            "filename": filename,
+            "message": "Tải ảnh biên lai lên thành công",
         })
 
 

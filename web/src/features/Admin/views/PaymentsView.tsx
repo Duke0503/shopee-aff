@@ -22,6 +22,7 @@ import {
   fetchAdminPayments,
   confirmAdminPayment,
   askCustomerBank,
+  uploadPaymentProof,
   type AdminPaymentUser,
 } from "@/lib/api"
 import { vnd, shortDate } from "@/lib/format"
@@ -46,6 +47,10 @@ import {
   History,
   Coins,
   ShieldCheck,
+  Upload,
+  Image as ImageIcon,
+  X,
+  Link,
 } from "lucide-react"
 
 export function PaymentsView() {
@@ -793,6 +798,56 @@ function PaymentDialog({
     return `https://img.vietqr.io/image/${user.bank_info.bin}-${user.bank_account}-compact2.png?${params.toString()}`
   }, [isBankValid, user, amount, transferMemo, custCode])
 
+  // Proof Image State & Upload
+  const [proofImage, setProofImage] = React.useState("")
+  const [isUploading, setIsUploading] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  const handleFileUpload = async (file: File) => {
+    if (!file || !file.type.startsWith("image/")) return
+    setIsUploading(true)
+    setUploadError(null)
+    try {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        try {
+          const base64 = reader.result as string
+          const res = await uploadPaymentProof({ data: base64 })
+          if (res.ok && res.url) {
+            setProofImage(res.url)
+          } else {
+            setUploadError(res.message || "Không thể tải ảnh lên")
+          }
+        } catch (err: any) {
+          setUploadError(err.message || "Lỗi khi tải ảnh")
+        } finally {
+          setIsUploading(false)
+        }
+      }
+      reader.readAsDataURL(file)
+    } catch (err: any) {
+      setUploadError(err.message || "Lỗi đọc file")
+      setIsUploading(false)
+    }
+  }
+
+  // Handle paste image from clipboard anywhere inside dialog
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile()
+        if (file) {
+          e.preventDefault()
+          handleFileUpload(file)
+          break
+        }
+      }
+    }
+  }
+
   // Confirm Mutation
   const confirmMutation = useMutation({
     mutationFn: () =>
@@ -802,6 +857,7 @@ function PaymentDialog({
         order_ids: user.order_ids,
         transfer_code: transferCode.trim() || undefined,
         reference: transferMemo.trim() || undefined,
+        proof_image: proofImage.trim() || undefined,
         note: note.trim() || undefined,
         notify_mode: notifyMode,
         target_group: targetGroup,
@@ -814,7 +870,10 @@ function PaymentDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl lg:max-w-5xl w-[96vw] max-h-[90vh] flex flex-col p-0 overflow-hidden border-border/80 bg-card shadow-2xl rounded-2xl">
+      <DialogContent
+        onPaste={handlePaste}
+        className="sm:max-w-4xl lg:max-w-5xl w-[96vw] max-h-[90vh] flex flex-col p-0 overflow-hidden border-border/80 bg-card shadow-2xl rounded-2xl"
+      >
         {/* Sticky Fixed Header */}
         <div className="shrink-0 flex items-center justify-between border-b border-border/70 px-6 py-4 bg-secondary/30">
           <div className="flex items-center gap-3">
@@ -1226,6 +1285,111 @@ function PaymentDialog({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Proof Image / Google Drive Link Section */}
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                    <span>Ảnh Biên Lai / Bill Chuyển Khoản (Đính kèm DM Zalo)</span>
+                  </label>
+                  {isUploading && (
+                    <span className="text-[11px] text-primary flex items-center gap-1 font-medium">
+                      <RefreshCw className="h-3 w-3 animate-spin" /> Đang tải ảnh...
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Link className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Dán link Google Drive hoặc tải ảnh bill..."
+                      value={proofImage}
+                      onChange={(e) => setProofImage(e.target.value)}
+                      className="h-8 pl-8 text-xs font-mono"
+                    />
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleFileUpload(file)
+                    }}
+                  />
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="h-8 gap-1.5 text-xs shrink-0"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Tải ảnh</span>
+                  </Button>
+                </div>
+
+                {uploadError && (
+                  <div className="text-[11px] text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {/* Image Preview if available */}
+                {proofImage && (
+                  <div className="flex items-center justify-between gap-3 p-2 rounded-lg bg-card border border-border/60">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-10 w-10 rounded-md border border-border overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
+                        {proofImage.startsWith("http") || proofImage.startsWith("/") ? (
+                          <img src={proofImage} alt="Bill proof" className="h-full w-full object-cover" />
+                        ) : (
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-foreground truncate max-w-[280px]">
+                          {proofImage.includes("drive.google.com") ? "Link Google Drive" : "Ảnh biên lai ngân hàng"}
+                        </div>
+                        <a
+                          href={proofImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                        >
+                          <span>Mở xem ảnh</span>
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setProofImage("")}
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      title="Xoá ảnh"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+
+                <div className="text-[10px] text-muted-foreground leading-relaxed flex items-center justify-between">
+                  <span>💡 Mẹo: Bạn có thể chụp màn hình bill và bấm <strong>Ctrl + V</strong> để dán trực tiếp.</span>
+                  {proofImage && (
+                    <Badge variant="secondary" className="text-[9px] bg-emerald-500/10 text-emerald-400">
+                      ✓ Đã đính kèm vào tin Zalo
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Note input */}

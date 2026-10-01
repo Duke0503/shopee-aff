@@ -71,13 +71,13 @@ async function get<T>(path: string): Promise<T> {
 export const fetchSnapshot = () => get<Snapshot>("/api/payouts")
 export const fetchLabels = () => get<Record<string, string>>("/api/labels")
 
-async function post(path: string, body?: unknown): Promise<ActionResult> {
+async function post<T = ActionResult>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
   })
-  return response.json() as Promise<ActionResult>
+  return response.json() as Promise<T>
 }
 
 export const markPaid = (customerId: string, orderIds: string[]) =>
@@ -713,5 +713,10 @@ export const askCustomerBank = (data: {
   customer_id: string
   custom_note?: string
 }) => post("/api/admin/payments/ask-bank", data)
+
+export const uploadPaymentProof = (data: {
+  data?: string
+  gdrive_url?: string
+}) => post<{ ok: boolean; url: string; message: string }>("/api/admin/payments/upload-proof", data)
 
 

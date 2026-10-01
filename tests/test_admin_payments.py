@@ -114,6 +114,12 @@ def test_admin_payment_confirm_records_transfer_and_marks_paid(conn, cfg, mock_h
         assert res["marked_orders"] == 1
 
         mock_send.assert_called_once()
+        recipient, dm_msg = mock_send.call_args[0]
+        assert "12.000" in dm_msg
+        assert "Số tiền nhận đợt này" in dm_msg
+        assert "Tổng tiền hoàn đã nhận" in dm_msg
+        assert "Số dư tích lũy còn lại" in dm_msg
+
         mock_bcast.assert_called_once()
         # Verify broadcast went to test group per user requirement
         _, bcast_kwargs = mock_bcast.call_args
@@ -152,3 +158,22 @@ def test_admin_payment_ask_bank(conn, cfg, mock_handler):
         assert call_recipient == "444"
         assert "STK" in call_msg
         assert "Hoang Van D" in call_msg
+
+
+def test_admin_upload_proof_gdrive(mock_handler):
+    mock_handler._body = lambda: {
+        "gdrive_url": "https://drive.google.com/file/d/12345/view",
+    }
+    res = mock_handler._admin_upload_proof()
+    assert res["ok"] is True
+    assert res["url"] == "https://drive.google.com/file/d/12345/view"
+
+
+def test_admin_upload_proof_base64(mock_handler):
+    png_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    mock_handler._body = lambda: {
+        "data": png_b64,
+    }
+    res = mock_handler._admin_upload_proof()
+    assert res["ok"] is True
+    assert "uploads/proofs/" in res["url"]
