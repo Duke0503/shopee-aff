@@ -51,7 +51,36 @@ async function main() {
   const api = await zalo.login(credentials);
   const ownId = await api.getOwnId();
   console.log(`[Bot Online] Đăng nhập thành công với UID: ${ownId}`);
+  console.log(`[Environment] Môi trường hoạt động: ${config.APP_ENV.toUpperCase()} (${config.IS_PRODUCTION ? 'PRODUCTION 🚀' : 'DEV LOCAL 🛠️'})`);
   console.log(`[Config] Nhóm đang kích hoạt (Active Group): ${config.ACTIVE_GROUP_ID}`);
+  if (config.IS_DEV) {
+    console.log(`[Dev Safeguard] 🛡️ ĐÃ BẬT BẢO VỆ: Bot local tuyệt đối KHÔNG gửi tin nhắn vào nhóm Production (${config.GROUP_MAIN_ID}) nếu không có cờ cưỡng chế.`);
+  }
+
+  // Safeguard: Bọc api.sendMessage để chặn triệt để mọi hành vi bot local gửi tin nhắn vào nhóm Production
+  const originalSendMessage = api.sendMessage.bind(api);
+  api.sendMessage = async function(content, threadId, threadType, options = {}) {
+    const threadIdStr = String(threadId || "");
+    const isProdGroup = threadIdStr === String(config.GROUP_MAIN_ID);
+
+    if (config.IS_DEV && isProdGroup) {
+      // Chỉ cho phép nếu có cờ forceProd hoặc tin nhắn là object có cờ forceProd / force_production
+      const isForced = options?.forceProd || options?.force_production || (typeof content === "object" && (content?.forceProd || content?.force_production));
+      if (!isForced) {
+        const preview = typeof content === "string" 
+          ? content.slice(0, 90).replace(/\n/g, " ") 
+          : JSON.stringify(content?.msg || content).slice(0, 90);
+        console.warn(
+          `[DEV SAFEGUARD BLOCKED] ⛔ ĐÃ CHẶN gửi tin nhắn vào nhóm Production (${threadIdStr})! ` +
+          `Bot đang chạy ở DEV (APP_ENV=${config.APP_ENV}). Nội dung: "${preview}"`
+        );
+        return { ok: true, dev_blocked: true, target: threadIdStr };
+      }
+      console.warn(`[DEV OVERRIDE] ⚠️ Cho phép gửi vào nhóm Production (${threadIdStr}) do có cờ forceProd từ lệnh chỉ định.`);
+    }
+
+    return originalSendMessage(content, threadId, threadType);
+  };
 
   const wording = JSON.parse(await fs.readFile(config.MESSAGES_PATH, "utf-8"));
   const friends = createFriendKeeper({
@@ -699,6 +728,15 @@ function extractTextAndUrls(data) {
         return;
       }
 
+      // Ở môi trường DEV, bot local tuyệt đối KHÔNG phản hồi tin nhắn trong nhóm Production
+      // trừ khi là lệnh cưỡng chế của admin bắt đầu bằng !force-prod
+      if (isGroup && String(message.threadId) === String(config.GROUP_MAIN_ID) && config.IS_DEV) {
+        const rawContent = message.data?.content || message.data?.msg || "";
+        if (!String(rawContent).trim().startsWith("!force-prod")) {
+          return;
+        }
+      }
+
       // Bóc tách text và link từ message.data
       const { text, urls } = extractTextAndUrls(message.data);
       console.log(`[Message In] [${isGroup ? 'Group ' + message.threadId : 'DM ' + senderUid}] ${senderName}: text="${text}", urls=${JSON.stringify(urls)}`);
@@ -1336,6 +1374,12 @@ function extractTextAndUrls(data) {
       const allowedGroups = config.LISTEN_GROUP_IDS.map(String);
       if (!allowedGroups.includes(String(event.threadId))) return;
 
+      // Ở môi trường DEV, bot local tuyệt đối bỏ qua mọi sự kiện của nhóm Production
+      if (config.IS_DEV && String(event.threadId) === String(config.GROUP_MAIN_ID)) {
+        console.log(`[DEV SAFEGUARD] Bỏ qua sự kiện group_event nhóm Production ${event.threadId} (chỉ xử lý bởi bot Production).`);
+        return;
+      }
+
       console.log(`[Group Event] Nhận sự kiện: ${event.type} (${event.act}) trong group ${event.threadId}`);
 
       if (event.type === GroupEventType.JOIN) {
@@ -1404,7 +1448,13 @@ function extractTextAndUrls(data) {
       req.on("end", async () => {
         try {
           const payload = JSON.parse(body);
-          const targetId = payload.targetId || config.ACTIVE_GROUP_ID;
+          let targetId = payload.targetId || config.ACTIVE_GROUP_ID;
+          if (config.IS_DEV && String(targetId) === String(config.GROUP_MAIN_ID)) {
+            if (!payload.force_production && !payload.forceProd) {
+              console.warn(`[DEV SAFEGUARD] 🛡️ Đã tự động chuyển hướng thông báo từ nhóm Production sang nhóm Dev (${config.GROUP_TEST_ID})!`);
+              targetId = config.GROUP_TEST_ID;
+            }
+          }
           const targetType = payload.type === "user" ? ThreadType.User : ThreadType.Group;
           const text = payload.message || "";
           const attachments = payload.attachments || (payload.imagePath ? [payload.imagePath] : undefined);
@@ -1432,8 +1482,14 @@ function extractTextAndUrls(data) {
           const payload = JSON.parse(body);
           const text = payload.message || "";
           // Only the two groups this instance knows: "test" to rehearse an
-          // announcement, anything else means the main group.
-          const groupId = payload.group === "test" ? config.GROUP_TEST_ID : config.ACTIVE_GROUP_ID;
+          // announcement, anything else means the active group.
+          let groupId = payload.group === "test" ? config.GROUP_TEST_ID : config.ACTIVE_GROUP_ID;
+          if (config.IS_DEV && String(groupId) === String(config.GROUP_MAIN_ID)) {
+            if (!payload.force_production && !payload.forceProd) {
+              console.warn(`[DEV SAFEGUARD] 🛡️ Đã tự động chuyển hướng broadcast từ nhóm Production sang nhóm Dev (${config.GROUP_TEST_ID})!`);
+              groupId = config.GROUP_TEST_ID;
+            }
+          }
           const attachments = payload.attachments || (payload.imagePath ? [payload.imagePath] : undefined);
 
           console.log(`[HTTP Broadcast] Gửi broadcast vào group ${groupId}: ${text.slice(0, 80)}`);

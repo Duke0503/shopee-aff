@@ -23,16 +23,29 @@ const env = loadEnv();
 const list = (value, fallback) =>
   value ? value.split(",").map((s) => s.trim()).filter(Boolean) : fallback;
 
+// Môi trường hoạt động: "dev" (mặc định khi chạy local) hoặc "production"
+const APP_ENV = (env.APP_ENV || process.env.APP_ENV || "dev").trim().toLowerCase();
+const IS_PRODUCTION = APP_ENV === "production";
+const IS_DEV = !IS_PRODUCTION;
+
 const MAIN_GROUP = env.ZALO_MAIN_GROUP_ID || "2813090100064697955";
+const TEST_GROUP = env.ZALO_TEST_GROUP_ID || "8786316503449470342";
+
+// Nhóm lắng nghe mặc định:
+// - Khi chạy DEV local: Mặc định CHỈ lắng nghe nhóm Dev (TEST_GROUP) để không can thiệp nhóm Production
+// - Khi chạy PRODUCTION: Lắng nghe nhóm chính thức (MAIN_GROUP)
+const defaultListenGroups = IS_DEV ? [TEST_GROUP] : [MAIN_GROUP];
 
 export const config = {
-  GROUP_TEST_ID: env.ZALO_TEST_GROUP_ID || "8786316503449470342",
+  APP_ENV,
+  IS_PRODUCTION,
+  IS_DEV,
+  GROUP_TEST_ID: TEST_GROUP,
   GROUP_MAIN_ID: MAIN_GROUP,
-  ACTIVE_GROUP_ID: MAIN_GROUP,
+  ACTIVE_GROUP_ID: IS_DEV ? TEST_GROUP : MAIN_GROUP,
 
-  // Groups this instance listens to. Production serves the main group only;
-  // a dev instance runs on its own Zalo account with its own list.
-  LISTEN_GROUP_IDS: list(env.ZALO_LISTEN_GROUP_IDS, [MAIN_GROUP]),
+  // Groups this instance listens to.
+  LISTEN_GROUP_IDS: list(env.ZALO_LISTEN_GROUP_IDS, defaultListenGroups),
 
   // Group members that are not customers (the bot's other accounts). The
   // member sync skips them, so a deleted row is not recreated five minutes
@@ -76,10 +89,10 @@ export const config = {
   // Bật/tắt tự động chào mừng trong nhóm khi có thành viên mới gia nhập
   ENABLE_GROUP_WELCOME: true,
 
-  // Danh sách nhóm ĐƯỢC PHÉP gửi tin chào mừng (Chỉ nhóm chính, cấm tuyệt đối nhóm Dev / nội bộ)
-  ALLOWED_WELCOME_GROUP_IDS: [
-    "2813090100064697955", // Hoàn Tiền Shopee (Nhóm chính)
-  ],
+  // Danh sách nhóm ĐƯỢC PHÉP gửi tin chào mừng:
+  // - Ở DEV: Tuyệt đối KHÔNG có nhóm chính, chỉ có nhóm Test Dev (để dev kiểm tra chào mừng nếu muốn)
+  // - Ở PRODUCTION: Mới được phép chào mừng trong nhóm chính MAIN_GROUP
+  ALLOWED_WELCOME_GROUP_IDS: IS_DEV ? [TEST_GROUP] : [MAIN_GROUP],
 
   // Tạm tắt chế độ tự động nhắn tin riêng 1-1 cho người mới vào (khi cần mở lại chỉ cần đổi thành true)
   ENABLE_PRIVATE_WELCOME: false,

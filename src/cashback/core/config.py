@@ -63,6 +63,15 @@ class Config:
     # affiliate link itself, as before (a dev copy has no public site).
     public_base_url: str = ""
     gdrive_webhook_url: str = ""
+    app_env: str = "dev"
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() == "production"
+
+    @property
+    def is_dev(self) -> bool:
+        return not self.is_production
 
     @property
     def has_shopee_credentials(self) -> bool:
@@ -177,4 +186,5 @@ def load() -> Config:
         assistant_token=os.getenv("ASSISTANT_TOKEN", "").strip(),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://hoantiendp.com").strip(),
         gdrive_webhook_url=os.getenv("GDRIVE_WEBHOOK_URL", "").strip(),
+        app_env=os.getenv("APP_ENV", "dev").strip().lower(),
     )
