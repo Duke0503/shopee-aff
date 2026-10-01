@@ -2796,10 +2796,12 @@ class _Handler(BaseHTTPRequestHandler):
         if gdrive_webhook:
             try:
                 import urllib.request
+                secret_token = os.getenv("GDRIVE_SECRET_TOKEN", "")
                 req_data = json.dumps({
                     "filename": filename,
                     "mimeType": "image/png" if ext == ".png" else "image/jpeg",
                     "base64": raw_b64,
+                    "token": secret_token,
                 }).encode("utf-8")
                 req = urllib.request.Request(
                     gdrive_webhook,

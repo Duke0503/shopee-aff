@@ -1504,9 +1504,22 @@ function PaymentDialog({
 // ----------------------------------------------------------------------
 // Google Drive Webhook Setup Modal
 // ----------------------------------------------------------------------
-const GDRIVE_SCRIPT_TEMPLATE = `function doPost(e) {
+const GDRIVE_SCRIPT_TEMPLATE = `// Đặt mật mã bảo vệ nếu muốn chống người lạ spam (hoặc để trống "" nếu không cần):
+var SECRET_TOKEN = "";
+
+function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
+    
+    // Kiểm tra mã bảo mật nếu bạn có đặt SECRET_TOKEN
+    var reqToken = (e.parameter && e.parameter.token) || data.token;
+    if (SECRET_TOKEN && reqToken !== SECRET_TOKEN) {
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: false,
+        error: "Unauthorized: Sai mã bí mật"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var filename = data.filename || ("bienlai_" + new Date().getTime() + ".jpg");
     var mimeType = data.mimeType || "image/jpeg";
     var decoded = Utilities.base64Decode(data.base64);
