@@ -785,6 +785,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_orders()
         if path == "/api/admin/payments":
             return self._admin_payments()
+        if path == "/api/admin/payout-batches":
+            return self._admin_payout_batches()
         if path == "/api/admin/products":
             return self._admin_products()
         if path == "/api/admin/logs":
@@ -911,6 +913,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_upload_proof()
         if path == "/api/admin/payments/gdrive-config":
             return self._admin_gdrive_config()
+        if path == "/api/admin/shopee/sync-payouts":
+            return self._admin_shopee_sync_payouts()
+        if path == "/api/admin/orders/settle":
+            return self._admin_settle_orders()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -1833,6 +1839,10 @@ class _Handler(BaseHTTPRequestHandler):
         if status_filter != "all" and status_filter in ("awaiting_approval", "approved", "paid", "rejected"):
             where_clauses.append("o.status = ?")
             params.append(status_filter)
+        settlement_filter = qs.get("settlement_status", ["all"])[0].strip().lower()
+        if settlement_filter != "all" and settlement_filter in ("settled", "unsettled", "processing"):
+            where_clauses.append("COALESCE(o.settlement_status, 'unsettled') = ?")
+            params.append(settlement_filter)
         if platform_filter != "all" and platform_filter in ("shopee", "tiktok"):
             where_clauses.append("COALESCE(o.platform, 'shopee') = ?")
             params.append(platform_filter)
@@ -1878,7 +1888,9 @@ class _Handler(BaseHTTPRequestHandler):
                 f"       o.status, o.order_value, o.estimated_commission, o.approved_commission, "
                 f"       o.cashback_amount, o.recorded_at, o.approved_at, o.paid_at, "
                 f"       o.rejection_reason, r.source_url, r.affiliate_url, r.estimate_detail, "
-                f"       COALESCE(o.platform, 'shopee') as platform "
+                f"       COALESCE(o.platform, 'shopee') as platform, "
+                f"       COALESCE(o.settlement_status, 'unsettled') as settlement_status, "
+                f"       o.payout_batch_id, o.settled_at "
                 f"  FROM orders o "
                 f"  LEFT JOIN customers c ON c.customer_id = o.customer_id "
                 f"  LEFT JOIN link_requests r ON r.request_id = o.request_id "
@@ -2341,6 +2353,8 @@ class _Handler(BaseHTTPRequestHandler):
                 SELECT o.order_id, o.customer_id, o.order_value, o.estimated_commission,
                        o.approved_commission, o.cashback_amount, o.status, o.recorded_at,
                        o.approved_at, o.paid_at, COALESCE(o.platform, 'shopee') as platform,
+                       COALESCE(o.settlement_status, 'unsettled') as settlement_status,
+                       o.payout_batch_id, o.settled_at,
                        r.source_url, r.affiliate_url, r.estimate_detail,
                        c.display_name, c.customer_code, c.zalo_user_id,
                        c.bank_name, c.bank_account, c.account_holder
@@ -2428,6 +2442,9 @@ class _Handler(BaseHTTPRequestHandler):
                     "order_value": r["order_value"],
                     "cashback_amount": cb,
                     "status": r["status"],
+                    "settlement_status": r["settlement_status"] if "settlement_status" in r.keys() else "unsettled",
+                    "payout_batch_id": r["payout_batch_id"] if "payout_batch_id" in r.keys() else None,
+                    "settled_at": r["settled_at"] if "settled_at" in r.keys() else None,
                     "recorded_at": r["recorded_at"],
                     "approved_at": r["approved_at"],
                     "platform": r["platform"],
@@ -2447,6 +2464,17 @@ class _Handler(BaseHTTPRequestHandler):
                 entry["bonus"] = campaigns.bonus_owed(conn, entry["order_ids"])
                 entry["payable_amount"] += entry["bonus"]
                 entry["total_unpaid"] = entry["payable_amount"] + entry["awaiting_amount"]
+                entry["settled_payable_amount"] = sum(
+                    (o.get("cashback_amount") or 0) for o in entry["orders"]
+                    if o.get("status") == "approved" and o.get("settlement_status") == "settled"
+                )
+                entry["unsettled_payable_amount"] = sum(
+                    (o.get("cashback_amount") or 0) for o in entry["orders"]
+                    if o.get("status") == "approved" and o.get("settlement_status") != "settled"
+                )
+                entry["is_fully_settled"] = (
+                    entry["payable_amount"] > 0 and entry["unsettled_payable_amount"] == 0
+                )
 
                 ref = str(entry["customer_code"] or entry["customer_id"]).strip()
                 entry["reference"] = ref
@@ -2857,6 +2885,150 @@ class _Handler(BaseHTTPRequestHandler):
             "gdrive_webhook_url": webhook_url,
             "message": "Đã lưu cấu hình Google Drive thành công!" if webhook_url else "Đã xóa cấu hình Google Drive",
         })
+
+    def _admin_payout_batches(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+        with ledger.connect(self.cfg.db_path) as conn:
+            batches = [dict(b) for b in ledger.get_payout_batches(conn)]
+            for b in batches:
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM orders WHERE payout_batch_id = ?",
+                    (b["batch_id"],)
+                ).fetchone()[0]
+                b["linked_orders_count"] = cnt
+        return self._json({"ok": True, "batches": batches})
+
+    def _admin_shopee_sync_payouts(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        from ..shopee import payout_sync
+        token = self.cfg.bridge_token
+        if not token:
+            return self._json({"ok": False, "message": "BRIDGE_TOKEN chưa được thiết lập"}, 400)
+
+        try:
+            import urllib.request
+            st_req = urllib.request.Request(
+                f"http://127.0.0.1:{self.cfg.bridge_port}/status",
+                headers={"X-Bridge-Token": token}
+            )
+            with urllib.request.urlopen(st_req, timeout=5) as resp:
+                st_data = json.loads(resp.read().decode())
+                if not st_data.get("connected"):
+                    return self._json({
+                        "ok": False,
+                        "message": "Extension chưa kết nối. Hãy mở trình duyệt bot trên máy trước."
+                    }, 400)
+
+            # Navigate to payout record page
+            nav_data = json.dumps({
+                "connector": "shopee_affiliate",
+                "action": "navigate",
+                "params": {"url": payout_sync.PAYOUT_PAGE}
+            }).encode()
+            nav_req = urllib.request.Request(
+                f"http://127.0.0.1:{self.cfg.bridge_port}/execute",
+                data=nav_data,
+                headers={"X-Bridge-Token": token, "Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(nav_req, timeout=30) as resp:
+                pass
+
+            import time
+            time.sleep(2.5)
+
+            # Execute extract script
+            ext_data = json.dumps({
+                "connector": "shopee_affiliate",
+                "action": "execute_script",
+                "params": {"code": payout_sync.EXTRACT_SCRIPT}
+            }).encode()
+            ext_req = urllib.request.Request(
+                f"http://127.0.0.1:{self.cfg.bridge_port}/execute",
+                data=ext_data,
+                headers={"X-Bridge-Token": token, "Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(ext_req, timeout=30) as resp:
+                res_json = json.loads(resp.read().decode())
+                res_val = res_json.get("value") or {}
+                raw_records = (res_val.get("result") or {}).get("records") or []
+
+            settled_count = 0
+            synced_batches = []
+            with ledger.connect(self.cfg.db_path) as conn:
+                for r in raw_records:
+                    pid = str(r.get("payoutId") or "").strip()
+                    if not pid:
+                        continue
+                    st_num = int(r.get("payoutPaymentStatus") or 0)
+                    status = "paid" if st_num == 10 else ("processing" if st_num == 1 else "failed")
+                    try:
+                        net_amt = int(int(r.get("totalPaymentAmount") or 0) / payout_sync.MONEY_SCALE)
+                    except Exception:
+                        net_amt = 0
+                    try:
+                        elig_amt = int(int(r.get("eligibleTotalAmount") or 0) / payout_sync.MONEY_SCALE)
+                    except Exception:
+                        elig_amt = net_amt
+
+                    c_time = payout_sync._parse_ts(r.get("payoutCreatedTime")) or ledger.now()
+                    p_time = payout_sync._parse_ts(r.get("payArrivalTime"))
+
+                    ledger.save_payout_batch(
+                        conn=conn,
+                        batch_id=pid,
+                        platform="shopee",
+                        status=status,
+                        amount=net_amt,
+                        eligible_amount=elig_amt,
+                        created_time=c_time,
+                        paid_time=p_time,
+                        raw_json=json.dumps(r, ensure_ascii=False)
+                    )
+                    synced_batches.append(pid)
+
+                    if status == "paid":
+                        paid_at = p_time or ledger.now()
+                        c = ledger.settle_orders_for_batch(
+                            conn=conn,
+                            platform="shopee",
+                            batch_id=pid,
+                            settled_at=paid_at,
+                            up_to_date=c_time
+                        )
+                        settled_count += c
+
+            return self._json({
+                "ok": True,
+                "message": f"Đã đồng bộ {len(synced_batches)} đợt thanh toán từ Shopee, quyết toán {settled_count} đơn hàng.",
+                "batches_count": len(synced_batches),
+                "orders_settled": settled_count
+            })
+        except Exception as exc:
+            return self._json({
+                "ok": False,
+                "message": f"Lỗi đồng bộ quyết toán Shopee: {exc}"
+            }, 500)
+
+    def _admin_settle_orders(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+        body = self._body()
+        batch_id = str(body.get("batch_id") or "MANUAL").strip()
+        platform = str(body.get("platform") or "shopee").strip()
+        order_ids = body.get("order_ids") or []
+        settled_at = body.get("settled_at") or ledger.now()
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            count = ledger.settle_orders_for_batch(
+                conn, platform, batch_id, settled_at, order_ids=order_ids if order_ids else None
+            )
+        return self._json({"ok": True, "settled_count": count})
 
 
     def _record_activity_log(self):

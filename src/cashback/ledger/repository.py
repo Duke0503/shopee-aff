@@ -147,8 +147,73 @@ CREATE INDEX IF NOT EXISTS idx_prod_count ON products_cache(request_count DESC);
 """
 
 
+VN_TZ = timezone(timedelta(hours=7))
+
+
 def now() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).astimezone(VN_TZ).isoformat(timespec="seconds")
+
+
+def parse_order_time(raw_val: object, order_id: str = "") -> str:
+    """Normalize any order date/timestamp into an ISO-8601 string with VN timezone (+07:00).
+
+    Handles:
+    - Epoch timestamp in seconds: 1789107091 -> '2026-09-11T13:11:31+07:00'
+    - Epoch timestamp in milliseconds: 1789107091000 -> '2026-09-11T13:11:31+07:00'
+    - String timestamps: '1789107091'
+    - ISO strings: '2026-09-24T14:35:54' or with offset
+    - Common date formats: 'YYYY-MM-DD HH:MM:SS', 'DD/MM/YYYY HH:MM:SS', etc.
+    - Fallback: Shopee order SN prefix YYMMDD (e.g. 260911... -> '2026-09-11T00:00:00+07:00')
+    - Fallback: now()
+    """
+    if raw_val is not None:
+        s = str(raw_val).strip()
+        if s:
+            # 1. Check numeric Unix epoch timestamp (seconds or milliseconds)
+            if re.fullmatch(r"\d{10,13}", s):
+                try:
+                    ts = int(s)
+                    if len(s) == 13:
+                        ts = ts / 1000.0
+                    return datetime.fromtimestamp(ts, tz=VN_TZ).isoformat(timespec="seconds")
+                except (ValueError, OSError):
+                    pass
+            # 2. Check ISO-8601 strings
+            try:
+                dt = datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=VN_TZ)
+                else:
+                    dt = dt.astimezone(VN_TZ)
+                return dt.isoformat(timespec="seconds")
+            except (ValueError, TypeError):
+                pass
+            # 3. Check common date formats
+            for fmt in (
+                "%Y-%m-%d %H:%M:%S",
+                "%Y/%m/%d %H:%M:%S",
+                "%d/%m/%Y %H:%M:%S",
+                "%d-%m-%Y %H:%M:%S",
+                "%d/%m/%Y %H:%M",
+                "%d-%m-%Y %H:%M",
+                "%Y-%m-%d",
+                "%d/%m/%Y",
+            ):
+                try:
+                    dt = datetime.strptime(s[:19], fmt)
+                    return dt.replace(tzinfo=VN_TZ).isoformat(timespec="seconds")
+                except (ValueError, TypeError):
+                    pass
+
+    # 4. Fallback from Shopee order_sn (YYMMDD...)
+    if order_id and len(order_id) >= 6:
+        m = re.match(r"^(\d{2})(\d{2})(\d{2})", order_id)
+        if m:
+            yy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                return datetime(2000 + yy, mm, dd, 0, 0, 0, tzinfo=VN_TZ).isoformat(timespec="seconds")
+
+    return now()
 
 
 @contextmanager
@@ -247,6 +312,20 @@ CREATE TABLE IF NOT EXISTS featured_deals (
     updated_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_deals_cat ON featured_deals(category, is_active, sort_order);
+
+CREATE TABLE IF NOT EXISTS payout_batches (
+    batch_id        TEXT PRIMARY KEY,
+    platform        TEXT NOT NULL DEFAULT 'shopee',
+    status          TEXT NOT NULL,
+    amount          INTEGER NOT NULL DEFAULT 0,
+    eligible_amount INTEGER NOT NULL DEFAULT 0,
+    created_time    TEXT,
+    paid_time       TEXT,
+    raw_json        TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_batches_platform ON payout_batches(platform, status);
 """
 
 
@@ -274,6 +353,9 @@ _LATER_COLUMNS = {
     "orders": {
         "notified_status": "TEXT",
         "platform": "TEXT NOT NULL DEFAULT 'shopee'",
+        "settlement_status": "TEXT NOT NULL DEFAULT 'unsettled'",
+        "payout_batch_id": "TEXT",
+        "settled_at": "TEXT",
     },
     # Signing in to the customer-facing view. password_hash is PBKDF2 and
     # cannot be read back -- asking the bot for a password issues a new
@@ -417,6 +499,8 @@ def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) ->
     conn.execute("CREATE INDEX IF NOT EXISTS idx_products_cache_canonical ON products_cache(canonical_url)")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_req_share_code"
                  " ON link_requests(share_code) WHERE share_code IS NOT NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_batch ON orders(payout_batch_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_settlement ON orders(settlement_status)")
 
 
 # The name a customer signs in with and reads back to us. customer_id is
@@ -750,14 +834,16 @@ def add_order(
     order_value: int | None,
     estimated_commission: int | None,
     platform: str = "shopee",
+    recorded_at: str | None = None,
 ) -> None:
+    order_time = parse_order_time(recorded_at, order_id)
     conn.execute(
         "INSERT INTO orders"
         " (order_id, customer_id, request_id, order_value, estimated_commission,"
         "  status, recorded_at, updated_at, platform)"
         " VALUES (?,?,?,?,?,?,?,?,?)",
         (order_id, customer_id, request_id, order_value, estimated_commission,
-         AWAITING_APPROVAL, now(), now(), platform),
+         AWAITING_APPROVAL, order_time, now(), platform),
     )
     _record_transition(conn, order_id, None, AWAITING_APPROVAL, f"recorded by {platform.title()}")
     if request_id:
@@ -848,6 +934,97 @@ def orders_awaiting_payout(conn: sqlite3.Connection) -> list[sqlite3.Row]:
         " ORDER BY o.approved_at",
         (APPROVED,),
     ).fetchall()
+
+
+def save_payout_batch(
+    conn: sqlite3.Connection,
+    batch_id: str,
+    platform: str,
+    status: str,
+    amount: int,
+    eligible_amount: int = 0,
+    created_time: str | None = None,
+    paid_time: str | None = None,
+    raw_json: str | None = None,
+) -> bool:
+    """Insert or update a platform settlement batch."""
+    current_time = now()
+    conn.execute(
+        """
+        INSERT INTO payout_batches (
+            batch_id, platform, status, amount, eligible_amount,
+            created_time, paid_time, raw_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(batch_id) DO UPDATE SET
+            status = excluded.status,
+            amount = excluded.amount,
+            eligible_amount = excluded.eligible_amount,
+            created_time = COALESCE(excluded.created_time, payout_batches.created_time),
+            paid_time = COALESCE(excluded.paid_time, payout_batches.paid_time),
+            raw_json = COALESCE(excluded.raw_json, payout_batches.raw_json),
+            updated_at = excluded.updated_at
+        """,
+        (
+            batch_id, platform, status, amount, eligible_amount,
+            created_time, paid_time, raw_json, current_time, current_time
+        ),
+    )
+    return True
+
+
+def get_payout_batches(conn: sqlite3.Connection, platform: str | None = None) -> list[sqlite3.Row]:
+    if platform:
+        return conn.execute(
+            "SELECT * FROM payout_batches WHERE platform = ? ORDER BY COALESCE(paid_time, created_time, created_at) DESC",
+            (platform,),
+        ).fetchall()
+    return conn.execute(
+        "SELECT * FROM payout_batches ORDER BY COALESCE(paid_time, created_time, created_at) DESC"
+    ).fetchall()
+
+
+def settle_orders_for_batch(
+    conn: sqlite3.Connection,
+    platform: str,
+    batch_id: str,
+    settled_at: str,
+    order_ids: list[str] | None = None,
+    up_to_date: str | None = None,
+) -> int:
+    """Mark approved orders as settled by a platform payout batch."""
+    if order_ids:
+        placeholders = ",".join("?" for _ in order_ids)
+        cur = conn.execute(
+            f"""
+            UPDATE orders
+               SET settlement_status = 'settled',
+                   payout_batch_id = ?,
+                   settled_at = ?,
+                   updated_at = ?
+             WHERE order_id IN ({placeholders})
+               AND settlement_status != 'settled'
+            """,
+            [batch_id, settled_at, now()] + order_ids,
+        )
+        return cur.rowcount
+
+    query = """
+        UPDATE orders
+           SET settlement_status = 'settled',
+               payout_batch_id = ?,
+               settled_at = ?,
+               updated_at = ?
+         WHERE COALESCE(platform, 'shopee') = ?
+           AND status = 'approved'
+           AND settlement_status != 'settled'
+    """
+    params = [batch_id, settled_at, now(), platform]
+    if up_to_date:
+        query += " AND COALESCE(approved_at, recorded_at) <= ?"
+        params.append(up_to_date)
+
+    cur = conn.execute(query, params)
+    return cur.rowcount
 
 
 def flag_for_review(

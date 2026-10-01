@@ -254,6 +254,18 @@ class _Handler(BaseHTTPRequestHandler):
             # out; say so rather than failing the extension's post.
             return self._send(200, {"delivered": delivered})
 
+        if path == "/execute":
+            action = payload.get("action", "execute_script")
+            connector = payload.get("connector", "shopee_affiliate")
+            params = payload.get("params", {})
+            timeout_ms = payload.get("timeout_ms", DEFAULT_JOB_TIMEOUT_MS)
+            job = Job(connector=connector, action=action, params=params, timeout_ms=timeout_ms)
+            try:
+                val = self.bridge.submit(job, timeout=(timeout_ms / 1000) + 10)
+                return self._send(200, {"ok": True, "value": val})
+            except Exception as exc:
+                return self._send(500, {"ok": False, "error": str(exc)})
+
         self._send(404, {"error": "not found"})
 
 

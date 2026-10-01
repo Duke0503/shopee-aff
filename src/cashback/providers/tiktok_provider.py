@@ -630,7 +630,8 @@ class TikTokAccessTradeProvider(BaseAffiliateProvider):
                 approved_comm = None
 
             rejection_reason = item.get("reject_reason") or item.get("rejection_reason")
-            order_time = str(item.get("created_time") or item.get("sale_time") or item.get("order_time") or item.get("created_at") or "")
+            raw_time = item.get("created_time") or item.get("sale_time") or item.get("order_time") or item.get("created_at") or ""
+            order_time = ledger.parse_order_time(raw_time, order_id=order_id)
 
             orders.append(
                 NormalizedOrder(

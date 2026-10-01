@@ -24,6 +24,7 @@ import {
   askCustomerBank,
   uploadPaymentProof,
   saveGDriveConfig,
+  syncAdminShopeePayouts,
   type AdminPaymentUser,
 } from "@/lib/api"
 import { vnd, shortDate } from "@/lib/format"
@@ -62,6 +63,7 @@ export function PaymentsView() {
   const [activeSubTab, setActiveSubTab] = React.useState<"queue" | "history">("queue")
   const [searchTerm, setSearchTerm] = React.useState("")
   const [filterBank, setFilterBank] = React.useState<"all" | "ready" | "needs_bank">("all")
+  const [filterSettlement, setFilterSettlement] = React.useState<"all" | "settled" | "unsettled">("all")
   const [includeAwaiting, setIncludeAwaiting] = React.useState(true)
   const [selectedUser, setSelectedUser] = React.useState<AdminPaymentUser | null>(null)
   const [gdriveModalOpen, setGDriveModalOpen] = React.useState(false)
@@ -108,6 +110,25 @@ export function PaymentsView() {
     },
   })
 
+  // Sync Shopee payouts mutation
+  const syncShopeeMutation = useMutation({
+    mutationFn: syncAdminShopeePayouts,
+    onSuccess: (res) => {
+      setToastMessage({
+        text: res.message || `Đồng bộ hoàn tất: ${res.batches_count || 0} đợt thanh toán, ${res.orders_settled || 0} đơn đã quyết toán!`,
+        type: "success",
+      })
+      queryClient.invalidateQueries({ queryKey: ["admin-payments"] })
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] })
+    },
+    onError: (err: any) => {
+      setToastMessage({
+        text: err.message || "Lỗi đồng bộ quyết toán Shopee",
+        type: "error",
+      })
+    },
+  })
+
   // Filter queue
   const payables = data?.payables || []
   const transfers = data?.transfers || []
@@ -119,6 +140,10 @@ export function PaymentsView() {
     total_transferred: 0,
     total_transfers_count: 0,
   }
+
+  const totalSettledPayable = React.useMemo(() => {
+    return payables.reduce((acc, u) => acc + (u.settled_payable_amount ?? (u.is_fully_settled ? u.payable_amount : 0)), 0)
+  }, [payables])
 
   const filteredPayables = React.useMemo(() => {
     return payables.filter((user) => {
@@ -135,6 +160,10 @@ export function PaymentsView() {
       if (filterBank === "ready" && user.bank_status !== "valid") return false
       if (filterBank === "needs_bank" && user.bank_status === "valid") return false
 
+      // Settlement filter
+      if (filterSettlement === "settled" && !user.is_fully_settled) return false
+      if (filterSettlement === "unsettled" && user.is_fully_settled) return false
+
       // Search term
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim()
@@ -150,7 +179,7 @@ export function PaymentsView() {
 
       return true
     })
-  }, [payables, filterBank, includeAwaiting, searchTerm])
+  }, [payables, filterBank, filterSettlement, includeAwaiting, searchTerm])
 
   const filteredTransfers = React.useMemo(() => {
     if (!searchTerm.trim()) return transfers
@@ -204,9 +233,14 @@ export function PaymentsView() {
           <div className="mt-2 text-xl font-bold tracking-tight text-emerald-500 sm:text-2xl">
             {vnd(summary.total_payable)}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span>{summary.ready_users} khách hàng đủ điều kiện</span>
+          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>{summary.ready_users} khách</span>
+            </div>
+            <span className="text-emerald-500 font-semibold" title="Hoa hồng Shopee đã thanh toán về ngân hàng">
+              🛡️ Đã về bank: {vnd(totalSettledPayable)}
+            </span>
           </div>
         </Card>
 
@@ -320,7 +354,7 @@ export function PaymentsView() {
                     filterBank === "all" ? "bg-card font-semibold text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Tất cả
+                  Tất cả TK
                 </button>
                 <button
                   onClick={() => setFilterBank("ready")}
@@ -341,6 +375,40 @@ export function PaymentsView() {
               </div>
             )}
 
+            {/* Filter by settlement status (Safe Cashflow) */}
+            {activeSubTab === "queue" && (
+              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/40 p-0.5 text-xs">
+                <button
+                  onClick={() => setFilterSettlement("all")}
+                  className={`rounded px-2 py-1 text-[11px] transition-colors ${
+                    filterSettlement === "all" ? "bg-card font-semibold text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tất cả sàn
+                </button>
+                <button
+                  onClick={() => setFilterSettlement("settled")}
+                  className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+                    filterSettlement === "settled" ? "bg-card font-semibold text-emerald-500 shadow-xs" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Các khách hàng mà Shopee đã chuyển tiền về ngân hàng của bạn"
+                >
+                  <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                  <span>Sàn đã trả (An toàn bank)</span>
+                </button>
+                <button
+                  onClick={() => setFilterSettlement("unsettled")}
+                  className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+                    filterSettlement === "unsettled" ? "bg-card font-semibold text-amber-500 shadow-xs" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Khách hàng có đơn mà Shopee chưa thanh toán về ngân hàng"
+                >
+                  <Clock className="h-3 w-3 text-amber-500" />
+                  <span>Chờ sàn trả</span>
+                </button>
+              </div>
+            )}
+
             {/* Include awaiting toggle (only for queue) */}
             {activeSubTab === "queue" && (
               <label className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-muted-foreground cursor-pointer select-none hover:text-foreground">
@@ -353,6 +421,21 @@ export function PaymentsView() {
                 <span>Hiện cả đơn chờ duyệt (Test)</span>
               </label>
             )}
+
+            {/* Sync Shopee Payouts */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncShopeeMutation.mutate()}
+              disabled={syncShopeeMutation.isPending}
+              className="h-8 gap-1.5 px-2.5 text-xs border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
+              title="Đồng bộ lịch sử giải ngân & quyết toán tiền từ Shopee Affiliate"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncShopeeMutation.isPending ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">
+                {syncShopeeMutation.isPending ? "Đang đồng bộ..." : "Đồng bộ Shopee"}
+              </span>
+            </Button>
 
             {/* Google Drive Config */}
             <Button
@@ -530,6 +613,21 @@ export function PaymentsView() {
                             {user.bonus > 0 && (
                               <div className="text-[10px] text-amber-400 font-medium">
                                 + {vnd(user.bonus)} thưởng campaign
+                              </div>
+                            )}
+                            {hasPayable && (
+                              <div className="flex items-center justify-end gap-1 pt-0.5">
+                                {user.is_fully_settled ? (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-0.5">
+                                    <ShieldCheck className="h-2.5 w-2.5 text-emerald-400" />
+                                    <span>Sàn đã chuyển tiền</span>
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/40 bg-amber-500/10 text-amber-400 font-medium flex items-center gap-0.5" title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn">
+                                    <Clock className="h-2.5 w-2.5 text-amber-400" />
+                                    <span>Chờ sàn ck ({vnd(user.unsettled_payable_amount || user.payable_amount)})</span>
+                                  </Badge>
+                                )}
                               </div>
                             )}
                           </div>
@@ -951,6 +1049,34 @@ function PaymentDialog({
 
         {/* Scrollable Center Body (Two Columns on Desktop) */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+          {/* Cashflow & Settlement Safety Alert */}
+          {user.is_fully_settled ? (
+            <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-3 shadow-xs">
+              <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 text-sm">
+                  🛡️ An Toàn Thanh Toán: Toàn Bộ Tiền Sàn Đã Về Ngân Hàng
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Toàn bộ tiền hoa hồng của khách hàng này (<strong>{vnd(user.settled_payable_amount || user.payable_amount)}</strong>) đã được Shopee quyết toán và thực tế chuyển khoản về ngân hàng của bạn. Bạn có thể an tâm quét QR chi trả cho khách ngay mà không lo thâm hụt dòng tiền vốn.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 flex items-start gap-3 shadow-xs">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <div className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 text-sm">
+                  ⚠️ Cảnh Báo Dòng Tiền: Shopee Chưa Chuyển Tiền Đợt Này Về Ngân Hàng
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Trong số <strong>{vnd(user.payable_amount)}</strong> cần trả khách, có <strong>{vnd(user.unsettled_payable_amount || user.payable_amount)}</strong> tiền hoa hồng mà sàn Shopee <strong>chưa chuyển khoản về tài khoản ngân hàng của bạn</strong> (đang đợi kỳ thanh toán hoặc đang xử lý).
+                  Nếu bạn bấm chuyển khoản ngay bây giờ, bạn sẽ phải <em>tự ứng tiền túi</em> trước. <strong>Khuyên dùng:</strong> Hãy chờ Shopee hoàn tất chuyển khoản về ngân hàng rồi mới bank cho khách!
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* Left Column (5 cols): VietQR & Protection Notice */}
             <div className="md:col-span-5 flex flex-col items-center space-y-4">
@@ -1469,6 +1595,74 @@ function PaymentDialog({
               </div>
             </div>
           </div>
+
+          {/* Order breakdown list for this customer */}
+          {user.orders && user.orders.length > 0 && (
+            <div className="mt-6 rounded-xl border border-border/70 bg-secondary/20 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Coins className="h-4 w-4 text-primary" />
+                  <span>Danh Sách Đơn Hàng Của Khách ({user.orders.length} đơn)</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    Tiền sàn đã về: <strong className="text-emerald-500">{user.orders.filter(o => o.settlement_status === "settled").length}</strong>/{user.orders.length} đơn
+                  </span>
+                </div>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-border/40">
+                {user.orders.map((o) => {
+                  const isSettled = o.settlement_status === "settled"
+                  return (
+                    <div key={o.order_id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-semibold text-foreground">
+                            {o.order_id}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">
+                            {o.platform === "tiktok" ? "TikTok" : "Shopee"}
+                          </Badge>
+                          {o.status === "awaiting_approval" ? (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-400">
+                              Chờ duyệt
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-400">
+                              Đã duyệt
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate max-w-[420px]">
+                          {o.product || "Đơn hàng liên kết Shopee"}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 space-y-0.5">
+                        <div className="font-mono font-bold text-emerald-500 text-xs">
+                          {vnd(o.cashback_amount || 0)}
+                        </div>
+                        <div>
+                          {isSettled ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20" title={`Shopee đã quyết toán trong đợt ${o.payout_batch_id || ''}`}>
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>Sàn đã chuyển {o.payout_batch_id ? `(#${o.payout_batch_id.slice(-6)})` : ""}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20" title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn">
+                              <Clock className="h-3 w-3" />
+                              <span>Chờ Shopee chuyển</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sticky Fixed Footer */}

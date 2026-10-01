@@ -59,6 +59,7 @@ import time
 
 from .browser_bridge import Bridge, Job
 from .report_importer import ReportRow
+from ..ledger.repository import parse_order_time
 
 CONNECTOR = "shopee_affiliate"
 REPORT_PAGE = "https://affiliate.shopee.vn/report/conversion_report"
@@ -197,13 +198,17 @@ def _row_to_report_row(raw: dict) -> ReportRow:
         first.get("order_status", ""),
     )
 
+    order_id = str(first.get("order_sn") or raw.get("checkout_id") or "")
+    purchase_time = raw.get("purchase_time")
+    order_time = parse_order_time(purchase_time, order_id)
+
     return ReportRow(
-        order_id=str(first.get("order_sn") or raw.get("checkout_id") or ""),
+        order_id=order_id,
         order_value=order_value,
         commission=commission,
         status=status,
         sub_ids=parse_sub_ids(raw.get("utm_content", "")),
-        order_time=str(raw.get("purchase_time") or ""),
+        order_time=order_time,
         raw=raw,
     )
 

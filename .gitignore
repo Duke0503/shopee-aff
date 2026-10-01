@@ -44,12 +44,15 @@ extension/background/base_url.js
 
 # SQLite databases & local data state
 *.db
+*.db*
 *.db-journal
 *.db-wal
 *.db-shm
 *.sqlite
 *.sqlite3
 cashback.db
+cashback.db*
+*.bak*
 
 # Runtime output, logs & dumps
 *.log

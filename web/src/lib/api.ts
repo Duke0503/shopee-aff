@@ -403,6 +403,9 @@ export interface AdminOrder {
   affiliate_url: string | null
   product: string
   platform?: "shopee" | "tiktok" | string
+  settlement_status?: "settled" | "processing" | "unsettled" | string
+  payout_batch_id?: string | null
+  settled_at?: string | null
   item_id?: string | null
   image_url?: string | null
   financial_breakdown?: OrderFinancialBreakdown
@@ -535,6 +538,7 @@ export const fetchAdminOrders = (params?: {
   limit?: number
   search?: string
   status?: string
+  settlement_status?: string
   customer_id?: string
   platform?: string
   sort_by?: string
@@ -545,6 +549,7 @@ export const fetchAdminOrders = (params?: {
   if (params?.limit) qs.set("limit", String(params.limit))
   if (params?.search) qs.set("search", params.search)
   if (params?.status && params.status !== "all") qs.set("status", params.status)
+  if (params?.settlement_status && params.settlement_status !== "all") qs.set("settlement_status", params.settlement_status)
   if (params?.platform && params.platform !== "all") qs.set("platform", params.platform)
   if (params?.customer_id) qs.set("customer_id", params.customer_id)
   if (params?.sort_by) qs.set("sort_by", params.sort_by)
@@ -630,6 +635,9 @@ export interface AdminPaymentOrder {
   order_value: number | null
   cashback_amount: number | null
   status: string
+  settlement_status?: "settled" | "processing" | "unsettled" | string
+  payout_batch_id?: string | null
+  settled_at?: string | null
   recorded_at: string | null
   approved_at: string | null
   platform: string
@@ -650,6 +658,9 @@ export interface AdminPaymentUser {
   awaiting_amount: number
   bonus: number
   total_unpaid: number
+  settled_payable_amount?: number
+  unsettled_payable_amount?: number
+  is_fully_settled?: boolean
   order_count: number
   order_ids: string[]
   orders: AdminPaymentOrder[]
@@ -725,6 +736,29 @@ export const saveGDriveConfig = (webhookUrl: string) =>
   post<{ ok: boolean; message: string }>("/api/admin/payments/gdrive-config", {
     gdrive_webhook_url: webhookUrl,
   })
+
+export interface PayoutBatch {
+  batch_id: string
+  platform: string
+  status: "paid" | "processing" | "failed" | string
+  amount: number
+  eligible_amount: number
+  created_time: string | null
+  paid_time: string | null
+  linked_orders_count: number
+  created_at: string
+  updated_at: string
+}
+
+export const fetchAdminPayoutBatches = () =>
+  get<{ ok: boolean; batches: PayoutBatch[] }>("/api/admin/payout-batches")
+
+export const syncAdminShopeePayouts = () =>
+  post<{ ok: boolean; message: string; batches_count: number; orders_settled: number }>("/api/admin/shopee/sync-payouts")
+
+export const settleAdminOrders = (data: { batch_id?: string; platform?: string; order_ids?: string[] }) =>
+  post<{ ok: boolean; settled_count: number }>("/api/admin/orders/settle", data)
+
 
 
 

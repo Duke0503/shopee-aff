@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator
 
+from ..ledger.repository import parse_order_time
+
 MAPPING_FILE = "report_mapping.json"
 
 # Candidate header names tried when auto-detecting, lowercase and
@@ -211,8 +213,8 @@ def read_rows(path: Path, mapping: ColumnMapping) -> Iterator[ReportRow]:
                 commission=parse_money(raw.get(mapping.commission)),
                 status=classify_status(raw.get(mapping.status)),
                 sub_ids=sub_ids,
-                order_time=(raw.get(mapping.order_time) or "").strip()
+                order_time=parse_order_time(raw.get(mapping.order_time), order_id)
                 if mapping.order_time
-                else "",
+                else parse_order_time(None, order_id),
                 raw=dict(raw),
             )

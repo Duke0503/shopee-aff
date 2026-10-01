@@ -113,21 +113,32 @@ def run(
                 # but discarding it left the ledger blank and the customer
                 # told "amount to be confirmed" when the number was known.
                 estimated_commission=row.commission,
+                recorded_at=row.order_time,
             )
             result.orders_new += 1
             existing = ledger.get_order(conn, row.order_id)
-        elif existing["estimated_commission"] is None and row.commission:
-            # An order recorded before the report was read for its estimate,
-            # or by a run that discarded it. Filling it in costs nothing and
-            # is what the payout page and the customer's message read from.
-            # Never touches the APPROVED figure, which only mark_approved
-            # sets.
-            conn.execute(
-                "UPDATE orders SET estimated_commission=?, updated_at=?"
-                " WHERE order_id=? AND estimated_commission IS NULL",
-                (row.commission, ledger.now(), row.order_id),
-            )
-            existing = ledger.get_order(conn, row.order_id)
+        else:
+            # Backfill or correct order_time if report has the official purchase date
+            if row.order_time and existing["recorded_at"] != row.order_time:
+                conn.execute(
+                    "UPDATE orders SET recorded_at=?, updated_at=?"
+                    " WHERE order_id=?",
+                    (row.order_time, ledger.now(), row.order_id),
+                )
+                existing = ledger.get_order(conn, row.order_id)
+
+            if existing["estimated_commission"] is None and row.commission:
+                # An order recorded before the report was read for its estimate,
+                # or by a run that discarded it. Filling it in costs nothing and
+                # is what the payout page and the customer's message read from.
+                # Never touches the APPROVED figure, which only mark_approved
+                # sets.
+                conn.execute(
+                    "UPDATE orders SET estimated_commission=?, updated_at=?"
+                    " WHERE order_id=? AND estimated_commission IS NULL",
+                    (row.commission, ledger.now(), row.order_id),
+                )
+                existing = ledger.get_order(conn, row.order_id)
 
         # RULE 2: an order already paid is never reprocessed, whatever the
         # report now says. Reconciliation windows overlap; without this a

@@ -210,6 +210,8 @@ def normalize_transactions(rows: list[dict[str, Any]]) -> list[NormalizedOrder]:
                 value = round(commission)
 
         reason = next((l.get("reason_rejected") for l in lines if l.get("reason_rejected")), None)
+        raw_time = lines[0].get("transaction_time") or lines[0].get("created_time") or ""
+        parsed_order_time = ledger.parse_order_time(raw_time, order_id=order_id)
         orders.append(NormalizedOrder(
             order_id=order_id,
             platform=plat,
@@ -220,7 +222,7 @@ def normalize_transactions(rows: list[dict[str, Any]]) -> list[NormalizedOrder]:
             approved_commission=approved,
             status=status,
             rejection_reason=reason,
-            order_time=str(lines[0].get("transaction_time") or ""),
+            order_time=parsed_order_time,
         ))
     return orders
 
@@ -298,6 +300,7 @@ def sync_accesstrade_orders(
                     order_value=order.order_value,
                     estimated_commission=order.estimated_commission,
                     platform=order.platform or "tiktok",
+                    recorded_at=order.order_time,
                 )
                 summary.orders_new += 1
                 existing = ledger.get_order(conn, order.order_id)
@@ -305,6 +308,15 @@ def sync_accesstrade_orders(
             if not existing:
                 summary.skipped += 1
                 continue
+
+            # Backfill or correct order_time if transaction data has the purchase date
+            if order.order_time and existing["recorded_at"] != order.order_time:
+                conn.execute(
+                    "UPDATE orders SET recorded_at = ?, updated_at = ?"
+                    " WHERE order_id = ?",
+                    (order.order_time, ledger.now(), order.order_id),
+                )
+                existing = ledger.get_order(conn, order.order_id)
 
             # Don't modify already paid orders
             if existing["paid_at"]:

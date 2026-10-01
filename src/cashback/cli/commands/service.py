@@ -231,6 +231,15 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             if outcome.needs_review:
                 log.info(f"[reconcile] {outcome.needs_review} row(s) need a human")
 
+            # Periodically sync Shopee payout settlement records
+            try:
+                from ...shopee import payout_sync
+                payout_res = payout_sync.sync_shopee_payouts(cfg.db_path, bridge)
+                if payout_res.get("orders_settled"):
+                    log.info(f"[reconcile] {payout_res['orders_settled']} order(s) marked settled by Shopee payout")
+            except Exception as exc:
+                log.info(f"[reconcile] payout sync skipped: {exc}")
+
     def accesstrade_loop() -> None:
         """Pull TikTok orders in from AccessTrade, on the same timer as the
         Shopee report. Nothing ran this before: TikTok orders reached neither

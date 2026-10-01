@@ -26,6 +26,7 @@ import {
   PackageCheck,
   XCircle,
   Banknote,
+  ShieldCheck,
 } from "lucide-react"
 import { PaginationBar } from "@/features/Admin/components/PaginationBar"
 import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
@@ -41,6 +42,7 @@ export function OrdersView() {
   const [limit, setLimit] = React.useState(20)
   const [searchTerm, setSearchTerm] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
+  const [settlementFilter, setSettlementFilter] = React.useState<string>("all")
   const [platformFilter, setPlatformFilter] = React.useState<string>("all")
   const [sortBy, setSortBy] = React.useState<string>("date")
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc")
@@ -52,13 +54,14 @@ export function OrdersView() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders", page, limit, searchTerm, statusFilter, platformFilter, sortBy, sortOrder],
+    queryKey: ["admin-orders", page, limit, searchTerm, statusFilter, settlementFilter, platformFilter, sortBy, sortOrder],
     queryFn: () =>
       fetchAdminOrders({
         page,
         limit,
         search: searchTerm,
         status: statusFilter,
+        settlement_status: settlementFilter,
         platform: platformFilter,
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -87,7 +90,12 @@ export function OrdersView() {
     total_pages: Math.ceil(orders.length / limit) || 1,
   }
 
-  const renderStatus = (status: AdminOrder["status"], platform?: string) => {
+  const renderStatus = (
+    status: AdminOrder["status"],
+    platform?: string,
+    settlementStatus?: string,
+    payoutBatchId?: string | null
+  ) => {
     const platformLabel = platform === "tiktok" ? "TikTok" : "Shopee"
     switch (status) {
       case "awaiting_approval":
@@ -98,15 +106,39 @@ export function OrdersView() {
         )
       case "approved":
         return (
-          <Badge variant="info">
-            <PackageCheck className="mr-1 h-3 w-3" /> Đã duyệt (Chờ chi trả)
-          </Badge>
+          <div className="flex flex-col gap-1 items-start">
+            <Badge variant="info">
+              <PackageCheck className="mr-1 h-3 w-3" /> Đã duyệt (Chờ chi trả)
+            </Badge>
+            {settlementStatus === "settled" ? (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500 bg-emerald-500/10 font-mono flex items-center gap-0.5" title={`Shopee đã thanh toán trong đợt ${payoutBatchId || ''}`}>
+                <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" />
+                <span>Sàn đã ck {payoutBatchId ? `(#${payoutBatchId.slice(-6)})` : ""}</span>
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-500 bg-amber-500/10 flex items-center gap-0.5" title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn">
+                <Clock className="h-2.5 w-2.5 text-amber-500" />
+                <span>Chờ sàn chuyển tiền</span>
+              </Badge>
+            )}
+          </div>
         )
       case "paid":
         return (
-          <Badge variant="success">
-            <CheckCircle2 className="mr-1 h-3 w-3" /> Đã hoàn tiền
-          </Badge>
+          <div className="flex flex-col gap-1 items-start">
+            <Badge variant="success">
+              <CheckCircle2 className="mr-1 h-3 w-3" /> Đã hoàn tiền
+            </Badge>
+            {settlementStatus === "settled" ? (
+              <span className="text-[10px] text-emerald-500 font-mono flex items-center gap-0.5">
+                <ShieldCheck className="h-2.5 w-2.5" /> Sàn đã quyết toán
+              </span>
+            ) : (
+              <span className="text-[10px] text-amber-500" title="Đã hoàn tiền cho khách trước khi sàn chuyển tiền về bank">
+                Ứng trước (Chờ sàn ck)
+              </span>
+            )}
+          </div>
         )
       case "rejected":
         return (
@@ -180,72 +212,121 @@ export function OrdersView() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 border-t pt-2.5 dark:border-border">
-          <button
-            onClick={() => {
-              setStatusFilter("all")
-              setPage(1)
-            }}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === "all"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            Tất cả ({pagination.total})
-          </button>
-          <button
-            onClick={() => {
-              setStatusFilter("awaiting_approval")
-              setPage(1)
-            }}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === "awaiting_approval"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            Chờ đối soát
-          </button>
-          <button
-            onClick={() => {
-              setStatusFilter("approved")
-              setPage(1)
-            }}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === "approved"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            Đã duyệt (Chờ hoàn)
-          </button>
-          <button
-            onClick={() => {
-              setStatusFilter("paid")
-              setPage(1)
-            }}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === "paid"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            Đã hoàn tiền
-          </button>
-          <button
-            onClick={() => {
-              setStatusFilter("rejected")
-              setPage(1)
-            }}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === "rejected"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            Từ chối / Hủy
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 dark:border-border">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => {
+                setStatusFilter("all")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Tất cả ({pagination.total})
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("awaiting_approval")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === "awaiting_approval"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Chờ đối soát
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("approved")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === "approved"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Đã duyệt (Chờ hoàn)
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("paid")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === "paid"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Đã hoàn tiền
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("rejected")
+                setPage(1)
+              }}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === "rejected"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Từ chối / Hủy
+            </button>
+          </div>
+
+          {/* Settlement status filter toggle */}
+          <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/40 p-0.5 text-xs">
+            <button
+              onClick={() => {
+                setSettlementFilter("all")
+                setPage(1)
+              }}
+              className={`rounded px-2 py-1 text-[11px] transition-colors ${
+                settlementFilter === "all"
+                  ? "bg-card font-semibold text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tất cả sàn
+            </button>
+            <button
+              onClick={() => {
+                setSettlementFilter("settled")
+                setPage(1)
+              }}
+              className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+                settlementFilter === "settled"
+                  ? "bg-card font-semibold text-emerald-500 shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Đơn hàng mà Shopee đã giải ngân về tài khoản ngân hàng"
+            >
+              <ShieldCheck className="h-3 w-3 text-emerald-500" />
+              <span>Sàn đã trả</span>
+            </button>
+            <button
+              onClick={() => {
+                setSettlementFilter("unsettled")
+                setPage(1)
+              }}
+              className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+                settlementFilter === "unsettled"
+                  ? "bg-card font-semibold text-amber-500 shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Đơn hàng Shopee chưa thanh toán về ngân hàng"
+            >
+              <Clock className="h-3 w-3 text-amber-500" />
+              <span>Chờ sàn trả</span>
+            </button>
+          </div>
         </div>
       </div>
     </Card>
@@ -477,7 +558,9 @@ export function OrdersView() {
                   <OrderFinancialCard order={o} />
                 </TableCell>
 
-                <TableCell className="whitespace-nowrap">{renderStatus(o.status, o.platform)}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {renderStatus(o.status, o.platform, o.settlement_status, o.payout_batch_id)}
+                </TableCell>
 
                 <TableCell className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
                   {shortDate(o.recorded_at || o.approved_at)}
