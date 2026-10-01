@@ -62,6 +62,7 @@ class Config:
     # Where our short links (/s/<code>) live. Empty = hand out the
     # affiliate link itself, as before (a dev copy has no public site).
     public_base_url: str = ""
+    gdrive_webhook_url: str = ""
 
     @property
     def has_shopee_credentials(self) -> bool:
@@ -175,4 +176,5 @@ def load() -> Config:
         assistant_url=os.getenv("ASSISTANT_URL", "http://127.0.0.1:8891").strip(),
         assistant_token=os.getenv("ASSISTANT_TOKEN", "").strip(),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://hoantiendp.com").strip(),
+        gdrive_webhook_url=os.getenv("GDRIVE_WEBHOOK_URL", "").strip(),
     )

@@ -909,6 +909,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_payment_ask_bank()
         if path == "/api/admin/payments/upload-proof":
             return self._admin_upload_proof()
+        if path == "/api/admin/payments/gdrive-config":
+            return self._admin_gdrive_config()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -2510,11 +2512,15 @@ class _Handler(BaseHTTPRequestHandler):
                 "total_transfers_count": len(transfers_list),
             }
 
+            gdrive_url = getattr(self.cfg, "gdrive_webhook_url", "") or os.getenv("GDRIVE_WEBHOOK_URL", "").strip()
+
             return self._json({
                 "ok": True,
                 "summary": summary,
                 "payables": payables,
                 "transfers": transfers_list,
+                "gdrive_active": bool(gdrive_url),
+                "gdrive_webhook_url": gdrive_url,
             })
 
     def _admin_payment_confirm(self):
@@ -2812,6 +2818,42 @@ class _Handler(BaseHTTPRequestHandler):
             "url": public_url,
             "filename": filename,
             "message": "Tải ảnh biên lai lên thành công",
+        })
+
+    def _admin_gdrive_config(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+
+        body = self._body()
+        webhook_url = str(body.get("gdrive_webhook_url") or "").strip()
+
+        # Update runtime environment
+        os.environ["GDRIVE_WEBHOOK_URL"] = webhook_url
+
+        # Persist to .env
+        env_path = PROJECT_ROOT / ".env"
+        if env_path.exists():
+            content = env_path.read_text(encoding="utf-8")
+            if "GDRIVE_WEBHOOK_URL=" in content:
+                lines = []
+                for line in content.splitlines():
+                    if line.startswith("GDRIVE_WEBHOOK_URL=") or line.startswith("GDRIVE_WEBHOOK_URL ="):
+                        lines.append(f"GDRIVE_WEBHOOK_URL={webhook_url}")
+                    else:
+                        lines.append(line)
+                env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            else:
+                with env_path.open("a", encoding="utf-8") as f:
+                    f.write(f"\n# Google Drive Webhook URL (Auto upload bill)\nGDRIVE_WEBHOOK_URL={webhook_url}\n")
+        else:
+            env_path.write_text(f"GDRIVE_WEBHOOK_URL={webhook_url}\n", encoding="utf-8")
+
+        return self._json({
+            "ok": True,
+            "gdrive_active": bool(webhook_url),
+            "gdrive_webhook_url": webhook_url,
+            "message": "Đã lưu cấu hình Google Drive thành công!" if webhook_url else "Đã xóa cấu hình Google Drive",
         })
 
 

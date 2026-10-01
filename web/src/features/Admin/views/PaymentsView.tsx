@@ -23,6 +23,7 @@ import {
   confirmAdminPayment,
   askCustomerBank,
   uploadPaymentProof,
+  saveGDriveConfig,
   type AdminPaymentUser,
 } from "@/lib/api"
 import { vnd, shortDate } from "@/lib/format"
@@ -51,6 +52,7 @@ import {
   Image as ImageIcon,
   X,
   Link,
+  Cloud,
 } from "lucide-react"
 
 export function PaymentsView() {
@@ -62,6 +64,7 @@ export function PaymentsView() {
   const [filterBank, setFilterBank] = React.useState<"all" | "ready" | "needs_bank">("all")
   const [includeAwaiting, setIncludeAwaiting] = React.useState(true)
   const [selectedUser, setSelectedUser] = React.useState<AdminPaymentUser | null>(null)
+  const [gdriveModalOpen, setGDriveModalOpen] = React.useState(false)
   const [toastMessage, setToastMessage] = React.useState<{ text: string; type: "success" | "error" | "info" } | null>(null)
 
   // Copy helper
@@ -350,6 +353,29 @@ export function PaymentsView() {
                 <span>Hiện cả đơn chờ duyệt (Test)</span>
               </label>
             )}
+
+            {/* Google Drive Config */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGDriveModalOpen(true)}
+              className={`h-8 gap-1.5 px-2.5 text-xs transition-colors ${
+                data?.gdrive_active
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                  : "border-border/60 bg-secondary/30 text-muted-foreground hover:text-foreground"
+              }`}
+              title="Cấu hình Google Drive lưu ảnh biên lai tự động"
+            >
+              <Cloud className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Google Drive</span>
+              {data?.gdrive_active ? (
+                <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              ) : (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-amber-500/40 text-amber-400">
+                  Cài đặt
+                </Badge>
+              )}
+            </Button>
 
             {/* Refresh */}
             <Button
@@ -701,6 +727,8 @@ export function PaymentsView() {
         <PaymentDialog
           user={selectedUser}
           includeAwaitingDefault={includeAwaiting}
+          gdriveActive={data?.gdrive_active}
+          onOpenGDriveSetup={() => setGDriveModalOpen(true)}
           onClose={() => setSelectedUser(null)}
           onSuccess={(res) => {
             setSelectedUser(null)
@@ -716,6 +744,21 @@ export function PaymentsView() {
           }}
         />
       )}
+
+      {/* Google Drive Setup Modal */}
+      <GDriveSetupModal
+        isOpen={gdriveModalOpen}
+        onClose={() => setGDriveModalOpen(false)}
+        currentUrl={data?.gdrive_webhook_url || ""}
+        isActive={!!data?.gdrive_active}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-payments"] })
+          setToastMessage({
+            text: "Đã cập nhật cấu hình Google Drive thành công!",
+            type: "success",
+          })
+        }}
+      />
     </div>
   )
 }
@@ -726,6 +769,8 @@ export function PaymentsView() {
 interface PaymentDialogProps {
   user: AdminPaymentUser
   includeAwaitingDefault: boolean
+  gdriveActive?: boolean
+  onOpenGDriveSetup: () => void
   onClose: () => void
   onSuccess: (result: any) => void
   onAskBank: () => void
@@ -734,6 +779,8 @@ interface PaymentDialogProps {
 function PaymentDialog({
   user,
   includeAwaitingDefault,
+  gdriveActive,
+  onOpenGDriveSetup,
   onClose,
   onSuccess,
   onAskBank,
@@ -1294,11 +1341,27 @@ function PaymentDialog({
                     <ImageIcon className="h-3.5 w-3.5 text-primary" />
                     <span>Ảnh Biên Lai / Bill Chuyển Khoản (Đính kèm DM Zalo)</span>
                   </label>
-                  {isUploading && (
-                    <span className="text-[11px] text-primary flex items-center gap-1 font-medium">
-                      <RefreshCw className="h-3 w-3 animate-spin" /> Đang tải ảnh...
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isUploading && (
+                      <span className="text-[11px] text-primary flex items-center gap-1 font-medium">
+                        <RefreshCw className="h-3 w-3 animate-spin" /> Đang tải ảnh...
+                      </span>
+                    )}
+                    {gdriveActive ? (
+                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <Cloud className="h-3 w-3" /> Auto Google Drive
+                      </Badge>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onOpenGDriveSetup}
+                        className="text-[10px] text-amber-400 hover:underline flex items-center gap-1"
+                        title="Bấm để thiết lập tự động tải ảnh lên Google Drive"
+                      >
+                        <Cloud className="h-3 w-3" /> Cài Drive tự động
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1432,6 +1495,253 @@ function PaymentDialog({
               </>
             )}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ----------------------------------------------------------------------
+// Google Drive Webhook Setup Modal
+// ----------------------------------------------------------------------
+const GDRIVE_SCRIPT_TEMPLATE = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var filename = data.filename || ("bienlai_" + new Date().getTime() + ".jpg");
+    var mimeType = data.mimeType || "image/jpeg";
+    var decoded = Utilities.base64Decode(data.base64);
+    var blob = Utilities.newBlob(decoded, mimeType, filename);
+    
+    // Thư mục lưu ảnh trên Google Drive (tự tạo nếu chưa có)
+    var folderName = "BienLai_HoanTien";
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    
+    // Lưu file vào thư mục và bật quyền xem công khai qua link
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      drive_url: file.getUrl()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: false,
+      error: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`
+
+interface GDriveSetupModalProps {
+  isOpen: boolean
+  onClose: () => void
+  currentUrl: string
+  isActive: boolean
+  onSaved: () => void
+}
+
+function GDriveSetupModal({
+  isOpen,
+  onClose,
+  currentUrl,
+  isActive,
+  onSaved,
+}: GDriveSetupModalProps) {
+  const [url, setUrl] = React.useState(currentUrl)
+  const [copiedCode, setCopiedCode] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setUrl(currentUrl)
+    setError(null)
+  }, [currentUrl, isOpen])
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(GDRIVE_SCRIPT_TEMPLATE)
+    setCopiedCode(true)
+    setTimeout(() => setCopiedCode(false), 2000)
+  }
+
+  const handleSave = async (targetUrl: string) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await saveGDriveConfig(targetUrl.trim())
+      if (res.ok) {
+        onSaved()
+        onClose()
+      } else {
+        setError(res.message || "Không thể lưu cấu hình")
+      }
+    } catch (err: any) {
+      setError(err.message || "Lỗi khi lưu cấu hình")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-card border-border/80">
+        <div className="shrink-0 border-b border-border/70 p-5 bg-secondary/20">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Cloud className="h-4 w-4" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold text-foreground">
+                Cấu Hình Tự Động Lưu Ảnh Vào Google Drive
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Chỉ 1 phút thiết lập miễn phí qua Google Apps Script — không cần thẻ tín dụng hay GCP Console.
+              </DialogDescription>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {/* Status banner */}
+          <div
+            className={`p-3 rounded-xl border flex items-center justify-between ${
+              isActive
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {isActive ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+              <div>
+                <span className="font-semibold">
+                  {isActive ? "Google Drive Đang Hoạt Động" : "Chưa Kết Nối Google Drive"}
+                </span>
+                <p className="text-[11px] opacity-80 mt-0.5">
+                  {isActive
+                    ? "Ảnh bill dán vào sẽ tự động tải lên thư mục 'BienLai_HoanTien' và lấy link công khai."
+                    : "Hiện tại ảnh tải lên chỉ lưu tạm trên ổ cứng server nội bộ."}
+                </p>
+              </div>
+            </div>
+            {isActive && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">
+                Active
+              </Badge>
+            )}
+          </div>
+
+          {/* Setup Guide */}
+          <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/30 p-4">
+            <h4 className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+              <span>📋 3 Bước Thiết Lập Miễn Phí (1 Phút)</span>
+            </h4>
+
+            {/* Step 1 */}
+            <div className="space-y-1">
+              <div className="font-medium text-foreground">
+                1. Mở dự án Google Apps Script mới:
+              </div>
+              <p className="text-muted-foreground text-[11px]">
+                Truy cập{" "}
+                <a
+                  href="https://script.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline font-medium inline-flex items-center gap-0.5"
+                >
+                  script.google.com <ExternalLink className="h-2.5 w-2.5" />
+                </a>{" "}
+                (bằng tài khoản Gmail bạn muốn lưu ảnh) và bấm nút <strong>"Dự án mới" (New project)</strong>.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between font-medium text-foreground">
+                <span>2. Xóa code cũ và dán đoạn mã này vào:</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyCode}
+                  className="h-6 gap-1 px-2 text-[10px]"
+                >
+                  {copiedCode ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  <span>{copiedCode ? "Đã chép mã" : "Sao chép mã"}</span>
+                </Button>
+              </div>
+              <pre className="max-h-36 overflow-y-auto rounded-lg bg-black/60 p-2.5 font-mono text-[11px] text-emerald-300 border border-border/50">
+                {GDRIVE_SCRIPT_TEMPLATE}
+              </pre>
+            </div>
+
+            {/* Step 3 */}
+            <div className="space-y-1">
+              <div className="font-medium text-foreground">
+                3. Triển khai Web App và lấy Webhook URL:
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-muted-foreground ml-1">
+                <li>Bấm nút màu xanh <strong>Triển khai (Deploy)</strong> ở góc trên bên phải &gt; chọn <strong>Tùy chọn triển khai mới (New deployment)</strong>.</li>
+                <li>Bấm biểu tượng bánh răng ⚙️ cạnh <em>Chọn loại</em> &gt; chọn <strong>Ứng dụng web (Web app)</strong>.</li>
+                <li>Thực thi dưới dạng (Execute as): chọn <strong>Tôi (Me)</strong>.</li>
+                <li>Ai có quyền truy cập (Who has access): chọn <strong>Bất kỳ ai (Anyone)</strong> *(Rất quan trọng)*.</li>
+                <li>Bấm <strong>Triển khai (Deploy)</strong> &gt; Cho phép quyền Google Drive &gt; <strong>Sao chép URL ứng dụng web (Web app URL)</strong> kết thúc bằng <code>/exec</code>.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Webhook Input */}
+          <div className="space-y-2">
+            <label className="font-semibold text-foreground text-xs block">
+              Dán Webhook URL Google Apps Script của bạn vào đây:
+            </label>
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+              className="h-9 text-xs font-mono"
+            />
+            {error && (
+              <div className="text-[11px] text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 flex items-center justify-between border-t border-border/70 p-4 bg-secondary/20">
+          <div>
+            {isActive && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSave("")}
+                disabled={saving}
+                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                Hủy kết nối Drive
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => handleSave(url)}
+              disabled={saving || !url.trim()}
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs h-8 px-4"
+            >
+              {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              <span>{saving ? "Đang lưu..." : "Lưu Cấu Hình"}</span>
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

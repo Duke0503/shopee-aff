@@ -692,6 +692,8 @@ export interface AdminPaymentsResponse {
   summary: AdminPaymentSummary
   payables: AdminPaymentUser[]
   transfers: AdminPaymentTransfer[]
+  gdrive_active?: boolean
+  gdrive_webhook_url?: string
 }
 
 export const fetchAdminPayments = () => get<AdminPaymentsResponse>("/api/admin/payments")
@@ -718,5 +720,11 @@ export const uploadPaymentProof = (data: {
   data?: string
   gdrive_url?: string
 }) => post<{ ok: boolean; url: string; message: string }>("/api/admin/payments/upload-proof", data)
+
+export const saveGDriveConfig = (webhookUrl: string) =>
+  post<{ ok: boolean; message: string }>("/api/admin/payments/gdrive-config", {
+    gdrive_webhook_url: webhookUrl,
+  })
+
 
 

@@ -111,3 +111,6 @@ qr.png
 # Ledger snapshots written by `cashback backup` and `serve`
 backups/
 zalo_assistant/friend_state.json
+
+# User uploaded proofs
+src/cashback/web/static/uploads/
