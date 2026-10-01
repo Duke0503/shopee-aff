@@ -43,7 +43,9 @@ QR_TEMPLATE = "compact2"
 
 # Bank transfer references reject most punctuation, and Vietnamese banks
 # vary in what survives. Plain ASCII is what always arrives intact.
-REFERENCE_PREFIX = "Hoan tien Shopee"
+# Using clean identifiers without commercial words (like "Hoan tien Shopee")
+# avoids automated merchant transaction flagging by banks and tax authorities.
+REFERENCE_PREFIX = ""
 
 
 @dataclass
@@ -67,7 +69,8 @@ class Payable:
 
     @property
     def reference(self) -> str:
-        return f"{REFERENCE_PREFIX} {self.customer_code or self.customer_id}"
+        code = self.customer_code or self.customer_id
+        return f"{REFERENCE_PREFIX} {code}".strip() if REFERENCE_PREFIX else code
 
     def qr_url(self) -> str | None:
         """A VietQR with everything filled in, or None when unsure.

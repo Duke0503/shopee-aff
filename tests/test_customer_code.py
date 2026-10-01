@@ -180,4 +180,4 @@ def test_the_transfer_reference_carries_the_code(conn):
                      order_value=100_000, estimated_commission=10_000)
     ledger.mark_approved(conn, "O1", 10_000, 8_000)
     [payable] = payouts.collect(conn)
-    assert payable.reference == "Hoan tien Shopee DP00001"
+    assert payable.reference == "DP00001"

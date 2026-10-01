@@ -701,6 +701,7 @@ export const confirmAdminPayment = (data: {
   amount: number
   order_ids?: string[]
   transfer_code?: string
+  reference?: string
   note?: string
   proof_image?: string
   notify_mode?: "dm" | "group" | "both" | "none"

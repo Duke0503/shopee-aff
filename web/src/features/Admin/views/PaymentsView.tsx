@@ -45,6 +45,7 @@ import {
   VolumeX,
   History,
   Coins,
+  ShieldCheck,
 } from "lucide-react"
 
 export function PaymentsView() {
@@ -743,6 +744,11 @@ function PaymentDialog({
   const [targetGroup, setTargetGroup] = React.useState<"test" | "main">("test") // Default to test group per user request!
   const [includeAwaiting, setIncludeAwaiting] = React.useState(user.payable_amount <= 0 || includeAwaitingDefault)
 
+  // Transfer Memo (Neutral Content for Tax & AML Safety)
+  const custCode = user.customer_code || user.customer_id
+  const defaultMemo = user.reference || custCode || "DP"
+  const [transferMemo, setTransferMemo] = React.useState<string>(defaultMemo)
+
   // Copy feedback
   const [copiedField, setCopiedField] = React.useState<string | null>(null)
   const handleCopy = (field: string, text: string) => {
@@ -751,16 +757,41 @@ function PaymentDialog({
     setTimeout(() => setCopiedField(null), 1800)
   }
 
-  // Calculate dynamic QR URL based on custom amount
+  // Preset options for neutral memo
+  const todayStr = React.useMemo(() => {
+    const d = new Date()
+    const dd = String(d.getDate()).padStart(2, "0")
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    return `${dd}${mm}`
+  }, [])
+
+  const presetChips = React.useMemo(() => {
+    const chips = [
+      { label: custCode, desc: "Mã định danh (Khuyên dùng)", value: custCode },
+      { label: `${custCode} ${todayStr}`, desc: "Kèm ngày (Dễ soát sao kê)", value: `${custCode} ${todayStr}` },
+    ]
+    const numMatch = custCode.match(/\d+/)
+    if (numMatch) {
+      chips.push({
+        label: `DP${parseInt(numMatch[0], 10)}`,
+        desc: "Mã rút gọn",
+        value: `DP${parseInt(numMatch[0], 10)}`,
+      })
+    }
+    return chips
+  }, [custCode, todayStr])
+
+  // Calculate dynamic QR URL based on custom amount & transferMemo
   const qrUrl = React.useMemo(() => {
     if (!isBankValid || !user.bank_info || amount <= 0) return null
+    const memo = transferMemo.trim() || custCode
     const params = new URLSearchParams({
       amount: String(amount),
-      addInfo: user.reference,
+      addInfo: memo,
       accountName: user.account_holder || "",
     })
     return `https://img.vietqr.io/image/${user.bank_info.bin}-${user.bank_account}-compact2.png?${params.toString()}`
-  }, [isBankValid, user, amount])
+  }, [isBankValid, user, amount, transferMemo, custCode])
 
   // Confirm Mutation
   const confirmMutation = useMutation({
@@ -770,6 +801,7 @@ function PaymentDialog({
         amount,
         order_ids: user.order_ids,
         transfer_code: transferCode.trim() || undefined,
+        reference: transferMemo.trim() || undefined,
         note: note.trim() || undefined,
         notify_mode: notifyMode,
         target_group: targetGroup,
@@ -782,367 +814,438 @@ function PaymentDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-0 gap-0 border-border/80 bg-card shadow-2xl rounded-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/70 p-4 sm:px-6 bg-secondary/30">
-          <div>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
-              <CreditCard className="h-5 w-5 text-emerald-500" />
-              <span>Xác Nhận Chi Trả & Quét VietQR</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              Khách hàng: <strong className="text-foreground">{user.display_name}</strong> ({user.customer_code || user.customer_id}) • {user.order_count} đơn hàng
-            </DialogDescription>
+      <DialogContent className="sm:max-w-4xl lg:max-w-5xl w-[96vw] max-h-[90vh] flex flex-col p-0 overflow-hidden border-border/80 bg-card shadow-2xl rounded-2xl">
+        {/* Sticky Fixed Header */}
+        <div className="shrink-0 flex items-center justify-between border-b border-border/70 px-6 py-4 bg-secondary/30">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-xs">
+              <CreditCard className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <DialogTitle className="text-base font-bold text-foreground">
+                  Chi Trả Tiền Hoàn & Quét VietQR
+                </DialogTitle>
+                {user.customer_code ? (
+                  <CodeBadge code={user.customer_code} />
+                ) : (
+                  <Badge variant="outline" className="text-[10px]">
+                    {user.customer_id}
+                  </Badge>
+                )}
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Khách hàng: <strong className="text-foreground">{user.display_name}</strong> •{" "}
+                <span className="font-mono">{user.zalo_user_id || user.customer_id}</span> •{" "}
+                {user.order_count} đơn hàng
+              </DialogDescription>
+            </div>
           </div>
         </div>
 
-        {/* Content Body: 2 Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-4 sm:p-6">
-          {/* Left Column: VietQR Image / Bank Status */}
-          <div className="md:col-span-5 flex flex-col items-center justify-start space-y-3">
-            {isBankValid && qrUrl ? (
-              <div className="w-full flex flex-col items-center space-y-3">
-                {/* VietQR Container */}
-                <div className="relative w-full max-w-[260px] aspect-square rounded-2xl border-2 border-emerald-500/30 bg-white p-2 shadow-md flex items-center justify-center overflow-hidden group">
-                  <img
-                    src={qrUrl}
-                    alt="VietQR Code"
-                    className="w-full h-full object-contain"
-                  />
-                  <a
-                    href={qrUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-semibold gap-1.5 backdrop-blur-xs"
-                  >
-                    <ExternalLink className="h-6 w-6" />
-                    <span>Mở ảnh QR lớn</span>
-                  </a>
-                </div>
-
-                {/* Bank badge */}
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Building className="h-4 w-4 text-primary" />
-                  <span>{user.bank_info?.shortName || user.bank_name}</span>
-                  <Badge variant="outline" className="text-[10px] font-mono">
-                    BIN: {user.bank_info?.bin}
-                  </Badge>
-                </div>
-
-                <div className="text-[11px] text-center text-muted-foreground">
-                  Quét mã QR bằng App ngân hàng bất kỳ để tự động điền STK, Số tiền và Nội dung.
-                </div>
-              </div>
-            ) : (
-              <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-center space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/20 text-amber-500">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-amber-500">
-                    {user.bank_status === "missing" ? "Chưa có thông tin STK" : "Ngân hàng không xác định"}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {user.bank_status === "missing"
-                      ? "Khách hàng chưa cung cấp số tài khoản nhận tiền hoàn."
-                      : `Tên ngân hàng "${user.bank_name}" chưa khớp với danh mục ngân hàng NAPAS.`}
-                  </p>
-                </div>
-
-                {/* Reminder button */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full gap-2 text-xs border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
-                  onClick={onAskBank}
-                >
-                  <Bell className="h-4 w-4" />
-                  <span>Nhắc Khách Gửi STK Qua Zalo</span>
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Transfer Details & Notification Settings */}
-          <div className="md:col-span-7 space-y-4">
-            {/* Quick Copy Fields */}
-            <div className="rounded-xl border border-border/70 bg-secondary/30 p-3 space-y-2">
-              <div className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                <span>THÔNG TIN CHUYỂN KHOẢN</span>
-                <span className="text-[11px] font-normal text-emerald-400">1-Click Copy</span>
-              </div>
-
-              {/* Ngân hàng */}
-              <div className="flex items-center justify-between text-xs py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Ngân hàng:</span>
-                <div className="flex items-center gap-1.5 font-medium text-foreground">
-                  <span>{user.bank_info?.shortName || user.bank_name || "Chưa có"}</span>
-                  {user.bank_name && (
-                    <button
-                      onClick={() => handleCopy("bank", user.bank_info?.shortName || user.bank_name)}
-                      className="text-muted-foreground hover:text-foreground"
+        {/* Scrollable Center Body (Two Columns on Desktop) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Left Column (5 cols): VietQR & Protection Notice */}
+            <div className="md:col-span-5 flex flex-col items-center space-y-4">
+              {isBankValid && qrUrl ? (
+                <div className="w-full flex flex-col items-center space-y-3.5">
+                  {/* VietQR Code Container */}
+                  <div className="relative w-full max-w-[280px] aspect-square rounded-2xl border-2 border-emerald-500/30 bg-white p-3 shadow-md flex items-center justify-center overflow-hidden group">
+                    <img
+                      src={qrUrl}
+                      alt="VietQR Code"
+                      className="w-full h-full object-contain"
+                    />
+                    <a
+                      href={qrUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-semibold gap-2 backdrop-blur-xs"
                     >
-                      {copiedField === "bank" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* STK */}
-              <div className="flex items-center justify-between text-xs py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Số tài khoản:</span>
-                <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
-                  <span>{user.bank_account || "Chưa có"}</span>
-                  {user.bank_account && (
-                    <button
-                      onClick={() => handleCopy("stk", user.bank_account)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedField === "stk" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Chủ tài khoản */}
-              <div className="flex items-center justify-between text-xs py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Chủ tài khoản:</span>
-                <div className="flex items-center gap-1.5 font-medium uppercase text-foreground">
-                  <span>{user.account_holder || "—"}</span>
-                  {user.account_holder && (
-                    <button
-                      onClick={() => handleCopy("name", user.account_holder)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedField === "name" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Số tiền */}
-              <div className="flex items-center justify-between text-xs py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Số tiền:</span>
-                <div className="flex items-center gap-1.5 font-bold text-emerald-500 text-sm">
-                  <span>{vnd(amount)}</span>
-                  <button
-                    onClick={() => handleCopy("amount", String(amount))}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {copiedField === "amount" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Nội dung */}
-              <div className="flex items-center justify-between text-xs py-1">
-                <span className="text-muted-foreground">Nội dung CK:</span>
-                <div className="flex items-center gap-1.5 font-mono font-medium text-foreground">
-                  <span>{user.reference}</span>
-                  <button
-                    onClick={() => handleCopy("ref", user.reference)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {copiedField === "ref" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Amount adjustment */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  Số tiền chi trả (VND)
-                </label>
-                <Input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="h-8 text-xs font-bold text-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  Mã giao dịch ngân hàng
-                </label>
-                <Input
-                  placeholder="VD: FT2409... (tuỳ chọn)"
-                  value={transferCode}
-                  onChange={(e) => setTransferCode(e.target.value)}
-                  className="h-8 text-xs font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Include awaiting toggle */}
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none hover:text-foreground">
-                <input
-                  type="checkbox"
-                  checked={includeAwaiting}
-                  onChange={(e) => {
-                    const checked = e.target.checked
-                    setIncludeAwaiting(checked)
-                    if (checked) {
-                      setAmount(user.total_unpaid > 0 ? user.total_unpaid : defaultAmount)
-                    } else {
-                      setAmount(user.payable_amount > 0 ? user.payable_amount : defaultAmount)
-                    }
-                  }}
-                  className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
-                />
-                <span>Tất toán toàn bộ bao gồm đơn chờ duyệt ({vnd(user.total_unpaid)})</span>
-              </label>
-            </div>
-
-            {/* Notification Mode Selection (Core Requirement) */}
-            <div className="space-y-2 pt-1 border-t border-border/60">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Send className="h-3.5 w-3.5 text-primary" />
-                  <span>Chế Độ Thông Báo Sau Khi Chuyển</span>
-                </span>
-              </div>
-
-              {/* 4 Cards for Notification Mode */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* 1. DM */}
-                <button
-                  type="button"
-                  onClick={() => setNotifyMode("dm")}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
-                    notifyMode === "dm"
-                      ? "border-primary bg-primary/10 shadow-xs"
-                      : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <User className="h-3.5 w-3.5 text-blue-400" />
-                    <span>Tin riêng (DM)</span>
+                      <ExternalLink className="h-6 w-6" />
+                      <span>Mở ảnh QR lớn / Tải về</span>
+                    </a>
                   </div>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Gửi tin nhắn riêng Zalo cho khách
-                  </span>
-                </button>
 
-                {/* 2. Group */}
-                <button
-                  type="button"
-                  onClick={() => setNotifyMode("group")}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
-                    notifyMode === "group"
-                      ? "border-primary bg-primary/10 shadow-xs"
-                      : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <Users2 className="h-3.5 w-3.5 text-indigo-400" />
-                    <span>Nhóm Zalo</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Bắn thông báo chúc mừng vào nhóm
-                  </span>
-                </button>
-
-                {/* 3. Both */}
-                <button
-                  type="button"
-                  onClick={() => setNotifyMode("both")}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
-                    notifyMode === "both"
-                      ? "border-emerald-500 bg-emerald-500/10 shadow-xs"
-                      : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-                    <Bell className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Cả hai (Khuyên dùng)</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Gửi cả tin riêng Zalo và thông báo nhóm
-                  </span>
-                </button>
-
-                {/* 4. None */}
-                <button
-                  type="button"
-                  onClick={() => setNotifyMode("none")}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
-                    notifyMode === "none"
-                      ? "border-primary bg-primary/10 shadow-xs"
-                      : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                    <VolumeX className="h-3.5 w-3.5" />
-                    <span>Không thông báo</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Chỉ cập nhật trạng thái đã thanh toán
-                  </span>
-                </button>
-              </div>
-
-              {/* Target Group Selector (If group or both selected) */}
-              {(notifyMode === "group" || notifyMode === "both") && (
-                <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5 space-y-1.5">
-                  <div className="text-[11px] font-semibold text-foreground flex items-center justify-between">
-                    <span>Chọn nhóm Zalo phát thông báo:</span>
-                    <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20">
-                      Mặc định Dev
+                  {/* Bank info badges */}
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+                    <Badge variant="secondary" className="bg-primary/10 text-primary font-semibold flex items-center gap-1">
+                      <Building className="h-3 w-3" />
+                      <span>{user.bank_info?.shortName || user.bank_name}</span>
+                    </Badge>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      BIN: {user.bank_info?.bin}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-card p-2 text-xs cursor-pointer hover:border-primary">
-                      <input
-                        type="radio"
-                        name="targetGroup"
-                        checked={targetGroup === "test"}
-                        onChange={() => setTargetGroup("test")}
-                        className="text-primary focus:ring-primary h-3.5 w-3.5"
-                      />
-                      <div>
-                        <div className="font-semibold text-foreground">🧪 Nhóm Dev / Test</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">ID: 8786316503449470342</div>
-                      </div>
-                    </label>
 
-                    <label className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-card p-2 text-xs cursor-pointer hover:border-primary">
-                      <input
-                        type="radio"
-                        name="targetGroup"
-                        checked={targetGroup === "main"}
-                        onChange={() => setTargetGroup("main")}
-                        className="text-primary focus:ring-primary h-3.5 w-3.5"
-                      />
-                      <div>
-                        <div className="font-semibold text-foreground">🚀 Nhóm Hoàn Tiền Chính</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">ID: 2813090100064697955</div>
-                      </div>
-                    </label>
+                  <p className="text-[11px] text-center text-muted-foreground leading-normal px-2">
+                    Mở app Ngân hàng quét QR để tự động điền STK, Số tiền ({vnd(amount)}) và Nội dung ({transferMemo}).
+                  </p>
+
+                  {/* Anti-Tax / Anti-AML Protection Box */}
+                  <div className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-left space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+                      <span>Bảo vệ tài khoản & Tránh quét Thuế</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Nội dung chuyển khoản mặc định sử dụng <strong>mã định danh ({custCode})</strong> thay vì từ khoá thương mại (<em>hoàn tiền, shopee, hoa hồng</em>), giúp hệ thống AI ngân hàng không phân loại giao dịch thương mại/chịu thuế.
+                    </p>
                   </div>
+                </div>
+              ) : (
+                <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-center space-y-3">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/20 text-amber-500">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-amber-500">
+                      {user.bank_status === "missing" ? "Chưa có thông tin STK" : "Ngân hàng không xác định"}
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {user.bank_status === "missing"
+                        ? "Khách hàng chưa cung cấp số tài khoản nhận tiền hoàn."
+                        : `Tên ngân hàng "${user.bank_name}" chưa khớp với danh mục ngân hàng NAPAS.`}
+                    </p>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-2 text-xs border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
+                    onClick={onAskBank}
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>Nhắc Khách Gửi STK Qua Zalo</span>
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Note input */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">
-                Ghi chú nội bộ
-              </label>
-              <Input
-                placeholder="VD: Đã chuyển khoản qua VCB sáng nay..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="h-8 text-xs"
-              />
+            {/* Right Column (7 cols): Transfer Details & Settings */}
+            <div className="md:col-span-7 space-y-4">
+              {/* Quick Copy Info Card */}
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3.5 space-y-2">
+                <div className="flex items-center justify-between pb-1 border-b border-border/40">
+                  <span className="text-xs font-semibold text-muted-foreground tracking-wide">
+                    THÔNG TIN CHUYỂN KHOẢN
+                  </span>
+                  <span className="text-[11px] font-medium text-emerald-400">1-Click Copy</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  {/* Bank */}
+                  <div className="flex items-center justify-between py-1 border-b border-border/30">
+                    <span className="text-muted-foreground">Ngân hàng:</span>
+                    <div className="flex items-center gap-1.5 font-medium text-foreground">
+                      <span>{user.bank_info?.shortName || user.bank_name || "Chưa có"}</span>
+                      {user.bank_name && (
+                        <button
+                          onClick={() => handleCopy("bank", user.bank_info?.shortName || user.bank_name)}
+                          className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                          title="Copy Ngân hàng"
+                        >
+                          {copiedField === "bank" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Account Holder */}
+                  <div className="flex items-center justify-between py-1 border-b border-border/30">
+                    <span className="text-muted-foreground">Chủ TK:</span>
+                    <div className="flex items-center gap-1.5 font-semibold uppercase text-foreground">
+                      <span className="truncate max-w-[140px]">{user.account_holder || "—"}</span>
+                      {user.account_holder && (
+                        <button
+                          onClick={() => handleCopy("name", user.account_holder)}
+                          className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                          title="Copy Chủ tài khoản"
+                        >
+                          {copiedField === "name" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Account Number */}
+                  <div className="flex items-center justify-between py-1 border-b border-border/30">
+                    <span className="text-muted-foreground">Số tài khoản:</span>
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
+                      <span>{user.bank_account || "Chưa có"}</span>
+                      {user.bank_account && (
+                        <button
+                          onClick={() => handleCopy("stk", user.bank_account)}
+                          className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                          title="Copy Số tài khoản"
+                        >
+                          {copiedField === "stk" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="flex items-center justify-between py-1 border-b border-border/30">
+                    <span className="text-muted-foreground">Số tiền:</span>
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-500">
+                      <span>{vnd(amount)}</span>
+                      <button
+                        onClick={() => handleCopy("amount", String(amount))}
+                        className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                        title="Copy Số tiền"
+                      >
+                        {copiedField === "amount" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Memo row */}
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <span className="text-muted-foreground">Nội dung CK:</span>
+                  <div className="flex items-center gap-1.5 font-mono font-semibold text-primary">
+                    <span>{transferMemo}</span>
+                    <button
+                      onClick={() => handleCopy("ref", transferMemo)}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="Copy Nội dung"
+                    >
+                      {copiedField === "ref" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Memo Customization & Quick Chips */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Nội dung chuyển khoản (Memo)</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">Cập nhật QR tức thì</span>
+                </div>
+                <Input
+                  value={transferMemo}
+                  onChange={(e) => setTransferMemo(e.target.value)}
+                  placeholder="Nhập nội dung chuyển khoản..."
+                  className="h-8 text-xs font-mono font-medium"
+                />
+                {/* Quick Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[10px] text-muted-foreground">Gợi ý an toàn:</span>
+                  {presetChips.map((chip) => (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      onClick={() => setTransferMemo(chip.value)}
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-mono border transition-all ${
+                        transferMemo === chip.value
+                          ? "bg-primary text-primary-foreground border-primary font-semibold shadow-2xs"
+                          : "bg-secondary/60 hover:bg-secondary text-foreground border-border/60"
+                      }`}
+                      title={chip.desc}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount adjustment & Bank Transfer code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                    Số tiền chi trả (VND)
+                  </label>
+                  <Input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="h-8 text-xs font-bold text-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                    Mã GD ngân hàng (FT Code)
+                  </label>
+                  <Input
+                    placeholder="VD: FT2409... (tuỳ chọn)"
+                    value={transferCode}
+                    onChange={(e) => setTransferCode(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Include awaiting toggle */}
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none hover:text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={includeAwaiting}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setIncludeAwaiting(checked)
+                      if (checked) {
+                        setAmount(user.total_unpaid > 0 ? user.total_unpaid : defaultAmount)
+                      } else {
+                        setAmount(user.payable_amount > 0 ? user.payable_amount : defaultAmount)
+                      }
+                    }}
+                    className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                  />
+                  <span>Tất toán toàn bộ bao gồm đơn chờ duyệt ({vnd(user.total_unpaid)})</span>
+                </label>
+              </div>
+
+              {/* Notification Mode Selection */}
+              <div className="space-y-2 pt-2 border-t border-border/60">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Send className="h-3.5 w-3.5 text-primary" />
+                  <span>Chế Độ Thông Báo Sau Khi Chuyển</span>
+                </span>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {/* 1. DM */}
+                  <button
+                    type="button"
+                    onClick={() => setNotifyMode("dm")}
+                    className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                      notifyMode === "dm"
+                        ? "border-primary bg-primary/10 shadow-xs"
+                        : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <User className="h-3.5 w-3.5 text-blue-400" />
+                      <span>Tin riêng (DM)</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      Gửi tin nhắn riêng Zalo cho khách
+                    </span>
+                  </button>
+
+                  {/* 2. Group */}
+                  <button
+                    type="button"
+                    onClick={() => setNotifyMode("group")}
+                    className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                      notifyMode === "group"
+                        ? "border-primary bg-primary/10 shadow-xs"
+                        : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <Users2 className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>Nhóm Zalo</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      Bắn thông báo chúc mừng vào nhóm
+                    </span>
+                  </button>
+
+                  {/* 3. Both */}
+                  <button
+                    type="button"
+                    onClick={() => setNotifyMode("both")}
+                    className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                      notifyMode === "both"
+                        ? "border-emerald-500 bg-emerald-500/10 shadow-xs"
+                        : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                      <Bell className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Cả hai (Khuyên dùng)</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      Gửi cả tin riêng Zalo và nhóm
+                    </span>
+                  </button>
+
+                  {/* 4. None */}
+                  <button
+                    type="button"
+                    onClick={() => setNotifyMode("none")}
+                    className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                      notifyMode === "none"
+                        ? "border-primary bg-primary/10 shadow-xs"
+                        : "border-border/60 bg-secondary/30 hover:bg-secondary/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                      <VolumeX className="h-3.5 w-3.5" />
+                      <span>Không thông báo</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      Chỉ ghi nhận đã thanh toán
+                    </span>
+                  </button>
+                </div>
+
+                {/* Target Group Selector */}
+                {(notifyMode === "group" || notifyMode === "both") && (
+                  <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5 space-y-1.5">
+                    <div className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                      <span>Chọn nhóm Zalo phát thông báo:</span>
+                      <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20">
+                        Mặc định Dev
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-card p-2 text-xs cursor-pointer hover:border-primary">
+                        <input
+                          type="radio"
+                          name="targetGroup"
+                          checked={targetGroup === "test"}
+                          onChange={() => setTargetGroup("test")}
+                          className="text-primary focus:ring-primary h-3.5 w-3.5"
+                        />
+                        <div>
+                          <div className="font-semibold text-foreground">🧪 Nhóm Dev / Test</div>
+                          <div className="text-[10px] text-muted-foreground font-mono">ID: 8786316503449470342</div>
+                        </div>
+                      </label>
+
+                      <label className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-card p-2 text-xs cursor-pointer hover:border-primary">
+                        <input
+                          type="radio"
+                          name="targetGroup"
+                          checked={targetGroup === "main"}
+                          onChange={() => setTargetGroup("main")}
+                          className="text-primary focus:ring-primary h-3.5 w-3.5"
+                        />
+                        <div>
+                          <div className="font-semibold text-foreground">🚀 Nhóm Hoàn Tiền Chính</div>
+                          <div className="text-[10px] text-muted-foreground font-mono">ID: 2813090100064697955</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Note input */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">
+                  Ghi chú nội bộ
+                </label>
+                <Input
+                  placeholder="VD: Đã chuyển khoản qua VCB sáng nay..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-border/70 p-4 sm:px-6 bg-secondary/20">
+        {/* Sticky Fixed Footer */}
+        <div className="shrink-0 flex items-center justify-between border-t border-border/70 px-6 py-3.5 bg-secondary/30">
           <Button variant="ghost" size="sm" onClick={onClose} className="text-xs">
             Đóng
           </Button>
@@ -1151,7 +1254,7 @@ function PaymentDialog({
             size="sm"
             onClick={() => confirmMutation.mutate()}
             disabled={confirmMutation.isPending || amount <= 0}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-5 shadow-sm"
+            className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-6 py-2 h-9 shadow-sm"
           >
             {confirmMutation.isPending ? (
               <>

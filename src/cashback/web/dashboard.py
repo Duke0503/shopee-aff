@@ -2443,7 +2443,7 @@ class _Handler(BaseHTTPRequestHandler):
                 entry["payable_amount"] += entry["bonus"]
                 entry["total_unpaid"] = entry["payable_amount"] + entry["awaiting_amount"]
 
-                ref = f"Hoan tien Shopee {entry['customer_code'] or entry['customer_id']}"
+                ref = str(entry["customer_code"] or entry["customer_id"]).strip()
                 entry["reference"] = ref
 
                 qr_amount = entry["payable_amount"] if entry["payable_amount"] > 0 else entry["awaiting_amount"]
@@ -2584,7 +2584,7 @@ class _Handler(BaseHTTPRequestHandler):
         zalo_uid = c_dict.get("zalo_user_id") or customer_id
         bank_name = c_dict.get("bank_name") or "Ngân hàng"
         bank_acc = c_dict.get("bank_account") or ""
-        reference = f"Hoan tien Shopee {customer_code}"
+        reference = str(body.get("reference") or body.get("transfer_memo") or customer_code).strip()
         vnd_amount = _vnd(amount)
 
         notifications_log = {}
