@@ -2507,6 +2507,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         body = self._body()
         raw_url = str(body.get("url") or "").strip()
+        if any(d in raw_url.lower() for d in ("lazada.vn", "s.lazada.vn", "c.lazada.vn", "tiki.vn", "ti.ki")):
+            return self._json({
+                "ok": False,
+                "error": "unsupported_platform",
+                "message": "Hiện tại hệ thống chỉ hỗ trợ hoàn tiền cho các đơn hàng trên Shopee và TikTok Shop."
+            }, 400)
         match = ANY_SHOPEE_URL.search(raw_url)
         if not match:
             from ..providers.registry import get_registry
@@ -2683,6 +2689,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         body = self._body()
         raw_url = str(body.get("url") or "").strip()
+        if any(d in raw_url.lower() for d in ("lazada.vn", "s.lazada.vn", "c.lazada.vn", "tiki.vn", "ti.ki")):
+            return self._json({
+                "ok": False,
+                "error": "unsupported_platform",
+                "message": "Hiện tại hệ thống chỉ hỗ trợ hoàn tiền cho các đơn hàng trên Shopee và TikTok Shop."
+            }, 400)
         match = ANY_SHOPEE_URL.search(raw_url)
         if not match:
             from ..providers.registry import get_registry
@@ -3081,6 +3093,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         body = self._body()
         raw_url = str(body.get("url") or "").strip()
+        if any(d in raw_url.lower() for d in ("lazada.vn", "s.lazada.vn", "c.lazada.vn", "tiki.vn", "ti.ki")):
+            return self._json({
+                "ok": False,
+                "error": "unsupported_platform",
+                "message": "Hiện tại hệ thống chỉ hỗ trợ hoàn tiền cho các đơn hàng trên Shopee và TikTok Shop."
+            }, 400)
         customer_id = self._session_customer() or str(body.get("customer_id") or "").strip()
         channel = str(body.get("channel") or "zalo").strip()
         max_age_hours = float(body.get("max_age_hours") or 12.0)

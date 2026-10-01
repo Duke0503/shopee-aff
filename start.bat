@@ -1,5 +1,5 @@
 @echo off
-title KHOI DONG HE THONG HOAN TIEN SHOPEE / TIKTOK / LAZADA / SHOPEEFOOD
+title KHOI DONG HE THONG HOAN TIEN SHOPEE / TIKTOK
 cd /d "%~dp0"
 echo ========================================================
 echo   DANG KHOI DONG HE THONG HOAN TIEN (BACKEND, BOT, WEB)...

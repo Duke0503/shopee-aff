@@ -6,12 +6,13 @@ import sizeOf from "image-size";
 import { config } from "./config.js";
 import { createFriendKeeper } from "./friends.js";
 
-// Regex nhận diện link Shopee, TikTok Shop, Lazada & ShopeeFood
+// Regex nhận diện link Shopee, TikTok Shop, Lazada, Tiki & ShopeeFood
 const SHOPEE_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:shopee\.vn|s\.shopee\.vn|shp\.ee)\/[^\s]+/i;
 const TIKTOK_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop)\/[^\s]+/i;
 const LAZADA_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:lazada\.vn|s\.lazada\.vn|c\.lazada\.vn)\/[^\s]+/i;
+const TIKI_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiki\.vn|ti\.ki)\/[^\s]+/i;
 const SHOPEEFOOD_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopeefood\.vn|food\.shopee\.vn|shopee\.vn\/now-food)\/[^\s]+/i;
-const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/i;
+const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|tiki\.vn|ti\.ki|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/i;
 
 process.on("uncaughtException", (err) => {
   console.error("[Uncaught Exception]:", err);
@@ -350,10 +351,10 @@ function extractTextAndUrls(data) {
   if (data.href) urls.push(data.href);
   if (data.url) urls.push(data.url);
 
-  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee, TikTok, Lazada hay ShopeeFood nào (cho phép dấu nháy đơn ' trong URL như L'Oreal)
+  // Quét regex trên toàn bộ chuỗi JSON của data để không bao giờ bỏ sót bất kỳ link Shopee, TikTok, Lazada, Tiki hay ShopeeFood nào (cho phép dấu nháy đơn ' trong URL như L'Oreal)
   try {
     const rawJson = JSON.stringify(data);
-    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|shopeefood\.vn|food\.shopee\.vn)\/[^\s"\\]+/gi);
+    const productMatches = rawJson.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|tiki\.vn|ti\.ki|shopeefood\.vn|food\.shopee\.vn)\/[^\s"\\]+/gi);
     if (productMatches) {
       for (const m of productMatches) {
         urls.push(m);
@@ -377,8 +378,35 @@ function extractTextAndUrls(data) {
     try {
       const isTikTok = TIKTOK_LINK_REGEX.test(rawUrl);
       const isLazada = LAZADA_LINK_REGEX.test(rawUrl);
+      const isTiki = TIKI_LINK_REGEX.test(rawUrl);
       const isFood = SHOPEEFOOD_LINK_REGEX.test(rawUrl);
-      const platformLabel = isTikTok ? "TikTok Shop" : (isLazada ? "Lazada" : (isFood ? "ShopeeFood" : "Shopee"));
+
+      const isGroup = threadType === ThreadType.Group;
+      const tagText = isGroup && senderUid ? `@${senderName}` : "";
+      const tagPrefix = tagText ? `${tagText}\n` : "";
+      const mentions = tagText
+        ? [
+            {
+              uid: String(senderUid),
+              pos: 0,
+              len: tagText.length,
+            },
+          ]
+        : undefined;
+
+      // Nếu khách gửi link Lazada hoặc Tiki: Phản hồi ngay chỉ hỗ trợ Shopee và TikTok Shop
+      if (isLazada || isTiki) {
+        const platName = isLazada ? "Lazada" : "Tiki";
+        console.log(`[Unsupported Platform] Khách gửi link ${platName}: ${rawUrl} (Người gửi: ${senderName}, UID: ${senderUid})`);
+        const unsupportedMsg =
+          tagPrefix +
+          `Dạ hiện tại hệ thống chỉ hỗ trợ hoàn tiền cho các đơn hàng trên Shopee và TikTok Shop thôi bạn nhé! 🛍️✨\n\n` +
+          `👉 Bạn hãy gửi link sản phẩm Shopee hoặc TikTok Shop để nhận lại đến 80% tiền hoàn nha! 💖`;
+        await api.sendMessage({ msg: unsupportedMsg, mentions }, threadId, threadType);
+        return;
+      }
+
+      const platformLabel = isTikTok ? "TikTok Shop" : (isFood ? "ShopeeFood" : "Shopee");
       console.log(`[${platformLabel} Link] Đang kiểm tra thông tin link: ${rawUrl} (Người gửi: ${senderName}, UID: ${senderUid})`);
       const effectiveCustomerId = customerId || (senderUid ? String(senderUid) : config.DEFAULT_CUSTOMER_ID);
 
@@ -394,19 +422,6 @@ function extractTextAndUrls(data) {
           max_age_hours: 12
         }),
       }).then((r) => r.json()).catch(() => ({ ok: false }));
-
-      const isGroup = threadType === ThreadType.Group;
-      const tagText = isGroup && senderUid ? `@${senderName}` : "";
-      const tagPrefix = tagText ? `${tagText}\n` : "";
-      const mentions = tagText
-        ? [
-            {
-              uid: String(senderUid),
-              pos: 0,
-              len: tagText.length,
-            },
-          ]
-        : undefined;
 
       // Nếu người bán (Shop) không tham gia chương trình tiếp thị liên kết (Affiliate)
       if (resolveRes.no_affiliate || resolveRes.error === "product_not_in_affiliate") {
