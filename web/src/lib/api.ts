@@ -615,6 +615,7 @@ export const recordAdminTransfer = (data: {
 
 export interface AdminPaymentSummary {
   total_payable: number
+  total_unsettled?: number
   total_awaiting: number
   ready_users: number
   needs_bank_users: number
@@ -666,7 +667,7 @@ export interface AdminPaymentUser {
   orders: AdminPaymentOrder[]
   qr_url: string | null
   reference: string
-  payout_status: "ready" | "needs_bank" | "awaiting" | "settled"
+  payout_status: "ready" | "needs_bank" | "awaiting_settlement" | "awaiting" | "settled"
   last_transfer: {
     id: number
     amount: number

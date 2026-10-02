@@ -141,9 +141,6 @@ export function PaymentsView() {
     total_transfers_count: 0,
   }
 
-  const totalSettledPayable = React.useMemo(() => {
-    return payables.reduce((acc, u) => acc + (u.settled_payable_amount ?? (u.is_fully_settled ? u.payable_amount : 0)), 0)
-  }, [payables])
 
   const filteredPayables = React.useMemo(() => {
     return payables.filter((user) => {
@@ -222,10 +219,10 @@ export function PaymentsView() {
 
       {/* Top 4 KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4 shrink-0">
-        {/* Card 1: Payable (Approved) */}
+        {/* Card 1: Payable (Approved & Settled) */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Chờ Chi Trả (Đã Duyệt)</span>
+            <span className="text-xs font-medium text-muted-foreground">Sẵn Sàng Chi Trả (Sàn Đã Chốt)</span>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
               <Coins className="h-4 w-4" />
             </div>
@@ -236,28 +233,33 @@ export function PaymentsView() {
           <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>{summary.ready_users} khách</span>
+              <span>{summary.ready_users} khách đủ ĐK</span>
             </div>
-            <span className="text-emerald-500 font-semibold" title="Hoa hồng Shopee đã thanh toán về ngân hàng">
-              🛡️ Đã về bank: {vnd(totalSettledPayable)}
+            <span className="text-emerald-500 font-semibold" title="Shopee đã thanh toán về ngân hàng">
+              🛡️ An toàn giải ngân
             </span>
           </div>
         </Card>
 
-        {/* Card 2: Awaiting Approval (Estimated) */}
+        {/* Card 2: Unsettled (Approved by customer but waiting for Shopee payout) */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Tạm Tính (Chờ Đối Soát)</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+            <span className="text-xs font-medium text-muted-foreground">Chờ Sàn Quyết Toán (Đã Duyệt)</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
               <Clock className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            {vnd(summary.total_awaiting)}
+          <div className="mt-2 text-xl font-bold tracking-tight text-amber-500 sm:text-2xl">
+            {vnd(summary.total_unsettled || 0)}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
-            <span>Đang chờ Shopee / TikTok xác nhận</span>
+          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+              <span>Chờ Shopee chốt kỳ</span>
+            </div>
+            <span className="text-muted-foreground" title="Đơn khách mới đặt hoặc đang giao hàng">
+              Tạm tính: {vnd(summary.total_awaiting)}
+            </span>
           </div>
         </Card>
 
@@ -494,7 +496,145 @@ export function PaymentsView() {
                 </p>
               </div>
             ) : (
-              <Table>
+              <>
+                {/* Mobile View: Cards (md:hidden) */}
+                <div className="md:hidden divide-y divide-border/60">
+                  {filteredPayables.map((user) => {
+                    const isBankValid = user.bank_status === "valid"
+                    const hasPayable = user.payable_amount > 0
+                    const targetAmount = hasPayable
+                      ? user.payable_amount
+                      : ((user.unsettled_payable_amount ?? 0) > 0 ? (user.unsettled_payable_amount ?? 0) : user.awaiting_amount)
+
+                    return (
+                      <div key={user.customer_id} className="p-3.5 space-y-3 hover:bg-secondary/10 transition-colors">
+                        {/* Top: Customer & Target Amount */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {user.customer_code ? (
+                                <CodeBadge code={user.customer_code} />
+                              ) : (
+                                <Badge variant="outline" className="text-[10px]">
+                                  DP???
+                                </Badge>
+                              )}
+                              <span className="font-semibold text-xs text-foreground truncate max-w-[150px]">
+                                {user.display_name || "Khách hàng"}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono">
+                              UID: {user.zalo_user_id || user.customer_id}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-bold text-emerald-500">
+                              {vnd(targetAmount)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {user.order_count} đơn hàng
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Middle: Bank details & Settlement Badge */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-secondary/30 rounded-lg p-2.5">
+                          {isBankValid ? (
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-semibold">
+                                  {user.bank_info?.shortName || user.bank_name}
+                                </Badge>
+                                <span className="font-mono font-medium text-xs text-foreground">
+                                  {user.bank_account}
+                                </span>
+                                <button
+                                  onClick={() => copyToClipboard(`stk-${user.customer_id}`, user.bank_account)}
+                                  className="text-muted-foreground hover:text-foreground"
+                                  title="Copy STK"
+                                >
+                                  {copiedKey === `stk-${user.customer_id}` ? (
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground uppercase">
+                                {user.account_holder || "—"}
+                              </div>
+                            </div>
+                          ) : user.bank_status === "missing" ? (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-500">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <span>Chưa có STK nhận tiền</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-500">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <span>Ngân hàng không khớp</span>
+                            </div>
+                          )}
+
+                          <div>
+                            {user.is_fully_settled ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-0.5">
+                                <ShieldCheck className="h-2.5 w-2.5 text-emerald-400" />
+                                <span>Sàn đã chốt 100%</span>
+                              </Badge>
+                            ) : (user.unsettled_payable_amount ?? 0) > 0 ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/40 bg-amber-500/10 text-amber-400 font-medium flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5 text-amber-400" />
+                                <span>Chờ sàn chốt ({vnd(user.unsettled_payable_amount || 0)})</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500/40 bg-blue-500/10 text-blue-400 font-medium flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5 text-blue-400" />
+                                <span>Tạm tính</span>
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bottom Action: Big touch-friendly button */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant={isBankValid ? "default" : "outline"}
+                            className={`flex-1 h-9 gap-1.5 text-xs font-semibold ${
+                              isBankValid
+                                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                                : "border-border/60 hover:bg-secondary"
+                            }`}
+                            onClick={() => setSelectedUser(user)}
+                          >
+                            <QrCode className="h-4 w-4" />
+                            <span>{isBankValid ? "Quét VietQR & Trả Tiền" : "Xem Đơn & Chi Trả"}</span>
+                          </Button>
+
+                          {!isBankValid && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 px-3 text-xs border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                              onClick={() => askBankMutation.mutate(user.customer_id)}
+                              disabled={askBankMutation.isPending}
+                              title="Gửi tin nhắn riêng qua Zalo nhắc khách cung cấp STK"
+                            >
+                              <Bell className="h-3.5 w-3.5 mr-1" />
+                              <span>Nhắc STK</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Desktop View: Full Table (hidden md:block) */}
+                <div className="hidden md:block">
+                  <Table>
                 <TableHeader className="bg-secondary/40 sticky top-0 z-10 backdrop-blur-md">
                   <TableRow className="border-border/60">
                     <TableHead className="w-56 text-xs font-semibold">Khách Hàng</TableHead>
@@ -604,9 +744,9 @@ export function PaymentsView() {
                             </div>
                             <div className="flex items-center justify-end gap-1.5 text-[11px] text-muted-foreground">
                               {hasPayable ? (
-                                <span className="text-emerald-400/90 font-medium">Đã duyệt: {vnd(user.payable_amount)}</span>
+                                <span className="text-emerald-400/90 font-medium">Sẵn sàng: {vnd(user.payable_amount)}</span>
                               ) : (
-                                <span className="text-blue-400 font-medium">Tạm tính (chờ): {vnd(user.awaiting_amount)}</span>
+                                <span className="text-amber-400 font-medium">Chờ sàn chốt: {vnd(user.unsettled_payable_amount || user.awaiting_amount)}</span>
                               )}
                               <span>• {user.order_count} đơn</span>
                             </div>
@@ -615,17 +755,22 @@ export function PaymentsView() {
                                 + {vnd(user.bonus)} thưởng campaign
                               </div>
                             )}
+                            {(user.unsettled_payable_amount ?? 0) > 0 && hasPayable && (
+                              <div className="text-[10px] text-amber-500/90 font-medium">
+                                (còn {vnd(user.unsettled_payable_amount || 0)} chờ sàn chốt)
+                              </div>
+                            )}
                             {hasPayable && (
                               <div className="flex items-center justify-end gap-1 pt-0.5">
                                 {user.is_fully_settled ? (
                                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-0.5">
                                     <ShieldCheck className="h-2.5 w-2.5 text-emerald-400" />
-                                    <span>Sàn đã chuyển tiền</span>
+                                    <span>Sàn đã chốt 100%</span>
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/40 bg-amber-500/10 text-amber-400 font-medium flex items-center gap-0.5" title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn">
                                     <Clock className="h-2.5 w-2.5 text-amber-400" />
-                                    <span>Chờ sàn ck ({vnd(user.unsettled_payable_amount || user.payable_amount)})</span>
+                                    <span>Có đơn chờ chốt</span>
                                   </Badge>
                                 )}
                               </div>
@@ -719,7 +864,9 @@ export function PaymentsView() {
                   })}
                 </TableBody>
               </Table>
-            )}
+            </div>
+          </>
+        )}
           </div>
         )}
 
@@ -866,7 +1013,7 @@ export function PaymentsView() {
 // ----------------------------------------------------------------------
 interface PaymentDialogProps {
   user: AdminPaymentUser
-  includeAwaitingDefault: boolean
+  includeAwaitingDefault?: boolean
   gdriveActive?: boolean
   onOpenGDriveSetup: () => void
   onClose: () => void
@@ -876,7 +1023,6 @@ interface PaymentDialogProps {
 
 function PaymentDialog({
   user,
-  includeAwaitingDefault,
   gdriveActive,
   onOpenGDriveSetup,
   onClose,
@@ -884,15 +1030,77 @@ function PaymentDialog({
   onAskBank,
 }: PaymentDialogProps) {
   const isBankValid = user.bank_status === "valid"
-  const defaultAmount = user.payable_amount > 0 ? user.payable_amount : user.awaiting_amount
 
-  // Form State
-  const [amount, setAmount] = React.useState<number>(defaultAmount)
+  // Order selection state: default to all settled approved orders
+  const [selectedOrderIds, setSelectedOrderIds] = React.useState<Set<string>>(() => {
+    const settledIds = (user.orders || [])
+      .filter((o) => o.status === "approved" && o.settlement_status === "settled")
+      .map((o) => o.order_id)
+    return new Set(settledIds)
+  })
+
+  // Selected orders & amounts:
+  const selectedOrders = React.useMemo(() => {
+    return (user.orders || []).filter((o) => selectedOrderIds.has(o.order_id))
+  }, [user.orders, selectedOrderIds])
+
+  const calculatedCashback = React.useMemo(() => {
+    return selectedOrders.reduce((sum, o) => sum + (o.cashback_amount || 0), 0)
+  }, [selectedOrders])
+
+  const selectedSettledCount = React.useMemo(() => {
+    return selectedOrders.filter((o) => o.settlement_status === "settled").length
+  }, [selectedOrders])
+
+  const selectedUnsettledCount = React.useMemo(() => {
+    return selectedOrders.filter((o) => o.settlement_status !== "settled").length
+  }, [selectedOrders])
+
+  const bonusAmount = React.useMemo(() => {
+    if (!user.bonus) return 0
+    return selectedOrders.length > 0 ? user.bonus : 0
+  }, [user.bonus, selectedOrders])
+
+  const calculatedTotal = calculatedCashback + bonusAmount
+
+  // Form State: amount is synced with calculatedTotal
+  const [amount, setAmount] = React.useState<number>(calculatedTotal)
   const [transferCode, setTransferCode] = React.useState("")
   const [note, setNote] = React.useState("")
   const [notifyMode, setNotifyMode] = React.useState<"dm" | "group" | "both" | "none">("both")
   const [targetGroup, setTargetGroup] = React.useState<"test" | "main">("test") // Default to test group per user request!
-  const [includeAwaiting, setIncludeAwaiting] = React.useState(user.payable_amount <= 0 || includeAwaitingDefault)
+
+  // Sync amount whenever selected orders change
+  React.useEffect(() => {
+    setAmount(calculatedTotal)
+  }, [calculatedTotal])
+
+  const toggleOrder = (orderId: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(orderId)) {
+        next.delete(orderId)
+      } else {
+        next.add(orderId)
+      }
+      return next
+    })
+  }
+
+  const selectAllSettled = () => {
+    const ids = (user.orders || [])
+      .filter((o) => o.status === "approved" && o.settlement_status === "settled")
+      .map((o) => o.order_id)
+    setSelectedOrderIds(new Set(ids))
+  }
+
+  const selectAll = () => {
+    setSelectedOrderIds(new Set((user.orders || []).map((o) => o.order_id)))
+  }
+
+  const clearAll = () => {
+    setSelectedOrderIds(new Set())
+  }
 
   // Transfer Memo (Neutral Content for Tax & AML Safety)
   const custCode = user.customer_code || user.customer_id
@@ -999,14 +1207,14 @@ function PaymentDialog({
       confirmAdminPayment({
         customer_id: user.customer_id,
         amount,
-        order_ids: user.order_ids,
+        order_ids: Array.from(selectedOrderIds),
         transfer_code: transferCode.trim() || undefined,
         reference: transferMemo.trim() || undefined,
         proof_image: proofImage.trim() || undefined,
         note: note.trim() || undefined,
         notify_mode: notifyMode,
         target_group: targetGroup,
-        include_awaiting: includeAwaiting,
+        include_awaiting: false,
       }),
     onSuccess: (data) => {
       onSuccess(data)
@@ -1049,16 +1257,28 @@ function PaymentDialog({
 
         {/* Scrollable Center Body (Two Columns on Desktop) */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-          {/* Cashflow & Settlement Safety Alert */}
-          {user.is_fully_settled ? (
+          {/* Dynamic Cashflow & Settlement Safety Alert based on Selected Orders */}
+          {selectedOrders.length === 0 ? (
+            <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 flex items-start gap-3 shadow-xs">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <div className="font-semibold text-amber-500 flex items-center gap-1.5 text-sm">
+                  ⚠️ Chưa Chọn Đơn Hàng Nào Để Thanh Toán
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Vui lòng tick chọn các đơn hàng bạn muốn chuyển khoản ở bảng bên dưới. Số tiền chuyển khoản và mã VietQR sẽ được tự động tính toán chính xác theo các đơn đã chọn.
+                </p>
+              </div>
+            </div>
+          ) : selectedUnsettledCount === 0 ? (
             <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-3 shadow-xs">
               <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
                 <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 text-sm">
-                  🛡️ An Toàn Thanh Toán: Toàn Bộ Tiền Sàn Đã Về Ngân Hàng
+                  🛡️ An Toàn Tuyệt Đối: Shopee Đã Quyết Toán {selectedSettledCount} Đơn Này Về Ngân Hàng
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Toàn bộ tiền hoa hồng của khách hàng này (<strong>{vnd(user.settled_payable_amount || user.payable_amount)}</strong>) đã được Shopee quyết toán và thực tế chuyển khoản về ngân hàng của bạn. Bạn có thể an tâm quét QR chi trả cho khách ngay mà không lo thâm hụt dòng tiền vốn.
+                  Toàn bộ <strong>{selectedOrders.length} đơn hàng</strong> đang chọn (tổng hoa hồng: <strong>{vnd(calculatedTotal)}</strong>) đã được sàn Shopee quyết toán và thực tế chuyển khoản về ngân hàng của bạn. Bạn có thể an tâm quét QR chi trả cho khách ngay mà không lo thâm hụt dòng tiền vốn.
                 </p>
               </div>
             </div>
@@ -1067,11 +1287,11 @@ function PaymentDialog({
               <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
                 <div className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 text-sm">
-                  ⚠️ Cảnh Báo Dòng Tiền: Shopee Chưa Chuyển Tiền Đợt Này Về Ngân Hàng
+                  ⚠️ Cảnh Báo Dòng Tiền: Có {selectedUnsettledCount} Đơn Shopee Chưa Chốt Tiền Về Bank
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Trong số <strong>{vnd(user.payable_amount)}</strong> cần trả khách, có <strong>{vnd(user.unsettled_payable_amount || user.payable_amount)}</strong> tiền hoa hồng mà sàn Shopee <strong>chưa chuyển khoản về tài khoản ngân hàng của bạn</strong> (đang đợi kỳ thanh toán hoặc đang xử lý).
-                  Nếu bạn bấm chuyển khoản ngay bây giờ, bạn sẽ phải <em>tự ứng tiền túi</em> trước. <strong>Khuyên dùng:</strong> Hãy chờ Shopee hoàn tất chuyển khoản về ngân hàng rồi mới bank cho khách!
+                  Trong các đơn đang chọn, có <strong>{selectedUnsettledCount} đơn</strong> mà Shopee <strong>chưa chuyển khoản tiền hoa hồng về ngân hàng của bạn</strong>.
+                  Nếu bạn bấm xác nhận chuyển khoản ngay bây giờ, bạn sẽ phải <em>tự ứng tiền túi</em> trước. <strong>Khuyên dùng:</strong> Bấm nút &ldquo;Chỉ chọn đơn sàn đã chốt&rdquo; bên dưới để an toàn dòng tiền!
                 </p>
               </div>
             </div>
@@ -1312,25 +1532,19 @@ function PaymentDialog({
                 </div>
               </div>
 
-              {/* Include awaiting toggle */}
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none hover:text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={includeAwaiting}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setIncludeAwaiting(checked)
-                      if (checked) {
-                        setAmount(user.total_unpaid > 0 ? user.total_unpaid : defaultAmount)
-                      } else {
-                        setAmount(user.payable_amount > 0 ? user.payable_amount : defaultAmount)
-                      }
-                    }}
-                    className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
-                  />
-                  <span>Tất toán toàn bộ bao gồm đơn chờ duyệt ({vnd(user.total_unpaid)})</span>
-                </label>
+              {/* Live Selected Orders Summary Banner */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                <div className="flex items-center gap-1.5 text-foreground font-semibold">
+                  <Coins className="h-4 w-4 text-emerald-500" />
+                  <span>Đã chọn: <strong className="text-emerald-500">{selectedOrderIds.size}</strong>/{user.orders?.length || 0} đơn</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground font-medium">
+                  {selectedUnsettledCount > 0 ? (
+                    <span className="text-amber-500">Gồm {selectedUnsettledCount} đơn chờ chốt</span>
+                  ) : (
+                    <span className="text-emerald-500">100% đơn sàn đã chốt</span>
+                  )}
+                </div>
               </div>
 
               {/* Notification Mode Selection */}
@@ -1596,66 +1810,255 @@ function PaymentDialog({
             </div>
           </div>
 
-          {/* Order breakdown list for this customer */}
+          {/* Interactive Order Selection Table & Mobile Cards */}
           {user.orders && user.orders.length > 0 && (
-            <div className="mt-6 rounded-xl border border-border/70 bg-secondary/20 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Coins className="h-4 w-4 text-primary" />
-                  <span>Danh Sách Đơn Hàng Của Khách ({user.orders.length} đơn)</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    Tiền sàn đã về: <strong className="text-emerald-500">{user.orders.filter(o => o.settlement_status === "settled").length}</strong>/{user.orders.length} đơn
-                  </span>
+            <div className="mt-6 rounded-2xl border border-border/80 bg-secondary/20 p-3.5 sm:p-4 space-y-3 shadow-xs">
+              {/* Header with Title and Quick Selector Buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-border/60">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs sm:text-sm font-bold text-foreground">
+                      Bảng Chọn Đơn Hàng Chi Trả ({selectedOrderIds.size}/{user.orders.length} đơn)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Tick chọn từng đơn hàng để chuyển khoản. Mã VietQR và số tiền sẽ tự động cập nhật.
+                  </p>
+                </div>
+
+                {/* Quick Selection Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={selectAllSettled}
+                    className="h-7 px-2.5 text-[11px] font-semibold border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
+                    title="Chỉ chọn những đơn Shopee đã quyết toán tiền về tài khoản ngân hàng"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 mr-1 text-emerald-500" />
+                    <span>Chỉ đơn đã chốt ({(user.orders || []).filter(o => o.status === "approved" && o.settlement_status === "settled").length})</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={selectAll}
+                    className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Chọn tất cả
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={clearAll}
+                    className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+                  >
+                    Bỏ chọn
+                  </Button>
                 </div>
               </div>
 
-              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-border/40">
+              {/* Selection Summary Pill */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-card/80 border border-border/60 p-2.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground">Đang chọn:</span>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary font-bold">
+                    {selectedOrderIds.size} / {user.orders.length} đơn
+                  </Badge>
+                  {selectedUnsettledCount > 0 ? (
+                    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-500 font-medium text-[10px]">
+                      ⚠️ {selectedUnsettledCount} đơn chờ chốt
+                    </Badge>
+                  ) : selectedOrderIds.size > 0 ? (
+                    <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-500 font-medium text-[10px]">
+                      🛡️ 100% đã chốt sàn
+                    </Badge>
+                  ) : null}
+                </div>
+
+                <div className="font-mono text-xs">
+                  <span className="text-muted-foreground">Tổng tiền chi trả: </span>
+                  <strong className="text-emerald-500 font-bold text-sm">
+                    {vnd(calculatedTotal)}
+                  </strong>
+                  {bonusAmount > 0 && (
+                    <span className="text-amber-400 text-[10px] ml-1">
+                      (gồm {vnd(bonusAmount)} thưởng)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 1. Desktop Table View (sm:block) */}
+              <div className="hidden sm:block overflow-x-auto rounded-xl border border-border/70 bg-card/60">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-secondary/60 text-muted-foreground font-semibold border-b border-border/60">
+                    <tr>
+                      <th className="p-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.size === user.orders.length && user.orders.length > 0}
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate = selectedOrderIds.size > 0 && selectedOrderIds.size < user.orders.length
+                            }
+                          }}
+                          onChange={(e) => (e.target.checked ? selectAll() : clearAll())}
+                          className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                        />
+                      </th>
+                      <th className="p-3 font-semibold">Mã Đơn & Sàn</th>
+                      <th className="p-3 font-semibold">Sản Phẩm & Thời Gian</th>
+                      <th className="p-3 font-semibold">Trạng Thái Chốt Sàn</th>
+                      <th className="p-3 font-semibold text-right">Tiền Hoàn (Cashback)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {user.orders.map((o) => {
+                      const isSelected = selectedOrderIds.has(o.order_id)
+                      const isSettled = o.settlement_status === "settled"
+                      return (
+                        <tr
+                          key={o.order_id}
+                          onClick={() => toggleOrder(o.order_id)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected ? "bg-emerald-500/10 hover:bg-emerald-500/15" : "hover:bg-secondary/40"
+                          }`}
+                        >
+                          <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleOrder(o.order_id)}
+                              className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <div className="font-mono font-bold text-foreground">{o.order_id}</div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 font-medium">
+                                {o.platform === "tiktok" ? "TikTok" : "Shopee"}
+                              </Badge>
+                              {o.status === "awaiting_approval" ? (
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-blue-500/10 text-blue-400">
+                                  Chờ duyệt
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-400">
+                                  Đã duyệt
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3 max-w-[280px]">
+                            <div className="truncate text-foreground font-medium" title={o.product || "Sản phẩm"}>
+                              {o.product || "Sản phẩm"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              Ngày đặt: {shortDate(o.approved_at || o.recorded_at)}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {isSettled ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"
+                                title={`Shopee đã quyết toán đợt ${o.payout_batch_id || ""}`}
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                <span>Sàn đã chốt {o.payout_batch_id ? `(#${o.payout_batch_id.slice(-6)})` : ""}</span>
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20"
+                                title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn"
+                              >
+                                <Clock className="h-3 w-3" />
+                                <span>Chờ Shopee chốt</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="font-mono font-bold text-emerald-500 text-sm">
+                              {vnd(o.cashback_amount || 0)}
+                            </div>
+                            {o.order_value && o.order_value > 0 && (
+                              <div className="text-[10px] text-muted-foreground">
+                                Đơn: {vnd(o.order_value)}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 2. Mobile Card List View (sm:hidden) */}
+              <div className="sm:hidden space-y-2 max-h-72 overflow-y-auto pr-0.5">
                 {user.orders.map((o) => {
+                  const isSelected = selectedOrderIds.has(o.order_id)
                   const isSettled = o.settlement_status === "settled"
                   return (
-                    <div key={o.order_id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs font-semibold text-foreground">
-                            {o.order_id}
-                          </span>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">
-                            {o.platform === "tiktok" ? "TikTok" : "Shopee"}
-                          </Badge>
-                          {o.status === "awaiting_approval" ? (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-400">
-                              Chờ duyệt
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-400">
-                              Đã duyệt
-                            </Badge>
-                          )}
+                    <div
+                      key={o.order_id}
+                      onClick={() => toggleOrder(o.order_id)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? "border-emerald-500 bg-emerald-500/10 shadow-xs"
+                          : "border-border/60 bg-card hover:bg-secondary/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}} // handled by parent onClick
+                            className="rounded border-border text-primary focus:ring-primary h-5 w-5 shrink-0 cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-foreground">{o.order_id}</span>
+                              <Badge variant="outline" className="text-[9px] px-1 py-0">
+                                {o.platform === "tiktok" ? "TikTok" : "Shopee"}
+                              </Badge>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground truncate max-w-[200px] mt-0.5">
+                              {o.product || "Sản phẩm Shopee"}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] text-muted-foreground truncate max-w-[420px]">
-                          {o.product || "Đơn hàng liên kết Shopee"}
+                        <div className="text-right shrink-0">
+                          <div className="font-mono text-xs font-bold text-emerald-500">
+                            {vnd(o.cashback_amount || 0)}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {shortDate(o.approved_at || o.recorded_at)}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0 space-y-0.5">
-                        <div className="font-mono font-bold text-emerald-500 text-xs">
-                          {vnd(o.cashback_amount || 0)}
-                        </div>
+                      <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between text-[10px]">
                         <div>
                           {isSettled ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20" title={`Shopee đã quyết toán trong đợt ${o.payout_batch_id || ''}`}>
+                            <span className="inline-flex items-center gap-1 font-semibold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                               <ShieldCheck className="h-3 w-3" />
-                              <span>Sàn đã chuyển {o.payout_batch_id ? `(#${o.payout_batch_id.slice(-6)})` : ""}</span>
+                              <span>Sàn đã chốt {o.payout_batch_id ? `(#${o.payout_batch_id.slice(-6)})` : ""}</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20" title="Shopee chưa chuyển tiền đợt này về tài khoản ngân hàng của bạn">
+                            <span className="inline-flex items-center gap-1 font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                               <Clock className="h-3 w-3" />
-                              <span>Chờ Shopee chuyển</span>
+                              <span>Chờ Shopee chốt</span>
                             </span>
                           )}
                         </div>
+                        <span className={isSelected ? "font-semibold text-emerald-500" : "text-muted-foreground"}>
+                          {isSelected ? "✓ Đã chọn" : "Chạm để chọn"}
+                        </span>
                       </div>
                     </div>
                   )
@@ -1665,30 +2068,38 @@ function PaymentDialog({
           )}
         </div>
 
-        {/* Sticky Fixed Footer */}
-        <div className="shrink-0 flex items-center justify-between border-t border-border/70 px-6 py-3.5 bg-secondary/30">
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-xs">
-            Đóng
-          </Button>
+        {/* Sticky Fixed Footer for both Web & Mobile */}
+        <div className="shrink-0 border-t border-border/70 p-3 sm:px-6 sm:py-3.5 bg-secondary/30">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <div className="flex items-center justify-between sm:justify-start gap-3">
+              <Button variant="ghost" size="sm" onClick={onClose} className="text-xs h-8">
+                Đóng
+              </Button>
+              <div className="text-xs text-muted-foreground">
+                Đã chọn: <strong className="text-foreground">{selectedOrderIds.size}</strong> đơn •{" "}
+                Số tiền: <strong className="text-emerald-500 font-bold">{vnd(amount)}</strong>
+              </div>
+            </div>
 
-          <Button
-            size="sm"
-            onClick={() => confirmMutation.mutate()}
-            disabled={confirmMutation.isPending || amount <= 0}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-6 py-2 h-9 shadow-sm"
-          >
-            {confirmMutation.isPending ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Đang xử lý & gửi thông báo...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Xác Nhận Đã Chuyển & Gửi Thông Báo</span>
-              </>
-            )}
-          </Button>
+            <Button
+              size="sm"
+              onClick={() => confirmMutation.mutate()}
+              disabled={confirmMutation.isPending || amount <= 0 || selectedOrderIds.size === 0}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-5 py-2 h-9 shadow-sm w-full sm:w-auto"
+            >
+              {confirmMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Đang xử lý & gửi thông báo...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Xác Nhận Đã Chuyển ({vnd(amount)})</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

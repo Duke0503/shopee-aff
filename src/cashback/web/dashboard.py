@@ -2454,24 +2454,26 @@ class _Handler(BaseHTTPRequestHandler):
                 cust_entry["order_ids"].append(r["order_id"])
                 cust_entry["order_count"] += 1
 
-                if r["status"] == "approved":
+                is_settled = (r["settlement_status"] == "settled")
+                if r["status"] == "approved" and is_settled:
                     cust_entry["payable_amount"] += cb
+                    cust_entry["settled_payable_amount"] = (cust_entry.get("settled_payable_amount") or 0) + cb
+                elif r["status"] == "approved":
+                    cust_entry["unsettled_payable_amount"] = (cust_entry.get("unsettled_payable_amount") or 0) + cb
                 elif r["status"] == "awaiting_approval":
                     cust_entry["awaiting_amount"] += cb
 
             payables = []
             for cid, entry in customers_map.items():
-                entry["bonus"] = campaigns.bonus_owed(conn, entry["order_ids"])
+                settled_order_ids = [
+                    o["order_id"] for o in entry["orders"]
+                    if o["status"] == "approved" and o.get("settlement_status") == "settled"
+                ]
+                entry["bonus"] = campaigns.bonus_owed(conn, settled_order_ids)
                 entry["payable_amount"] += entry["bonus"]
-                entry["total_unpaid"] = entry["payable_amount"] + entry["awaiting_amount"]
-                entry["settled_payable_amount"] = sum(
-                    (o.get("cashback_amount") or 0) for o in entry["orders"]
-                    if o.get("status") == "approved" and o.get("settlement_status") == "settled"
-                )
-                entry["unsettled_payable_amount"] = sum(
-                    (o.get("cashback_amount") or 0) for o in entry["orders"]
-                    if o.get("status") == "approved" and o.get("settlement_status") != "settled"
-                )
+                entry["settled_payable_amount"] = (entry.get("settled_payable_amount") or 0) + entry["bonus"]
+                entry["unsettled_payable_amount"] = entry.get("unsettled_payable_amount") or 0
+                entry["total_unpaid"] = entry["payable_amount"] + entry["unsettled_payable_amount"] + entry["awaiting_amount"]
                 entry["is_fully_settled"] = (
                     entry["payable_amount"] > 0 and entry["unsettled_payable_amount"] == 0
                 )
@@ -2479,7 +2481,8 @@ class _Handler(BaseHTTPRequestHandler):
                 ref = str(entry["customer_code"] or entry["customer_id"]).strip()
                 entry["reference"] = ref
 
-                qr_amount = entry["payable_amount"] if entry["payable_amount"] > 0 else entry["awaiting_amount"]
+                # QR amount defaults to payable_amount (the settled amount ready to pay)!
+                qr_amount = entry["payable_amount"] if entry["payable_amount"] > 0 else (entry["unsettled_payable_amount"] if entry["unsettled_payable_amount"] > 0 else entry["awaiting_amount"])
                 if entry["bank_status"] == "valid" and entry["bank_info"] and qr_amount > 0:
                     params = urllib.parse.urlencode({
                         "amount": qr_amount,
@@ -2507,25 +2510,26 @@ class _Handler(BaseHTTPRequestHandler):
                         entry["payout_status"] = "ready"
                     else:
                         entry["payout_status"] = "needs_bank"
+                elif entry["unsettled_payable_amount"] > 0:
+                    entry["payout_status"] = "awaiting_settlement"
                 elif entry["awaiting_amount"] > 0:
-                    if entry["bank_status"] == "valid":
-                        entry["payout_status"] = "awaiting"
-                    else:
-                        entry["payout_status"] = "needs_bank"
+                    entry["payout_status"] = "awaiting"
                 else:
                     entry["payout_status"] = "settled"
 
                 payables.append(entry)
 
             payables.sort(key=lambda p: (
-                1 if p["payable_amount"] > 0 else (2 if p["awaiting_amount"] > 0 else 3),
+                1 if p["payable_amount"] > 0 else (2 if p["unsettled_payable_amount"] > 0 else (3 if p["awaiting_amount"] > 0 else 4)),
                 -p["payable_amount"],
+                -p["unsettled_payable_amount"],
                 -p["awaiting_amount"]
             ))
 
             transfers_list = [dict(r) for r in transfer_rows]
 
             total_payable = sum(p["payable_amount"] for p in payables)
+            total_unsettled = sum(p["unsettled_payable_amount"] for p in payables)
             total_awaiting = sum(p["awaiting_amount"] for p in payables)
             ready_users = sum(1 for p in payables if p["payout_status"] == "ready")
             needs_bank_users = sum(1 for p in payables if p["payout_status"] == "needs_bank")
@@ -2533,6 +2537,7 @@ class _Handler(BaseHTTPRequestHandler):
 
             summary = {
                 "total_payable": total_payable,
+                "total_unsettled": total_unsettled,
                 "total_awaiting": total_awaiting,
                 "ready_users": ready_users,
                 "needs_bank_users": needs_bank_users,
