@@ -449,68 +449,76 @@ export function Home() {
       <Header current="home" />
 
       {/* MAIN CONTENT */}
-      <main className="w-full pt-20 bg-background flex-1">
+      <main className="w-full pt-16 sm:pt-18 md:pt-20 bg-background flex-1">
         <div className="flex flex-col w-full">
-          {/* HERO SECTION WITH FESTIVE MID-AUTUMN BACKGROUND */}
+          {/* HERO SECTION - CLEAN MODERN FINTECH */}
           <div className="relative w-full overflow-hidden">
-            {/* Mid-Autumn Festive Background Wallpaper (Desktop 16:9 & Mobile 9:16) - Vivid & High Definition */}
-            <div
-              className="pointer-events-none absolute inset-0 hidden sm:block bg-cover bg-center bg-no-repeat opacity-95 transition-opacity"
-              style={{ backgroundImage: "url('/hero-bg-pc.jpg')" }}
-            />
-            <div
-              className="pointer-events-none absolute inset-0 block sm:hidden bg-cover bg-top bg-no-repeat opacity-95 transition-opacity"
-              style={{ backgroundImage: "url('/hero-bg-mobile.jpg')" }}
-            />
-
-            {/* Subtle atmospheric vignette: keeps lanterns and moon shining vibrant while guaranteeing 100% text readability */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#050b18]/60 via-[#070e22]/40 to-background/90 dark:to-background transition-colors" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background via-background/60 to-transparent" />
-
-            {/* Subtle Ambient Glow Elements */}
-            <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[780px] h-[380px] bg-gradient-to-tr from-primary-fixed/20 via-primary-container/10 to-transparent blur-3xl pointer-events-none rounded-full" />
-            <div className="absolute top-96 right-10 w-96 h-96 bg-tertiary-fixed/15 blur-3xl pointer-events-none rounded-full" />
+            {/* Ambient Mesh Aura Glow */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[760px] h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/15 via-emerald-500/5 to-transparent blur-3xl opacity-70" />
+              <div className="absolute top-1/4 -right-16 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-1/3 -left-16 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+            </div>
 
             {/* HERO SECTION CONTENT & SMART LINK CONVERTER */}
-            <section className="relative max-w-7xl mx-auto px-6 lg:px-12 pt-8 pb-16 flex flex-col items-center text-center">
-              {/* Top Pill Tag - Honest & Modest with Festive Gold Glow */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/45 backdrop-blur-md border border-amber-400/40 shadow-md">
-                <span className="size-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#f59e0b]" />
-                <span className="font-label-md text-label-md text-amber-300 font-bold tracking-wider uppercase">
+            <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-4 sm:pt-8 pb-10 sm:pb-16 flex flex-col items-center text-center">
+              {/* Top Pill Tag */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 dark:bg-primary/15 border border-primary/20 shadow-2xs backdrop-blur-sm">
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[11px] sm:text-xs text-primary font-bold tracking-wider uppercase">
                   MUA SẮM TIẾT KIỆM · HOÀN TIỀN TỰ ĐỘNG 80%
                 </span>
               </div>
 
-              {/* Main Dynamic Headline - Radiant White & High Contrast */}
-              <h1 className="mt-6 max-w-4xl font-display-lg text-display-lg text-white font-extrabold tracking-tight leading-tight drop-shadow-md">
-                Dán link Shopee hoặc TikTok Shop để nhận lại{" "}
-                <span className="text-emerald-400 font-black drop-shadow-[0_2px_14px_rgba(16,185,129,0.45)]">80% hoa hồng</span> về tài khoản ngân hàng
+              {/* Main Dynamic Headline */}
+              <h1 className="mt-3.5 sm:mt-5 max-w-4xl text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight sm:leading-snug text-foreground">
+                Dán link Shopee hoặc TikTok Shop
+                <br className="hidden sm:inline" />{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-400 font-black">
+                  nhận lại 80% hoa hồng
+                </span>
               </h1>
 
-              {/* Explanatory Subtitle - Luminous Slate White */}
-              <p className="mt-5 max-w-2xl font-body-lg text-body-lg text-slate-100 leading-relaxed drop-shadow-sm font-normal">
-                Không mất phí, không cần đăng ký phức tạp. Nhận ngay 80% số tiền hoa hồng của sàn chuyển thẳng về tài khoản ngân hàng của bạn sau khi đơn hàng thành công.
+              {/* Explanatory Subtitle */}
+              <p className="mt-2.5 sm:mt-4 max-w-xl text-xs sm:text-base text-muted-foreground leading-relaxed font-normal">
+                Chuyển thẳng về tài khoản ngân hàng sau khi đơn hoàn tất. Miễn phí 100%, không cần đăng ký phức tạp.
               </p>
 
               {/* Smart Link Input Box & Converter Engine */}
-              <div className="mt-10 w-full max-w-3xl">
-                <div className="p-2 sm:p-2.5 rounded-2xl bg-white dark:bg-[#131b2e] shadow-2xl flex flex-col sm:flex-row items-center gap-2.5 transition-all focus-within:ring-2 focus-within:ring-primary/40 border border-white/20">
-                  <div className="relative flex-1 w-full flex items-center pl-4 pr-2">
-                    <span className="material-symbols-outlined text-slate-400 text-xl flex-shrink-0">
+              <div className="mt-5 sm:mt-8 w-full max-w-2xl">
+                {/* Platform Indicator Badges */}
+                <div className="flex items-center justify-center gap-2 mb-2.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#ee4d2d]/10 text-[#ee4d2d] text-[11px] font-bold border border-[#ee4d2d]/20">
+                    <span className="size-1.5 rounded-full bg-[#ee4d2d]" />
+                    Shopee
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-white text-[11px] font-bold border border-neutral-900/20 dark:border-white/20">
+                    <span className="size-1.5 rounded-full bg-neutral-900 dark:bg-white" />
+                    TikTok Shop
+                  </span>
+                  <span className="text-[11px] text-muted-foreground hidden xs:inline">
+                    • Hoàn 80% hoa hồng
+                  </span>
+                </div>
+
+                {/* Input Card */}
+                <div className="p-1.5 sm:p-2 rounded-2xl bg-card border border-border/80 shadow-xl flex flex-col sm:flex-row items-center gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/60">
+                  <div className="relative flex-1 w-full flex items-center pl-3.5 pr-2">
+                    <span className="material-symbols-outlined text-muted-foreground text-xl flex-shrink-0">
                       link
                     </span>
                     <input
                       type="text"
                       value={inputUrl}
                       onChange={(e) => setInputUrl(e.target.value)}
-                      placeholder="Dán link sản phẩm Shopee hoặc TikTok Shop tại đây..."
-                      className="w-full bg-transparent px-3 py-3 font-body-md-medium text-body-md-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                      placeholder="Dán link sản phẩm Shopee hoặc TikTok Shop..."
+                      className="w-full bg-transparent px-2.5 py-2.5 sm:py-3 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none font-medium"
                     />
                     <button
                       type="button"
                       onClick={handlePaste}
                       title="Dán từ bộ nhớ tạm"
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-label-sm text-label-sm flex items-center gap-1 transition-colors flex-shrink-0 cursor-pointer font-medium"
+                      className="px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs flex items-center gap-1 transition-colors flex-shrink-0 cursor-pointer font-semibold shadow-2xs active:scale-95"
                     >
                       <span className="material-symbols-outlined text-sm">content_paste</span>
                       <span>Dán</span>
@@ -521,17 +529,17 @@ export function Home() {
                     type="button"
                     onClick={() => handleConvert()}
                     disabled={converting}
-                    className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 flex-shrink-0 cursor-pointer font-bold"
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 flex-shrink-0 cursor-pointer font-bold"
                   >
                     {converting ? (
                       <>
-                        <span className="material-symbols-outlined text-lg animate-spin">refresh</span>
+                        <span className="material-symbols-outlined text-base animate-spin">refresh</span>
                         <span>Đang xử lý...</span>
                       </>
                     ) : (
                       <>
                         <span>Lấy Link Hoàn Tiền 80%</span>
-                        <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                        <span className="material-symbols-outlined text-base">arrow_forward</span>
                       </>
                     )}
                   </button>
@@ -739,16 +747,16 @@ export function Home() {
 
                 {/* 3 Cohesive Trust Badges (Modern SaaS Pill Design) */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 text-xs">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/45 backdrop-blur-md border border-white/20 text-white font-medium shadow-md">
-                    <span className="material-symbols-outlined text-emerald-400 text-base">verified</span>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-secondary/70 dark:bg-card border border-border/80 text-foreground font-medium shadow-2xs">
+                    <span className="material-symbols-outlined text-emerald-500 text-base">verified</span>
                     <span>Áp dụng Shopee &amp; TikTok Shop</span>
                   </div>
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/45 backdrop-blur-md border border-white/20 text-white font-medium shadow-md">
-                    <span className="material-symbols-outlined text-emerald-400 text-base">bolt</span>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-secondary/70 dark:bg-card border border-border/80 text-foreground font-medium shadow-2xs">
+                    <span className="material-symbols-outlined text-emerald-500 text-base">bolt</span>
                     <span>Chuyển khoản tự động 24/7</span>
                   </div>
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/45 backdrop-blur-md border border-white/20 text-white font-medium shadow-md">
-                    <span className="material-symbols-outlined text-emerald-400 text-base">savings</span>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-secondary/70 dark:bg-card border border-border/80 text-foreground font-medium shadow-2xs">
+                    <span className="material-symbols-outlined text-emerald-500 text-base">savings</span>
                     <span>0đ phí duy trì trọn đời</span>
                   </div>
                 </div>

@@ -4021,22 +4021,7 @@ class _Handler(BaseHTTPRequestHandler):
         qs = parse_qs(parsed.query)
         cat = qs.get("category", ["all"])[0].strip()
         with ledger.connect(self.cfg.db_path) as conn:
-            rows = ledger.get_featured_deals(conn, category=cat, limit=24)
-            deals = []
-            for r in rows:
-                deals.append({
-                    "id": r["id"],
-                    "itemId": r["item_id"],
-                    "name": r["name"],
-                    "platform": r["platform"],
-                    "category": r["category"],
-                    "originalPrice": r["original_price"],
-                    "salePrice": r["sale_price"],
-                    "commissionRate": r["commission_rate"],
-                    "cashback": r["cashback"],
-                    "image": r["image_url"],
-                    "url": r["url"],
-                })
+            deals = ledger.get_dynamic_featured_deals(conn, category=cat, limit=24)
             return self._json({"ok": True, "deals": deals})
 
     def _fnb_vouchers(self):

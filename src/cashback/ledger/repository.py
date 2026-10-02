@@ -1381,6 +1381,33 @@ def get_stale_hot_products(
     ).fetchall()
 
 
+def classify_deal_category(name: str) -> str:
+    """Classify product title into tech, home, or beauty for featured deals."""
+    lower = name.lower()
+    tech_kw = (
+        "điện thoại", "tai nghe", "bàn phím", "chuột", "ugreen", "airtag", "bluetooth",
+        "5g", "sim", "laptop", "cáp", "sạc", "loa", "smartwatch", "đồng hồ", "quạt",
+        "pin", "anker", "camera", "máy tính", "công nghệ", "soundcore", "dareu", "baseus", "cân điện tử"
+    )
+    home_kw = (
+        "tủ", "kệ", "khăn", "nồi", "chảo", "ghế", "sữa", "pate", "mèo", "chó",
+        "thú cưng", "bếp", "gia dụng", "đời sống", "nước giặt", "bình", "hộp", "ly",
+        "cốc", "gối", "nệm", "deli", "tefal", "nutifood", "aptamil", "xe máy", "giường", "bàn ăn", "tất", "vớ"
+    )
+    beauty_kw = (
+        "mặt nạ", "dầu gội", "tế bào gốc", "son", "kem", "serum", "sữa rửa mặt",
+        "nước hoa", "chăm sóc da", "váy", "đầm", "áo", "quần", "thời trang", "balo",
+        "túi xách", "giày", "lipoderm", "mỹ phẩm", "kem chống nắng", "trang điểm", "srx", "dress"
+    )
+    if any(kw in lower for kw in tech_kw):
+        return "tech"
+    if any(kw in lower for kw in home_kw):
+        return "home"
+    if any(kw in lower for kw in beauty_kw):
+        return "beauty"
+    return "home"
+
+
 def get_featured_deals(
     conn: sqlite3.Connection, category: str | None = None, limit: int = 24
 ) -> list[sqlite3.Row]:
@@ -1404,6 +1431,96 @@ def get_featured_deals(
         """,
         (limit,),
     ).fetchall()
+
+
+def get_dynamic_featured_deals(
+    conn: sqlite3.Connection, category: str | None = None, limit: int = 24
+) -> list[dict[str, Any]]:
+    """Return hot deals combining top trending products from products_cache and curated featured_deals.
+
+    Prioritizes real products converted by customers, with deterministic daily rotation
+    so the carousel is always fresh and engaging.
+    """
+    deals: list[dict[str, Any]] = []
+    seen_ids = set()
+
+    # 1. Fetch real converted products from products_cache
+    cache_rows = conn.execute(
+        """
+        SELECT item_id, name, price, cashback, image_url, canonical_url, affiliate_url, request_count, updated_at
+        FROM products_cache
+        WHERE image_url IS NOT NULL AND image_url != '' AND price > 10000 AND cashback > 0
+        ORDER BY request_count DESC, updated_at DESC
+        LIMIT 80
+        """
+    ).fetchall()
+
+    today_str = datetime.now(VN_TZ).strftime("%Y-%m-%d")
+    trending_candidates: list[dict[str, Any]] = []
+
+    for cr in cache_rows:
+        item_id = str(cr["item_id"] or "")
+        if not item_id or item_id in seen_ids:
+            continue
+
+        prod_name = str(cr["name"] or "").strip()
+        cat = classify_deal_category(prod_name)
+        if category and category != "all" and cat != category:
+            continue
+
+        price = int(cr["price"] or 0)
+        cb = int(cr["cashback"] or 0)
+        url = cr["canonical_url"] or cr["affiliate_url"] or f"https://shopee.vn/product/i.{item_id}"
+        orig_price = round(price * 1.15)
+        comm_rate = round((cb / price) * 100, 1) if price > 0 else 8.0
+        platform = "TikTok Shop" if "tiktok" in item_id.lower() or "tiktok" in url.lower() else "Shopee Mall"
+
+        # Deterministic daily rotation score
+        req_count = cr["request_count"] or 1
+        day_hash = (hash(f"{item_id}_{today_str}") % 15)
+        score = req_count * 10 + day_hash
+
+        seen_ids.add(item_id)
+        trending_candidates.append({
+            "id": f"trend_{item_id}",
+            "itemId": item_id,
+            "name": prod_name,
+            "platform": platform,
+            "category": cat,
+            "originalPrice": orig_price,
+            "salePrice": price,
+            "commissionRate": comm_rate,
+            "cashback": cb,
+            "image": cr["image_url"],
+            "url": url,
+            "_score": score,
+        })
+
+    trending_candidates.sort(key=lambda x: x["_score"], reverse=True)
+    for t in trending_candidates:
+        t.pop("_score", None)
+        deals.append(t)
+
+    # 2. Append curated manual deals if they haven't been shown yet
+    manual_rows = get_featured_deals(conn, category=category, limit=limit)
+    for r in manual_rows:
+        if r["item_id"] not in seen_ids:
+            seen_ids.add(r["item_id"])
+            deals.append({
+                "id": r["id"],
+                "itemId": r["item_id"],
+                "name": r["name"],
+                "platform": r["platform"],
+                "category": r["category"],
+                "originalPrice": r["original_price"],
+                "salePrice": r["sale_price"],
+                "commissionRate": r["commission_rate"],
+                "cashback": r["cashback"],
+                "image": r["image_url"],
+                "url": r["url"],
+            })
+
+    return deals[:limit]
 
 
 def upsert_featured_deal(

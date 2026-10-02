@@ -10,21 +10,21 @@ export function ZaloCommunityBanner() {
 
   return (
     <Card className="luxury-panel relative overflow-hidden border border-border/80 p-6 sm:p-7 md:p-8 shadow-md w-full h-full flex flex-col justify-between">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
       <div className="space-y-5">
-        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-300 shadow-2xs backdrop-blur-xs">
-          <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-          <span>🥮 Sự Kiện Trung Thu — Nhóm Zalo Chính Thức</span>
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary shadow-2xs backdrop-blur-xs">
+          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>{t("zalo_community_badge")}</span>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-start sm:items-center">
-          <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border border-amber-400/30 group">
+          <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border border-primary/20 group">
             <img
-              src="/autumn-square.jpg"
-              alt="Đón Trung Thu Hoàn Tiền 80%"
+              src="/zalo-group-avatar.jpg"
+              alt="Cộng Đồng Hoàn Tiền DP"
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
-            <span className="absolute bottom-1 right-1 bg-black/75 backdrop-blur-xs text-[10px] font-bold text-amber-300 px-1.5 py-0.5 rounded">
+            <span className="absolute bottom-1 right-1 bg-black/75 backdrop-blur-xs text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded">
               80%
             </span>
           </div>
