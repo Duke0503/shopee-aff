@@ -27,13 +27,13 @@ export function Header({ current }: { current: Route }) {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-border/40 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all">
-        <div className="h-16 sm:h-18 md:h-20 max-w-7xl mx-auto px-3 sm:px-6 lg:px-12 flex items-center justify-between gap-2 sm:gap-6">
+        <div className="h-14 sm:h-18 md:h-20 max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-12 flex items-center justify-between gap-1.5 sm:gap-6">
           <button
             onClick={() => navigate("home")}
-            className="flex items-center gap-2 sm:gap-3 group text-left cursor-pointer shrink-0 min-w-0"
+            className="flex items-center gap-1.5 sm:gap-3 group text-left cursor-pointer shrink-0 min-w-0"
           >
-            <BrandLogo className="size-8 sm:size-9 md:size-10 rounded-xl shadow-[0_2px_8px_rgba(0,105,72,0.2)] shrink-0" />
-            <span className="font-bold text-base sm:text-lg md:text-xl text-on-surface tracking-tight leading-none group-hover:text-primary transition-colors whitespace-nowrap">
+            <BrandLogo className="size-7 sm:size-9 md:size-10 rounded-xl shadow-[0_2px_8px_rgba(0,105,72,0.2)] shrink-0" />
+            <span className="font-extrabold text-sm sm:text-lg md:text-xl text-on-surface tracking-tight leading-none group-hover:text-primary transition-colors whitespace-nowrap">
               Hoàn Tiền DP
             </span>
           </button>
@@ -73,7 +73,7 @@ export function Header({ current }: { current: Route }) {
           </nav>
 
           {/* Action buttons + Theme Toggle */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             <ThemeToggle />
             {me ? (
               <UserProfileMenu me={me} />
@@ -82,7 +82,7 @@ export function Header({ current }: { current: Route }) {
                 <button
                   type="button"
                   onClick={() => navigate("login")}
-                  className="inline-flex items-center justify-center text-xs sm:text-sm font-semibold sm:font-bold bg-primary text-on-primary px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl hover:bg-primary-container shadow-[0_2px_10px_rgba(0,105,72,0.2)] transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                  className="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-primary text-on-primary px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl hover:bg-primary-container shadow-[0_2px_10px_rgba(0,105,72,0.2)] transition-all cursor-pointer whitespace-nowrap active:scale-95"
                 >
                   Đăng Nhập
                 </button>
@@ -153,6 +153,18 @@ export function BottomNav({ current }: { current: Route }) {
         </div>
         <span>{t("nav_guide_short")}</span>
       </button>
+
+      <a
+        href={ZALO_GROUP_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px] font-medium transition-all active:scale-95 cursor-pointer text-muted-foreground hover:text-foreground"
+      >
+        <div className="p-1 rounded-xl transition-colors">
+          <span className="material-symbols-outlined text-[20px] text-[#0068ff]">groups</span>
+        </div>
+        <span className="text-[#0068ff] font-semibold">Nhóm Zalo</span>
+      </a>
     </nav>
   )
 }

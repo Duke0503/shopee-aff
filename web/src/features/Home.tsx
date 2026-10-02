@@ -212,7 +212,7 @@ export function Home() {
       <Header current="home" />
 
       {/* MAIN CONTENT */}
-      <main className="w-full pt-16 sm:pt-18 md:pt-20 bg-background flex-1">
+      <main className="w-full pt-14 sm:pt-18 md:pt-20 bg-background flex-1">
         <div className="flex flex-col w-full">
           {/* HERO SECTION - CLEAN MODERN FINTECH */}
           <div className="relative w-full overflow-hidden">
@@ -224,66 +224,66 @@ export function Home() {
             </div>
 
             {/* HERO SECTION CONTENT & SMART LINK CONVERTER */}
-            <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-4 sm:pt-8 pb-10 sm:pb-16 flex flex-col items-center text-center">
+            <section className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-12 pt-2 sm:pt-8 pb-8 sm:pb-16 flex flex-col items-center text-center">
               {/* Top Pill Tag */}
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 dark:bg-primary/15 border border-primary/20 shadow-2xs backdrop-blur-sm">
+              <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:py-1.5 rounded-full bg-primary/10 dark:bg-primary/15 border border-primary/20 shadow-2xs backdrop-blur-sm">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                <span className="text-[11px] sm:text-xs text-primary font-bold tracking-wider uppercase">
+                <span className="text-[10px] sm:text-xs text-primary font-bold tracking-wider uppercase">
                   MUA SẮM TIẾT KIỆM · HOÀN TIỀN TỰ ĐỘNG 80%
                 </span>
               </div>
 
               {/* Main Dynamic Headline */}
-              <h1 className="mt-3.5 sm:mt-5 max-w-4xl text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight sm:leading-snug text-foreground">
-                Dán link Shopee hoặc TikTok Shop
-                <br className="hidden sm:inline" />{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-400 font-black">
-                  nhận lại 80% hoa hồng
+              <h1 className="mt-2.5 sm:mt-5 max-w-4xl text-xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-snug sm:leading-snug text-foreground">
+                Dán link Shopee · TikTok Shop
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-400">
+                  Nhận lại 80% hoa hồng
                 </span>
               </h1>
 
               {/* Explanatory Subtitle */}
-              <p className="mt-2.5 sm:mt-4 max-w-xl text-xs sm:text-base text-muted-foreground leading-relaxed font-normal">
-                Chuyển thẳng về tài khoản ngân hàng sau khi đơn hoàn tất. Miễn phí 100%, không cần đăng ký phức tạp.
+              <p className="mt-1.5 sm:mt-3 max-w-xl text-xs sm:text-base text-muted-foreground leading-relaxed font-normal px-2">
+                Chuyển thẳng về tài khoản ngân hàng sau khi đơn giao thành công. Miễn phí 100%, không cần đăng ký.
               </p>
 
               {/* Smart Link Input Box & Converter Engine */}
-              <div className="mt-5 sm:mt-8 w-full max-w-2xl">
+              <div className="mt-4 sm:mt-8 w-full max-w-2xl">
                 {/* Platform Indicator Badges */}
-                <div className="flex items-center justify-center gap-2 mb-2.5">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#ee4d2d]/10 text-[#ee4d2d] text-[11px] font-bold border border-[#ee4d2d]/20">
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#ee4d2d]/10 text-[#ee4d2d] text-[10px] sm:text-[11px] font-bold border border-[#ee4d2d]/20">
                     <span className="size-1.5 rounded-full bg-[#ee4d2d]" />
                     Shopee
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-white text-[11px] font-bold border border-neutral-900/20 dark:border-white/20">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-white text-[10px] sm:text-[11px] font-bold border border-neutral-900/20 dark:border-white/20">
                     <span className="size-1.5 rounded-full bg-neutral-900 dark:bg-white" />
                     TikTok Shop
                   </span>
-                  <span className="text-[11px] text-muted-foreground hidden xs:inline">
-                    • Hoàn 80% hoa hồng
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground">
+                    • Hoàn 80% Napas 24/7
                   </span>
                 </div>
 
                 {/* Input Card */}
-                <div className="p-1.5 sm:p-2 rounded-2xl bg-card border border-border/80 shadow-xl flex flex-col sm:flex-row items-center gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/60">
-                  <div className="relative flex-1 w-full flex items-center pl-3.5 pr-2">
-                    <span className="material-symbols-outlined text-muted-foreground text-xl flex-shrink-0">
+                <div className="p-1 sm:p-2 rounded-2xl bg-card border border-border/80 shadow-lg flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/60">
+                  <div className="relative flex-1 w-full flex items-center pl-2.5 sm:pl-3.5 pr-1.5">
+                    <span className="material-symbols-outlined text-muted-foreground text-lg sm:text-xl flex-shrink-0">
                       link
                     </span>
                     <input
                       type="text"
                       value={inputUrl}
                       onChange={(e) => setInputUrl(e.target.value)}
-                      placeholder="Dán link sản phẩm Shopee hoặc TikTok Shop..."
-                      className="w-full bg-transparent px-2.5 py-2.5 sm:py-3 text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none font-medium"
+                      placeholder="Dán link Shopee hoặc TikTok Shop..."
+                      className="w-full bg-transparent px-2 py-2 sm:py-3 text-xs sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none font-medium min-w-0"
                     />
                     <button
                       type="button"
                       onClick={handlePaste}
                       title="Dán từ bộ nhớ tạm"
-                      className="px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs flex items-center gap-1 transition-colors flex-shrink-0 cursor-pointer font-semibold shadow-2xs active:scale-95"
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-[11px] sm:text-xs flex items-center gap-1 transition-colors flex-shrink-0 cursor-pointer font-semibold shadow-2xs active:scale-95"
                     >
-                      <span className="material-symbols-outlined text-sm">content_paste</span>
+                      <span className="material-symbols-outlined text-xs sm:text-sm">content_paste</span>
                       <span>Dán</span>
                     </button>
                   </div>
@@ -292,17 +292,17 @@ export function Home() {
                     type="button"
                     onClick={() => handleConvert()}
                     disabled={converting}
-                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 flex-shrink-0 cursor-pointer font-bold"
+                    className="w-full sm:w-auto px-5 py-2.5 sm:py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 shadow-md transition-all active:scale-95 flex-shrink-0 cursor-pointer font-bold"
                   >
                     {converting ? (
                       <>
-                        <span className="material-symbols-outlined text-base animate-spin">refresh</span>
+                        <span className="material-symbols-outlined text-sm sm:text-base animate-spin">refresh</span>
                         <span>Đang xử lý...</span>
                       </>
                     ) : (
                       <>
                         <span>Lấy Link Hoàn Tiền 80%</span>
-                        <span className="material-symbols-outlined text-base">arrow_forward</span>
+                        <span className="material-symbols-outlined text-sm sm:text-base">arrow_forward</span>
                       </>
                     )}
                   </button>
@@ -938,12 +938,12 @@ export function Home() {
         </div>
       </footer>
 
-      {/* FLOATING STICKY ZALO COMMUNITY BUTTON */}
+      {/* FLOATING STICKY ZALO COMMUNITY BUTTON (Desktop only) */}
       <a
         href={ZALO_GROUP_URL}
         target="_blank"
         rel="noreferrer"
-        className="fixed bottom-20 sm:bottom-6 left-6 z-40 group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[#0068ff] hover:bg-[#0057d9] text-white font-bold text-xs shadow-2xl hover:shadow-[0_8px_25px_rgba(0,104,255,0.45)] transition-all transform hover:-translate-y-0.5 active:scale-95 cursor-pointer border-2 border-white/20"
+        className="hidden md:flex fixed bottom-6 right-6 z-40 group items-center gap-2 px-4 py-2.5 rounded-full bg-[#0068ff] hover:bg-[#0057d9] text-white font-bold text-xs shadow-2xl hover:shadow-[0_8px_25px_rgba(0,104,255,0.45)] transition-all transform hover:-translate-y-0.5 active:scale-95 cursor-pointer border-2 border-white/20"
         title="Tham gia nhóm Zalo Hoàn Tiền DP"
       >
         <span className="relative flex size-2.5">
@@ -951,8 +951,7 @@ export function Home() {
           <span className="relative inline-flex rounded-full size-2.5 bg-emerald-300"></span>
         </span>
         <span className="material-symbols-outlined text-lg">groups</span>
-        <span className="hidden sm:inline">Nhóm Zalo Nhận Tiền 24/7</span>
-        <span className="sm:hidden">Zalo 80%</span>
+        <span>Nhóm Zalo Nhận Tiền 24/7</span>
       </a>
 
       {/* QUICK TOAST NOTIFICATION */}
