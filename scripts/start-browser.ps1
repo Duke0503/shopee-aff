@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 # scripts/start-browser.ps1 -> project root
 $Root      = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Extension = Join-Path $Root "extension"
-$Profile   = Join-Path $Root ".browser-profile"
+$ProfileDir = Join-Path $Root ".browser-profile"
 
 $Browser = @(
   "C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -32,11 +32,11 @@ if (-not (Test-Path (Join-Path $Extension "background\base_url.js"))) {
   throw "base_url.js is missing. Run: uv run cashback setup-token"
 }
 
-$IsNew = -not (Test-Path $Profile)
-if ($IsNew) { New-Item -ItemType Directory -Path $Profile -Force | Out-Null }
+$IsNew = -not (Test-Path $ProfileDir)
+if ($IsNew) { New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null }
 
 $Args = @(
-  "--user-data-dir=$Profile"
+  "--user-data-dir=$ProfileDir"
   "--load-extension=$Extension"
   "--disable-extensions-except=$Extension"
   "--no-first-run"
@@ -64,7 +64,7 @@ $Args = @(
 )
 
 Write-Host "Browser : $Browser"
-Write-Host "Profile : $Profile"
+Write-Host "Profile : $ProfileDir"
 Write-Host "Loading : $Extension"
 Start-Process -FilePath $Browser -ArgumentList $Args | Out-Null
 

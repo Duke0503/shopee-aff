@@ -24,9 +24,14 @@ New-Item -ItemType Directory -Force -Path $PidDir | Out-Null
 function Stop-Recorded([string]$Name) {
     $file = Join-Path $PidDir "$Name.pid"
     if (Test-Path $file) {
-        $recorded = Get-Content $file | Select-Object -First 1
-        if ($recorded) { taskkill /T /F /PID $recorded 2>$null | Out-Null }
-        Remove-Item $file -Force
+        $recorded = Get-Content $file -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($recorded) {
+            $p = Get-Process -Id $recorded -ErrorAction SilentlyContinue
+            if ($p) {
+                Stop-Process -Id $recorded -Force -ErrorAction SilentlyContinue
+            }
+        }
+        Remove-Item $file -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -60,7 +65,7 @@ Write-Host "[4/5] Dang khoi chay cac thanh phan he thong..." -ForegroundColor Cy
 
 # --- DICH VU 1: BACKEND CASHBACK SERVER (Port 8899 & Port 80) ---
 Write-Host "  [+] 1. Khoi chay Backend Cashback Server..." -ForegroundColor Green
-$BackendCmd = "Set-Location '$Root'; `$Host.UI.RawUI.WindowTitle = '[1] CASHBACK BACKEND (Port 8899 & 80)'; Write-Host '=== CASHBACK BACKEND SERVER (Port 8899 & 80) ===' -ForegroundColor Green; uv run cashback serve"
+$BackendCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[1] CASHBACK BACKEND (Port 8899 & 80)' } catch {}; Write-Host '=== CASHBACK BACKEND SERVER (Port 8899 & 80) ===' -ForegroundColor Green; uv run cashback serve"
 Start-Recorded "backend" $BackendCmd
 
 Start-Sleep -Seconds 2
@@ -68,21 +73,21 @@ Start-Sleep -Seconds 2
 # --- DICH VU 2: ZALO ASSISTANT BOT (Port 8891) ---
 Write-Host "  [+] 2. Khoi chay Zalo Assistant Bot..." -ForegroundColor Green
 $ZaloDir = Join-Path $Root "zalo_assistant"
-$ZaloCmd = "Set-Location '$ZaloDir'; `$Host.UI.RawUI.WindowTitle = '[2] ZALO ASSISTANT BOT (Port 8891)'; Write-Host '=== ZALO ASSISTANT BOT (24/7) ===' -ForegroundColor Yellow; node assistant_worker.js"
+$ZaloCmd = "Set-Location '$ZaloDir'; try { [System.Console]::Title = '[2] ZALO ASSISTANT BOT (Port 8891)' } catch {}; Write-Host '=== ZALO ASSISTANT BOT (24/7) ===' -ForegroundColor Yellow; node assistant_worker.js"
 Start-Recorded "assistant" $ZaloCmd
 
 Start-Sleep -Seconds 1
 
 # --- DICH VU 3: CLOUDFLARE TUNNEL (hoantiendp.com) ---
 Write-Host "  [+] 3. Khoi chay Cloudflare Tunnel (hoantiendp.com)..." -ForegroundColor Green
-$TunnelCmd = "Set-Location '$Root'; `$Host.UI.RawUI.WindowTitle = '[3] CLOUDFLARE TUNNEL (hoantiendp.com)'; Write-Host '=== CLOUDFLARE TUNNEL ===' -ForegroundColor Cyan; powershell -ExecutionPolicy Bypass -File 'scripts\start-tunnel.ps1'"
+$TunnelCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[3] CLOUDFLARE TUNNEL (hoantiendp.com)' } catch {}; Write-Host '=== CLOUDFLARE TUNNEL ===' -ForegroundColor Cyan; powershell -ExecutionPolicy Bypass -File 'scripts\start-tunnel.ps1'"
 Start-Recorded "tunnel" $TunnelCmd
 
 Start-Sleep -Seconds 1
 
 # --- DICH VU 4: CHROME EXTENSION AUTOMATION (Shopee / ShopeeFood Link Gen) ---
 Write-Host "  [+] 4. Khoi chay Trinh duyet Shopee Automation..." -ForegroundColor Green
-$BrowserCmd = "Set-Location '$Root'; `$Host.UI.RawUI.WindowTitle = '[4] SHOPEE CHROME AUTOMATION'; Write-Host '=== SHOPEE EXTENSION AUTOMATION ===' -ForegroundColor Magenta; powershell -ExecutionPolicy Bypass -File 'scripts\start-browser.ps1'"
+$BrowserCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[4] SHOPEE CHROME AUTOMATION' } catch {}; Write-Host '=== SHOPEE EXTENSION AUTOMATION ===' -ForegroundColor Magenta; powershell -ExecutionPolicy Bypass -File 'scripts\start-browser.ps1'"
 Start-Recorded "browser" $BrowserCmd
 
 Write-Host ""
