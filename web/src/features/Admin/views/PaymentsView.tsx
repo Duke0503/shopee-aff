@@ -54,6 +54,7 @@ import {
   X,
   Link,
   Cloud,
+  Sparkles,
 } from "lucide-react"
 
 export function PaymentsView() {
@@ -217,8 +218,8 @@ export function PaymentsView() {
         </div>
       )}
 
-      {/* Top 4 KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4 shrink-0">
+      {/* Top 5 KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 lg:gap-4 shrink-0">
         {/* Card 1: Payable (Approved & Settled) */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -244,7 +245,7 @@ export function PaymentsView() {
         {/* Card 2: Unsettled (Approved by customer but waiting for Shopee payout) */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Chờ Sàn Quyết Toán (Đã Duyệt)</span>
+            <span className="text-xs font-medium text-muted-foreground">Chờ Sàn Quyết Toán</span>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
               <Clock className="h-4 w-4" />
             </div>
@@ -263,7 +264,29 @@ export function PaymentsView() {
           </div>
         </Card>
 
-        {/* Card 3: Needs Bank Details */}
+        {/* Card 3: Campaign & Event Bonus */}
+        <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm border-purple-500/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-purple-700 dark:text-purple-300 font-semibold">Thưởng Sự Kiện (Bonus)</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400">
+              <Sparkles className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-xl font-bold tracking-tight text-purple-600 dark:text-purple-400 sm:text-2xl font-mono">
+            {vnd(summary.total_bonus || 0)}
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />
+              <span>Chờ chuyển: {vnd(summary.pending_bonus ?? summary.total_bonus ?? 0)}</span>
+            </div>
+            <span className="text-purple-600 dark:text-purple-400 font-medium">
+              Đã chi: {vnd(summary.settled_bonus || 0)}
+            </span>
+          </div>
+        </Card>
+
+        {/* Card 4: Needs Bank Details */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Thiếu / Lỗi Số Tài Khoản</span>
@@ -280,7 +303,7 @@ export function PaymentsView() {
           </div>
         </Card>
 
-        {/* Card 4: Historical Transferred */}
+        {/* Card 5: Historical Transferred */}
         <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-card to-card/60 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Tổng Đã Chi Trả</span>

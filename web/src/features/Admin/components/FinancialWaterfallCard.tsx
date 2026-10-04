@@ -10,6 +10,7 @@ import {
   Clock,
   DollarSign,
   AlertCircle,
+  Sparkles,
 } from "lucide-react"
 
 interface FinancialWaterfallCardProps {
@@ -28,15 +29,19 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
   const cashbackPipeline = fin.cashback_pipeline || 0
   const totalCashback = fin.total_cashback_all ?? fin.total_cashback ?? (cashbackPaid + cashbackReady + cashbackPipeline)
 
-  // Lợi nhuận dự tính = Thực nhận Shopee - Toàn bộ tiền hoàn (Đã hoàn + Chờ hoàn + Dự tính sẽ hoàn)
-  const estimatedProfit = fin.estimated_net_profit ?? (netShopee - totalCashback)
+  const campaignBonusTotal = fin.campaign_bonus_total || 0
+  const campaignBonusPaid = fin.campaign_bonus_paid || 0
+  const campaignBonusPending = fin.campaign_bonus_pending || 0
+
+  // Lợi nhuận dự tính = Thực nhận Shopee - Toàn bộ tiền hoàn (Đã hoàn + Chờ hoàn + Dự tính sẽ hoàn) - Thưởng sự kiện
+  const estimatedProfit = fin.estimated_net_profit ?? (netShopee - totalCashback - campaignBonusTotal)
   const estimatedMargin = fin.estimated_net_margin ?? (netShopee > 0 ? Math.round((estimatedProfit / netShopee) * 1000) / 10 : 20.0)
 
-  // Lợi nhuận thực thu = Đã duyệt/nhận trừ đi các khoản đã hoàn hoặc chờ hoàn
+  // Lợi nhuận thực thu = Đã duyệt/nhận trừ đi các khoản đã hoàn hoặc chờ hoàn và thưởng đã trả
   const realizedProfit = fin.realized_net_profit || 0
   const realizedMargin = fin.realized_net_margin ?? (realizedProfit > 0 ? 20.0 : 0.0)
 
-  const paperProfit = fin.paper_profit ?? (gross - totalCashback)
+  const paperProfit = fin.paper_profit ?? (gross - totalCashback - campaignBonusTotal)
   const paperMargin = fin.paper_margin ?? (gross > 0 ? Math.round((paperProfit / gross) * 1000) / 10 : 20.0)
 
   return (
@@ -69,8 +74,8 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
         </div>
       </div>
 
-      {/* 6-Step Waterfall Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+      {/* 7-Step Waterfall Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2.5 mt-4">
         {/* Step 1: Gross */}
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col justify-between">
           <div>
@@ -140,7 +145,7 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-                4. Số Tiền Đã Hoàn
+                4. Tiền Đã Hoàn
               </span>
               <CheckCircle2 className="h-3.5 w-3.5 text-violet-500" />
             </div>
@@ -176,17 +181,43 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
           </div>
         </div>
 
-        {/* Step 6: Estimated Net Profit */}
+        {/* Step 6: Campaign/Event Bonus */}
+        <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                6. Thưởng Sự Kiện
+              </span>
+              <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Bonus chiến dịch (Event)</div>
+            <div className="mt-2 text-base font-bold font-mono text-purple-600 dark:text-purple-400">
+              {campaignBonusTotal > 0 ? `-${vnd(campaignBonusTotal)}` : vnd(0)}
+            </div>
+          </div>
+          <div className="mt-2 text-[10px] space-y-0.5 text-muted-foreground border-t border-purple-500/20 pt-1.5">
+            <div className="flex justify-between">
+              <span>Đã chuyển:</span>
+              <span className="font-mono text-purple-600 dark:text-purple-400">{vnd(campaignBonusPaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Chờ chuyển:</span>
+              <span className="font-mono font-medium text-foreground">{vnd(campaignBonusPending)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 7: Estimated Net Profit */}
         <div className="rounded-xl border-2 border-emerald-500/50 bg-emerald-500/10 p-3 flex flex-col justify-between shadow-xs">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-200">
-                6. LỢI NHUẬN (DỰ TÍNH)
+                7. LỢI NHUẬN (DỰ TÍNH)
               </span>
               <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5 font-medium">
-              20% Thực Nhận của Admin
+              Đã trừ Hoàn tiền &amp; Event
             </div>
             <div className="mt-2 text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
               {vnd(estimatedProfit)}
@@ -204,8 +235,8 @@ export function FinancialWaterfallCard({ financials: fin }: FinancialWaterfallCa
         <div className="flex items-start gap-2 text-muted-foreground">
           <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
           <div className="leading-snug text-[11px]">
-            <strong className="text-foreground">Công thức tính minh bạch (Quy tắc 8:2): </strong>
-            Sàn thanh toán Thực Nhận (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span> sau khi trừ thuế TNCN và phí dịch vụ theo từng sàn). Khách nhận trọn vẹn 80% (<span className="font-mono font-medium text-foreground">{vnd(totalCashback)}</span>). Admin giữ trọn vẹn 20% = 
+            <strong className="text-foreground">Công thức tính minh bạch: </strong>
+            Sàn thanh toán Thực Nhận (<span className="font-mono font-medium text-foreground">{vnd(netShopee)}</span> sau khi trừ thuế TNCN và phí sàn). Khách nhận trọn vẹn hoàn tiền (<span className="font-mono font-medium text-foreground">{vnd(totalCashback)}</span>) và thưởng sự kiện (<span className="font-mono font-medium text-purple-600 dark:text-purple-400">+{vnd(campaignBonusTotal)}</span>). Admin giữ
             <strong className="text-emerald-600 dark:text-emerald-400"> Lợi Nhuận Dự Tính ({vnd(estimatedProfit)} ~ {estimatedMargin}%)</strong>.
             {" "}Lợi nhuận trên giấy trước thuế sàn là <span className="font-mono font-semibold text-foreground">{vnd(paperProfit)} ({paperMargin}%)</span>. Khi sàn đối soát duyệt đơn, lợi nhuận chuyển sang Thực Thu (đã chốt: <span className="font-mono font-medium text-foreground">{vnd(realizedProfit)} ({realizedMargin}%)</span>).
           </div>

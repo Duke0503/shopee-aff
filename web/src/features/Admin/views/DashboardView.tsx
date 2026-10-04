@@ -28,6 +28,7 @@ import {
   UserPlus,
   Repeat,
   ChevronRight,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FinancialWaterfallCard } from "@/features/Admin/components/FinancialWaterfallCard"
@@ -248,8 +249,8 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Hero 4 KPI Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Hero 5 KPI Cards Grid */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {isAdmin && fin ? (
           <>
             {/* Card 1: Gross Shopee Commission */}
@@ -300,7 +301,32 @@ export function DashboardView({
               </div>
             </Card>
 
-            {/* Card 3: Estimated Net Admin Profit */}
+            {/* Card 3: Event & Campaign Bonus */}
+            <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md border-purple-500/30 bg-purple-500/5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-purple-700 dark:text-purple-300 font-semibold">
+                  Thưởng Sự Kiện (Event)
+                </span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold tracking-tight text-purple-600 dark:text-purple-400 font-mono">
+                  {vnd(fin.campaign_bonus_total || 0)}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="text-[10px] font-medium border-purple-500/30 text-purple-600 dark:text-purple-400">
+                    Đã trả: {vnd(fin.campaign_bonus_paid || 0)}
+                  </Badge>
+                  <span className="text-[11px]">
+                    Chờ: <strong className="font-mono text-foreground">{vnd(fin.campaign_bonus_pending || 0)}</strong>
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Card 4: Estimated Net Admin Profit */}
             <Card className="relative overflow-hidden p-5 shadow-xs transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
@@ -321,7 +347,7 @@ export function DashboardView({
                   >
                     <Percent className="mr-0.5 h-2.5 w-2.5" /> Biên lãi {fin.estimated_net_margin ?? fin.real_net_margin ?? kpis.net_margin}%
                   </Badge>
-                  <span className="truncate">20% trên thực nhận sàn</span>
+                  <span className="truncate">Đã trừ hoàn &amp; event</span>
                 </div>
               </div>
             </Card>

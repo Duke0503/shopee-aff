@@ -150,7 +150,18 @@ class Bridge:
 
     def touch(self, instance_uuid: str) -> None:
         with self._lock:
+            first_conn = len(self._instances) == 0
             self._instances[instance_uuid] = datetime.now()
+        if first_conn:
+            try:
+                from ..core import telegram_alerts
+                telegram_alerts.send_recovery(
+                    "shopee_bridge",
+                    "Extension Shopee Đã Kết Nối Lại",
+                    f"Trình duyệt đã kết nối thành công với Bridge (Port 8787). Hệ thống tạo link Affiliate hoạt động bình thường."
+                )
+            except Exception:
+                pass
 
     def status(self) -> dict:
         cutoff = datetime.now() - timedelta(seconds=90)

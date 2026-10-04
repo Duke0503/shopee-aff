@@ -1214,6 +1214,26 @@ class _Handler(BaseHTTPRequestHandler):
             # 4. total_cashback_all: Tổng tiền hoàn tất cả (đã hoàn + chờ hoàn + dự tính)
             total_cashback_all = cashback_paid + cashback_ready + cashback_pipeline
             total_cashback_committed = cashback_paid + cashback_ready
+
+            # Chi phí thưởng sự kiện (Campaign/Event Bonus):
+            camp_row = conn.execute("""
+                SELECT COUNT(DISTINCT campaign_id) as total_campaigns,
+                       COALESCE(SUM(amount), 0) as total_bonus,
+                       COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as bonus_paid,
+                       COALESCE(SUM(CASE WHEN status != 'void' AND status != 'paid' THEN amount ELSE 0 END), 0) as bonus_pending,
+                       COUNT(id) as total_awards
+                  FROM campaign_awards
+                 WHERE status != 'void'
+            """).fetchone()
+            campaign_metrics = {
+                "total_campaigns": camp_row["total_campaigns"],
+                "total_bonus": camp_row["total_bonus"],
+                "bonus_paid": camp_row["bonus_paid"],
+                "bonus_pending": camp_row["bonus_pending"],
+                "total_awards": camp_row["total_awards"],
+            }
+            camp_bonus_total = camp_row["total_bonus"]
+            camp_bonus_paid = camp_row["bonus_paid"]
             
             # Shopee deductions:
             # - Phí dịch vụ sàn Shopee: 0.98%
@@ -1222,22 +1242,22 @@ class _Handler(BaseHTTPRequestHandler):
             tax_withheld = round_dong(gross_commission * 0.10)
             net_from_shopee = round_dong(gross_commission - shopee_fee - tax_withheld)
 
-            # Lợi nhuận dự tính: Thực nhận Shopee trừ đi TOÀN BỘ tiền sẽ chia cho khách (đã hoàn + chờ hoàn + dự tính)
-            estimated_net_profit = round_dong(net_from_shopee - total_cashback_all)
+            # Lợi nhuận dự tính: Thực nhận Shopee trừ đi TOÀN BỘ tiền sẽ chia cho khách (tiền hoàn 80% + thưởng sự kiện event bonus)
+            estimated_net_profit = round_dong(net_from_shopee - total_cashback_all - camp_bonus_total)
             estimated_net_margin = round((estimated_net_profit / net_from_shopee) * 100, 1) if net_from_shopee > 0 else 20.0
 
-            # Lợi nhuận đã chốt / thực thu (từ các đơn đã duyệt thành công)
+            # Lợi nhuận đã chốt / thực thu (từ các đơn đã duyệt thành công trừ tiền đã hoàn & thưởng đã trả)
             approved_gross = conn.execute(
                 f"SELECT COALESCE(SUM(COALESCE(approved_commission, 0)), 0) FROM orders WHERE {date_filter} AND status IN ('approved', 'paid')"
             ).fetchone()[0]
             approved_fee = round_dong(approved_gross * 0.0098)
             approved_tax = round_dong(approved_gross * 0.10)
             approved_net = approved_gross - approved_fee - approved_tax
-            realized_net_profit = round_dong(approved_net - total_cashback_committed)
+            realized_net_profit = round_dong(approved_net - total_cashback_committed - camp_bonus_paid)
             realized_net_margin = round((realized_net_profit / approved_net) * 100, 1) if approved_net > 0 else 0.0
 
-            # Lợi nhuận danh nghĩa (trên giấy, trước thuế & phí sàn)
-            paper_profit = round_dong(gross_commission - total_cashback_all)
+            # Lợi nhuận danh nghĩa (trên giấy, trước thuế & phí sàn, trừ tiền hoàn & thưởng sự kiện)
+            paper_profit = round_dong(gross_commission - total_cashback_all - camp_bonus_total)
             paper_margin = round((paper_profit / gross_commission) * 100, 1) if gross_commission > 0 else 20.0
 
             # Daily Trends
@@ -1543,22 +1563,6 @@ class _Handler(BaseHTTPRequestHandler):
                 ),
             ]
 
-            camp_row = conn.execute("""
-                SELECT COUNT(DISTINCT campaign_id) as total_campaigns,
-                       COALESCE(SUM(amount), 0) as total_bonus,
-                       COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as bonus_paid,
-                       COALESCE(SUM(CASE WHEN status != 'void' AND status != 'paid' THEN amount ELSE 0 END), 0) as bonus_pending,
-                       COUNT(id) as total_awards
-                  FROM campaign_awards
-                 WHERE status != 'void'
-            """).fetchone()
-            campaign_metrics = {
-                "total_campaigns": camp_row["total_campaigns"],
-                "total_bonus": camp_row["total_bonus"],
-                "bonus_paid": camp_row["bonus_paid"],
-                "bonus_pending": camp_row["bonus_pending"],
-                "total_awards": camp_row["total_awards"],
-            }
 
         metrics = {
             "period": period,
@@ -2673,6 +2677,8 @@ class _Handler(BaseHTTPRequestHandler):
             total_payable = sum(p["payable_amount"] for p in payables)
             total_unsettled = sum(p["unsettled_payable_amount"] for p in payables)
             total_awaiting = sum(p["awaiting_amount"] for p in payables)
+            total_bonus = sum(p.get("total_bonus", 0) for p in payables)
+            settled_bonus = sum(p.get("settled_bonus", 0) for p in payables)
             ready_users = sum(1 for p in payables if p["payout_status"] == "ready")
             needs_bank_users = sum(1 for p in payables if p["payout_status"] == "needs_bank")
             total_transferred = sum((t.get("amount") or 0) for t in transfers_list)
@@ -2681,6 +2687,9 @@ class _Handler(BaseHTTPRequestHandler):
                 "total_payable": total_payable,
                 "total_unsettled": total_unsettled,
                 "total_awaiting": total_awaiting,
+                "total_bonus": total_bonus,
+                "settled_bonus": settled_bonus,
+                "pending_bonus": total_bonus - settled_bonus,
                 "ready_users": ready_users,
                 "needs_bank_users": needs_bank_users,
                 "total_transferred": total_transferred,

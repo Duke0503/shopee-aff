@@ -44,16 +44,17 @@ def _stamp() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
 
-def wait_for_extension(bridge: Bridge, seconds: int) -> bool:
+def wait_for_extension(bridge: Bridge, seconds: int = 15, notify_on_fail: bool = False) -> bool:
     for _ in range(seconds):
         if bridge.connected():
             return True
         time.sleep(1)
-    try:
-        from ..core import telegram_alerts
-        telegram_alerts.notify_shopee_bridge_disconnected()
-    except Exception:
-        pass
+    if notify_on_fail:
+        try:
+            from ..core import telegram_alerts
+            telegram_alerts.notify_shopee_bridge_disconnected()
+        except Exception:
+            pass
     return False
 
 

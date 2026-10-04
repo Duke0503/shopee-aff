@@ -627,6 +627,9 @@ export interface AdminPaymentSummary {
   total_payable: number
   total_unsettled?: number
   total_awaiting: number
+  total_bonus?: number
+  settled_bonus?: number
+  pending_bonus?: number
   ready_users: number
   needs_bank_users: number
   total_transferred: number
