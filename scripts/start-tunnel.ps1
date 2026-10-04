@@ -7,6 +7,13 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $EnvFile = Join-Path $Root ".env"
 
+# Check if Cloudflared is already running as a native Windows Service
+$cfSvc = Get-Service -Name "Cloudflared" -ErrorAction SilentlyContinue
+if ($cfSvc -and $cfSvc.Status -eq "Running") {
+    Write-Host "Cloudflared Windows Service is already running." -ForegroundColor Green
+    exit 0
+}
+
 # Locate cloudflared binary
 $Cloudflared = @(
   (Get-Command cloudflared -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),

@@ -34,13 +34,21 @@ function Stop-Recorded([string]$Name) {
     if (Test-Path $file) {
         $recorded = Get-Content $file -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($recorded) {
-            $p = Get-Process -Id $recorded -ErrorAction SilentlyContinue
-            if ($p) {
-                Stop-Process -Id $recorded -Force -ErrorAction SilentlyContinue
-            }
+            cmd.exe /c "taskkill /F /T /PID $recorded" 2>$null
         }
         Remove-Item $file -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Stop-Port([int]$Port) {
+    try {
+        $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        foreach ($conn in $conns) {
+            if ($conn.OwningProcess -gt 0) {
+                cmd.exe /c "taskkill /F /T /PID $($conn.OwningProcess)" 2>$null
+            }
+        }
+    } catch {}
 }
 
 function Start-Recorded([string]$Name, [string]$Command) {
@@ -50,6 +58,9 @@ function Start-Recorded([string]$Name, [string]$Command) {
 
 $servicesToStop = if ($CodeOnly) { @("backend", "assistant") } else { @("backend", "assistant", "tunnel", "browser") }
 foreach ($name in $servicesToStop) { Stop-Recorded $name }
+Stop-Port 8899
+Stop-Port 8787
+Stop-Port 8891
 Start-Sleep -Seconds 1
 
 # 2. Kiem tra uv va dong bo moi truong Python

@@ -67,7 +67,13 @@ def unwrap_shopeefood_url(raw_url: str, timeout: float = 4.0) -> tuple[str, bool
                     clean,
                     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
                 )
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                ctx = None
+                try:
+                    import certifi, ssl
+                    ctx = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    ctx = None
+                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
                     resolved_url = resp.geturl()
             except Exception:
                 resolved_url = clean

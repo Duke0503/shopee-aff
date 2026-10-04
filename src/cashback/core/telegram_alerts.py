@@ -103,7 +103,14 @@ def send_telegram_message(text: str, chat_id: str | None = None, parse_mode: str
             data=data,
             headers={"Content-Type": "application/json", "User-Agent": "HoanTienDPAlertBot/1.0"},
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        ctx = None
+        try:
+            import certifi
+            import ssl
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = None
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             res_data = json.loads(resp.read().decode())
             if res_data.get("ok"):
                 return True
