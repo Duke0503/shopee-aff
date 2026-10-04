@@ -91,7 +91,7 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 # 7. TỰ ĐỘNG CLONE DỰ ÁN QUA GIT ACCESS TOKEN NẾU CHƯA CÓ
 $projectDir = "C:\Project\mmo"
 if (-not (Test-Path "$projectDir\.git")) {
-    Write-Host "`n[7/7] Đang Clone dự án từ GitHub về $projectDir..." -ForegroundColor Yellow
+    Write-Host "`n[7/9] Đang Clone dự án từ GitHub về $projectDir..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Force -Path "C:\Project" | Out-Null
     if ($GitToken) {
         git clone "https://$GitToken@github.com/Duke0503/shopee-aff.git" $projectDir
@@ -99,9 +99,60 @@ if (-not (Test-Path "$projectDir\.git")) {
         git clone "https://github.com/Duke0503/shopee-aff.git" $projectDir
     }
     Write-Host " -> Đã Clone mã nguồn từ GitHub thành công!" -ForegroundColor Green
+} else {
+    Write-Host "`n[7/9] Dự án đã tồn tại tại $projectDir, đang cập nhật mã nguồn..." -ForegroundColor Yellow
+    Set-Location $projectDir
+    git fetch origin main
+    git reset --hard origin/main
+    Write-Host " -> Đã cập nhật mã nguồn mới nhất!" -ForegroundColor Green
 }
 
+# 8. TỰ ĐỘNG ĐỒNG BỘ CẤU HÌNH BẢO MẬT TỪ MÁY CÁ NHÂN SANG VPS QUA RDP
+Write-Host "`n[8/9] Đang tự động kiểm tra và chuyển .env & credentials từ máy cá nhân..." -ForegroundColor Yellow
+$localPaths = @(
+    "\\tsclient\c\Project\mmo",
+    "\\tsclient\C\Project\mmo"
+)
+$syncedEnv = $false
+foreach ($lp in $localPaths) {
+    if (Test-Path "$lp\.env") {
+        Copy-Item "$lp\.env" "$projectDir\.env" -Force
+        Write-Host " -> [OK] Đã tự động sao chép file .env từ máy cá nhân sang VPS!" -ForegroundColor Green
+        $syncedEnv = $true
+    }
+    if (Test-Path "$lp\zalo_assistant\credentials.json") {
+        if (-not (Test-Path "$projectDir\zalo_assistant")) {
+            New-Item -ItemType Directory -Force -Path "$projectDir\zalo_assistant" | Out-Null
+        }
+        Copy-Item "$lp\zalo_assistant\credentials.json" "$projectDir\zalo_assistant\credentials.json" -Force
+        Write-Host " -> [OK] Đã tự động sao chép credentials.json từ máy cá nhân sang VPS!" -ForegroundColor Green
+    }
+}
+if (-not $syncedEnv -and -not (Test-Path "$projectDir\.env")) {
+    Write-Host " -> Ghi chú: Chưa tìm thấy ổ chia sẻ RDP. Nếu cần bạn có thể dán .env vào $projectDir" -ForegroundColor DarkYellow
+}
+
+# 9. TỰ ĐỘNG CẤU HÌNH GITHUB ACTIONS RUNNER (CI/CD 24/7)
+Write-Host "`n[9/9] Kích hoạt GitHub Actions Runner (CI/CD Tự Động)..." -ForegroundColor Yellow
+$runnerScript = "$projectDir\scripts\setup_ci_runner.ps1"
+if (Test-Path $runnerScript) {
+    & powershell -ExecutionPolicy Bypass -File $runnerScript -GitToken $GitToken
+} else {
+    Write-Host " -> Bỏ qua cấu hình runner do không tìm thấy file script." -ForegroundColor DarkYellow
+}
+
+# Tạo shortcut trên Desktop của VPS
+try {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = "$desktopPath\KHOI_DONG_HE_THONG.bat"
+    Set-Content -Path $shortcutPath -Value "@echo off`ncall `"$projectDir\start_vps.bat`""
+    Write-Host " -> Đã tạo shortcut khởi động hệ thống ngoài Desktop VPS!" -ForegroundColor Green
+} catch {}
+
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "🎉 HOÀN TẤT CÀI ĐẶT MÔI TRƯỜNG & MÃ NGUỒN TRÊN VPS!" -ForegroundColor Green
-Write-Host "Các công cụ đã sẵn sàng: Chrome, Node.js, Python uv, Git, Cloudflared" -ForegroundColor Green
+Write-Host "🎉 HOÀN TẤT 100% CÀI ĐẶT MÔI TRƯỜNG, DỮ LIỆU & CI/CD!" -ForegroundColor Green
+Write-Host "Bây giờ bạn chỉ cần:" -ForegroundColor Yellow
+Write-Host "1. Mở Chrome trên VPS -> chrome://extensions -> Load unpacked: C:\Project\mmo\extension" -ForegroundColor Yellow
+Write-Host "2. Đăng nhập affiliate.shopee.vn" -ForegroundColor Yellow
+Write-Host "3. Chạy file KHOI_DONG_HE_THONG ngoài màn hình Desktop VPS!" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Green
