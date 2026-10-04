@@ -53,7 +53,7 @@ PASSWORD_LENGTH = 8
 # compiled dependency on a machine that has to keep running unattended.
 PBKDF2_ROUNDS = 240_000
 
-SESSION_DAYS = 30
+SESSION_DAYS = 3650
 SESSION_BYTES = 32
 
 # Five wrong guesses inside the window and the account stops answering.
@@ -103,16 +103,16 @@ def verify_password(password: str, stored: str | None) -> bool:
     return hmac.compare_digest(candidate.hex(), digest)
 
 
-def issue_password(conn: sqlite3.Connection, customer_id: str) -> str | None:
+def issue_password(conn: sqlite3.Connection, customer_id: str,
+                   revoke_sessions: bool = False) -> str | None:
     """Mint a new password for this customer and return it, once.
 
     Returns None if there is no such customer. The plaintext is returned
     here and nowhere else -- it is not written to the database, not
     logged, and cannot be read back afterwards.
 
-    Any existing password stops working immediately. Asking again is a
-    reset, and the message that carries it has to say so, or a customer
-    who asks out of curiosity is locked out of a session they had open.
+    Any existing password stops working immediately.
+    Active sessions are preserved by default to keep customers logged in across devices.
     """
     row = conn.execute(
         "SELECT 1 FROM customers WHERE customer_id=?", (customer_id,)).fetchone()
@@ -126,9 +126,8 @@ def issue_password(conn: sqlite3.Connection, customer_id: str) -> str | None:
         " WHERE customer_id=?",
         (hash_password(password), _stamp(_now()), customer_id),
     )
-    # Every session signed in with the old password ends here. A password
-    # reset that leaves old sessions alive is not a reset.
-    conn.execute("DELETE FROM sessions WHERE customer_id=?", (customer_id,))
+    if revoke_sessions:
+        conn.execute("DELETE FROM sessions WHERE customer_id=?", (customer_id,))
     return password
 
 
@@ -240,15 +239,23 @@ def customer_for_token(conn: sqlite3.Connection, token: str) -> str | None:
     """Whose session this is, or None if it is expired or unknown."""
     if not token:
         return None
+    token_h = _hash_token(token)
     row = conn.execute(
         "SELECT customer_id, expires_at FROM sessions WHERE token_hash=?",
-        (_hash_token(token),)).fetchone()
+        (token_h,)).fetchone()
     if row is None:
         return None
-    if row["expires_at"] <= _stamp(_now()):
+    now_str = _stamp(_now())
+    if row["expires_at"] <= now_str:
         conn.execute("DELETE FROM sessions WHERE token_hash=?",
-                     (_hash_token(token),))
+                     (token_h,))
         return None
+    # Sliding session: keep session alive forever as long as customer uses the app
+    renew_threshold = _stamp(_now() + timedelta(days=1825))
+    if row["expires_at"] <= renew_threshold:
+        new_exp = _stamp(_now() + timedelta(days=SESSION_DAYS))
+        conn.execute("UPDATE sessions SET expires_at=? WHERE token_hash=?",
+                     (new_exp, token_h))
     return row["customer_id"]
 
 

@@ -13,6 +13,7 @@ which means they can read it, which means it is stored recoverably.
 
 from __future__ import annotations
 
+from datetime import timedelta
 import json
 import urllib.error
 import urllib.request
@@ -59,12 +60,19 @@ class TestPasswordsAreNotRecoverable:
         accounts.issue_password(conn, "C0001")
         assert accounts.login(conn, "C0001", first).ok is False
 
-    def test_a_reset_ends_sessions_opened_with_the_old_one(self, conn, customer):
-        """A reset that leaves old sessions alive is not a reset."""
+    def test_a_reset_preserves_sessions_by_default_to_keep_login_alive(self, conn, customer):
+        """Active sessions stay alive so asking for a password on one device does not kick another."""
         first = accounts.issue_password(conn, "C0001")
         session = accounts.login(conn, "C0001", first)
         assert accounts.customer_for_token(conn, session.token) == "C0001"
         accounts.issue_password(conn, "C0001")
+        assert accounts.customer_for_token(conn, session.token) == "C0001"
+
+    def test_a_reset_can_revoke_sessions_when_requested(self, conn, customer):
+        first = accounts.issue_password(conn, "C0001")
+        session = accounts.login(conn, "C0001", first)
+        assert accounts.customer_for_token(conn, session.token) == "C0001"
+        accounts.issue_password(conn, "C0001", revoke_sessions=True)
         assert accounts.customer_for_token(conn, session.token) is None
 
     def test_a_password_is_not_derived_from_the_customer(self):
@@ -140,6 +148,17 @@ class TestSessions:
         token = accounts.login(conn, "C0001", password).token
         accounts.logout(conn, token)
         assert accounts.customer_for_token(conn, token) is None
+
+    def test_sliding_session_renews_active_session(self, conn, customer):
+        password = accounts.issue_password(conn, "C0001")
+        token = accounts.login(conn, "C0001", password).token
+        # Simulate session expiring within renewal threshold (e.g. in 100 days)
+        near_expiry = accounts._stamp(accounts._now() + timedelta(days=100))
+        conn.execute("UPDATE sessions SET expires_at=?", (near_expiry,))
+        # Accessing customer_for_token should renew it back to SESSION_DAYS (3650 days)
+        assert accounts.customer_for_token(conn, token) == "C0001"
+        row = conn.execute("SELECT expires_at FROM sessions").fetchone()
+        assert row["expires_at"] > accounts._stamp(accounts._now() + timedelta(days=3600))
 
 
 class TestChangingPassword:
@@ -248,7 +267,7 @@ class TestOverHTTP:
                                     {"name": "C0001", "password": password})
         assert body["ok"] is True
         cookie = response.headers["Set-Cookie"]
-        assert "HttpOnly" in cookie and "SameSite=Strict" in cookie
+        assert "HttpOnly" in cookie and "SameSite=Lax" in cookie
 
     def test_a_signed_in_customer_reads_their_own_orders(self, server):
         base, password = server

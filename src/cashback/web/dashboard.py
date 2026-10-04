@@ -807,9 +807,16 @@ class _Handler(BaseHTTPRequestHandler):
             f"{SESSION_COOKIE}={token}",
             "Path=/",
             "HttpOnly",
-            "SameSite=Strict",
-            "Max-Age=0" if clear else f"Max-Age={accounts.SESSION_DAYS * 86400}",
+            "SameSite=Lax",
         ]
+        if clear:
+            parts.append("Max-Age=0")
+            parts.append("Expires=Thu, 01 Jan 1970 00:00:00 GMT")
+        else:
+            max_age = accounts.SESSION_DAYS * 86400
+            parts.append(f"Max-Age={max_age}")
+            exp_date = (datetime.now(timezone.utc) + timedelta(days=accounts.SESSION_DAYS)).strftime("%a, %d %b %Y %H:%M:%S GMT")
+            parts.append(f"Expires={exp_date}")
         # Set Secure flag when accessed over HTTPS (direct or through Cloudflare edge)
         proto = self.headers.get("X-Forwarded-Proto") or ""
         cf_visitor = self.headers.get("CF-Visitor") or ""
@@ -1068,16 +1075,17 @@ class _Handler(BaseHTTPRequestHandler):
         from ..core import audit
 
         body = self._body()
+        name = str(body.get("name") or "").strip()
+        password = str(body.get("password") or "").strip()
         with ledger.connect(self.cfg.db_path) as conn:
-            result = accounts.login(conn, str(body.get("name") or ""),
-                                    str(body.get("password") or ""))
+            result = accounts.login(conn, name, password)
             conn.commit()
         if not result.ok:
             # Failures are audited but never told apart for the caller:
             # distinguishing "no such account" from "wrong password" turns
             # the form into a way to ask who uses this service.
             audit.record(audit.LOGIN_REFUSED,
-                         name=str(body.get("name") or "")[:40],
+                         name=name[:40],
                          reason=result.reason)
             return self._json({"ok": False, "message": result.reason}, 401)
         audit.record(audit.LOGIN_OK, customer_id=result.customer_id)

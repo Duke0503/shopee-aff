@@ -40,7 +40,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
   const [showPassword, setShowPassword] = useState(false)
 
   const attempt = useMutation({
-    mutationFn: () => login(name.trim(), password),
+    mutationFn: () => login(name.trim(), password.trim()),
     onSuccess: (result) => {
       if (result.ok) onSignedIn()
     },
@@ -56,7 +56,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
           ? t("login_error", { reason: String(attempt.error) })
           : ""
 
-  const ready = name.trim().length > 0 && password.length > 0
+  const ready = name.trim().length > 0 && password.trim().length > 0
 
   // It hides its eyes only while the password field has the cursor. A
   // face covering its eyes at a field nobody is typing in is a mascot

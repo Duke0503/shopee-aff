@@ -944,20 +944,8 @@ function extractTextAndUrls(data) {
             }).then((r) => r.json()).catch(() => null);
 
             if (authRes && authRes.ok && authRes.password) {
-              const custId = authRes.customer_code || authRes.customer_id;
               const pwd = authRes.password;
-              const reply =
-                `🔐 MẬT KHẨU ĐĂNG NHẬP WEBSITE 🔐\n\n` +
-                `🆔 Tên đăng nhập (Mã ID): ${custId}\n` +
-                `🔑 Mật khẩu: ${pwd}\n` +
-                `🌐 Link đăng nhập: https://hoantiendp.com/login\n\n` +
-                `👉 HƯỚNG DẪN TIẾP THEO:\n` +
-                `1. Truy cập https://hoantiendp.com/login và đăng nhập bằng Mã ID + Mật khẩu trên.\n` +
-                `2. Bấm vào tên bạn ở góc trên cùng → Chọn "Cài đặt tài khoản ngân hàng" để điền STK nhận chuyển khoản hoàn tiền 80% tự động.\n` +
-                `3. Bạn có thể đổi lại mật khẩu cá nhân bất kỳ lúc nào trên website.\n\n` +
-                `⚠️ Lưu ý bảo mật: Mỗi lần bạn gõ /matkhau, hệ thống sẽ cấp một mật khẩu mới để bảo vệ an toàn cho tài khoản của bạn.`;
-
-              await api.sendMessage(reply, message.threadId, message.type);
+              await api.sendMessage(pwd, message.threadId, message.type);
             } else {
               await api.sendMessage(`⚠️ Chưa thể tạo mật khẩu lúc này, bạn vui lòng thử lại sau 10 giây nhé!`, message.threadId, message.type);
             }
