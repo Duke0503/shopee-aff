@@ -861,7 +861,16 @@ class _Handler(BaseHTTPRequestHandler):
                               "text/html; charset=utf-8")
 
         target = index
-        if path not in ("/", "", "/index.html"):
+        if path.startswith("/uploads/"):
+            candidate = (PROJECT_ROOT / path.lstrip("/")).resolve()
+            try:
+                candidate.relative_to((PROJECT_ROOT / "uploads").resolve())
+                if candidate.is_file():
+                    target = candidate
+            except ValueError:
+                pass
+
+        if target == index and path not in ("/", "", "/index.html"):
             # Resolve inside STATIC_DIR or not at all. A path that climbs
             # out with .. is how a local server serves the rest of the disk.
             candidate = (STATIC_DIR / path.lstrip("/")).resolve()
@@ -2991,9 +3000,12 @@ class _Handler(BaseHTTPRequestHandler):
         if not cust or cust.get("role") not in ("admin", "employee"):
             return self._json({"ok": False, "message": "unauthorized"}, 403)
 
-        body = self._body()
+        try:
+            body = self._body(max_bytes=25 * 1024 * 1024)
+        except TypeError:
+            body = self._body()
         if not body:
-            return self._json({"ok": False, "message": "Dữ liệu không hợp lệ"}, 400)
+            return self._json({"ok": False, "message": "Dữ liệu không hợp lệ hoặc kích thước ảnh vượt quá 25MB"}, 400)
 
         # 1. Direct Google Drive link / external URL
         gdrive_url = str(body.get("gdrive_url") or "").strip()
@@ -3029,34 +3041,46 @@ class _Handler(BaseHTTPRequestHandler):
             ext = ".jpg"
 
         filename = f"proof_{int(time.time())}_{uuid.uuid4().hex[:6]}{ext}"
-        upload_dir = STATIC_DIR / "uploads" / "proofs"
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        file_path = upload_dir / filename
-        file_path.write_bytes(image_bytes)
+        
+        # Save to both persistent PROJECT_ROOT/uploads/proofs and STATIC_DIR/uploads/proofs
+        upload_dirs = [
+            PROJECT_ROOT / "uploads" / "proofs",
+            STATIC_DIR / "uploads" / "proofs",
+        ]
+        for udir in upload_dirs:
+            udir.mkdir(parents=True, exist_ok=True)
+            (udir / filename).write_bytes(image_bytes)
 
         # Build accessible URL
         host = self.headers.get("Host") or "127.0.0.1:8899"
-        proto = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+        proto = "https" if (self.headers.get("X-Forwarded-Proto") == "https" or (not host.startswith("127.") and not host.startswith("localhost"))) else "http"
         public_url = f"{proto}://{host}/uploads/proofs/{filename}"
 
         # If user configured Google Drive Webhook/API
-        gdrive_webhook = os.getenv("GDRIVE_WEBHOOK_URL")
+        gdrive_webhook = os.getenv("GDRIVE_WEBHOOK_URL", "").strip()
         if gdrive_webhook:
             try:
-                import urllib.request
-                secret_token = os.getenv("GDRIVE_SECRET_TOKEN", "")
-                req_data = json.dumps({
+                secret_token = os.getenv("GDRIVE_SECRET_TOKEN", "").strip()
+                payload_bytes = json.dumps({
                     "filename": filename,
                     "mimeType": "image/png" if ext == ".png" else "image/jpeg",
                     "base64": raw_b64,
                     "token": secret_token,
                 }).encode("utf-8")
+
+                import urllib.request
+                import ssl
+                try:
+                    import certifi
+                    ctx = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    ctx = ssl._create_unverified_context()
                 req = urllib.request.Request(
                     gdrive_webhook,
-                    data=req_data,
-                    headers={"Content-Type": "application/json"}
+                    data=payload_bytes,
+                    headers={"Content-Type": "application/json", "User-Agent": "HoanTienDP/1.0"}
                 )
-                with urllib.request.urlopen(req, timeout=12) as resp:
+                with urllib.request.urlopen(req, timeout=25, context=ctx) as resp:
                     res_json = json.loads(resp.read().decode("utf-8"))
                     if res_json.get("drive_url") or res_json.get("url"):
                         public_url = res_json.get("drive_url") or res_json.get("url")
@@ -4767,17 +4791,23 @@ class _Handler(BaseHTTPRequestHandler):
     MAX_BODY_BYTES = 65_536  # 64 KB limit to prevent memory exhaustion / DoS
 
 
-    def _body(self) -> dict:
+    def _body(self, max_bytes: int = MAX_BODY_BYTES) -> dict:
         if hasattr(self, "_cached_body"):
             return self._cached_body
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            if not length or length > self.MAX_BODY_BYTES:
+            if not length:
                 self._cached_body = {}
                 return self._cached_body
-            self._cached_body = json.loads(self.rfile.read(length).decode("utf-8")) or {}
+            if length > max_bytes:
+                _log.warning("Request body too large: %d bytes (limit: %d)", length, max_bytes)
+                self._cached_body = {}
+                return self._cached_body
+            raw_bytes = self.rfile.read(length)
+            self._cached_body = json.loads(raw_bytes.decode("utf-8")) or {}
             return self._cached_body
-        except (ValueError, TypeError, UnicodeDecodeError):
+        except (ValueError, TypeError, UnicodeDecodeError) as e:
+            _log.warning("Failed to parse request JSON body: %s", e)
             self._cached_body = {}
             return self._cached_body
 
@@ -4896,9 +4926,24 @@ class _Handler(BaseHTTPRequestHandler):
             f"📝 <b>Commit:</b> <code>{commit_sha}</code> - {commit_msg}\n"
             f"👤 <b>Tác giả:</b> {author}\n"
             f"⏱ <b>Thời gian:</b> <code>{time_str}</code>\n\n"
-            f"✅ <i>Mã nguồn trên VPS đã được tự động kéo mới nhất và đồng bộ!</i>"
+            f"✅ <i>Mã nguồn trên VPS đã được tự động kéo mới nhất và đồng bộ!</i>\n"
+            f"🔄 <i>Đang khởi động lại Backend & Assistant để cập nhật logic mới...</i>"
         )
         telegram_alerts.send_telegram_message(msg)
+
+        # Restart backend & assistant with updated code
+        def _do_restart():
+            import time
+            time.sleep(2)
+            restart_script = PROJECT_ROOT / "scripts" / "start-all.ps1"
+            if restart_script.exists():
+                _log.info("CI/CD: Restarting backend and assistant via start-all.ps1 -CodeOnly...")
+                subprocess.Popen(
+                    ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(restart_script), "-CodeOnly"],
+                    creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, "CREATE_NEW_CONSOLE") else 0
+                )
+
+        threading.Thread(target=_do_restart, daemon=False).start()
 
 
 class DualStackServer(ThreadingHTTPServer):

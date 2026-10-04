@@ -117,3 +117,4 @@ zalo_assistant/friend_state.json
 
 # User uploaded proofs
 src/cashback/web/static/uploads/
+uploads/

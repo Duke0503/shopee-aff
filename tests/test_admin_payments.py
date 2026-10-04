@@ -171,9 +171,10 @@ def test_admin_upload_proof_gdrive(mock_handler):
     assert res["url"] == "https://drive.google.com/file/d/12345/view"
 
 
-def test_admin_upload_proof_base64(mock_handler):
+def test_admin_upload_proof_base64(mock_handler, monkeypatch):
+    monkeypatch.setenv("GDRIVE_WEBHOOK_URL", "https://script.google.com/test")
     png_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-    mock_handler._body = lambda: {
+    mock_handler._body = lambda *args, **kwargs: {
         "data": png_b64,
     }
     with patch("urllib.request.urlopen") as mock_url:

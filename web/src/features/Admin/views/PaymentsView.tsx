@@ -1179,30 +1179,78 @@ function PaymentDialog({
   const [uploadError, setUploadError] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
+  const compressImage = (file: File, maxDim = 1800, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith("image/") || file.type.includes("svg") || file.type.includes("gif")) {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string) || "")
+        reader.onerror = () => resolve("")
+        reader.readAsDataURL(file)
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onerror = () => resolve("")
+      reader.onload = (e) => {
+        const rawResult = (e.target?.result as string) || ""
+        const img = new Image()
+        img.onerror = () => resolve(rawResult)
+        img.onload = () => {
+          try {
+            let { width, height } = img
+            if (width <= maxDim && height <= maxDim && file.size < 600_000) {
+              resolve(rawResult)
+              return
+            }
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width)
+                width = maxDim
+              } else {
+                width = Math.round((width * maxDim) / height)
+                height = maxDim
+              }
+            }
+            const canvas = document.createElement("canvas")
+            canvas.width = width
+            canvas.height = height
+            const ctx = canvas.getContext("2d")
+            if (!ctx) {
+              resolve(rawResult)
+              return
+            }
+            ctx.drawImage(img, 0, 0, width, height)
+            resolve(canvas.toDataURL("image/jpeg", quality))
+          } catch {
+            resolve(rawResult)
+          }
+        }
+        img.src = rawResult
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleFileUpload = async (file: File) => {
     if (!file || !file.type.startsWith("image/")) return
     setIsUploading(true)
     setUploadError(null)
     try {
-      const reader = new FileReader()
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result as string
-          const res = await uploadPaymentProof({ data: base64 })
-          if (res.ok && res.url) {
-            setProofImage(res.url)
-          } else {
-            setUploadError(res.message || "Không thể tải ảnh lên")
-          }
-        } catch (err: any) {
-          setUploadError(err.message || "Lỗi khi tải ảnh")
-        } finally {
-          setIsUploading(false)
-        }
+      const base64 = await compressImage(file)
+      if (!base64) {
+        setUploadError("Không thể đọc dữ liệu ảnh")
+        setIsUploading(false)
+        return
       }
-      reader.readAsDataURL(file)
+      const res = await uploadPaymentProof({ data: base64 })
+      if (res.ok && res.url) {
+        setProofImage(res.url)
+      } else {
+        setUploadError(res.message || "Không thể tải ảnh lên")
+      }
     } catch (err: any) {
-      setUploadError(err.message || "Lỗi đọc file")
+      setUploadError(err.message || "Lỗi khi tải ảnh")
+    } finally {
       setIsUploading(false)
     }
   }
