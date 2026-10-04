@@ -58,6 +58,7 @@ cashback.db*
 *.log
 logs/
 *.flows
+_*.py
 gw3.flows
 
 # The dedicated browser profile: a full Chrome/Edge profile, including a live
