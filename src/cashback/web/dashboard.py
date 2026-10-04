@@ -114,6 +114,59 @@ def t(key: str, **values) -> str:
     return text
 
 
+def _resolve_proof_urls(raw_url: str) -> dict:
+    """Resolve any proof image URL (Google Drive, local, or external).
+
+    Returns:
+        img_src: URL suitable for <img src="..."> (direct image CDN for Google Drive).
+        fallback_src: Fallback thumbnail URL if img_src fails.
+        link_href: URL for clicking to view the full file.
+        is_gdrive: Whether this is a Google Drive URL.
+        file_id: The Google Drive file ID if applicable.
+    """
+    if not raw_url:
+        return {"img_src": "", "fallback_src": "", "link_href": "", "is_gdrive": False, "file_id": None}
+
+    url = str(raw_url).strip()
+    file_id = None
+
+    # Google Drive file ID patterns:
+    # 1. drive.google.com/file/d/<file_id>/view...
+    m = re.search(r"drive\.google\.com/file/d/([a-zA-Z0-9_-]+)", url)
+    if m:
+        file_id = m.group(1)
+    else:
+        # 2. drive.google.com/open?id=<file_id> or uc?id=<file_id>
+        m = re.search(r"drive\.google\.com/(?:open|uc)\?(?:.*&)?id=([a-zA-Z0-9_-]+)", url)
+        if m:
+            file_id = m.group(1)
+        else:
+            # 3. googleusercontent.com/d/<file_id>
+            m = re.search(r"googleusercontent\.com/d/([a-zA-Z0-9_-]+)", url)
+            if m:
+                file_id = m.group(1)
+            elif re.search(r"thumbnail\?(?:.*&)?id=([a-zA-Z0-9_-]+)", url):
+                m = re.search(r"thumbnail\?(?:.*&)?id=([a-zA-Z0-9_-]+)", url)
+                file_id = m.group(1)
+
+    if file_id:
+        return {
+            "img_src": f"https://lh3.googleusercontent.com/d/{file_id}",
+            "fallback_src": f"https://drive.google.com/thumbnail?sz=w1200&id={file_id}",
+            "link_href": f"https://drive.google.com/file/d/{file_id}/view?usp=sharing",
+            "is_gdrive": True,
+            "file_id": file_id,
+        }
+
+    return {
+        "img_src": url,
+        "fallback_src": "",
+        "link_href": url,
+        "is_gdrive": False,
+        "file_id": None,
+    }
+
+
 # ----------------------------------------------------------------------
 # Reading
 # ----------------------------------------------------------------------
@@ -775,6 +828,13 @@ class _Handler(BaseHTTPRequestHandler):
         if path.startswith("/b/"):
             bill_id = path[3:].strip("/")
             return self._serve_bill(bill_id)
+
+        if path.startswith("/proof/gdrive/"):
+            file_id = path[len("/proof/gdrive/"):].strip("/")
+            return self._public_gdrive_proof_proxy(file_id)
+
+        if path == "/api/public/proof-proxy":
+            return self._public_gdrive_proof_proxy()
 
         if path == "/api/payouts":
             if not self.from_loopback and not self._session_is_staff():
@@ -2388,7 +2448,12 @@ class _Handler(BaseHTTPRequestHandler):
                  WHERE customer_id = ?
                  ORDER BY created_at DESC
             """, (customer_id,)).fetchall()
-            transfers = [dict(r) for r in transfer_rows]
+            transfers = []
+            for r in transfer_rows:
+                t_dict = dict(r)
+                pinfo = _resolve_proof_urls(t_dict.get("proof_image") or "")
+                t_dict["proof_image_direct"] = pinfo["img_src"]
+                transfers.append(t_dict)
 
             # Stats
             stats = {
@@ -2681,7 +2746,12 @@ class _Handler(BaseHTTPRequestHandler):
                 -p["awaiting_amount"]
             ))
 
-            transfers_list = [dict(r) for r in transfer_rows]
+            transfers_list = []
+            for r in transfer_rows:
+                t_dict = dict(r)
+                pinfo = _resolve_proof_urls(t_dict.get("proof_image") or "")
+                t_dict["proof_image_direct"] = pinfo["img_src"]
+                transfers_list.append(t_dict)
 
             total_payable = sum(p["payable_amount"] for p in payables)
             total_unsettled = sum(p["unsettled_payable_amount"] for p in payables)
@@ -3028,9 +3098,11 @@ class _Handler(BaseHTTPRequestHandler):
         # 1. Direct Google Drive link / external URL
         gdrive_url = str(body.get("gdrive_url") or "").strip()
         if gdrive_url:
+            resolved = _resolve_proof_urls(gdrive_url)
             return self._json({
                 "ok": True,
                 "url": gdrive_url,
+                "direct_url": resolved["img_src"],
                 "source": "gdrive",
                 "message": "Đã lưu link Google Drive thành công",
             })
@@ -3105,9 +3177,11 @@ class _Handler(BaseHTTPRequestHandler):
             except Exception as err:
                 _log.warning("Google Drive webhook forward failed: %s", err)
 
+        resolved = _resolve_proof_urls(public_url)
         return self._json({
             "ok": True,
             "url": public_url,
+            "direct_url": resolved["img_src"],
             "filename": filename,
             "message": "Tải ảnh biên lai lên thành công",
         })
@@ -4170,7 +4244,7 @@ class _Handler(BaseHTTPRequestHandler):
             bank_acc_masked = bank_acc[:2] + "****" + bank_acc[-4:]
         else:
             bank_acc_masked = bank_acc
-        proof_img = html.escape(row["proof_image"] or "")
+        proof_raw = row["proof_image"] or ""
         transfer_code = html.escape(row["transfer_code"] or f"DP{row['id']:05d}")
 
         orders_html = ""
@@ -4236,14 +4310,28 @@ class _Handler(BaseHTTPRequestHandler):
             </div>"""
 
         proof_html = ""
-        if proof_img:
+        if proof_raw:
+            pinfo = _resolve_proof_urls(proof_raw)
+            img_src = html.escape(pinfo["img_src"])
+            link_href = html.escape(pinfo["link_href"])
+            fallback_src = html.escape(pinfo["fallback_src"])
+            file_id = pinfo["file_id"]
+
+            if pinfo["is_gdrive"] and file_id:
+                proxy_src = f"/proof/gdrive/{file_id}"
+                onerror_attr = f' onerror="if(this.dataset.step===\'1\'){{this.dataset.step=\'2\';this.src=\'{proxy_src}\';}}else{{this.dataset.step=\'1\';this.src=\'{fallback_src}\';}}"'
+                hint_text = "(Bấm vào ảnh để xem kích thước gốc trên Google Drive)"
+            else:
+                onerror_attr = ""
+                hint_text = "(Bấm vào ảnh để phóng to)"
+
             proof_html = f"""
             <div class="proof-box">
               <div style="font-size:12px;color:#94a3b8;font-weight:600;">🧾 Ảnh biên lai chuyển khoản</div>
-              <a href="{proof_img}" target="_blank" rel="noopener">
-                <img src="{proof_img}" alt="Biên lai chuyển khoản" class="proof-img" />
+              <a href="{link_href}" target="_blank" rel="noopener">
+                <img src="{img_src}"{onerror_attr} alt="Biên lai chuyển khoản" class="proof-img" />
               </a>
-              <div style="font-size:11px;color:#64748b;margin-top:4px;">(Bấm vào ảnh để phóng to)</div>
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">{hint_text}</div>
             </div>"""
 
         bank_row_html = f"""<div class="info-row">
@@ -4420,6 +4508,58 @@ class _Handler(BaseHTTPRequestHandler):
 </body>
 </html>"""
         return self._send(200, page_html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _public_gdrive_proof_proxy(self, file_id: str = ""):
+        """Proxy Google Drive proof image with disk caching in uploads/proofs/."""
+        if not file_id:
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            file_id = (params.get("id") or [""])[0].strip()
+
+        if not file_id or not re.match(r"^[a-zA-Z0-9_-]+$", file_id):
+            return self._send(400, b"Invalid file id", "text/plain")
+
+        cache_dir = PROJECT_ROOT / "uploads" / "proofs"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cached_file = cache_dir / f"gdrive_{file_id}.jpg"
+        if cached_file.exists() and cached_file.stat().st_size > 0:
+            self._extra_headers = [
+                ("Cache-Control", "public, max-age=604800, immutable"),
+                ("Access-Control-Allow-Origin", "*"),
+            ]
+            return self._send(200, cached_file.read_bytes(), "image/jpeg")
+
+        urls_to_try = [
+            f"https://lh3.googleusercontent.com/d/{file_id}",
+            f"https://drive.google.com/thumbnail?sz=w1200&id={file_id}",
+            f"https://drive.google.com/uc?export=view&id={file_id}",
+        ]
+        import urllib.request
+        for u in urls_to_try:
+            try:
+                req = urllib.request.Request(
+                    u,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                )
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    if resp.status == 200:
+                        ct = resp.headers.get("Content-Type") or ""
+                        if "image" in ct:
+                            data = resp.read()
+                            if len(data) > 0:
+                                try:
+                                    cached_file.write_bytes(data)
+                                except Exception:
+                                    pass
+                                self._extra_headers = [
+                                    ("Cache-Control", "public, max-age=604800, immutable"),
+                                    ("Access-Control-Allow-Origin", "*"),
+                                ]
+                                return self._send(200, data, ct)
+            except Exception:
+                continue
+
+        return self._send(404, b"Proof image not found", "text/plain")
 
     def _share_product(self, conn, row) -> dict:
         """Name, picture, price and cashback for a link's product page.

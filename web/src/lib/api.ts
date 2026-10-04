@@ -710,6 +710,7 @@ export interface AdminPaymentTransfer {
   transfer_code: string | null
   note: string | null
   proof_image: string | null
+  proof_image_direct?: string | null
   order_ids: string | null
   notify_mode: "dm" | "group" | "both" | "none" | null
   notified_at: string | null
@@ -750,7 +751,19 @@ export const askCustomerBank = (data: {
 export const uploadPaymentProof = (data: {
   data?: string
   gdrive_url?: string
-}) => post<{ ok: boolean; url: string; message: string }>("/api/admin/payments/upload-proof", data)
+}) => post<{ ok: boolean; url: string; direct_url?: string; message: string }>("/api/admin/payments/upload-proof", data)
+
+export function getDirectImageUrl(url?: string | null): string {
+  if (!url) return ""
+  const m = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+            url.match(/drive\.google\.com\/(?:open|uc)\?(?:.*&)?id=([a-zA-Z0-9_-]+)/) ||
+            url.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/) ||
+            url.match(/thumbnail\?(?:.*&)?id=([a-zA-Z0-9_-]+)/)
+  if (m) {
+    return `https://lh3.googleusercontent.com/d/${m[1]}`
+  }
+  return url
+}
 
 export const saveGDriveConfig = (webhookUrl: string) =>
   post<{ ok: boolean; message: string }>("/api/admin/payments/gdrive-config", {

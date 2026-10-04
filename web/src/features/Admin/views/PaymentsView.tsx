@@ -25,6 +25,7 @@ import {
   uploadPaymentProof,
   saveGDriveConfig,
   syncAdminShopeePayouts,
+  getDirectImageUrl,
   type AdminPaymentUser,
 } from "@/lib/api"
 import { vnd, shortDate } from "@/lib/format"
@@ -1845,7 +1846,7 @@ function PaymentDialog({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="h-10 w-10 rounded-md border border-border overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
                         {proofImage.startsWith("http") || proofImage.startsWith("/") ? (
-                          <img src={proofImage} alt="Bill proof" className="h-full w-full object-cover" />
+                          <img src={getDirectImageUrl(proofImage)} alt="Bill proof" className="h-full w-full object-cover" />
                         ) : (
                           <ImageIcon className="h-5 w-5 text-muted-foreground" />
                         )}
@@ -2252,9 +2253,15 @@ function doPost(e) {
     var file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
+    var fileId = file.getId();
+    var viewUrl = file.getUrl();
+    var directUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+
     return ContentService.createTextOutput(JSON.stringify({
       ok: true,
-      drive_url: file.getUrl()
+      file_id: fileId,
+      drive_url: viewUrl,
+      direct_url: directUrl
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({

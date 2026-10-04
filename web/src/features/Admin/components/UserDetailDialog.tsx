@@ -22,6 +22,7 @@ import {
 import {
   fetchAdminUserDetail,
   recordAdminTransfer,
+  getDirectImageUrl,
   type AdminUser,
   type UserDetailData,
 } from "@/lib/api"
@@ -384,7 +385,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                       {proofImage && (
                         <div className="relative inline-block">
                           <img
-                            src={proofImage}
+                            src={getDirectImageUrl(proofImage)}
                             alt="Bill preview"
                             onClick={() => setViewingProof(proofImage)}
                             className="h-8 w-12 object-cover rounded border border-border cursor-pointer hover:opacity-80"
@@ -525,7 +526,20 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
           >
             <div className="relative max-h-[85vh] max-w-[90vw] overflow-hidden rounded-xl bg-card p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                <span className="text-xs font-bold">Hình ảnh chứng từ chuyển tiền</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold">Hình ảnh chứng từ chuyển tiền</span>
+                  {viewingProof && (viewingProof.includes("drive.google.com") || viewingProof.includes("googleusercontent.com")) && (
+                    <a
+                      href={viewingProof}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Mở trên Google Drive
+                    </a>
+                  )}
+                </div>
                 <button
                   onClick={() => setViewingProof(null)}
                   className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -534,7 +548,7 @@ export function UserDetailDialog({ user, open, onOpenChange }: UserDetailDialogP
                 </button>
               </div>
               <img
-                src={viewingProof}
+                src={getDirectImageUrl(viewingProof)}
                 alt="Proof"
                 className="max-h-[75vh] w-auto max-w-full rounded object-contain mt-2"
               />

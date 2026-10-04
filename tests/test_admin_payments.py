@@ -211,6 +211,49 @@ def test_serve_bill_html(conn, cfg, mock_handler):
     assert "Không tìm thấy biên lai" in html_404
 
 
+def test_resolve_proof_urls():
+    from cashback.web.dashboard import _resolve_proof_urls
+    
+    # 1. Google Drive view URL
+    res = _resolve_proof_urls("https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view?usp=drivesdk")
+    assert res["is_gdrive"] is True
+    assert res["file_id"] == "1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_"
+    assert res["img_src"] == "https://lh3.googleusercontent.com/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_"
+    assert "thumbnail" in res["fallback_src"]
+    assert "https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view" in res["link_href"]
+
+    # 2. Google Drive open?id= URL
+    res2 = _resolve_proof_urls("https://drive.google.com/open?id=abcXYZ123")
+    assert res2["is_gdrive"] is True
+    assert res2["file_id"] == "abcXYZ123"
+    assert res2["img_src"] == "https://lh3.googleusercontent.com/d/abcXYZ123"
+
+    # 3. Local/Normal URL
+    res3 = _resolve_proof_urls("https://hoantiendp.com/uploads/proofs/test.jpg")
+    assert res3["is_gdrive"] is False
+    assert res3["file_id"] is None
+    assert res3["img_src"] == "https://hoantiendp.com/uploads/proofs/test.jpg"
+
+
+def test_serve_bill_html_gdrive(conn, cfg, mock_handler):
+    ledger.add_customer(conn, "C006", display_name="Nguyen Van F")
+    conn.execute("UPDATE customers SET customer_code = 'DP00006' WHERE customer_id = 'C006'")
+    cur = conn.execute("""
+        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, created_at)
+        VALUES ('C006', 50000, 'DP00006TX', 'Hoan tien', 'https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view?usp=drivesdk', '2026-10-04 15:32:00')
+    """)
+    tx_id = cur.lastrowid
+    conn.commit()
+
+    mock_handler._send = lambda status, body, ct: (status, body.decode("utf-8"), ct)
+    status, html_content, content_type = mock_handler._serve_bill(str(tx_id))
+    assert status == 200
+    assert "https://lh3.googleusercontent.com/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content
+    assert "https://drive.google.com/thumbnail?sz=w1200&amp;id=1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content or "https://drive.google.com/thumbnail?sz=w1200&id=1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content
+    assert "/proof/gdrive/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content
+    assert "https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view" in html_content
+
+
 def test_payment_confirm_sets_notified_status_and_cashback(conn, cfg, mock_handler):
     ledger.add_customer(conn, "C009", display_name="Tran Van G", zalo_user_id="999", private_chat_id="999")
     ledger.add_order(conn, "ORD09", "C009", None, order_value=300_000, estimated_commission=30_000)
