@@ -1,6 +1,6 @@
 # =====================================================================
-# SCRIPT TỰ ĐỘNG CÀI ĐẶT GITHUB ACTIONS RUNNER (CI/CD) CHO VPS
-# Chạy dưới dạng Windows Service - Tự khởi động cùng hệ thống 24/7
+# SCRIPT TU DONG CAI DAT GITHUB ACTIONS RUNNER (CI/CD) CHO VPS
+# Chay duoi dang Windows Service - Tu khoi dong cung he thong 24/7
 # =====================================================================
 
 param(
@@ -9,17 +9,17 @@ param(
 )
 
 if (-not $GitToken) {
-    $GitToken = Read-Host "Nhập GitHub Personal Access Token (ghp_...)"
+    $GitToken = Read-Host "Nhap GitHub Personal Access Token (ghp_...)"
 }
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "🚀 ĐANG CẤU HÌNH GITHUB ACTIONS RUNNER (CI/CD) TRÊN VPS..." -ForegroundColor Cyan
+Write-Host "[HOAN TIEN DP] DANG CAU HINH GITHUB ACTIONS RUNNER (CI/CD)..." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Gọi GitHub API lấy Registration Token cho Runner
-Write-Host "`n[1/3] Đang kết nối GitHub API lấy mã đăng ký Runner..." -ForegroundColor Yellow
+# 1. Goi GitHub API lay Registration Token cho Runner
+Write-Host "`n[1/3] Dang ket noi GitHub API lay ma dang ky Runner..." -ForegroundColor Yellow
 $headers = @{
     "Authorization" = "token $GitToken"
     "Accept" = "application/vnd.github.v3+json"
@@ -30,26 +30,26 @@ try {
     $res = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/actions/runners/registration-token" -Method Post -Headers $headers
     $regToken = $res.token
 } catch {
-    Write-Host "Lỗi: Không thể lấy token đăng ký từ GitHub API: $_" -ForegroundColor Red
+    Write-Host "Loi: Khong the lay token dang ky tu GitHub API: $_" -ForegroundColor Red
     exit 1
 }
 
 if (-not $regToken) {
-    Write-Host "Lỗi: Không lấy được token đăng ký Runner từ GitHub!" -ForegroundColor Red
+    Write-Host "Loi: Khong lay duoc token dang ky Runner tu GitHub!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host " -> Lấy registration token thành công: $regToken" -ForegroundColor Green
+Write-Host " -> Lay registration token thanh cong: $regToken" -ForegroundColor Green
 
-# 2. Tạo thư mục C:\actions-runner
+# 2. Tao thu muc C:\actions-runner
 $runnerDir = "C:\actions-runner"
 if (-not (Test-Path $runnerDir)) {
     New-Item -ItemType Directory -Force -Path $runnerDir | Out-Null
 }
 Set-Location $runnerDir
 
-# 3. Tải Runner Package nếu chưa có
-Write-Host "`n[2/3] Đang tải GitHub Actions Runner binary..." -ForegroundColor Yellow
+# 3. Tai Runner Package neu chua co
+Write-Host "`n[2/3] Dang tai GitHub Actions Runner binary..." -ForegroundColor Yellow
 $runnerZip = "$runnerDir\actions-runner.zip"
 if (-not (Test-Path "$runnerDir\config.cmd")) {
     Invoke-WebRequest -Uri "https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-win-x64-2.321.0.zip" -OutFile $runnerZip
@@ -58,11 +58,11 @@ if (-not (Test-Path "$runnerDir\config.cmd")) {
     Remove-Item $runnerZip -Force -ErrorAction SilentlyContinue
 }
 
-# 4. Cấu hình Runner và cài đặt dưới dạng Windows Service
-Write-Host "`n[3/3] Đang đăng ký Runner với GitHub repo và cài đặt Windows Service..." -ForegroundColor Yellow
+# 4. Cau hinh Runner va cai dat duoi dang Windows Service
+Write-Host "`n[3/3] Dang dang ky Runner voi GitHub repo va cai dat Windows Service..." -ForegroundColor Yellow
 & .\config.cmd --url "https://github.com/$Repo" --token $regToken --name "hoantiendp-vps" --work "_work" --runasservice --unattended --replace
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "🎉 GITHUB ACTIONS CI/CD RUNNER ĐÃ ĐƯỢC KÍCH HOẠT THÀNH CÔNG!" -ForegroundColor Green
-Write-Host "Từ bây giờ, mỗi lần commit lên nhánh 'main', VPS sẽ tự động cập nhật!" -ForegroundColor Green
+Write-Host "[HOAN TAT] GITHUB ACTIONS CI/CD RUNNER DA DUOC KICH HOAT THANH CONG!" -ForegroundColor Green
+Write-Host "Moi lan commit len nhanh 'main', VPS se tu dong cap nhat!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
