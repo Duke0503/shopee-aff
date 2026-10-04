@@ -33,6 +33,8 @@ See core/accounts.py for why the bot is the login channel.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import math
 import mimetypes
@@ -40,6 +42,7 @@ import os
 import random
 import re
 import socket
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -895,6 +898,9 @@ class _Handler(BaseHTTPRequestHandler):
             # "locked" is what the login page already knows how to explain.
             return self._json({"ok": False, "error": "rate_limited",
                                "message": "locked"}, 429)
+
+        if path == "/api/deploy-webhook":
+            return self._handle_deploy_webhook()
 
         if path == "/api/auth/login":
             return self._login()
@@ -4550,6 +4556,125 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, UnicodeDecodeError):
             self._cached_body = {}
             return self._cached_body
+
+    def _raw_body(self, max_bytes: int = 1_048_576) -> bytes:
+        if hasattr(self, "_cached_raw_body"):
+            return self._cached_raw_body
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not length or length > max_bytes:
+                self._cached_raw_body = b""
+                return self._cached_raw_body
+            self._cached_raw_body = self.rfile.read(length)
+            return self._cached_raw_body
+        except Exception:
+            self._cached_raw_body = b""
+            return self._cached_raw_body
+
+    def _handle_deploy_webhook(self):
+        secret = os.getenv("DEPLOY_WEBHOOK_SECRET", "hoantiendp_ci_cd_secret_2026").strip()
+        hub_sig = self.headers.get("X-Hub-Signature-256", "").strip()
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        query_secret = (query.get("secret") or [""])[0].strip()
+
+        raw = self._raw_body()
+
+        valid = False
+        if hub_sig and secret:
+            expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+            valid = hmac.compare_digest(hub_sig, expected)
+        elif query_secret and secret:
+            valid = hmac.compare_digest(query_secret, secret)
+        elif not secret:
+            valid = True
+
+        if not valid:
+            _log.warning("Deploy webhook received with invalid secret / signature.")
+            return self._json({"ok": False, "error": "invalid_secret"}, 401)
+
+        event = self.headers.get("X-GitHub-Event", "push")
+        if event == "ping":
+            return self._json({"ok": True, "message": "pong"})
+
+        try:
+            payload = json.loads(raw.decode("utf-8")) if raw else {}
+        except Exception:
+            payload = {}
+
+        ref = payload.get("ref", "")
+        if ref and ref != "refs/heads/main":
+            return self._json({"ok": True, "message": f"ignored_branch_{ref}"})
+
+        head_commit = payload.get("head_commit") or {}
+        commit_sha = (head_commit.get("id") or payload.get("after") or "latest")[:7]
+        commit_msg = (head_commit.get("message") or "Deploy trigger").split("\n")[0]
+        author = (head_commit.get("author") or {}).get("name", "Git User")
+
+        threading.Thread(
+            target=self._run_git_deploy,
+            args=(commit_sha, commit_msg, author),
+            daemon=True,
+        ).start()
+
+        return self._json({"ok": True, "status": "deploying", "commit": commit_sha})
+
+    @staticmethod
+    def _run_git_deploy(commit_sha: str, commit_msg: str, author: str) -> None:
+        from ..core import telegram_alerts
+        time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+        _log.info("CI/CD Webhook: Starting automatic git pull for commit %s by %s...", commit_sha, author)
+
+        try:
+            pull_res = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
+            if pull_res.returncode != 0:
+                err = pull_res.stderr.strip() or pull_res.stdout.strip()
+                _log.error("CI/CD git pull failed: %s", err)
+                telegram_alerts.report_bug(
+                    title=f"CI/CD Git Pull Thất Bại (Commit {commit_sha})",
+                    details=f"Lệnh git pull origin main trả về mã lỗi {pull_res.returncode}:\n{err}",
+                    severity="HIGH",
+                    source="ci_cd.webhook",
+                    action_needed="Kiểm tra xung đột file hoặc token Git trên VPS.",
+                )
+                return
+        except Exception as exc:
+            _log.exception("CI/CD exception during git pull: %s", exc)
+            telegram_alerts.report_bug(
+                title=f"CI/CD Lỗi Ngoại Lệ Khi Kéo Code (Commit {commit_sha})",
+                details=str(exc),
+                severity="HIGH",
+                source="ci_cd.webhook",
+            )
+            return
+
+        # Run uv sync
+        try:
+            subprocess.run(
+                ["uv", "sync"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except Exception as exc:
+            _log.warning("CI/CD uv sync note: %s", exc)
+
+        # Notify Dev DP group
+        msg = (
+            f"🚀 <b>[CI/CD AUTO DEPLOY THÀNH CÔNG]</b>\n\n"
+            f"📦 <b>Nhánh:</b> <code>main</code>\n"
+            f"📝 <b>Commit:</b> <code>{commit_sha}</code> - {commit_msg}\n"
+            f"👤 <b>Tác giả:</b> {author}\n"
+            f"⏱ <b>Thời gian:</b> <code>{time_str}</code>\n\n"
+            f"✅ <i>Mã nguồn trên VPS đã được tự động kéo mới nhất và đồng bộ!</i>"
+        )
+        telegram_alerts.send_telegram_message(msg)
 
 
 class DualStackServer(ThreadingHTTPServer):
