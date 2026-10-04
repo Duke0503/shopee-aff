@@ -34,7 +34,12 @@ function Stop-Recorded([string]$Name) {
     if (Test-Path $file) {
         $recorded = Get-Content $file -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($recorded) {
-            cmd.exe /c "taskkill /F /T /PID $recorded" 2>$null
+            try {
+                Stop-Process -Id ([int]$recorded) -Force -ErrorAction SilentlyContinue
+            } catch {}
+            try {
+                cmd.exe /c "taskkill /F /T /PID $recorded >nul 2>nul"
+            } catch {}
         }
         Remove-Item $file -Force -ErrorAction SilentlyContinue
     }
@@ -45,7 +50,12 @@ function Stop-Port([int]$Port) {
         $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
         foreach ($conn in $conns) {
             if ($conn.OwningProcess -gt 0) {
-                cmd.exe /c "taskkill /F /T /PID $($conn.OwningProcess)" 2>$null
+                try {
+                    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+                } catch {}
+                try {
+                    cmd.exe /c "taskkill /F /T /PID $($conn.OwningProcess) >nul 2>nul"
+                } catch {}
             }
         }
     } catch {}
