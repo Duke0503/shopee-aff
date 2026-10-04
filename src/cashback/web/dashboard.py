@@ -46,6 +46,9 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import logging
+
+_log = logging.getLogger("cashback.web.dashboard")
 
 from ..core import accounts, banks
 from ..core.config import PROJECT_ROOT, Config
@@ -766,6 +769,10 @@ class _Handler(BaseHTTPRequestHandler):
             code, _, action = path[3:].strip("/").partition("/")
             return self._open_share_link(code, go=(action == "go"))
 
+        if path.startswith("/b/"):
+            bill_id = path[3:].strip("/")
+            return self._serve_bill(bill_id)
+
         if path == "/api/payouts":
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
@@ -957,6 +964,10 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.from_loopback and not self._session_is_staff():
                 return self._json({"ok": False, "message": "forbidden"}, 403)
             return self._admin_upsert_fnb_voucher()
+        if path == "/api/alerts/telegram":
+            if not self.from_loopback and not self._session_is_staff():
+                return self._json({"ok": False, "message": "forbidden"}, 403)
+            return self._send_telegram_alert_api()
 
         # /api/customers/<id>/paid  and  /api/customers/<id>/ask-bank
         if len(parts) == 4 and parts[:2] == ["api", "customers"]:
@@ -2672,22 +2683,24 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             remaining_str = f"{_vnd(remaining_unpaid)}"
 
-        proof_line = f"\n🧾 Ảnh biên lai chuyển khoản: {proof_image}" if proof_image else ""
+        from datetime import datetime, timezone, timedelta
+        now_vn = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y %H:%M")
+
+        base = str(getattr(self.cfg, "public_base_url", "") or "").rstrip("/")
+        bill_url = f"{base}/b/{transfer_id}" if base else f"/b/{transfer_id}"
+        bill_line = f"\n🔗 Bill: {bill_url}"
+        tag_user = f"@{display_name}"
 
         notifications_log = {}
 
         if notify_mode in ("dm", "both"):
             dm_text = (
-                f"🎉 CHÚC MỪNG BẠN ĐÃ ĐƯỢC HOÀN TIỀN! 🎉\n\n"
-                f"Admin vừa chuyển khoản hoàn tiền cho bạn:\n"
-                f"💰 Số tiền nhận đợt này: {vnd_amount}\n"
-                f"⏳ Số dư tích lũy còn lại: {remaining_str}\n"
-                f"💎 Tổng tiền hoàn đã nhận: {vnd_total_transferred}\n\n"
-                f"🏦 Ngân hàng nhận: {bank_name} ({bank_acc})\n"
-                f"🏷️ Nội dung CK: {reference}\n"
-                f"📦 Số đơn tất toán đợt này: {marked_count} đơn"
-                f"{proof_line}\n\n"
-                f"Cảm ơn bạn đã tin tưởng và đồng hành cùng Hoàn Tiền Shopping Dp! Tiếp tục gửi link để nhận thêm nhiều ưu đãi hoàn tiền bạn nhé! 🛍️✨"
+                f"✅ Xác nhận thanh toán thành công!\n"
+                f"💰 Số tiền: {vnd_amount}\n"
+                f"📥 Tổng đã nhận: {vnd_total_transferred}\n"
+                f"📅 Ngày: {now_vn}"
+                f"{bill_line}\n"
+                f"👤 User: {tag_user}"
             )
             try:
                 sender.send(zalo_uid, dm_text)
@@ -2697,20 +2710,36 @@ class _Handler(BaseHTTPRequestHandler):
 
         if notify_mode in ("group", "both"):
             group_text = (
-                f"🎉 THÔNG BÁO CHI TRẢ HOÀN TIỀN THÀNH CÔNG! 🎉\n\n"
-                f"Xin chúc mừng thành viên {display_name} ({customer_code}) vừa được admin chuyển khoản thành công khoản tiền hoàn:\n"
-                f"💰 Số tiền nhận đợt này: {vnd_amount}\n"
-                f"💎 Tổng tiền hoàn đã nhận: {vnd_total_transferred}\n"
-                f"📦 Số đơn đã tất toán: {marked_count} đơn"
-                f"{proof_line}\n\n"
-                f"Cảm ơn bạn đã mua sắm thông minh và tích lũy tiền hoàn cùng nhóm! 👏\n"
-                f"👉 Cả nhà hãy tiếp tục gửi link Shopee / TikTok vào đây để nhận hoàn tiền tới 80% nhé! 🚀💵"
+                f"✅ Xác nhận thanh toán thành công!\n"
+                f"💰 Số tiền: {vnd_amount}\n"
+                f"📥 Tổng đã nhận: {vnd_total_transferred}\n"
+                f"📅 Ngày: {now_vn}"
+                f"{bill_line}\n"
+                f"👤 User: {tag_user}"
             )
             mentions = []
             if zalo_uid and str(zalo_uid).isdigit():
-                pos = group_text.find(display_name)
-                if pos != -1:
-                    mentions.append({"pos": pos, "uid": str(zalo_uid), "len": len(display_name)})
+                idx = group_text.find(tag_user)
+                if idx != -1:
+                    u16_pos = len(group_text[:idx].encode("utf-16-le")) // 2
+                    u16_len = len(tag_user.encode("utf-16-le")) // 2
+                    mentions.append({
+                        "pos": u16_pos,
+                        "uid": str(zalo_uid),
+                        "len": u16_len,
+                        "tag": tag_user,
+                    })
+                else:
+                    idx = group_text.find(display_name)
+                    if idx != -1:
+                        u16_pos = len(group_text[:idx].encode("utf-16-le")) // 2
+                        u16_len = len(display_name.encode("utf-16-le")) // 2
+                        mentions.append({
+                            "pos": u16_pos,
+                            "uid": str(zalo_uid),
+                            "len": u16_len,
+                            "tag": display_name,
+                        })
             try:
                 sender.broadcast(group_text, group=target_group, mentions=mentions)
                 notifications_log["group"] = f"sent_to_{target_group}"
@@ -3035,6 +3064,84 @@ class _Handler(BaseHTTPRequestHandler):
             )
         return self._json({"ok": True, "settled_count": count})
 
+    def _send_telegram_alert_api(self):
+        body = self._body()
+        alert_type = body.get("alert_type", "custom")
+        from ..core import telegram_alerts
+        if alert_type == "zalo_conflict":
+            telegram_alerts.notify_zalo_websocket_conflict(
+                reconnect_count=body.get("reconnect_count", 3),
+                reason=body.get("reason", "")
+            )
+            return self._json({"ok": True})
+        elif alert_type == "zalo_recovered":
+            telegram_alerts.notify_zalo_recovered()
+            return self._json({"ok": True})
+        elif alert_type == "shopee_captcha":
+            telegram_alerts.notify_shopee_captcha(
+                hint=body.get("hint", ""),
+                current_url=body.get("current_url", "")
+            )
+            return self._json({"ok": True})
+        elif alert_type == "shopee_session":
+            telegram_alerts.notify_shopee_session_expired(
+                hint=body.get("hint", ""),
+                current_url=body.get("current_url", "")
+            )
+            return self._json({"ok": True})
+        elif alert_type == "shopee_bridge":
+            telegram_alerts.notify_shopee_bridge_disconnected()
+            return self._json({"ok": True})
+        elif alert_type == "member_joined":
+            total_cust = 0
+            try:
+                with ledger.connect(self.cfg.db_path) as conn:
+                    row = conn.execute("SELECT COUNT(*) FROM customers").fetchone()
+                    if row:
+                        total_cust = row[0]
+            except Exception:
+                pass
+            telegram_alerts.notify_new_member_joined(
+                display_name=body.get("display_name", "Thành viên mới"),
+                member_rank=body.get("member_rank", 0),
+                group_name=body.get("group_name", "Hoàn Tiền Shopee"),
+                total_customers=total_cust,
+                zalo_uid=body.get("zalo_uid", "")
+            )
+            return self._json({"ok": True})
+        elif alert_type == "new_order":
+            telegram_alerts.notify_new_order_received(
+                order_id=body.get("order_id", ""),
+                platform=body.get("platform", "shopee"),
+                customer_id=body.get("customer_id"),
+                customer_name=body.get("customer_name"),
+                order_value=body.get("order_value"),
+                estimated_commission=body.get("estimated_commission"),
+                cashback_amount=body.get("cashback_amount"),
+            )
+            return self._json({"ok": True})
+        elif alert_type == "bug_report":
+            telegram_alerts.report_bug(
+                title=body.get("title", "Lỗi phát sinh hệ thống"),
+                details=body.get("details", ""),
+                severity=body.get("severity", "HIGH"),
+                source=body.get("source", "External / Worker"),
+                error_trace=body.get("error_trace", ""),
+                action_needed=body.get("action_needed", ""),
+                fingerprint=body.get("fingerprint", ""),
+                force=body.get("force", False),
+            )
+            return self._json({"ok": True})
+        elif alert_type == "custom":
+            telegram_alerts.send_alert(
+                title=body.get("title", "Cảnh báo hệ thống"),
+                details=body.get("details", ""),
+                action_needed=body.get("action_needed", ""),
+                alert_type=body.get("key", "generic_alert"),
+                force=body.get("force", False)
+            )
+            return self._json({"ok": True})
+        return self._json({"ok": False, "error": "unknown alert_type"}, 400)
 
     def _record_activity_log(self):
         body = self._body()
@@ -3185,12 +3292,13 @@ class _Handler(BaseHTTPRequestHandler):
 
             if action == "get_orders":
                 from ..messaging import notifications
+                in_group = bool(body.get("is_group", False))
                 return self._json({
                     "ok": True,
                     "customer_id": cust_id,
                     "customer_code": cust_code,
                     "parts": notifications.order_history(
-                        conn, cust_id, self.cfg.advertised_cashback_rate),
+                        conn, cust_id, self.cfg.advertised_cashback_rate, in_group=in_group),
                 })
 
             if action == "get_balance":
@@ -3741,6 +3849,305 @@ class _Handler(BaseHTTPRequestHandler):
             product=product, house=house, offer=offer,
             zalo_url=words.get("open_zalo_url", ""))
         return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _serve_bill(self, bill_id: str):
+        """Public bill verification receipt: /b/<code>."""
+        from datetime import datetime, timezone, timedelta
+        import html
+        vn_tz = timezone(timedelta(hours=7))
+
+        with ledger.connect(self.cfg.db_path) as conn:
+            row = conn.execute("""
+                SELECT pt.*, c.display_name, c.customer_code, c.bank_name, c.bank_account, c.account_holder
+                  FROM payment_transfers pt
+                  JOIN customers c ON c.customer_id = pt.customer_id
+                 WHERE pt.id = ? OR pt.transfer_code = ?
+                 ORDER BY pt.id DESC LIMIT 1
+            """, (bill_id, bill_id)).fetchone()
+
+            if not row:
+                err_html = """<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biên lai không tồn tại - Hoàn Tiền DP</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #090d16; color: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; }
+    .card { background: #131b2e; border-radius: 18px; padding: 36px 24px; max-width: 420px; width: 100%; text-align: center; border: 1px solid #1e293b; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h2 { color: #f87171; font-size: 20px; margin-bottom: 8px; }
+    p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
+    a { display: inline-block; padding: 11px 24px; background: #10b981; color: white; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Không tìm thấy biên lai</h2>
+    <p>Biên lai thanh toán này không tồn tại hoặc đã được cập nhật.</p>
+    <a href="/">Về trang chủ Hoàn Tiền DP</a>
+  </div>
+</body>
+</html>"""
+                return self._send(404, err_html.encode("utf-8"), "text/html; charset=utf-8")
+
+            # Total received up to this transfer
+            tot_row = conn.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM payment_transfers
+                 WHERE customer_id = ? AND id <= ?
+            """, (row["customer_id"], row["id"])).fetchone()
+            tot_val = tot_row[0] if tot_row else row["amount"]
+
+            # Marked orders if available
+            orders_info = []
+            if row["order_ids"]:
+                oids = [o.strip() for o in row["order_ids"].split(",") if o.strip()]
+                if oids:
+                    marks = ",".join("?" * len(oids))
+                    orders_info = conn.execute(f"""
+                        SELECT o.order_id, o.order_value, o.cashback_amount, r.estimate_detail
+                          FROM orders o
+                          LEFT JOIN link_requests r ON r.request_id = o.request_id
+                         WHERE o.order_id IN ({marks})
+                    """, oids).fetchall()
+
+        created_str = row["created_at"] or ""
+        try:
+            dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+            vn_dt = dt.astimezone(vn_tz)
+            created_fmt = vn_dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            created_fmt = created_str[:16]
+
+        amount_fmt = _vnd(row["amount"])
+        total_fmt = _vnd(tot_val)
+        c_name = html.escape(row["display_name"] or "Khách hàng")
+        c_code = html.escape(row["customer_code"] or row["customer_id"])
+        bank_name = html.escape(row["bank_name"] or "")
+        bank_acc = html.escape(row["bank_account"] or "")
+        if len(bank_acc) > 4:
+            bank_acc_masked = bank_acc[:2] + "****" + bank_acc[-4:]
+        else:
+            bank_acc_masked = bank_acc
+        proof_img = html.escape(row["proof_image"] or "")
+        transfer_code = html.escape(row["transfer_code"] or f"DP{row['id']:05d}")
+
+        orders_html = ""
+        if orders_info:
+            rows_html = []
+            for o in orders_info:
+                oid = html.escape(o["order_id"])
+                cb = _vnd(o["cashback_amount"] or 0)
+                p_name = ""
+                try:
+                    p_detail = json.loads(o["estimate_detail"] or "{}")
+                    p_name = p_detail.get("name") or p_detail.get("title") or ""
+                except Exception:
+                    pass
+                if not p_name:
+                    p_name = f"Đơn #{oid}"
+                p_name_esc = html.escape(p_name[:36] + ("..." if len(p_name) > 36 else ""))
+                rows_html.append(f"""
+                <div class="order-chip">
+                  <div>
+                    <div style="font-weight:600;color:#f1f5f9;">{p_name_esc}</div>
+                    <div style="font-size:11px;color:#64748b;">Mã: {oid}</div>
+                  </div>
+                  <div style="font-weight:700;color:#10b981;white-space:nowrap;margin-left:8px;">+{cb}</div>
+                </div>""")
+            orders_html = f"""
+            <div class="orders-section">
+              <div class="orders-title">
+                <span>📦 Đơn hàng tất toán đợt này</span>
+                <span>{len(orders_info)} đơn</span>
+              </div>
+              {''.join(rows_html)}
+            </div>"""
+
+        proof_html = ""
+        if proof_img:
+            proof_html = f"""
+            <div class="proof-box">
+              <div style="font-size:12px;color:#94a3b8;font-weight:600;">🧾 Ảnh biên lai chuyển khoản</div>
+              <a href="{proof_img}" target="_blank" rel="noopener">
+                <img src="{proof_img}" alt="Biên lai chuyển khoản" class="proof-img" />
+              </a>
+              <div style="font-size:11px;color:#64748b;margin-top:4px;">(Bấm vào ảnh để phóng to)</div>
+            </div>"""
+
+        bank_row_html = f"""<div class="info-row">
+        <span class="info-label">🏦 Ngân hàng</span>
+        <span class="info-val">{bank_name} ({bank_acc_masked})</span>
+      </div>""" if bank_name else ""
+
+        page_html = f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biên Lai Chuyển Khoản #{transfer_code} - Hoàn Tiền DP</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #090d16;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }}
+    .bill-card {{
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 24px;
+      max-width: 460px;
+      width: 100%;
+      padding: 32px 24px;
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.6), 0 0 30px rgba(16,185,129,0.06);
+      position: relative;
+      overflow: hidden;
+    }}
+    .bill-card::before {{
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
+    }}
+    .header {{ text-align: center; margin-bottom: 24px; }}
+    .badge-icon {{
+      width: 58px; height: 58px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 2px solid rgba(16, 185, 129, 0.3);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 12px;
+      font-size: 26px;
+    }}
+    .status-text {{
+      color: #10b981;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }}
+    .amount {{
+      font-size: 34px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      margin: 4px 0 2px;
+    }}
+    .divider {{
+      height: 1px;
+      background: #1e293b;
+      margin: 20px 0;
+    }}
+    .info-list {{ list-style: none; display: flex; flex-direction: column; gap: 12px; }}
+    .info-row {{ display: flex; justify-content: space-between; align-items: flex-start; font-size: 13.5px; }}
+    .info-label {{ color: #94a3b8; display: flex; align-items: center; gap: 6px; }}
+    .info-val {{ color: #f8fafc; font-weight: 600; text-align: right; }}
+    .highlight-val {{ color: #38bdf8; font-weight: 700; }}
+    .proof-box {{
+      margin-top: 16px;
+      padding: 12px;
+      background: #0b1120;
+      border-radius: 12px;
+      border: 1px dashed #334155;
+      text-align: center;
+    }}
+    .proof-img {{
+      max-width: 100%;
+      border-radius: 8px;
+      max-height: 240px;
+      object-fit: contain;
+      margin-top: 8px;
+      cursor: pointer;
+      border: 1px solid #1e293b;
+    }}
+    .orders-section {{
+      margin-top: 18px;
+      padding: 12px 14px;
+      background: #0b1120;
+      border-radius: 12px;
+      font-size: 12.5px;
+      border: 1px solid #1e293b;
+    }}
+    .orders-title {{ color: #94a3b8; font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; }}
+    .order-chip {{ display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #1e293b; }}
+    .order-chip:last-child {{ border-bottom: none; }}
+    .footer-actions {{ margin-top: 24px; text-align: center; }}
+    .btn-home {{
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: #10b981;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      text-align: center;
+    }}
+    .btn-home:hover {{ background: #059669; }}
+    .verified-mark {{
+      margin-top: 16px;
+      font-size: 11.5px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="bill-card">
+    <div class="header">
+      <div class="badge-icon">✅</div>
+      <div class="status-text">Xác nhận thanh toán thành công</div>
+      <div class="amount">+{amount_fmt}</div>
+      <div style="font-size:12px;color:#94a3b8;">Hệ thống Hoàn Tiền DP • hoantiendp.com</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="info-list">
+      <div class="info-row">
+        <span class="info-label">👤 Khách hàng</span>
+        <span class="info-val">{c_name} <span style="color:#94a3b8;font-size:11.5px;">({c_code})</span></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">📥 Tổng đã nhận</span>
+        <span class="info-val highlight-val">{total_fmt}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">📅 Ngày chi trả</span>
+        <span class="info-val">{created_fmt}</span>
+      </div>
+      {bank_row_html}
+      <div class="info-row">
+        <span class="info-label">🏷️ Mã giao dịch</span>
+        <span class="info-val" style="font-family:monospace;color:#a5b4fc;">{transfer_code}</span>
+      </div>
+    </div>
+
+    {proof_html}
+    {orders_html}
+
+    <div class="footer-actions">
+      <a href="/" class="btn-home">Về trang chủ Hoàn Tiền DP</a>
+      <div class="verified-mark">
+        🛡️ Chứng từ giao dịch được xác thực bởi Hoàn Tiền DP
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+        return self._send(200, page_html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _share_product(self, conn, row) -> dict:
         """Name, picture, price and cashback for a link's product page.

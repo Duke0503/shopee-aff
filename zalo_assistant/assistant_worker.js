@@ -14,12 +14,61 @@ const TIKI_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiki\.vn|ti\.ki)\/[^
 const SHOPEEFOOD_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopeefood\.vn|food\.shopee\.vn|shopee\.vn\/now-food)\/[^\s]+/i;
 const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|tiki\.vn|ti\.ki|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/i;
 
+async function reportBugToTelegram({ title, details, severity = "HIGH", source = "zalo_assistant", trace = "", actionNeeded = "" }) {
+  try {
+    await fetch(`${config.MAIN_API_URL}/api/alerts/telegram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        alert_type: "bug_report",
+        title,
+        details,
+        severity,
+        source,
+        error_trace: trace,
+        action_needed: actionNeeded,
+      }),
+    });
+  } catch (_) {
+    // Direct Telegram fallback
+    const devChatId = config.TELEGRAM_DEV_CHAT_ID || config.TELEGRAM_CHAT_ID;
+    if (config.TELEGRAM_BOT_TOKEN && devChatId) {
+      const badge = severity === "CRITICAL" ? "🚨🔴 [BUG CRITICAL - KHẨN CẤP]" : (severity === "HIGH" ? "⚠️🟠 [BUG HIGH - QUAN TRỌNG]" : "⚠️🟡 [WARNING]");
+      const text = `${badge} <b>${title}</b>\n\n` +
+                   `📍 <b>Nguồn:</b> <code>${source}</code>\n` +
+                   `⏱ <b>Thời gian:</b> <code>${new Date().toLocaleTimeString('vi-VN')}</code>\n` +
+                   `📝 <b>Chi tiết:</b>\n${details}\n` +
+                   (trace ? `\n📌 <b>Trace:</b>\n<pre>${trace.slice(0, 800)}</pre>\n` : "") +
+                   (actionNeeded ? `\n👉 <b>Xử lý:</b> ${actionNeeded}` : "");
+      fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: devChatId, text, parse_mode: "HTML" }),
+      }).catch(() => {});
+    }
+  }
+}
+
 process.on("uncaughtException", (err) => {
   console.error("[Uncaught Exception]:", err);
+  reportBugToTelegram({
+    title: "Uncaught Exception trong Zalo Assistant",
+    severity: "CRITICAL",
+    details: err?.message || String(err),
+    trace: err?.stack || "",
+    actionNeeded: "Kiểm tra tiến trình Zalo Assistant bot xem có bị treo hoặc sập không.",
+  });
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[Unhandled Rejection]:", reason);
+  reportBugToTelegram({
+    title: "Unhandled Promise Rejection trong Zalo Assistant",
+    severity: "HIGH",
+    details: String(reason?.message || reason),
+    trace: reason?.stack || "",
+    actionNeeded: "Kiểm tra lỗi bất đồng bộ trong assistant_worker.js.",
+  });
 });
 
 function randomInt(min, max) {
@@ -956,7 +1005,7 @@ function extractTextAndUrls(data) {
             const res = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_orders" }),
+              body: JSON.stringify({ uid: String(senderUid), name: senderName, action: "get_orders", is_group: isGroup }),
             }).then((r) => r.json()).catch(() => null);
 
             if (res && res.ok && Array.isArray(res.parts)) {
@@ -1386,24 +1435,48 @@ function extractTextAndUrls(data) {
         const updateMembers = event.data.updateMembers || [];
         const realGroupName = await getGroupName(event.threadId);
 
-        // Ghi nhận tất cả thành viên mới vào nhật ký quản trị
+        // Lấy số lượng thành viên hiện tại của nhóm
+        let currentTotalMembers = 0;
+        try {
+          const gRes = await api.getGroupInfo(String(event.threadId));
+          const gInfo = gRes?.gridInfoMap?.[String(event.threadId)] || gRes;
+          currentTotalMembers = gInfo?.totalMember || (gInfo?.memVerList?.length) || 0;
+        } catch (_) {}
+
+        // Ghi nhận tất cả thành viên mới vào nhật ký quản trị & bắn thông báo Telegram
         for (const member of updateMembers) {
           if (member.id === ownId) continue;
 
-          console.log(`[Member Joined] Phát hiện thành viên mới gia nhập: ${member.dName || member.id} (nhóm: ${realGroupName})`);
+          const memberName = member.dName || member.name || `Thành viên ${String(member.id).slice(-4)}`;
+          console.log(`[Member Joined] Phát hiện thành viên mới gia nhập: ${memberName} (nhóm: ${realGroupName})`);
           
           logActivity(
             "group_join",
             member.id || member.uid,
-            member.dName || member.name,
-            { groupId: event.threadId, groupName: realGroupName },
+            memberName,
+            { groupId: event.threadId, groupName: realGroupName, rank: currentTotalMembers },
             `zalo_group_${event.threadId}`
           );
+
+          // Bắn thông báo về Telegram Group DP Business
+          try {
+            fetch(`${config.MAIN_API_URL}/api/alerts/telegram`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                alert_type: "member_joined",
+                display_name: memberName,
+                member_rank: currentTotalMembers,
+                group_name: realGroupName,
+                zalo_uid: String(member.id || member.uid || "")
+              })
+            }).catch(() => {});
+          } catch (_) {}
 
           if (config.ENABLE_PRIVATE_WELCOME) {
             await sendPrivateWelcome(member);
           } else {
-            console.log(`[Private DM] Tạm tắt gửi tin riêng cho người mới: ${member.dName || member.id}`);
+            console.log(`[Private DM] Tạm tắt gửi tin riêng cho người mới: ${memberName}`);
           }
         }
 
@@ -1427,6 +1500,77 @@ function extractTextAndUrls(data) {
     } catch (err) {
       console.error("[Group Event Handler Error]:", err);
     }
+  });
+
+  // LẮNG NGHE SỰ KIỆN KẾT NỐI & XUNG ĐỘT WEBSOCKET ZALO
+  let recentDisconnects = [];
+  let isAlertedConflict = false;
+
+  async function reportTelegramConflict(alertType, data = {}) {
+    try {
+      await fetch(`${config.MAIN_API_URL}/api/alerts/telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alert_type: alertType, ...data }),
+      });
+    } catch (_) {
+      // Fallback gửi trực tiếp tới Telegram nếu backend chưa chạy
+      const devChatId = config.TELEGRAM_DEV_CHAT_ID || config.TELEGRAM_CHAT_ID;
+      if (config.TELEGRAM_BOT_TOKEN && devChatId) {
+        let text = "";
+        if (alertType === "zalo_conflict") {
+          text = `🚨 <b>[CẢNH BÁO HỆ THỐNG] Zalo Bot Tranh Chấp WebSocket</b>\n\n` +
+                 `⏱ <b>Thời gian:</b> <code>${new Date().toLocaleTimeString('vi-VN')}</code>\n` +
+                 `🔍 <b>Chi tiết:</b> Bị ngắt WebSocket dồn dập (${data.reconnect_count || 3} lần/phút).\n` +
+                 `Nguyên nhân: <code>${data.reason || 'Tranh chấp session do 2 worker cùng chạy'}</code>\n\n` +
+                 `👉 <b>Hành động:</b> Kiểm tra có 2 worker chạy cùng lúc không và tắt bớt 1 bên!`;
+        } else if (alertType === "zalo_recovered") {
+          text = `✅ <b>[ĐÃ PHỤC HỒI] WebSocket Zalo Bot Đã Ổn Định</b>\n\n` +
+                 `⏱ <b>Thời gian:</b> <code>${new Date().toLocaleTimeString('vi-VN')}</code>\n` +
+                 `Trạng thái: Kết nối WebSocket Zalo đã hoạt động bình thường trở lại.`;
+        }
+        if (text) {
+          fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: devChatId,
+              text,
+              parse_mode: "HTML",
+            }),
+          }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  api.listener.on("closed", (code, reason) => {
+    const now = Date.now();
+    recentDisconnects.push(now);
+    recentDisconnects = recentDisconnects.filter(t => now - t <= 60000);
+    console.warn(`[Zalo Listener Closed] Mã: ${code}, Lý do: ${reason}. Số lần ngắt trong 60s: ${recentDisconnects.length}`);
+
+    if (recentDisconnects.length >= 3 && !isAlertedConflict) {
+      isAlertedConflict = true;
+      console.error(`[Zalo WebSocket Conflict] ⚠️ PHÁT HIỆN TRANH CHẤP WEBSOCKET! Gửi cảnh báo tới Dev...`);
+      reportTelegramConflict("zalo_conflict", {
+        reconnect_count: recentDisconnects.length,
+        reason: `Mã ${code}: ${reason || 'Ngắt liên tục do 2 worker cùng kết nối hoặc bị đăng nhập đè session'}`
+      });
+    }
+  });
+
+  api.listener.on("connected", () => {
+    console.log(`[Zalo Listener Connected] ✅ WebSocket Zalo đã kết nối thành công.`);
+    if (isAlertedConflict) {
+      isAlertedConflict = false;
+      recentDisconnects = [];
+      reportTelegramConflict("zalo_recovered");
+    }
+  });
+
+  api.listener.on("error", (err) => {
+    console.warn(`[Zalo Listener Error]:`, err?.message || err);
   });
 
   // Bắt đầu listener
@@ -1500,7 +1644,21 @@ function extractTextAndUrls(data) {
             results.push(await api.sendMessage({ msg: "", attachments }, groupId, ThreadType.Group));
           }
           if (text) {
-            const mentions = Array.isArray(payload.mentions) ? [...payload.mentions] : [];
+            const mentions = [];
+            if (Array.isArray(payload.mentions)) {
+              for (const m of payload.mentions) {
+                if (m.tag && typeof m.tag === "string") {
+                  const p = text.indexOf(m.tag);
+                  if (p !== -1) {
+                    mentions.push({ uid: String(m.uid), pos: p, len: m.tag.length });
+                    continue;
+                  }
+                }
+                if (typeof m.pos === "number" && typeof m.len === "number") {
+                  mentions.push({ uid: String(m.uid), pos: m.pos, len: m.len });
+                }
+              }
+            }
             const allPos = payload.mentionAll ? text.indexOf("@All") : -1;
             if (allPos !== -1) mentions.push({ pos: allPos, uid: "-1", len: 4 });
             const msg = { msg: text };

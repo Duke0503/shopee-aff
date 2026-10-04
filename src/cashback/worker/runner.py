@@ -49,6 +49,11 @@ def wait_for_extension(bridge: Bridge, seconds: int) -> bool:
         if bridge.connected():
             return True
         time.sleep(1)
+    try:
+        from ..core import telegram_alerts
+        telegram_alerts.notify_shopee_bridge_disconnected()
+    except Exception:
+        pass
     return False
 
 
@@ -90,6 +95,11 @@ def run_one_pass(
     if outcome["stored"]:
         if totals.failing_streak >= FAILING_ALERT_AFTER:
             log.warning(f"LINKS WORKING AGAIN after {totals.failing_streak} failed pass(es)")
+            try:
+                from ..core import telegram_alerts
+                telegram_alerts.notify_shopee_recovered()
+            except Exception:
+                pass
         totals.failing_streak = 0
     elif any(i.get("error") for i in results):
         _note_failure(totals, next((i["error"] for i in results if i.get("error")), "?"))

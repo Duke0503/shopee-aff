@@ -34,7 +34,8 @@ def member(conn):
 
 def test_no_orders_says_how_to_start(member):
     [text] = notifications.order_history(member, MEMBER, 0.8)
-    assert text == notifications.messages.render("orders_empty")
+    assert "chưa có đơn hàng nào" in text
+    assert "https://hoantiendp.com/orders" in text
 
 
 def test_every_order_is_listed_newest_first(member):
@@ -45,21 +46,35 @@ def test_every_order_is_listed_newest_first(member):
     text = "\n".join(notifications.order_history(member, MEMBER, 0.8))
     positions = [text.index(o) for o in ("NEW", "MID", "BAD", "OLD")]
     assert positions == sorted(positions)
-    assert "(4 " in text                       # the header counts them
-    assert "DP00001" in text                   # the code to sign in with
+    assert "Danh sách 4 đơn hàng gần nhất:" in text
+    assert "DP00001" not in text
+    assert "https://hoantiendp.com/orders" in text
+
+
+def test_today_orders_format(member):
+    now_vn = notifications.datetime.now(notifications.timezone.utc).astimezone(ledger.VN_TZ)
+    today_iso = now_vn.isoformat()
+    _order(member, "TODAY1", ledger.AWAITING_APPROVAL, commission=20_000, recorded=today_iso)
+    _order(member, "TODAY2", ledger.APPROVED, commission=10_000, recorded=today_iso)
+    text = "\n".join(notifications.order_history(member, MEMBER, 0.8))
+    assert "📦 Đơn hàng ngày " in text
+    assert "1. TODAY" in text
+    assert "💰 Tổng hoa hồng:" in text
+    assert "🔗 Xem chi tiết tất cả đơn hàng tại: https://hoantiendp.com/orders" in text
 
 
 def test_a_long_history_is_split_and_nothing_is_lost(member):
-    ids = [f"ORDER{n:03d}" for n in range(60)]
+    now_vn = notifications.datetime.now(notifications.timezone.utc).astimezone(ledger.VN_TZ)
+    ids = [f"ORDER{n:03d}" for n in range(100)]
     for n, oid in enumerate(ids):
+        # Place 100 orders today with varying seconds/minutes
         _order(member, oid, ledger.AWAITING_APPROVAL,
-               recorded=f"2026-09-{1 + n % 28:02d}T10:00:{n % 60:02d}+07:00")
+               recorded=now_vn.replace(hour=(n // 60) % 24, minute=n % 60, second=n % 60).isoformat())
     parts = notifications.order_history(member, MEMBER, 0.8)
     assert len(parts) > 1
     assert all(len(p) <= notifications.MESSAGE_LIMIT for p in parts)
     joined = "\n".join(parts)
-    # One block per order; "Mã đơn: <id>" appears once in each block.
-    assert all(joined.count(f"Mã đơn: {oid}") == 1 for oid in ids)
+    assert all(oid in joined for oid in ids)
 
 
 def test_the_assistant_gets_the_messages(db):

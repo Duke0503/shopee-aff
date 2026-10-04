@@ -62,6 +62,52 @@ class GzipRotatingFileHandler(logging.handlers.RotatingFileHandler):
             pass
 
 
+class TelegramLoggingHandler(logging.Handler):
+    """Automatically forwards WARNING, ERROR, and CRITICAL logs to Telegram Dev group."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # Avoid recursion loops from telegram / urllib / http requests
+        name = (record.name or "").lower()
+        if any(ign in name for ign in ("urllib", "httpcore", "httpx", "telegram")):
+            return
+
+        try:
+            from . import telegram_alerts
+
+            if record.levelno >= logging.CRITICAL:
+                sev = "CRITICAL"
+            elif record.levelno >= logging.ERROR:
+                sev = "HIGH"
+            elif record.levelno >= logging.WARNING:
+                # Filter noise: only alert on warnings from cashback application modules
+                if not (record.name or "").startswith("cashback"):
+                    return
+                sev = "WARNING"
+            else:
+                return
+
+            msg = record.getMessage()
+            trace = ""
+            if record.exc_info:
+                trace = self.formatException(record.exc_info)
+                if len(trace) > 1200:
+                    trace = trace[:1200] + "\n... [đã cắt bớt]"
+
+            fp = f"{sev}:{record.name}:{record.filename}:{record.lineno}:{msg[:40]}"
+            source = f"{record.name} ({record.filename}:{record.lineno})"
+
+            telegram_alerts.report_bug(
+                title=f"{sev}: {msg[:70]}",
+                details=msg,
+                severity=sev,
+                source=source,
+                error_trace=trace,
+                fingerprint=fp,
+            )
+        except Exception:
+            self.handleError(record)
+
+
 def configure(level: int = logging.INFO, console: bool = True) -> None:
     """Set up logging once, at startup. Safe to call twice."""
     root = logging.getLogger()
@@ -87,6 +133,11 @@ def configure(level: int = logging.INFO, console: bool = True) -> None:
         stream.setFormatter(formatter)
         stream._cashback = True
         root.addHandler(stream)
+
+    # Attach Telegram alerting handler for WARNING, ERROR and CRITICAL
+    tele_handler = TelegramLoggingHandler(level=logging.WARNING)
+    tele_handler._cashback = True
+    root.addHandler(tele_handler)
 
     # httpx narrates every request at INFO, which buries everything else.
     logging.getLogger("httpx").setLevel(logging.WARNING)

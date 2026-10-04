@@ -62,6 +62,7 @@ def test_admin_payments_query_and_vietqr(conn, cfg, mock_handler):
     conn.execute("UPDATE customers SET customer_code = 'DP00002' WHERE customer_id = 'C002'")
     ledger.add_order(conn, "ORD02", "C002", None, order_value=150_000, estimated_commission=20_000)
     ledger.mark_approved(conn, "ORD02", 20_000, 16_000)
+    conn.execute("UPDATE orders SET settlement_status = 'settled'")
     conn.commit()
 
     res = mock_handler._admin_payments()
@@ -116,9 +117,10 @@ def test_admin_payment_confirm_records_transfer_and_marks_paid(conn, cfg, mock_h
         mock_send.assert_called_once()
         recipient, dm_msg = mock_send.call_args[0]
         assert "12.000" in dm_msg
-        assert "Số tiền nhận đợt này" in dm_msg
-        assert "Tổng tiền hoàn đã nhận" in dm_msg
-        assert "Số dư tích lũy còn lại" in dm_msg
+        assert "Xác nhận thanh toán thành công" in dm_msg
+        assert "Số tiền" in dm_msg
+        assert "Tổng đã nhận" in dm_msg
+        assert "Bill" in dm_msg
 
         mock_bcast.assert_called_once()
         # Verify broadcast went to test group per user requirement
@@ -174,6 +176,35 @@ def test_admin_upload_proof_base64(mock_handler):
     mock_handler._body = lambda: {
         "data": png_b64,
     }
-    res = mock_handler._admin_upload_proof()
-    assert res["ok"] is True
-    assert "uploads/proofs/" in res["url"]
+    with patch("urllib.request.urlopen") as mock_url:
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"drive_url": "https://drive.google.com/test"}).encode("utf-8")
+        mock_url.return_value.__enter__.return_value = mock_resp
+        res = mock_handler._admin_upload_proof()
+        assert res["ok"] is True
+        assert res["url"] == "https://drive.google.com/test"
+
+
+def test_serve_bill_html(conn, cfg, mock_handler):
+    ledger.add_customer(conn, "C005", display_name="Pham Thi E")
+    conn.execute("UPDATE customers SET customer_code = 'DP00005' WHERE customer_id = 'C005'")
+    cur = conn.execute("""
+        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, created_at)
+        VALUES ('C005', 67164, 'DP00005TX', 'Hoan tien', 'https://example.com/proof.png', '2026-10-03 10:16:00')
+    """)
+    tx_id = cur.lastrowid
+    conn.commit()
+
+    mock_handler._send = lambda status, body, ct: (status, body.decode("utf-8"), ct)
+    status, html_content, content_type = mock_handler._serve_bill(str(tx_id))
+    assert status == 200
+    assert "text/html" in content_type
+    assert "67.164" in html_content
+    assert "Pham Thi E" in html_content
+    assert "Xác nhận thanh toán thành công" in html_content
+    assert "https://example.com/proof.png" in html_content
+
+    # Non-existent bill returns 404
+    status_404, html_404, _ = mock_handler._serve_bill("999999")
+    assert status_404 == 404
+    assert "Không tìm thấy biên lai" in html_404

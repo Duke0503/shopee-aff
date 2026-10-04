@@ -852,6 +852,25 @@ def add_order(
             (CONVERTED, request_id, PENDING),
         )
 
+    # Dispatch notification to DP Business Telegram group
+    try:
+        from ..core import telegram_alerts
+        customer_name = None
+        if customer_id:
+            row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (customer_id,)).fetchone()
+            if row and row[0]:
+                customer_name = row[0]
+        telegram_alerts.notify_new_order_received(
+            order_id=order_id,
+            platform=platform,
+            customer_id=customer_id,
+            customer_name=customer_name,
+            order_value=order_value,
+            estimated_commission=estimated_commission,
+        )
+    except Exception:
+        pass
+
 
 def mark_approved(
     conn: sqlite3.Connection,

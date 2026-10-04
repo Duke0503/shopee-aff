@@ -542,45 +542,113 @@ def notify_failed_links(db_path: Path, bot: Sender) -> int:
 MESSAGE_LIMIT = 1800
 
 
-def order_history(conn, customer_id: str, cashback_rate: float) -> list[str]:
-    """Every order this customer has ever had, as messages ready to send.
+def order_history(conn, customer_id: str, cashback_rate: float, in_group: bool = False) -> list[str]:
+    """Every order this customer has ever had, formatted cleanly for Zalo.
 
-    Newest first. A figure not yet approved is marked as an estimate: it is
-    what the order would pay, not what it will pay, and only an approved
-    commission is ever paid from.
+    If today has orders: lists today's orders + total cashback.
+    If no orders today: lists up to 5 recent orders.
+    Never exposes customer code or web password.
     """
+    target_id = ledger.find_customer_id(conn, customer_id) or customer_id
     rows = conn.execute(
         "SELECT o.order_id, o.status, o.platform, o.estimated_commission,"
-        "       o.cashback_amount, o.rejection_reason,"
+        "       o.cashback_amount, o.rejection_reason, o.recorded_at,"
+        "       o.approved_at, o.updated_at,"
         "       r.affiliate_url, r.source_url, r.estimate_detail"
         "  FROM orders o"
         "  LEFT JOIN link_requests r ON r.request_id = o.request_id"
         " WHERE o.customer_id = ?"
         " ORDER BY COALESCE(o.recorded_at, o.approved_at, o.updated_at) DESC",
-        (customer_id,),
+        (target_id,),
     ).fetchall()
-    if not rows:
-        return [messages.render("orders_empty")]
 
-    blocks = [_with_campaign(conn, row["order_id"], _order_block(row, cashback_rate))
-              for row in rows]
-    code = ledger.customer_code_of(conn, customer_id)
-    frame = messages.render("orders_summary", orders="\x00",
-                           customer_id=code, count=len(rows))
-    head, tail = frame.split("\x00", 1)
+    now_vn = datetime.now(timezone.utc).astimezone(ledger.VN_TZ)
+    today_date = now_vn.date()
+    today_str = now_vn.strftime("%d/%m/%Y")
+
+    if not rows:
+        return [
+            messages.render("orders_no_orders_today", date=today_str)
+            + "\n\n"
+            + messages.render("orders_link_footer")
+        ]
+
+    today_orders: list[tuple[str, int]] = []
+    past_orders: list[tuple[str, str, int]] = []
+
+    for row in rows:
+        raw_time = row["recorded_at"] if "recorded_at" in row.keys() else None
+        if not raw_time and "approved_at" in row.keys():
+            raw_time = row["approved_at"]
+        if not raw_time and "updated_at" in row.keys():
+            raw_time = row["updated_at"]
+        iso_time = ledger.parse_order_time(raw_time, row["order_id"])
+        try:
+            order_dt = datetime.fromisoformat(iso_time)
+        except Exception:
+            order_dt = now_vn
+
+        status = row["status"]
+        if status == ledger.REJECTED:
+            cb = 0
+        elif row["cashback_amount"]:
+            cb = row["cashback_amount"]
+        else:
+            estimate = row["estimated_commission"]
+            fees = (1 - 0.10 - 0.0098) if (row["platform"] or "shopee") == "shopee" else (1 - 0.10)
+            cb = round_dong(round_dong(estimate * fees) * cashback_rate) if estimate else 0
+
+        if order_dt.date() == today_date:
+            today_orders.append((row["order_id"], cb))
+        else:
+            past_orders.append((row["order_id"], order_dt.strftime("%d/%m"), cb))
+
+    lines: list[str] = []
+
+    if today_orders:
+        lines.append(messages.render("orders_today_header", date=today_str))
+        lines.append("")
+        total_cb = 0
+        for idx, (order_id, cb) in enumerate(today_orders, 1):
+            total_cb += cb
+            item = messages.render("order_item_today", index=idx, order_id=order_id, cashback=_vnd(cb))
+            lines.append(_with_campaign(conn, order_id, item))
+        lines.append("")
+        lines.append(messages.render("orders_today_total", total=_vnd(total_cb)))
+        lines.append("")
+        lines.append(messages.render("orders_link_footer"))
+    elif past_orders:
+        recent_count = min(len(past_orders), 5)
+        recent = past_orders[:recent_count]
+        lines.append(messages.render("orders_no_orders_today", date=today_str))
+        lines.append("")
+        lines.append(messages.render("orders_recent_header", count=recent_count))
+        lines.append("")
+        for idx, (order_id, date_short, cb) in enumerate(recent, 1):
+            item = messages.render("order_item_recent", index=idx, order_id=order_id, date=date_short, cashback=_vnd(cb))
+            lines.append(_with_campaign(conn, order_id, item))
+        lines.append("")
+        lines.append(messages.render("orders_link_footer"))
+    else:
+        lines.append(messages.render("orders_no_orders_today", date=today_str))
+        lines.append("")
+        lines.append(messages.render("orders_link_footer"))
+
+    full_text = "\n".join(lines)
+    if len(full_text) <= MESSAGE_LIMIT:
+        return [full_text]
 
     parts: list[str] = []
-    current = head
-    for block in blocks:
-        joined = block if current in ("", head) else "\n\n" + block
-        if current not in ("", head) and len(current) + len(joined) > MESSAGE_LIMIT:
+    current = ""
+    for line in lines:
+        cand = (current + "\n" + line) if current else line
+        if len(cand) > MESSAGE_LIMIT and current:
             parts.append(current)
-            current, joined = "", block
-        current += joined
-    if len(current) + len(tail) > MESSAGE_LIMIT:
-        parts.extend([current, tail.lstrip("\n")])
-    else:
-        parts.append(current + tail)
+            current = line
+        else:
+            current = cand
+    if current:
+        parts.append(current)
     return parts
 
 
@@ -670,6 +738,19 @@ def _order_block(row, cashback_rate: float) -> str:
     name, _, _ = _order_identity(row)
     product = name or messages.render("order_fallback_name", order_id=row["order_id"])
     status = row["status"]
+
+    date_str = ""
+    raw_date = row["recorded_at"] if "recorded_at" in row.keys() else None
+    if raw_date:
+        try:
+            from datetime import datetime, timezone, timedelta
+            dt = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
+            vn_dt = dt.astimezone(timezone(timedelta(hours=7)))
+            date_str = vn_dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            date_str = str(raw_date)[:16]
+    date_line = f"\n📅 Ngày: {date_str}" if date_str else ""
+
     if status == ledger.AWAITING_APPROVAL:
         estimate = row["estimated_commission"]
         fees = (1 - 0.10 - 0.0098) if (row["platform"] or "shopee") == "shopee" else (1 - 0.10)
@@ -683,8 +764,8 @@ def _order_block(row, cashback_rate: float) -> str:
     elif status == ledger.REJECTED:
         reason = f" ({row['rejection_reason']})" if row["rejection_reason"] else ""
         return messages.render("order_item_rejected", product=product,
-                               reason=reason, order_id=row["order_id"])
+                               reason=reason, order_id=row["order_id"], date_line=date_line)
     else:
         return f"- {product}: {row['order_id']} ({status})"
     return messages.render(key, product=product, cashback=cashback,
-                           order_id=row["order_id"])
+                           order_id=row["order_id"], date_line=date_line)

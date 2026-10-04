@@ -246,7 +246,23 @@ def _hint(step: int, why: str, state: dict) -> str:
 
 def _fail(bridge: Bridge, step: int, why: str) -> LinkStepError:
     state = page_state(bridge)
-    return LinkStepError(step, why, _describe(state), _hint(step, why, state))
+    hint = _hint(step, why, state)
+    href = str(state.get("href") or "")
+    low = why.lower()
+
+    # Trigger urgent alerts to Telegram Dev Group
+    try:
+        from ..core import telegram_alerts
+        if any(m in href for m in VERIFICATION_MARKERS) or "verification check" in low:
+            telegram_alerts.notify_shopee_captcha(hint=hint, current_url=href)
+        elif state.get("password_box") or any(m in href for m in ("/login", "/signin", "passport", "/account")):
+            telegram_alerts.notify_shopee_session_expired(hint=hint, current_url=href)
+        elif "unavailable" in state or "no result for" in low or "job_timeout" in low:
+            telegram_alerts.notify_shopee_bridge_disconnected()
+    except Exception:
+        pass
+
+    return LinkStepError(step, why, _describe(state), hint)
 
 
 def _js(bridge: Bridge, code: str, timeout: float = 60) -> dict:

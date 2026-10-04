@@ -1,0 +1,54 @@
+name: CI/CD Auto Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Windows VPS
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Python Dependencies
+        run: |
+          uv sync
+
+      - name: Install Zalo Assistant Dependencies
+        run: |
+          cd zalo_assistant
+          npm install --omit=dev
+
+      - name: Send Telegram Notification
+        shell: powershell
+        run: |
+          try {
+            $msg = "🚀 <b>[CI/CD DEPLOY THÀNH CÔNG]</b>`n`n" +
+                   "📦 <b>Nhánh:</b> <code>main</code>`n" +
+                   "📝 <b>Commit:</b> <code>$($env:GITHUB_SHA.Substring(0, 7))</code> - $($env:GITHUB_COMMIT_MESSAGE)`n" +
+                   "👤 <b>Tác giả:</b> $($env:GITHUB_ACTOR)`n" +
+                   "⏱ <b>Thời gian:</b> $(Get-Date -Format 'HH:mm:ss dd/MM/yyyy')`n`n" +
+                   "✅ <i>Mã nguồn trên VPS đã được tự động đồng bộ mới nhất!</i>"
+            
+            # Đọc token từ .env trên VPS
+            $envPath = "C:\Project\mmo\.env"
+            if (Test-Path $envPath) {
+                $botToken = ""
+                $devChatId = ""
+                Get-Content $envPath | ForEach-Object {
+                    if ($_ -match "^TELEGRAM_BOT_TOKEN=(.+)$") { $botToken = $Matches[1].Trim() }
+                    if ($_ -match "^TELEGRAM_DEV_CHAT_ID=(.+)$") { $devChatId = $Matches[1].Trim() }
+                    if (-not $devChatId -and $_ -match "^TELEGRAM_CHAT_ID=(.+)$") { $devChatId = $Matches[1].Trim() }
+                }
+                if ($botToken -and $devChatId) {
+                    $body = @{ chat_id = $devChatId; text = $msg; parse_mode = "HTML" } | ConvertTo-Json
+                    Invoke-RestMethod -Uri "https://api.telegram.org/bot$botToken/sendMessage" -Method Post -ContentType "application/json" -Body $body | Out-Null
+                }
+            }
+          } catch {
+            Write-Host "Warning: Failed to send Telegram notification: $_"
+          }

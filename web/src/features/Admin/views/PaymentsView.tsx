@@ -1346,6 +1346,29 @@ function PaymentDialog({
                     </p>
                   </div>
                 </div>
+              ) : isBankValid && amount <= 0 ? (
+                <div className="w-full rounded-xl border border-dashed border-border/80 bg-secondary/20 p-5 text-center space-y-3">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <QrCode className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">
+                      Chưa tạo mã VietQR (Số tiền: 0đ)
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ngân hàng <strong>{user.bank_info?.shortName || user.bank_name}</strong> đã khớp NAPAS 24/7. Hãy tick chọn các đơn hàng bên dưới để hệ thống tạo mã QR VietQR tương ứng.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 text-xs">
+                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Building className="h-3 w-3" />
+                      <span>{user.bank_info?.shortName || user.bank_name}</span>
+                    </Badge>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      BIN: {user.bank_info?.bin}
+                    </Badge>
+                  </div>
+                </div>
               ) : (
                 <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-center space-y-3">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/20 text-amber-500">

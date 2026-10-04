@@ -83,6 +83,12 @@ export const config = {
   PORT: Number(env.ASSISTANT_PORT || 8891),
   MAIN_API_URL: env.MAIN_API_URL || `http://127.0.0.1:${env.DASHBOARD_PORT || 8899}`,
 
+  // Telegram Alerts & Business Notifications
+  TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN || "",
+  TELEGRAM_CHAT_ID: env.TELEGRAM_CHAT_ID || "",
+  TELEGRAM_DEV_CHAT_ID: env.TELEGRAM_DEV_CHAT_ID || env.TELEGRAM_CHAT_ID || "",
+  TELEGRAM_BUSINESS_CHAT_ID: env.TELEGRAM_BUSINESS_CHAT_ID || env.TELEGRAM_CHAT_ID || "",
+
   // Default customer ID dùng khi khách chưa có mã
   DEFAULT_CUSTOMER_ID: "default_bot",
 

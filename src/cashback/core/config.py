@@ -64,6 +64,8 @@ class Config:
     public_base_url: str = ""
     gdrive_webhook_url: str = ""
     app_env: str = "dev"
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     @property
     def is_production(self) -> bool:
@@ -187,4 +189,6 @@ def load() -> Config:
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://hoantiendp.com").strip(),
         gdrive_webhook_url=os.getenv("GDRIVE_WEBHOOK_URL", "").strip(),
         app_env=os.getenv("APP_ENV", "dev").strip().lower(),
+        telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
+        telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", "").strip(),
     )
