@@ -1,6 +1,7 @@
 import { Zalo, ThreadType, GroupEventType, FriendEventType } from "zca-js";
 import fs from "node:fs/promises";
 import http from "node:http";
+import net from "node:net";
 import path from "node:path";
 import sizeOf from "image-size";
 import { config } from "./config.js";
@@ -79,8 +80,31 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function checkPortAvailable(port) {
+  return new Promise((resolve, reject) => {
+    const tester = net.createServer()
+      .once("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          reject(new Error(`Cổng ${port} đang được sử dụng bởi một tiến trình Bot khác. Dừng tiến trình này ngay để tránh tranh chấp WebSocket Zalo.`));
+        } else {
+          reject(err);
+        }
+      })
+      .once("listening", () => {
+        tester.once("close", () => resolve()).close();
+      })
+      .listen(port, "127.0.0.1");
+  });
+}
+
 async function main() {
   console.log("=== KHỞI ĐỘNG ZALO ASSISTANT BOT (FULL PLAN) ===");
+  try {
+    await checkPortAvailable(config.PORT);
+  } catch (err) {
+    console.error(`[FATAL CONCURRENCY ERROR] ${err.message}`);
+    process.exit(1);
+  }
   const credentials = JSON.parse(await fs.readFile(config.CREDENTIALS_PATH, "utf-8"));
 
   const zalo = new Zalo({
@@ -1789,11 +1813,8 @@ function extractTextAndUrls(data) {
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      console.warn(`[HTTP Server Warning] Cổng ${config.PORT} đang bị chiếm, sẽ tự động thử lại sau 5s...`);
-      setTimeout(() => {
-        try { server.close(); } catch (_) {}
-        server.listen(config.PORT, "127.0.0.1");
-      }, 5000);
+      console.error(`[FATAL CONCURRENCY ERROR] Cổng ${config.PORT} bị chiếm dụng bởi tiến trình khác! Dừng bot ngay lập tức để tránh tranh chấp WebSocket.`);
+      process.exit(1);
     } else {
       console.error("[HTTP Server Error]:", err);
     }
