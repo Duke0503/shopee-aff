@@ -801,6 +801,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_products()
         if path == "/api/admin/logs":
             return self._admin_logs()
+        if path == "/api/admin/campaigns":
+            return self._admin_campaigns()
         if path == "/api/campaigns/offer":
             # The assistant asks this before sending a link, to say whether
             # an order from it could still win a campaign slot.
@@ -930,6 +932,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._admin_shopee_sync_payouts()
         if path == "/api/admin/orders/settle":
             return self._admin_settle_orders()
+        if path == "/api/admin/campaigns":
+            return self._admin_create_campaign()
         if path == "/api/auth/password":
             return self._change_password()
         if path == "/api/me/bank":
@@ -1539,6 +1543,23 @@ class _Handler(BaseHTTPRequestHandler):
                 ),
             ]
 
+            camp_row = conn.execute("""
+                SELECT COUNT(DISTINCT campaign_id) as total_campaigns,
+                       COALESCE(SUM(amount), 0) as total_bonus,
+                       COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as bonus_paid,
+                       COALESCE(SUM(CASE WHEN status != 'void' AND status != 'paid' THEN amount ELSE 0 END), 0) as bonus_pending,
+                       COUNT(id) as total_awards
+                  FROM campaign_awards
+                 WHERE status != 'void'
+            """).fetchone()
+            campaign_metrics = {
+                "total_campaigns": camp_row["total_campaigns"],
+                "total_bonus": camp_row["total_bonus"],
+                "bonus_paid": camp_row["bonus_paid"],
+                "bonus_pending": camp_row["bonus_pending"],
+                "total_awards": camp_row["total_awards"],
+            }
+
         metrics = {
             "period": period,
             "is_admin": is_admin,
@@ -1569,6 +1590,7 @@ class _Handler(BaseHTTPRequestHandler):
             "top_products": top_products,
             "channels": channels,
             "community_funnel": community_funnel,
+            "campaigns": campaign_metrics,
             "financials": {
                 "gross_commission": round_dong(gross_commission) if is_admin else None,
                 "shopee_fee": shopee_fee if is_admin else None,
@@ -1577,6 +1599,9 @@ class _Handler(BaseHTTPRequestHandler):
                 "cashback_paid": cashback_paid if is_admin else None,
                 "cashback_ready": cashback_ready if is_admin else None,
                 "cashback_pipeline": cashback_pipeline if is_admin else None,
+                "campaign_bonus_total": campaign_metrics["total_bonus"] if is_admin else None,
+                "campaign_bonus_paid": campaign_metrics["bonus_paid"] if is_admin else None,
+                "campaign_bonus_pending": campaign_metrics["bonus_pending"] if is_admin else None,
                 "total_cashback": total_cashback_all if is_admin else None,
                 "total_cashback_all": total_cashback_all if is_admin else None,
                 "total_cashback_committed": total_cashback_committed if is_admin else None,
@@ -2176,6 +2201,83 @@ class _Handler(BaseHTTPRequestHandler):
             }
         })
 
+    def _admin_campaigns(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") not in ("admin", "employee"):
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+        with ledger.connect(self.cfg.db_path) as conn:
+            campaign_rows = conn.execute("SELECT * FROM campaigns ORDER BY starts_at DESC").fetchall()
+            c_list = []
+            for c in campaign_rows:
+                cid = c["campaign_id"]
+                awards = conn.execute("""
+                    SELECT a.id, a.campaign_id, a.customer_id, a.order_id, a.amount,
+                           a.status, a.created_at, a.confirmed_at, a.paid_at, a.notified_status,
+                           o.order_value, o.status as order_status, o.recorded_at,
+                           COALESCE(o.platform, 'shopee') as platform,
+                           cust.display_name, cust.customer_code, cust.zalo_user_id
+                      FROM campaign_awards a
+                      JOIN orders o ON o.order_id = a.order_id
+                      LEFT JOIN customers cust ON cust.customer_id = a.customer_id
+                     WHERE a.campaign_id = ?
+                     ORDER BY a.id ASC
+                """, (cid,)).fetchall()
+                
+                c_dict = dict(c)
+                c_dict["awards"] = [dict(a) for a in awards]
+                c_dict["slots_used"] = len([a for a in awards if a["status"] != "void"])
+                c_dict["total_bonus_awarded"] = sum(a["amount"] for a in awards if a["status"] != "void")
+                c_dict["total_bonus_paid"] = sum(a["amount"] for a in awards if a["status"] == "paid")
+                c_list.append(c_dict)
+
+            summary = {
+                "total_campaigns": len(c_list),
+                "total_bonus_awarded": sum(c["total_bonus_awarded"] for c in c_list),
+                "total_bonus_paid": sum(c["total_bonus_paid"] for c in c_list),
+                "total_slots_used": sum(c["slots_used"] for c in c_list),
+            }
+            return self._json({"ok": True, "campaigns": c_list, "summary": summary})
+
+    def _admin_create_campaign(self):
+        cust_id, cust = self._session_customer_info()
+        if not cust or cust.get("role") != "admin":
+            return self._json({"ok": False, "message": "unauthorized"}, 403)
+        body = self._body()
+        cid = str(body.get("campaign_id") or "").strip()
+        name = str(body.get("name") or "").strip()
+        starts_at = str(body.get("starts_at") or "").strip()
+        ends_at = str(body.get("ends_at") or "").strip()
+        try:
+            slots = int(body.get("slots") or 20)
+        except (ValueError, TypeError):
+            slots = 20
+        try:
+            bonus_vnd = int(body.get("bonus_vnd") or 20000)
+        except (ValueError, TypeError):
+            bonus_vnd = 20000
+        try:
+            min_order_value = int(body.get("min_order_value") or 0)
+        except (ValueError, TypeError):
+            min_order_value = 0
+        platforms = str(body.get("platforms") or "shopee,shopeefood,tiktok").strip()
+        try:
+            per_customer = int(body.get("per_customer") or 0)
+        except (ValueError, TypeError):
+            per_customer = 0
+
+        if not cid or not name or not starts_at or not ends_at:
+            return self._json({"ok": False, "message": "Vui lòng nhập đầy đủ Mã ID, Tên, Ngày bắt đầu và kết thúc"}, 400)
+
+        from ..ledger import campaigns
+        with ledger.connect(self.cfg.db_path) as conn:
+            existing = conn.execute("SELECT campaign_id FROM campaigns WHERE campaign_id = ?", (cid,)).fetchone()
+            if existing:
+                return self._json({"ok": False, "message": f"Chiến dịch với ID '{cid}' đã tồn tại"}, 400)
+            campaigns.create(conn, cid, name, starts_at, ends_at, slots, bonus_vnd, min_order_value, platforms, "", per_customer)
+            conn.commit()
+
+        return self._json({"ok": True, "message": "Tạo chiến dịch thành công!", "campaign_id": cid})
+
     def _admin_mark_paid(self):
         cust_id, cust = self._session_customer_info()
         if not cust or cust.get("role") not in ("admin", "employee"):
@@ -2394,6 +2496,15 @@ class _Handler(BaseHTTPRequestHandler):
                  LIMIT 100
             """).fetchall()
 
+            # Load active campaign awards mapped by order_id
+            award_rows = conn.execute("""
+                SELECT a.order_id, a.campaign_id, a.amount, a.status as award_status, c.name as campaign_name
+                  FROM campaign_awards a
+                  LEFT JOIN campaigns c ON c.campaign_id = a.campaign_id
+                 WHERE a.status != 'void'
+            """).fetchall()
+            order_awards = {a["order_id"]: dict(a) for a in award_rows}
+
             customers_map: dict[str, dict] = {}
             for r in order_rows:
                 cid = r["customer_id"]
@@ -2435,6 +2546,8 @@ class _Handler(BaseHTTPRequestHandler):
                         "payable_amount": 0,
                         "awaiting_amount": 0,
                         "bonus": 0,
+                        "total_bonus": 0,
+                        "settled_bonus": 0,
                         "total_unpaid": 0,
                         "order_count": 0,
                         "order_ids": [],
@@ -2454,10 +2567,17 @@ class _Handler(BaseHTTPRequestHandler):
                     conn, r["estimate_detail"], r["affiliate_url"], r["source_url"]
                 )
 
+                award = order_awards.get(r["order_id"])
+                bonus_val = award["amount"] if award else 0
+
                 order_dict = {
                     "order_id": r["order_id"],
                     "order_value": r["order_value"],
                     "cashback_amount": cb,
+                    "campaign_bonus": bonus_val,
+                    "campaign_name": award["campaign_name"] if award else None,
+                    "campaign_id": award["campaign_id"] if award else None,
+                    "award_status": award["award_status"] if award else None,
                     "status": r["status"],
                     "settlement_status": r["settlement_status"] if "settlement_status" in r.keys() else "unsettled",
                     "payout_batch_id": r["payout_batch_id"] if "payout_batch_id" in r.keys() else None,
@@ -2473,12 +2593,12 @@ class _Handler(BaseHTTPRequestHandler):
 
                 is_settled = (r["settlement_status"] == "settled")
                 if r["status"] == "approved" and is_settled:
-                    cust_entry["payable_amount"] += cb
-                    cust_entry["settled_payable_amount"] = (cust_entry.get("settled_payable_amount") or 0) + cb
+                    cust_entry["payable_amount"] += (cb + bonus_val)
+                    cust_entry["settled_payable_amount"] = (cust_entry.get("settled_payable_amount") or 0) + (cb + bonus_val)
                 elif r["status"] == "approved":
-                    cust_entry["unsettled_payable_amount"] = (cust_entry.get("unsettled_payable_amount") or 0) + cb
+                    cust_entry["unsettled_payable_amount"] = (cust_entry.get("unsettled_payable_amount") or 0) + (cb + bonus_val)
                 elif r["status"] == "awaiting_approval":
-                    cust_entry["awaiting_amount"] += cb
+                    cust_entry["awaiting_amount"] += (cb + bonus_val)
 
             payables = []
             for cid, entry in customers_map.items():
@@ -2486,9 +2606,14 @@ class _Handler(BaseHTTPRequestHandler):
                     o["order_id"] for o in entry["orders"]
                     if o["status"] == "approved" and o.get("settlement_status") == "settled"
                 ]
-                entry["bonus"] = campaigns.bonus_owed(conn, settled_order_ids)
-                entry["payable_amount"] += entry["bonus"]
-                entry["settled_payable_amount"] = (entry.get("settled_payable_amount") or 0) + entry["bonus"]
+                settled_bonus = sum(
+                    o.get("campaign_bonus", 0) for o in entry["orders"]
+                    if o["status"] == "approved" and o.get("settlement_status") == "settled"
+                )
+                total_cust_bonus = sum(o.get("campaign_bonus", 0) for o in entry["orders"])
+                entry["bonus"] = settled_bonus if settled_bonus > 0 else total_cust_bonus
+                entry["settled_bonus"] = settled_bonus
+                entry["total_bonus"] = total_cust_bonus
                 entry["unsettled_payable_amount"] = entry.get("unsettled_payable_amount") or 0
                 entry["total_unpaid"] = entry["payable_amount"] + entry["unsettled_payable_amount"] + entry["awaiting_amount"]
                 entry["is_fully_settled"] = (
@@ -2615,6 +2740,10 @@ class _Handler(BaseHTTPRequestHandler):
                   order_ids_str, notify_mode, target_group, cust_id))
             transfer_id = cur.lastrowid
 
+            bonus_total = 0
+            bonus_count = 0
+            camp_names = ""
+
             marked_count = 0
             if order_ids and isinstance(order_ids, list):
                 for oid in order_ids:
@@ -2624,6 +2753,22 @@ class _Handler(BaseHTTPRequestHandler):
                          WHERE order_id = ? AND customer_id = ?
                     """, (str(oid), customer_id))
                     marked_count += res.rowcount
+                marks = ",".join("?" * len(order_ids))
+                paid_awards = conn.execute(f"""
+                    SELECT a.amount, c.name as campaign_name
+                      FROM campaign_awards a
+                      LEFT JOIN campaigns c ON c.campaign_id = a.campaign_id
+                     WHERE a.order_id IN ({marks}) AND a.status != 'void'
+                """, [str(o) for o in order_ids]).fetchall()
+                if paid_awards:
+                    bonus_total = sum(a["amount"] for a in paid_awards)
+                    bonus_count = len(paid_awards)
+                    camp_names = ", ".join(list(dict.fromkeys(a["campaign_name"] or "Sự kiện" for a in paid_awards)))
+                    conn.execute(f"""
+                        UPDATE campaign_awards
+                           SET status = 'paid', paid_at = datetime('now'), confirmed_at = COALESCE(confirmed_at, datetime('now'))
+                         WHERE order_id IN ({marks}) AND status != 'void'
+                    """, [str(o) for o in order_ids])
             else:
                 status_clause = "status IN ('approved', 'awaiting_approval')" if include_awaiting else "status = 'approved'"
                 res = conn.execute(f"""
@@ -2632,6 +2777,21 @@ class _Handler(BaseHTTPRequestHandler):
                      WHERE customer_id = ? AND {status_clause} AND paid_at IS NULL
                 """, (customer_id,))
                 marked_count = res.rowcount
+                paid_awards = conn.execute("""
+                    SELECT a.amount, c.name as campaign_name
+                      FROM campaign_awards a
+                      LEFT JOIN campaigns c ON c.campaign_id = a.campaign_id
+                     WHERE a.customer_id = ? AND a.status != 'void' AND a.status != 'paid'
+                """, (customer_id,)).fetchall()
+                if paid_awards:
+                    bonus_total = sum(a["amount"] for a in paid_awards)
+                    bonus_count = len(paid_awards)
+                    camp_names = ", ".join(list(dict.fromkeys(a["campaign_name"] or "Sự kiện" for a in paid_awards)))
+                    conn.execute("""
+                        UPDATE campaign_awards
+                           SET status = 'paid', paid_at = datetime('now'), confirmed_at = COALESCE(confirmed_at, datetime('now'))
+                         WHERE customer_id = ? AND status != 'void' AND status != 'paid'
+                    """, (customer_id,))
 
             # Calculate financial metrics for customer:
             # 1. Total transferred all-time (including this transfer)
@@ -2697,12 +2857,22 @@ class _Handler(BaseHTTPRequestHandler):
         bill_line = f"\n🔗 Bill: {bill_url}"
         tag_user = f"@{display_name}"
 
+        cashback_base = max(0, amount - bonus_total)
+        if bonus_total > 0:
+            breakdown_lines = (
+                f"  • Hoàn tiền Shopee: {_vnd(cashback_base)} ({marked_count} đơn)\n"
+                f"  • Thưởng sự kiện: +{_vnd(bonus_total)} ({bonus_count} đơn - {camp_names})\n"
+            )
+        else:
+            breakdown_lines = ""
+
         notifications_log = {}
 
         if notify_mode in ("dm", "both"):
             dm_text = (
                 f"✅ Xác nhận thanh toán thành công!\n"
                 f"💰 Số tiền: {vnd_amount}\n"
+                f"{breakdown_lines}"
                 f"📥 Tổng đã nhận: {vnd_total_transferred}\n"
                 f"📅 Ngày: {now_vn}"
                 f"{bill_line}\n"
@@ -2718,6 +2888,7 @@ class _Handler(BaseHTTPRequestHandler):
             group_text = (
                 f"✅ Xác nhận thanh toán thành công!\n"
                 f"💰 Số tiền: {vnd_amount}\n"
+                f"{breakdown_lines}"
                 f"📥 Tổng đã nhận: {vnd_total_transferred}\n"
                 f"📅 Ngày: {now_vn}"
                 f"{bill_line}\n"
@@ -3905,6 +4076,9 @@ class _Handler(BaseHTTPRequestHandler):
 
             # Marked orders if available
             orders_info = []
+            awards_map = {}
+            total_bonus_in_transfer = 0
+            camp_names_in_transfer = []
             if row["order_ids"]:
                 oids = [o.strip() for o in row["order_ids"].split(",") if o.strip()]
                 if oids:
@@ -3915,6 +4089,17 @@ class _Handler(BaseHTTPRequestHandler):
                           LEFT JOIN link_requests r ON r.request_id = o.request_id
                          WHERE o.order_id IN ({marks})
                     """, oids).fetchall()
+                    aw_rows = conn.execute(f"""
+                        SELECT a.order_id, a.amount, c.name as campaign_name
+                          FROM campaign_awards a
+                          LEFT JOIN campaigns c ON c.campaign_id = a.campaign_id
+                         WHERE a.order_id IN ({marks}) AND a.status != 'void'
+                    """, oids).fetchall()
+                    for aw in aw_rows:
+                        awards_map[aw["order_id"]] = aw
+                        total_bonus_in_transfer += (aw["amount"] or 0)
+                        if aw["campaign_name"]:
+                            camp_names_in_transfer.append(aw["campaign_name"])
 
         created_str = row["created_at"] or ""
         try:
@@ -3942,7 +4127,12 @@ class _Handler(BaseHTTPRequestHandler):
             rows_html = []
             for o in orders_info:
                 oid = html.escape(o["order_id"])
-                cb = _vnd(o["cashback_amount"] or 0)
+                order_cb = o["cashback_amount"] or 0
+                aw = awards_map.get(o["order_id"])
+                bonus_amt = aw["amount"] if aw else 0
+                camp_name = html.escape(aw["campaign_name"] or "Sự kiện") if aw else ""
+                total_item = order_cb + bonus_amt
+
                 p_name = ""
                 try:
                     p_detail = json.loads(o["estimate_detail"] or "{}")
@@ -3952,20 +4142,45 @@ class _Handler(BaseHTTPRequestHandler):
                 if not p_name:
                     p_name = f"Đơn #{oid}"
                 p_name_esc = html.escape(p_name[:36] + ("..." if len(p_name) > 36 else ""))
+
+                bonus_subline = f'<div style="font-size:11px;color:#f59e0b;font-weight:600;margin-top:2px;">🎁 Thưởng sự kiện: +{_vnd(bonus_amt)} <span style="font-size:10px;color:#94a3b8;font-weight:normal;">({camp_name})</span></div>' if bonus_amt > 0 else ''
+                base_subline = f'<div style="font-size:10px;color:#64748b;">(Gốc: {_vnd(order_cb)})</div>' if bonus_amt > 0 else ''
+
                 rows_html.append(f"""
                 <div class="order-chip">
-                  <div>
-                    <div style="font-weight:600;color:#f1f5f9;">{p_name_esc}</div>
-                    <div style="font-size:11px;color:#64748b;">Mã: {oid}</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{p_name_esc}</div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px;">Mã: {oid}</div>
+                    {bonus_subline}
                   </div>
-                  <div style="font-weight:700;color:#10b981;white-space:nowrap;margin-left:8px;">+{cb}</div>
+                  <div style="text-align:right;white-space:nowrap;margin-left:12px;">
+                    <div style="font-weight:700;color:#10b981;font-size:14px;">+{_vnd(total_item)}</div>
+                    {base_subline}
+                  </div>
                 </div>""")
+
+            bonus_badge_html = ""
+            if total_bonus_in_transfer > 0:
+                camps_str = html.escape(", ".join(list(dict.fromkeys(camp_names_in_transfer))))
+                bonus_badge_html = f"""
+                <div style="margin:10px 0 14px 0;padding:10px 14px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:12px;display:flex;align-items:center;justify-content:space-between;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:18px;">🎁</span>
+                    <div>
+                      <div style="font-size:12px;font-weight:700;color:#f59e0b;">Đã cộng thưởng sự kiện</div>
+                      <div style="font-size:10px;color:#94a3b8;">{camps_str}</div>
+                    </div>
+                  </div>
+                  <div style="font-weight:800;font-size:14px;color:#f59e0b;">+{_vnd(total_bonus_in_transfer)}</div>
+                </div>"""
+
             orders_html = f"""
             <div class="orders-section">
               <div class="orders-title">
                 <span>📦 Đơn hàng tất toán đợt này</span>
                 <span>{len(orders_info)} đơn</span>
               </div>
+              {bonus_badge_html}
               {''.join(rows_html)}
             </div>"""
 

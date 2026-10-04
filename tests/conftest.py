@@ -32,6 +32,13 @@ def isolated_audit_trail(tmp_path):
     audit.set_directory(original)
 
 
+@pytest.fixture(autouse=True)
+def mock_telegram_alerts(monkeypatch):
+    """Never send real Telegram alerts during test runs."""
+    from cashback.core import telegram_alerts
+    monkeypatch.setattr(telegram_alerts, "send_telegram_message", lambda *args, **kwargs: True)
+
+
 @pytest.fixture
 def db(tmp_path: Path) -> Path:
     """An initialised, empty ledger."""

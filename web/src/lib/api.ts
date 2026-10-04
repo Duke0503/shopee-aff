@@ -276,6 +276,13 @@ export interface AdminMetrics {
   top_products: TopProduct[]
   channels?: ChannelMetric[]
   community_funnel?: CommunityFunnel
+  campaigns?: {
+    total_campaigns: number
+    total_bonus: number
+    bonus_paid: number
+    bonus_pending: number
+    total_awards: number
+  }
   financials: {
     gross_commission: number | null
     shopee_fee?: number | null
@@ -284,6 +291,9 @@ export interface AdminMetrics {
     cashback_paid: number | null
     cashback_ready: number | null
     cashback_pipeline: number | null
+    campaign_bonus_total?: number | null
+    campaign_bonus_paid?: number | null
+    campaign_bonus_pending?: number | null
     total_cashback: number | null
     total_cashback_all?: number | null
     total_cashback_committed?: number | null
@@ -635,6 +645,10 @@ export interface AdminPaymentOrder {
   order_id: string
   order_value: number | null
   cashback_amount: number | null
+  campaign_bonus?: number
+  campaign_name?: string | null
+  campaign_id?: string | null
+  award_status?: string | null
   status: string
   settlement_status?: "settled" | "processing" | "unsettled" | string
   payout_batch_id?: string | null
@@ -658,6 +672,8 @@ export interface AdminPaymentUser {
   payable_amount: number
   awaiting_amount: number
   bonus: number
+  total_bonus?: number
+  settled_bonus?: number
   total_unpaid: number
   settled_payable_amount?: number
   unsettled_payable_amount?: number
@@ -760,6 +776,66 @@ export const syncAdminShopeePayouts = () =>
 export const settleAdminOrders = (data: { batch_id?: string; platform?: string; order_ids?: string[] }) =>
   post<{ ok: boolean; settled_count: number }>("/api/admin/orders/settle", data)
 
+export interface CampaignAward {
+  id: number
+  campaign_id: string
+  customer_id: string
+  order_id: string
+  amount: number
+  status: "held" | "confirmed" | "paid" | "void" | string
+  created_at: string
+  confirmed_at: string | null
+  paid_at: string | null
+  notified_status: string | null
+  order_value: number | null
+  order_status: string
+  recorded_at: string | null
+  platform: string
+  display_name: string | null
+  customer_code: string | null
+  zalo_user_id: string | null
+}
 
+export interface AdminCampaign {
+  campaign_id: string
+  name: string
+  starts_at: string
+  ends_at: string
+  slots: number
+  bonus_vnd: number
+  min_order_value: number
+  platforms: string
+  excluded_customers?: string
+  per_customer?: number
+  awards: CampaignAward[]
+  slots_used: number
+  total_bonus_awarded: number
+  total_bonus_paid: number
+}
 
+export interface AdminCampaignsSummary {
+  total_campaigns: number
+  total_bonus_awarded: number
+  total_bonus_paid: number
+  total_slots_used: number
+}
 
+export interface AdminCampaignsResponse {
+  ok: boolean
+  campaigns: AdminCampaign[]
+  summary: AdminCampaignsSummary
+}
+
+export const fetchAdminCampaigns = () => get<AdminCampaignsResponse>("/api/admin/campaigns")
+
+export const createAdminCampaign = (data: {
+  campaign_id: string
+  name: string
+  starts_at: string
+  ends_at: string
+  slots: number
+  bonus_vnd: number
+  min_order_value?: number
+  platforms?: string
+  per_customer?: number
+}) => post<{ ok: boolean; message: string; campaign_id?: string }>("/api/admin/campaigns", data)

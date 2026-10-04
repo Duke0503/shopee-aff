@@ -27,7 +27,9 @@ import {
   Globe,
   UserPlus,
   Repeat,
+  ChevronRight,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { FinancialWaterfallCard } from "@/features/Admin/components/FinancialWaterfallCard"
 
 interface DashboardViewProps {
@@ -421,6 +423,64 @@ export function DashboardView({
           </>
         )}
       </div>
+
+      {/* Campaign & Event Bonus KPI Banner */}
+      {metrics.campaigns && metrics.campaigns.total_awards > 0 && (
+        <Card className="p-4 sm:p-5 border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-card to-card shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                <Gift className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-foreground">
+                    Thưởng Sự Kiện & Chiến Dịch (+20k)
+                  </h3>
+                  <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-500 border-amber-500/30 font-semibold">
+                    {metrics.campaigns.total_campaigns} Chiến dịch
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Đã trao <strong>{metrics.campaigns.total_awards} lượt thưởng</strong> cho các đơn thoả điều kiện
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
+              <div>
+                <span className="text-[11px] text-muted-foreground block">Tổng tiền thưởng</span>
+                <strong className="text-sm sm:text-base font-bold text-amber-500 font-mono">
+                  {vnd(metrics.campaigns.total_bonus)}
+                </strong>
+              </div>
+              <div className="h-8 w-px bg-border/60 hidden sm:block" />
+              <div>
+                <span className="text-[11px] text-muted-foreground block">Đã chi trả</span>
+                <strong className="text-sm sm:text-base font-bold text-emerald-500 font-mono">
+                  {vnd(metrics.campaigns.bonus_paid)}
+                </strong>
+              </div>
+              <div className="h-8 w-px bg-border/60 hidden sm:block" />
+              <div>
+                <span className="text-[11px] text-muted-foreground block">Chờ chi trả</span>
+                <strong className="text-sm sm:text-base font-bold text-amber-400 font-mono">
+                  {vnd(metrics.campaigns.bonus_pending)}
+                </strong>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onNavigateTab("campaigns")}
+                className="h-8 text-xs border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-semibold ml-auto sm:ml-0"
+              >
+                Xem chi tiết
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Financial Waterfall P&L Card */}
       {isAdmin && fin && (

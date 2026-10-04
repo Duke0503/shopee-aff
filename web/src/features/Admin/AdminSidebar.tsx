@@ -10,9 +10,10 @@ import {
   ChevronRight,
   X,
   CreditCard,
+  Gift,
 } from "lucide-react"
 
-export type AdminTab = "dashboard" | "users" | "employees" | "orders" | "payments" | "products" | "logs"
+export type AdminTab = "dashboard" | "users" | "employees" | "orders" | "payments" | "campaigns" | "products" | "logs"
 
 interface AdminSidebarProps {
   activeTab: AdminTab
@@ -54,6 +55,12 @@ export function AdminSidebar({
           id: "payments" as AdminTab,
           label: "Chi Trả & VietQR",
           icon: CreditCard,
+          adminOnly: false,
+        },
+        {
+          id: "campaigns" as AdminTab,
+          label: "Chiến Dịch & Thưởng",
+          icon: Gift,
           adminOnly: false,
         },
         {

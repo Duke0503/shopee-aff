@@ -13,6 +13,7 @@ interface AdminHeaderProps {
 const TAB_TITLES: Record<AdminTab, { title: string; category: string }> = {
   dashboard: { title: "Bảng Điều Hành & KPIs", category: "Tổng Quan" },
   payments: { title: "Quản Lý Chi Trả & VietQR", category: "Nghiệp Vụ" },
+  campaigns: { title: "Chiến Dịch & Thưởng Sự Kiện", category: "Nghiệp Vụ" },
   orders: { title: "Quản Lý Đơn Hàng Shopee", category: "Nghiệp Vụ" },
   users: { title: "Quản Lý Khách Hàng", category: "Nghiệp Vụ" },
   products: { title: "Kho Sản Phẩm", category: "Nghiệp Vụ" },

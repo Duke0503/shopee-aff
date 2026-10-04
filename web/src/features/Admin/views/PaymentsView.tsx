@@ -1057,9 +1057,8 @@ function PaymentDialog({
   }, [selectedOrders])
 
   const bonusAmount = React.useMemo(() => {
-    if (!user.bonus) return 0
-    return selectedOrders.length > 0 ? user.bonus : 0
-  }, [user.bonus, selectedOrders])
+    return selectedOrders.reduce((sum, o) => sum + (o.campaign_bonus || 0), 0)
+  }, [selectedOrders])
 
   const calculatedTotal = calculatedCashback + bonusAmount
 
@@ -1961,7 +1960,7 @@ function PaymentDialog({
                           </td>
                           <td className="p-3">
                             <div className="font-mono font-bold text-foreground">{o.order_id}</div>
-                            <div className="flex items-center gap-1 mt-0.5">
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                               <Badge variant="outline" className="text-[9px] px-1 py-0 font-medium">
                                 {o.platform === "tiktok" ? "TikTok" : "Shopee"}
                               </Badge>
@@ -1972,6 +1971,11 @@ function PaymentDialog({
                               ) : (
                                 <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-400">
                                   Đã duyệt
+                                </Badge>
+                              )}
+                              {Boolean(o.campaign_bonus) && (
+                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/15 text-amber-500 border border-amber-500/30 font-semibold flex items-center gap-0.5">
+                                  🎁 +{vnd(o.campaign_bonus!)} {o.campaign_name ? `(${o.campaign_name})` : ""}
                                 </Badge>
                               )}
                             </div>
@@ -2005,8 +2009,13 @@ function PaymentDialog({
                           </td>
                           <td className="p-3 text-right">
                             <div className="font-mono font-bold text-emerald-500 text-sm">
-                              {vnd(o.cashback_amount || 0)}
+                              {vnd((o.cashback_amount || 0) + (o.campaign_bonus || 0))}
                             </div>
+                            {Boolean(o.campaign_bonus) && (
+                              <div className="text-[10px] text-amber-400 font-medium">
+                                {vnd(o.cashback_amount || 0)} + {vnd(o.campaign_bonus!)} thưởng
+                              </div>
+                            )}
                             {o.order_value && o.order_value > 0 && (
                               <div className="text-[10px] text-muted-foreground">
                                 Đơn: {vnd(o.order_value)}
@@ -2049,6 +2058,11 @@ function PaymentDialog({
                               <Badge variant="outline" className="text-[9px] px-1 py-0">
                                 {o.platform === "tiktok" ? "TikTok" : "Shopee"}
                               </Badge>
+                              {Boolean(o.campaign_bonus) && (
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-amber-500/15 text-amber-500 border border-amber-500/30 font-semibold">
+                                  🎁 +{vnd(o.campaign_bonus!)}
+                                </Badge>
+                              )}
                             </div>
                             <div className="text-[11px] text-muted-foreground truncate max-w-[200px] mt-0.5">
                               {o.product || "Sản phẩm Shopee"}
@@ -2057,8 +2071,13 @@ function PaymentDialog({
                         </div>
                         <div className="text-right shrink-0">
                           <div className="font-mono text-xs font-bold text-emerald-500">
-                            {vnd(o.cashback_amount || 0)}
+                            {vnd((o.cashback_amount || 0) + (o.campaign_bonus || 0))}
                           </div>
+                          {Boolean(o.campaign_bonus) && (
+                            <div className="text-[9px] text-amber-400 font-medium">
+                              +{vnd(o.campaign_bonus!)} thưởng
+                            </div>
+                          )}
                           <div className="text-[10px] text-muted-foreground">
                             {shortDate(o.approved_at || o.recorded_at)}
                           </div>
