@@ -2763,13 +2763,27 @@ class _Handler(BaseHTTPRequestHandler):
             camp_names = ""
 
             marked_count = 0
+            rate = getattr(self.cfg, "advertised_cashback_rate", 0.80)
             if order_ids and isinstance(order_ids, list):
                 for oid in order_ids:
+                    ord_row = conn.execute("SELECT * FROM orders WHERE order_id = ? AND customer_id = ?", (str(oid), customer_id)).fetchone()
+                    calc_cb = None
+                    if ord_row and ord_row["cashback_amount"] is None:
+                        comm = ord_row["approved_commission"] or ord_row["estimated_commission"] or 0
+                        plat = ord_row["platform"] or "shopee"
+                        fee_factor = (1 - 0.10 - 0.0098) if plat == "shopee" else (1 - 0.10)
+                        net_comm = round_dong(comm * fee_factor)
+                        calc_cb = round_dong(net_comm * rate)
+
                     res = conn.execute("""
                         UPDATE orders
-                           SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                           SET status = 'paid',
+                               notified_status = 'paid',
+                               cashback_amount = COALESCE(cashback_amount, ?),
+                               paid_at = datetime('now'),
+                               updated_at = datetime('now')
                          WHERE order_id = ? AND customer_id = ?
-                    """, (str(oid), customer_id))
+                    """, (calc_cb, str(oid), customer_id))
                     marked_count += res.rowcount
                 marks = ",".join("?" * len(order_ids))
                 paid_awards = conn.execute(f"""
@@ -2791,7 +2805,11 @@ class _Handler(BaseHTTPRequestHandler):
                 status_clause = "status IN ('approved', 'awaiting_approval')" if include_awaiting else "status = 'approved'"
                 res = conn.execute(f"""
                     UPDATE orders
-                       SET status = 'paid', paid_at = datetime('now'), updated_at = datetime('now')
+                       SET status = 'paid',
+                           notified_status = 'paid',
+                           cashback_amount = COALESCE(cashback_amount, ROUND((COALESCE(approved_commission, estimated_commission, 0) * (1 - 0.10 - 0.0098)) * {rate})),
+                           paid_at = datetime('now'),
+                           updated_at = datetime('now')
                      WHERE customer_id = ? AND {status_clause} AND paid_at IS NULL
                 """, (customer_id,))
                 marked_count = res.rowcount

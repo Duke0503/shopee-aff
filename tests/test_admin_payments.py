@@ -209,3 +209,53 @@ def test_serve_bill_html(conn, cfg, mock_handler):
     status_404, html_404, _ = mock_handler._serve_bill("999999")
     assert status_404 == 404
     assert "Không tìm thấy biên lai" in html_404
+
+
+def test_payment_confirm_sets_notified_status_and_cashback(conn, cfg, mock_handler):
+    ledger.add_customer(conn, "C009", display_name="Tran Van G", zalo_user_id="999", private_chat_id="999")
+    ledger.add_order(conn, "ORD09", "C009", None, order_value=300_000, estimated_commission=30_000)
+    conn.commit()
+    # Order is in awaiting_approval (cashback_amount is None)
+    ord_row = conn.execute("SELECT cashback_amount, status, notified_status FROM orders WHERE order_id = 'ORD09'").fetchone()
+    assert ord_row["cashback_amount"] is None
+    assert ord_row["notified_status"] is None
+
+    mock_handler._body = lambda *args, **kwargs: {
+        "customer_id": "C009",
+        "amount": 21364,
+        "order_ids": ["ORD09"],
+        "notify_mode": "none",
+    }
+    res = mock_handler._admin_payment_confirm()
+    assert res["ok"] is True
+
+    # Order must now be marked paid, with notified_status='paid' and populated cashback_amount
+    updated = conn.execute("SELECT status, notified_status, cashback_amount FROM orders WHERE order_id = 'ORD09'").fetchone()
+    assert updated["status"] == "paid"
+    assert updated["notified_status"] == "paid"
+    assert updated["cashback_amount"] is not None
+    assert updated["cashback_amount"] > 0
+
+
+def test_announce_transfers_prevents_zero_dong(db):
+    from cashback.messaging.notifications import _announce_transfers
+    mock_bot = MagicMock()
+    mock_bot.send.return_value = True
+
+    # Dummy rows with 0 cashback
+    rows = [{
+        "order_id": "ORD_ZERO",
+        "customer_id": "C_ZERO",
+        "cashback_amount": 0,
+        "estimated_commission": 0,
+        "chat_id": "chat_zero",
+        "bank_name": "VCB",
+        "bank_account": "123",
+        "account_holder": "USER",
+        "customer_code": "DPZERO",
+    }]
+    sent = _announce_transfers(db, mock_bot, rows)
+    assert sent == 0
+    # Must NOT have sent any message with 0đ
+    mock_bot.send.assert_not_called()
+

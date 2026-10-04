@@ -336,7 +336,26 @@ def _announce_transfers(db_path: Path, bot: Sender, rows: list) -> int:
         chat_id = paid[0]["chat_id"]
         with ledger.connect(db_path) as bonus_conn:
             bonuses = _paid_bonus(bonus_conn, [r["order_id"] for r in paid])
-        total = sum(r["cashback_amount"] or 0 for r in paid) + sum(a for _, a in bonuses)
+        # Calculate total cashback properly even if cashback_amount was NULL on advance payout
+        total = 0
+        for r in paid:
+            cb = r["cashback_amount"] if "cashback_amount" in r.keys() else None
+            if cb is None or cb <= 0:
+                comm = r["estimated_commission"] if "estimated_commission" in r.keys() else 0
+                net_comm = round_dong((comm or 0) * (1 - 0.10 - 0.0098))
+                cb = round_dong(net_comm * 0.80)
+            total += (cb or 0)
+        total += sum(a for _, a in bonuses)
+
+        # NEVER send a transfer announcement of 0đ
+        if total <= 0:
+            log.warning("Skipping transfer announcement for %s: total is %dđ", customer_id, total)
+            with ledger.connect(db_path) as conn:
+                conn.executemany(
+                    "UPDATE orders SET notified_status=? WHERE order_id=?",
+                    [(ledger.PAID, r["order_id"]) for r in paid])
+            continue
+
         bank = ""
         if paid[0]["bank_account"]:
             bank = (f'{paid[0]["bank_name"]} - {paid[0]["bank_account"]} - '
