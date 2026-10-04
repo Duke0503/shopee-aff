@@ -5,12 +5,20 @@
 # 3. Cloudflare Tunnel (Routes hoantiendp.com to port 80)
 # 4. Shopee Chrome Automation (Browser with extension to generate official s.shopee.vn links)
 
+param(
+    [switch]$CodeOnly
+)
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "     KHOI DONG TOAN BO HE THONG HOAN TIEN (ALL-IN-ONE)     " -ForegroundColor Cyan
+if ($CodeOnly) {
+    Write-Host "     CAP NHAT LAI BACKEND & ZALO BOT (CODE ONLY)           " -ForegroundColor Cyan
+} else {
+    Write-Host "     KHOI DONG TOAN BO HE THONG HOAN TIEN (ALL-IN-ONE)     " -ForegroundColor Cyan
+}
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Stop only what THIS folder started last time.
@@ -40,7 +48,8 @@ function Start-Recorded([string]$Name, [string]$Command) {
     Set-Content -Path (Join-Path $PidDir "$Name.pid") -Value $p.Id
 }
 
-foreach ($name in "backend", "assistant", "tunnel", "browser") { Stop-Recorded $name }
+$servicesToStop = if ($CodeOnly) { @("backend", "assistant") } else { @("backend", "assistant", "tunnel", "browser") }
+foreach ($name in $servicesToStop) { Stop-Recorded $name }
 Start-Sleep -Seconds 1
 
 # 2. Kiem tra uv va dong bo moi truong Python
@@ -76,29 +85,36 @@ $ZaloDir = Join-Path $Root "zalo_assistant"
 $ZaloCmd = "Set-Location '$ZaloDir'; try { [System.Console]::Title = '[2] ZALO ASSISTANT BOT (Port 8891)' } catch {}; Write-Host '=== ZALO ASSISTANT BOT (24/7) ===' -ForegroundColor Yellow; node assistant_worker.js"
 Start-Recorded "assistant" $ZaloCmd
 
-Start-Sleep -Seconds 1
+if (-not $CodeOnly) {
+    Start-Sleep -Seconds 1
 
-# --- DICH VU 3: CLOUDFLARE TUNNEL (hoantiendp.com) ---
-Write-Host "  [+] 3. Khoi chay Cloudflare Tunnel (hoantiendp.com)..." -ForegroundColor Green
-$TunnelCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[3] CLOUDFLARE TUNNEL (hoantiendp.com)' } catch {}; Write-Host '=== CLOUDFLARE TUNNEL ===' -ForegroundColor Cyan; powershell -ExecutionPolicy Bypass -File 'scripts\start-tunnel.ps1'"
-Start-Recorded "tunnel" $TunnelCmd
+    # --- DICH VU 3: CLOUDFLARE TUNNEL (hoantiendp.com) ---
+    Write-Host "  [+] 3. Khoi chay Cloudflare Tunnel (hoantiendp.com)..." -ForegroundColor Green
+    $TunnelCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[3] CLOUDFLARE TUNNEL (hoantiendp.com)' } catch {}; Write-Host '=== CLOUDFLARE TUNNEL ===' -ForegroundColor Cyan; powershell -ExecutionPolicy Bypass -File 'scripts\start-tunnel.ps1'"
+    Start-Recorded "tunnel" $TunnelCmd
 
-Start-Sleep -Seconds 1
+    Start-Sleep -Seconds 1
 
-# --- DICH VU 4: CHROME EXTENSION AUTOMATION (Shopee / ShopeeFood Link Gen) ---
-Write-Host "  [+] 4. Khoi chay Trinh duyet Shopee Automation..." -ForegroundColor Green
-$BrowserCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[4] SHOPEE CHROME AUTOMATION' } catch {}; Write-Host '=== SHOPEE EXTENSION AUTOMATION ===' -ForegroundColor Magenta; powershell -ExecutionPolicy Bypass -File 'scripts\start-browser.ps1'"
-Start-Recorded "browser" $BrowserCmd
+    # --- DICH VU 4: CHROME EXTENSION AUTOMATION (Shopee / ShopeeFood Link Gen) ---
+    Write-Host "  [+] 4. Khoi chay Trinh duyet Shopee Automation..." -ForegroundColor Green
+    $BrowserCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[4] SHOPEE CHROME AUTOMATION' } catch {}; Write-Host '=== SHOPEE EXTENSION AUTOMATION ===' -ForegroundColor Magenta; powershell -ExecutionPolicy Bypass -File 'scripts\start-browser.ps1'"
+    Start-Recorded "browser" $BrowserCmd
 
-Write-Host ""
-Write-Host "============================================================" -ForegroundColor Green
-Write-Host "      TAT CA 4 DICH VU DA DUOC KHOI CHAY THANH CONG!       " -ForegroundColor Green
-Write-Host "============================================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "  1. Backend Server  : http://127.0.0.1:8899 & http://localhost:80" -ForegroundColor White
-Write-Host "  2. Zalo Bot Worker : http://localhost:8891 (Dang lang nghe 24/7)" -ForegroundColor White
-Write-Host "  3. Website Public  : https://hoantiendp.com" -ForegroundColor White
-Write-Host "  4. Chrome Extension: Tu dong tao link tiep thi Shopee/ShopeeFood" -ForegroundColor White
-Write-Host ""
-Write-Host "Luu y: Vui long giu cac cua so nay mo hoac thu nho xuong taskbar." -ForegroundColor Yellow
-Write-Host "He thong se tu dong van hanh va phuc vu khach hang." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host "      TAT CA 4 DICH VU DA DUOC KHOI CHAY THANH CONG!       " -ForegroundColor Green
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  1. Backend Server  : http://127.0.0.1:8899 & http://localhost:80" -ForegroundColor White
+    Write-Host "  2. Zalo Bot Worker : http://localhost:8891 (Dang lang nghe 24/7)" -ForegroundColor White
+    Write-Host "  3. Website Public  : https://hoantiendp.com" -ForegroundColor White
+    Write-Host "  4. Chrome Extension: Tu dong tao link tiep thi Shopee/ShopeeFood" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Luu y: Vui long giu cac cua so nay mo hoac thu nho xuong taskbar." -ForegroundColor Yellow
+    Write-Host "He thong se tu dong van hanh va phuc vu khach hang." -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host "  DA NAP LAI MA NGUON & KHOI DONG LAI BACKEND + ZALO BOT!   " -ForegroundColor Green
+    Write-Host "============================================================" -ForegroundColor Green
+}
