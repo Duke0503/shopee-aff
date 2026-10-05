@@ -118,7 +118,7 @@ def _build(price: int, shopee_rate: float, seller_rate: float,
     )
 
 
-def lookup(url: str, bridge=None, third_party: bool = True) -> Estimate | None:
+def lookup(url: str, bridge=None, third_party: bool = True, api_key: str = "") -> Estimate | None:
     """Best available estimate for a product URL, or None.
 
     Never raises. A missing estimate is a normal outcome: the link is
@@ -145,7 +145,7 @@ def lookup(url: str, bridge=None, third_party: bool = True) -> Estimate | None:
     from ..shopee import third_party_lookup as product_info
 
     try:
-        other = product_info.lookup(url)
+        other = product_info.lookup(url, api_key=api_key)
     except Exception:
         other = None
     if other and other.price > 0:

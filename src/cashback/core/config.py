@@ -50,6 +50,7 @@ class Config:
     _period_is_withheld: bool
     accesstrade_api_key: str = ""
     accesstrade_base_url: str = "https://api.accesstrade.vn"
+    addlivetag_api_key: str = ""
     backup_dir: Path = Path("./backups")
     backup_keep: int = 30
     backup_interval_hours: int = 24
@@ -179,6 +180,7 @@ def load() -> Config:
         accesstrade_base_url=os.getenv(
             "ACCESSTRADE_BASE_URL", "https://api.accesstrade.vn"
         ).strip(),
+        addlivetag_api_key=os.getenv("ADDLIVETAG_API_KEY", "").strip(),
         backup_dir=Path(os.getenv("BACKUP_DIR", "./backups")),
         backup_keep=int(os.getenv("BACKUP_KEEP", "30")),
         backup_interval_hours=int(os.getenv("BACKUP_INTERVAL_HOURS", "24")),

@@ -697,11 +697,15 @@ function extractTextAndUrls(data) {
           `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       } else {
+        const ratePercent = productData?.rate_percent || "80%";
+        boldTargets.push(`nhận ${ratePercent} hoa hồng`);
         replyText =
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
+          (productData?.name ? `📦 ${productData.name}\n` : "") +
           `🔗 ${linkUrl}\n\n` +
           openHint +
+          `🎁 Bạn sẽ nhận ${ratePercent} hoa hồng của đơn hàng này sau khi đặt mua thành công (tiền hoàn sẽ tự động ghi nhận và cộng vào tài khoản khi đơn hàng đồng bộ)!\n\n` +
           `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
       }

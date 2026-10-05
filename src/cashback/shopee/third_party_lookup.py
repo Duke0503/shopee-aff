@@ -47,10 +47,14 @@ off in one line, and it is never the first source.
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from dataclasses import dataclass
 
 import httpx
+
+_log = logging.getLogger("cashback.shopee.third_party_lookup")
 
 # Shortener domains come from shopee_lookup so there is only ever one
 # list to keep right: the two drifted apart once and shp.ee links were
@@ -122,7 +126,7 @@ def _to_float(value) -> float:
         return 0.0
 
 
-def lookup(url: str, timeout: float = TIMEOUT) -> ProductInfo | None:
+def lookup(url: str, timeout: float = TIMEOUT, api_key: str | None = None) -> ProductInfo | None:
     """Fetch commission details for a product URL. None when unavailable.
 
     Never raises: a lookup failure must degrade to "no estimate shown",
@@ -131,11 +135,20 @@ def lookup(url: str, timeout: float = TIMEOUT) -> ProductInfo | None:
     target = resolve_short_link(url, timeout) if is_short_link(url) else url
     ids = extract_ids(target)
 
-    params = {"item_id": ids[1]} if ids else {"url": target}
+    params: dict[str, str] = {"item_id": ids[1]} if ids else {"url": target}
+    headers: dict[str, str] = {}
+
+    key = (api_key or os.getenv("ADDLIVETAG_API_KEY", "")).strip()
+    if key:
+        headers["X-API-Key"] = key
+        params["key"] = key
 
     try:
         with httpx.Client(timeout=timeout) as client:
-            response = client.get(API_URL, params=params)
+            response = client.get(API_URL, params=params, headers=headers)
+        if response.status_code == 401:
+            _log.warning("[third_party_lookup] addlivetag.com returned 401 Unauthorized: API Key is required since 2026-10-01. Please configure ADDLIVETAG_API_KEY.")
+            return None
         body = response.json()
     except (httpx.HTTPError, ValueError):
         return None

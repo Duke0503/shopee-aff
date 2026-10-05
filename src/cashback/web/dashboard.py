@@ -3759,7 +3759,11 @@ class _Handler(BaseHTTPRequestHandler):
             target_url = resolve_short_link(target_url)
 
         try:
-            est = lookup(target_url, third_party=self.cfg.third_party_fallback)
+            est = lookup(
+                target_url,
+                third_party=self.cfg.third_party_fallback,
+                api_key=self.cfg.addlivetag_api_key,
+            )
         except Exception as exc:
             return self._json({"ok": False, "message": str(exc)}, 500)
 
@@ -4780,7 +4784,11 @@ class _Handler(BaseHTTPRequestHandler):
 
                 # Stale numbers: refresh price and commission, keep the link.
                 try:
-                    est = lookup(target_url, third_party=self.cfg.third_party_fallback)
+                    est = lookup(
+                        target_url,
+                        third_party=self.cfg.third_party_fallback,
+                        api_key=self.cfg.addlivetag_api_key,
+                    )
                 except Exception:
                     est = None
 
@@ -4853,7 +4861,11 @@ class _Handler(BaseHTTPRequestHandler):
             for row in stale_rows:
                 target_url = row["canonical_url"] or f"https://shopee.vn/product/{row['shop_id']}/{row['item_id']}"
                 try:
-                    est = lookup(target_url, third_party=self.cfg.third_party_fallback)
+                    est = lookup(
+                        target_url,
+                        third_party=self.cfg.third_party_fallback,
+                        api_key=self.cfg.addlivetag_api_key,
+                    )
                     if est and est.price > 0:
                         raw_comm = est.commission
                         net_comm = round_dong(raw_comm * (1 - 0.10 - 0.0098))
