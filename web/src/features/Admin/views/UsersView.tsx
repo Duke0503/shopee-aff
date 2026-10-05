@@ -88,10 +88,10 @@ export function UsersView() {
   }
 
   const toolbar = (
-    <Card className="p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <Card className="p-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             value={searchTerm}
@@ -100,19 +100,19 @@ export function UsersView() {
               setPage(1)
             }}
             placeholder="Tìm theo tên, ID khách, Zalo ID, số tài khoản..."
-            className="pl-9 text-xs sm:text-sm"
+            className="pl-8 text-[11px] h-7"
           />
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => {
               setFilterBank("all")
               setPage(1)
             }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
               filterBank === "all"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-xs"
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
@@ -123,9 +123,9 @@ export function UsersView() {
               setFilterBank("has_bank")
               setPage(1)
             }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
               filterBank === "has_bank"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-xs"
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
@@ -136,9 +136,9 @@ export function UsersView() {
               setFilterBank("no_bank")
               setPage(1)
             }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
               filterBank === "no_bank"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-xs"
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
@@ -292,7 +292,7 @@ export function UsersView() {
                       onMouseLeave={handleMouseLeave}
                       className="group cursor-pointer"
                     >
-                      <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs group-hover:text-primary transition-colors">
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground text-[11px] group-hover:text-primary transition-colors">
                         <span className="truncate max-w-[140px]">{u.display_name || u.customer_id}</span>
                         {hasRequests && (
                           <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary shrink-0 leading-none" title="Hover để xem sản phẩm đã hỏi">
@@ -321,10 +321,10 @@ export function UsersView() {
                   {/* Ngân Hàng Nhận Tiền */}
                   <TableCell className="min-w-[180px]">
                     {hasBank ? (
-                      <div className="space-y-1 text-xs">
+                      <div className="space-y-0.5 text-[11px]">
                         <div className="flex items-center gap-1.5 font-medium text-foreground">
-                          <CreditCard className="h-3.5 w-3.5 text-primary shrink-0" />
-                          <span className="font-semibold text-xs text-foreground truncate max-w-[120px]">{u.bank_name}</span>
+                          <CreditCard className="h-3 w-3 text-primary shrink-0" />
+                          <span className="font-semibold text-[11px] text-foreground truncate max-w-[120px]">{u.bank_name}</span>
                           {u.account_holder && (
                             <span className="text-[10px] text-muted-foreground truncate uppercase">
                               ({u.account_holder})
@@ -374,24 +374,24 @@ export function UsersView() {
                   </TableCell>
 
                   {/* Số Đơn */}
-                  <TableCell className="text-center whitespace-nowrap text-xs">
-                    <EmptyDash value={u.order_count} className="font-semibold text-foreground text-xs" />
+                  <TableCell className="text-center whitespace-nowrap text-[11px]">
+                    <EmptyDash value={u.order_count} className="font-semibold text-foreground text-[11px]" />
                   </TableCell>
 
                   {/* Tổng Tiền Aff */}
-                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
-                    <EmptyDash value={u.total_cashback} type="currency" className="font-semibold text-blue-600 dark:text-blue-400 text-xs" />
+                  <TableCell className="text-right whitespace-nowrap text-[11px] font-mono">
+                    <EmptyDash value={u.total_cashback} type="currency" className="font-semibold text-blue-600 dark:text-blue-400 text-[11px]" />
                   </TableCell>
 
                   {/* Chờ Duyệt */}
-                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
-                    <EmptyDash value={u.awaiting_amount} type="currency" className="font-medium text-amber-600 dark:text-amber-400 text-xs" />
+                  <TableCell className="text-right whitespace-nowrap text-[11px] font-mono">
+                    <EmptyDash value={u.awaiting_amount} type="currency" className="font-medium text-amber-600 dark:text-amber-400 text-[11px]" />
                   </TableCell>
 
                   {/* Có Thể Nhận */}
-                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
+                  <TableCell className="text-right whitespace-nowrap text-[11px] font-mono">
                     {canPayout ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-bold text-xs">
+                      <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-bold text-[11px]">
                         {vnd(u.ready_amount || 0)}
                       </span>
                     ) : (
@@ -400,19 +400,19 @@ export function UsersView() {
                   </TableCell>
 
                   {/* Đã Chuyển */}
-                  <TableCell className="text-right whitespace-nowrap text-xs font-mono">
-                    <EmptyDash value={u.paid_amount} type="currency" className="font-medium text-foreground text-xs" />
+                  <TableCell className="text-right whitespace-nowrap text-[11px] font-mono">
+                    <EmptyDash value={u.paid_amount} type="currency" className="font-medium text-foreground text-[11px]" />
                   </TableCell>
 
                   {/* Chi Tiết / Chuyển Khoản Button */}
                   <TableCell className="text-center whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-center gap-1">
                       {canPayout && (
                         <Button
-                          size="sm"
+                          size="xs"
                           variant="success"
                           onClick={() => setSelectedUser(u)}
-                          className="h-7 px-2 text-[11px] gap-1 shadow-xs"
+                          className="h-6.5 px-2 text-[10.5px] gap-1 shadow-xs"
                           title="Chuyển khoản ngay"
                         >
                           <Banknote className="h-3 w-3" /> Chuyển tiền

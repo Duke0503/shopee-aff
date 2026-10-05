@@ -2,6 +2,7 @@ import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { CurrencyInput } from "@/components/ui/CurrencyInput"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -530,24 +531,24 @@ export function CampaignsView() {
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                   Tiền thưởng mỗi đơn (VND)
                 </label>
-                <Input
-                  type="number"
-                  step="5000"
+                <CurrencyInput
                   value={newBonusVnd}
-                  onChange={(e) => setNewBonusVnd(Math.max(0, parseInt(e.target.value) || 20000))}
+                  onValueChange={(val) => setNewBonusVnd(Math.max(0, val || 20000))}
                   className="h-8 font-mono font-bold text-amber-500 text-xs"
+                  placeholder="20,000"
+                  suffix="đ"
                 />
               </div>
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                   Đơn tối thiểu (0 = Không yêu cầu)
                 </label>
-                <Input
-                  type="number"
-                  step="10000"
+                <CurrencyInput
                   value={newMinOrderValue}
-                  onChange={(e) => setNewMinOrderValue(Math.max(0, parseInt(e.target.value) || 0))}
+                  onValueChange={(val) => setNewMinOrderValue(Math.max(0, val || 0))}
                   className="h-8 font-mono text-xs"
+                  placeholder="0"
+                  suffix="đ"
                 />
               </div>
             </div>

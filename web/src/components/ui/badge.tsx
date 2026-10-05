@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
  * Four grey badges make a customer read four words to find their money.
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-colors",
+  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-medium whitespace-nowrap transition-colors",
   {
     variants: {
       variant: {

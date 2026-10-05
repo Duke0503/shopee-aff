@@ -103,21 +103,21 @@ export function AdminSidebar({
   ]
 
   const sidebarContent = (
-    <div className="flex h-full w-64 flex-col justify-between border-r border-border/80 bg-card/95 backdrop-blur-md">
+    <div className="flex h-full w-56 flex-col justify-between border-r border-border/80 bg-card/95 backdrop-blur-md">
       {/* Top: Brand Header */}
       <div>
-        <div className="flex h-16 items-center justify-between border-b border-border/70 px-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-              <Sparkles className="h-5 w-5" />
+        <div className="flex h-12 items-center justify-between border-b border-border/70 px-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs shadow-primary/20">
+              <Sparkles className="h-3.5 w-3.5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tracking-tight text-foreground">
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-bold tracking-tight text-foreground">
                   Hoàn Tiền DP
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">Admin Portal</p>
+              <p className="text-[10px] text-muted-foreground leading-none">Admin Portal</p>
             </div>
           </div>
 
@@ -125,15 +125,15 @@ export function AdminSidebar({
           {onCloseMobile && (
             <button
               onClick={onCloseMobile}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-secondary lg:hidden"
+              className="rounded-md p-1 text-muted-foreground hover:bg-secondary lg:hidden"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
         {/* Navigation Groups */}
-        <div className="space-y-6 px-3 py-4">
+        <div className="space-y-4 px-2 py-3">
           {navItems.map((group) => {
             const visibleItems = group.items.filter(
               (item) => !item.adminOnly || isAdmin
@@ -142,10 +142,10 @@ export function AdminSidebar({
 
             return (
               <div key={group.group}>
-                <div className="mb-2 px-3 text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase">
+                <div className="mb-1 px-2.5 text-[9.5px] font-bold tracking-wider text-muted-foreground/80 uppercase">
                   {group.group}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {visibleItems.map((item) => {
                     const Icon = item.icon
                     const isActive = activeTab === item.id
@@ -157,22 +157,22 @@ export function AdminSidebar({
                           onSelectTab(item.id)
                           if (onCloseMobile) onCloseMobile()
                         }}
-                        className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
+                        className={`group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all ${
                           isActive
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 font-semibold"
+                            ? "bg-primary text-primary-foreground shadow-xs shadow-primary/25 font-semibold"
                             : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5">
                           <Icon
-                            className={`h-4 w-4 shrink-0 transition-transform group-hover:scale-110 ${
+                            className={`h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-105 ${
                               isActive ? "text-primary-foreground" : "text-muted-foreground"
                             }`}
                           />
                           <span>{item.label}</span>
                         </div>
                         {isActive && (
-                          <ChevronRight className="h-3.5 w-3.5 opacity-80" />
+                          <ChevronRight className="h-3 w-3 opacity-80" />
                         )}
                       </button>
                     )
@@ -185,18 +185,18 @@ export function AdminSidebar({
       </div>
 
       {/* Bottom: User Card & Quick Links */}
-      <div className="border-t border-border/70 p-3">
+      <div className="border-t border-border/70 p-2">
         {/* User Card */}
-        <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary/50 p-2.5">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-xs font-bold text-primary">
+        <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-2">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/20 text-[11px] font-bold text-primary">
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-xs font-semibold text-foreground">
+              <div className="truncate text-[11px] font-semibold text-foreground">
                 {displayName}
               </div>
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9.5px] text-muted-foreground leading-none">
                 {roleTitle}
               </div>
             </div>
@@ -205,9 +205,9 @@ export function AdminSidebar({
           <button
             onClick={onLogout}
             title="Đăng xuất"
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

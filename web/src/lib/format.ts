@@ -34,3 +34,24 @@ export function shortDate(value: string | null | undefined): string {
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+/** Format raw number or string to comma-separated thousands string, e.g. 1111 -> "1,111" */
+export function formatVndNumber(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return ""
+  const str = String(value).replace(/[^\d-]/g, "")
+  if (!str) return ""
+  const isNegative = str.startsWith("-")
+  const digits = str.replace(/-/g, "")
+  if (!digits) return isNegative ? "-" : ""
+  const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return isNegative ? `-${formatted}` : formatted
+}
+
+/** Parse comma-separated or dot-separated string into a number */
+export function parseVndNumber(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return Math.round(value)
+  const clean = String(value).replace(/[^\d-]/g, "")
+  const parsed = parseInt(clean, 10)
+  return isNaN(parsed) ? 0 : parsed
+}

@@ -1981,6 +1981,16 @@ class _Handler(BaseHTTPRequestHandler):
         if customer_id:
             where_clauses.append("o.customer_id = ?")
             params.append(customer_id)
+        from_date = (qs.get("from_date", [""])[0] or qs.get("date_from", [""])[0] or "").strip()
+        to_date = (qs.get("to_date", [""])[0] or qs.get("date_to", [""])[0] or "").strip()
+        if from_date:
+            from_ts = f"{from_date} 00:00:00" if len(from_date) == 10 else from_date
+            where_clauses.append("COALESCE(o.recorded_at, o.approved_at) >= ?")
+            params.append(from_ts)
+        if to_date:
+            to_ts = f"{to_date} 23:59:59" if len(to_date) == 10 else to_date
+            where_clauses.append("COALESCE(o.recorded_at, o.approved_at) <= ?")
+            params.append(to_ts)
 
         where_sql = " AND ".join(where_clauses)
         offset = (page - 1) * limit

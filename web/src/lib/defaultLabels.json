@@ -89,7 +89,7 @@
   "password_not_signed_in": "Phiên đã hết hạn. Đăng nhập lại nhé.",
   "password_unknown_customer": "Không tìm thấy tài khoản.",
   "currency": "đ",
-  "thousands_separator": ".",
+  "thousands_separator": ",",
   "nothing_known": "—",
   "brand": "Hoàn Tiền Shopee & TikTok",
   "brand_badge": "VIP",

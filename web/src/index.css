@@ -558,3 +558,39 @@
     }
   }
 }
+
+/* ==========================================================================
+   Admin Portal Compact Dashboard Typography (11px base)
+   ========================================================================== */
+.admin-portal {
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+
+.admin-portal input,
+.admin-portal select,
+.admin-portal textarea {
+  font-size: 11px;
+}
+
+.admin-portal .text-xs {
+  font-size: 11px;
+}
+
+.admin-portal .text-sm {
+  font-size: 11.5px;
+}
+
+.admin-portal table {
+  font-size: 11px;
+}
+
+.admin-portal table th {
+  font-size: 10.5px;
+}
+
+.admin-portal table td {
+  font-size: 11px;
+}
+

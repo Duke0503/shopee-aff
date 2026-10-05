@@ -27,6 +27,8 @@ import {
   XCircle,
   Banknote,
   ShieldCheck,
+  Calendar,
+  RotateCcw,
 } from "lucide-react"
 import { PaginationBar } from "@/features/Admin/components/PaginationBar"
 import { AdminTableLayout } from "@/features/Admin/components/AdminTableLayout"
@@ -44,8 +46,77 @@ export function OrdersView() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [settlementFilter, setSettlementFilter] = React.useState<string>("all")
   const [platformFilter, setPlatformFilter] = React.useState<string>("all")
+  const [datePreset, setDatePreset] = React.useState<string>("all")
+  const [fromDate, setFromDate] = React.useState<string>("")
+  const [toDate, setToDate] = React.useState<string>("")
   const [sortBy, setSortBy] = React.useState<string>("date")
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc")
+
+  const formatDateYMD = (date: Date) => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }
+
+  const handlePresetChange = (preset: string) => {
+    setDatePreset(preset)
+    setPage(1)
+    const today = new Date()
+
+    if (preset === "all") {
+      setFromDate("")
+      setToDate("")
+    } else if (preset === "today") {
+      const s = formatDateYMD(today)
+      setFromDate(s)
+      setToDate(s)
+    } else if (preset === "yesterday") {
+      const yest = new Date(today)
+      yest.setDate(yest.getDate() - 1)
+      const s = formatDateYMD(yest)
+      setFromDate(s)
+      setToDate(s)
+    } else if (preset === "7d") {
+      const past = new Date(today)
+      past.setDate(past.getDate() - 6)
+      setFromDate(formatDateYMD(past))
+      setToDate(formatDateYMD(today))
+    } else if (preset === "30d") {
+      const past = new Date(today)
+      past.setDate(past.getDate() - 29)
+      setFromDate(formatDateYMD(past))
+      setToDate(formatDateYMD(today))
+    } else if (preset === "this_month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+      setFromDate(formatDateYMD(firstDay))
+      setToDate(formatDateYMD(today))
+    } else if (preset === "last_month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+      const lastDay = new Date(today.getFullYear(), today.getMonth(), 0)
+      setFromDate(formatDateYMD(firstDay))
+      setToDate(formatDateYMD(lastDay))
+    }
+  }
+
+  const handleFromDateChange = (val: string) => {
+    setFromDate(val)
+    setDatePreset("custom")
+    setPage(1)
+  }
+
+  const handleToDateChange = (val: string) => {
+    setToDate(val)
+    setDatePreset("custom")
+    setPage(1)
+  }
+
+  const handleClearDates = () => {
+    setDatePreset("all")
+    setFromDate("")
+    setToDate("")
+    setPage(1)
+  }
 
   const handleSort = (column: string, order: "asc" | "desc") => {
     setSortBy(column)
@@ -54,7 +125,19 @@ export function OrdersView() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-orders", page, limit, searchTerm, statusFilter, settlementFilter, platformFilter, sortBy, sortOrder],
+    queryKey: [
+      "admin-orders",
+      page,
+      limit,
+      searchTerm,
+      statusFilter,
+      settlementFilter,
+      platformFilter,
+      sortBy,
+      sortOrder,
+      fromDate,
+      toDate,
+    ],
     queryFn: () =>
       fetchAdminOrders({
         page,
@@ -65,6 +148,8 @@ export function OrdersView() {
         platform: platformFilter,
         sort_by: sortBy,
         sort_order: sortOrder,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
       }),
   })
 
@@ -152,11 +237,12 @@ export function OrdersView() {
   }
 
   const toolbar = (
-    <Card className="p-3">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <Card className="p-2.5">
+      <div className="flex flex-col gap-2">
+        {/* Row 1: Search & Platform */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
               value={searchTerm}
@@ -165,19 +251,19 @@ export function OrdersView() {
                 setPage(1)
               }}
               placeholder="Tìm theo mã đơn, khách hàng, tên sản phẩm..."
-              className="pl-9 text-xs sm:text-sm"
+              className="pl-8 text-[11px] h-7"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 sm:border-l sm:pl-3 dark:border-border">
+          <div className="flex items-center gap-1 sm:border-l sm:pl-2.5 dark:border-border">
             <button
               onClick={() => {
                 setPlatformFilter("all")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 platformFilter === "all"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -188,9 +274,9 @@ export function OrdersView() {
                 setPlatformFilter("shopee")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 platformFilter === "shopee"
-                  ? "bg-orange-600 text-white"
+                  ? "bg-orange-600 text-white shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -201,9 +287,9 @@ export function OrdersView() {
                 setPlatformFilter("tiktok")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 platformFilter === "tiktok"
-                  ? "bg-rose-600 text-white"
+                  ? "bg-rose-600 text-white shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -212,16 +298,17 @@ export function OrdersView() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 dark:border-border">
-          <div className="flex flex-wrap items-center gap-1.5">
+        {/* Row 2: Status & Settlement */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 border-t pt-2 dark:border-border">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => {
                 setStatusFilter("all")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 statusFilter === "all"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -232,9 +319,9 @@ export function OrdersView() {
                 setStatusFilter("awaiting_approval")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 statusFilter === "awaiting_approval"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -245,9 +332,9 @@ export function OrdersView() {
                 setStatusFilter("approved")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 statusFilter === "approved"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -258,9 +345,9 @@ export function OrdersView() {
                 setStatusFilter("paid")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 statusFilter === "paid"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -271,9 +358,9 @@ export function OrdersView() {
                 setStatusFilter("rejected")
                 setPage(1)
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 statusFilter === "rejected"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-xs"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
@@ -282,15 +369,15 @@ export function OrdersView() {
           </div>
 
           {/* Settlement status filter toggle */}
-          <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/40 p-0.5 text-xs">
+          <div className="flex items-center gap-1 rounded-md border border-border/60 bg-secondary/40 p-0.5 text-[11px]">
             <button
               onClick={() => {
                 setSettlementFilter("all")
                 setPage(1)
               }}
-              className={`rounded px-2 py-1 text-[11px] transition-colors ${
+              className={`rounded px-1.5 py-0.5 text-[10.5px] transition-colors ${
                 settlementFilter === "all"
-                  ? "bg-card font-semibold text-foreground shadow-xs"
+                  ? "bg-card font-semibold text-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -301,9 +388,9 @@ export function OrdersView() {
                 setSettlementFilter("settled")
                 setPage(1)
               }}
-              className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+              className={`rounded px-1.5 py-0.5 text-[10.5px] transition-colors flex items-center gap-1 ${
                 settlementFilter === "settled"
-                  ? "bg-card font-semibold text-emerald-500 shadow-xs"
+                  ? "bg-card font-semibold text-emerald-500 shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               title="Đơn hàng mà Shopee đã giải ngân về tài khoản ngân hàng"
@@ -316,9 +403,9 @@ export function OrdersView() {
                 setSettlementFilter("unsettled")
                 setPage(1)
               }}
-              className={`rounded px-2 py-1 text-[11px] transition-colors flex items-center gap-1 ${
+              className={`rounded px-1.5 py-0.5 text-[10.5px] transition-colors flex items-center gap-1 ${
                 settlementFilter === "unsettled"
-                  ? "bg-card font-semibold text-amber-500 shadow-xs"
+                  ? "bg-card font-semibold text-amber-500 shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               title="Đơn hàng Shopee chưa thanh toán về ngân hàng"
@@ -326,6 +413,65 @@ export function OrdersView() {
               <Clock className="h-3 w-3 text-amber-500" />
               <span>Chờ sàn trả</span>
             </button>
+          </div>
+        </div>
+
+        {/* Row 3: Date Filter presets & custom range */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 dark:border-border">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+              <Calendar className="h-3 w-3" /> Thời gian:
+            </span>
+            {[
+              { id: "all", label: "Tất cả" },
+              { id: "today", label: "Hôm nay" },
+              { id: "yesterday", label: "Hôm qua" },
+              { id: "7d", label: "7 ngày" },
+              { id: "30d", label: "30 ngày" },
+              { id: "this_month", label: "Tháng này" },
+              { id: "last_month", label: "Tháng trước" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handlePresetChange(p.id)}
+                className={`rounded px-1.5 py-0.5 text-[10.5px] font-medium transition-colors ${
+                  datePreset === p.id
+                    ? "bg-primary text-primary-foreground shadow-2xs"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <span className="text-muted-foreground text-[10.5px]">Từ:</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => handleFromDateChange(e.target.value)}
+              className="h-6 rounded border border-border bg-background px-1.5 py-0.5 text-[10.5px] font-mono focus:border-primary focus:outline-none"
+            />
+            <span className="text-muted-foreground text-[10.5px]">Đến:</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => handleToDateChange(e.target.value)}
+              className="h-6 rounded border border-border bg-background px-1.5 py-0.5 text-[10.5px] font-mono focus:border-primary focus:outline-none"
+            />
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={handleClearDates}
+                className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-destructive hover:bg-destructive/10 cursor-pointer"
+                title="Xóa lọc thời gian"
+              >
+                <RotateCcw className="h-2.5 w-2.5" />
+                <span>Bỏ lọc</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -456,20 +602,20 @@ export function OrdersView() {
                 {/* Khách Hàng */}
                 <TableCell className="min-w-[140px]">
                   <div className="space-y-0.5">
-                    <div className="font-semibold text-foreground text-xs">{o.customer_name || o.customer_id}</div>
+                    <div className="font-semibold text-foreground text-[11px]">{o.customer_name || o.customer_id}</div>
                     <CodeBadge code={o.customer_code || o.customer_id} label="KH:" variant="blue" />
                   </div>
                 </TableCell>
 
                 <TableCell className="min-w-[220px] max-w-[320px]">
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2">
                     <ProductThumbnail
                       imageUrl={o.image_url}
                       productName={o.product}
                       size="sm"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 text-xs font-medium text-foreground leading-snug" title={o.product}>
+                      <div className="line-clamp-2 text-[11px] font-medium text-foreground leading-snug" title={o.product}>
                         {o.product || (o.platform === "tiktok" ? "Đơn hàng TikTok Shop" : "Đơn hàng Shopee")}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -510,12 +656,12 @@ export function OrdersView() {
                   </div>
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
+                <TableCell className="text-right text-[11px] font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={o.order_value} type="currency" />
                 </TableCell>
 
                 <TableCell className="text-right whitespace-nowrap">
-                  <div className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">
+                  <div className="text-[11px] font-mono font-semibold text-amber-600 dark:text-amber-400">
                     <EmptyDash value={commission} type="currency" className="text-amber-600 dark:text-amber-400 font-semibold" />
                   </div>
                   {fin && !isRejected && (fin.shopee_part > 0 || fin.seller_part > 0) && (
@@ -542,7 +688,7 @@ export function OrdersView() {
                   )}
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                <TableCell className="text-right text-[11px] font-mono font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
                   {fin && !isRejected ? (
                     <span>{vnd(fin.net_shopee)}</span>
                   ) : (
@@ -550,7 +696,7 @@ export function OrdersView() {
                   )}
                 </TableCell>
 
-                <TableCell className="text-right text-xs font-mono font-medium text-foreground whitespace-nowrap">
+                <TableCell className="text-right text-[11px] font-mono font-medium text-foreground whitespace-nowrap">
                   <EmptyDash value={cashback} type="currency" />
                 </TableCell>
 
@@ -577,9 +723,9 @@ export function OrdersView() {
                         })
                       }
                       disabled={payMutation.isPending}
-                      className="h-7 bg-emerald-600 px-2.5 text-[11px] text-white hover:bg-emerald-700"
+                      className="h-6.5 bg-emerald-600 px-2 text-[10.5px] text-white hover:bg-emerald-700"
                     >
-                      <Banknote className="mr-1 h-3.5 w-3.5" /> Hoàn Tiền
+                      <Banknote className="mr-1 h-3 w-3" /> Hoàn Tiền
                     </Button>
                   ) : o.paid_at ? (
                     <span className="text-[11px] text-muted-foreground">

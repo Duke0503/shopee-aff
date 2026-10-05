@@ -2,6 +2,7 @@ import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { CurrencyInput } from "@/components/ui/CurrencyInput"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -1603,14 +1604,15 @@ function PaymentDialog({
               {/* Amount adjustment & Bank Transfer code */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                     Số tiền chi trả (VND)
                   </label>
-                  <Input
-                    type="number"
+                  <CurrencyInput
                     value={amount}
-                    onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="h-8 text-xs font-bold text-emerald-500"
+                    onValueChange={(val) => setAmount(Math.max(0, val))}
+                    className="h-8 text-xs font-bold text-emerald-500 font-mono"
+                    placeholder="0"
+                    suffix="đ"
                   />
                 </div>
                 <div>

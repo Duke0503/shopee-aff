@@ -108,7 +108,7 @@ export function Console() {
   const roleTitle = isAdmin ? "Quản Trị Viên (Admin)" : "Nhân Viên Vận Hành"
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="admin-portal flex h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Left Sidebar (Desktop Fixed + Mobile Drawer) */}
       <AdminSidebar
         activeTab={activeTab}

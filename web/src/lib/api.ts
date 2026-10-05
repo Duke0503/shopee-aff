@@ -553,6 +553,8 @@ export const fetchAdminOrders = (params?: {
   platform?: string
   sort_by?: string
   sort_order?: "asc" | "desc"
+  from_date?: string
+  to_date?: string
 }) => {
   const qs = new URLSearchParams()
   if (params?.page) qs.set("page", String(params.page))
@@ -564,6 +566,8 @@ export const fetchAdminOrders = (params?: {
   if (params?.customer_id) qs.set("customer_id", params.customer_id)
   if (params?.sort_by) qs.set("sort_by", params.sort_by)
   if (params?.sort_order) qs.set("sort_order", params.sort_order)
+  if (params?.from_date) qs.set("from_date", params.from_date)
+  if (params?.to_date) qs.set("to_date", params.to_date)
   const q = qs.toString() ? `?${qs.toString()}` : ""
   return get<{ ok: boolean; orders: AdminOrder[]; pagination?: PaginationMeta }>(`/api/admin/orders${q}`)
 }
