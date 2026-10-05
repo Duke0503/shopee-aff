@@ -3708,6 +3708,96 @@ class _Handler(BaseHTTPRequestHandler):
                     "bank_account_tail": (row["bank_account"] or "")[-4:] if row["bank_account"] else None,
                 })
 
+            if action in ("update_bank", "parse_bank", "get_bank"):
+                from ..core import banks as banks_mod, audit
+
+                text_to_parse = str(body.get("text") or "").strip()
+                explicit_bank = str(body.get("bank_name") or "").strip()
+                explicit_acc = str(body.get("bank_account") or "").strip()
+                explicit_holder = str(body.get("account_holder") or "").strip()
+
+                if action == "get_bank" or (not text_to_parse and not explicit_bank and not explicit_acc):
+                    return self._json({
+                        "ok": True,
+                        "action": "query",
+                        "has_bank": bool(row["bank_account"]),
+                        "customer_id": cust_id,
+                        "customer_code": cust_code,
+                        "display_name": display_name,
+                        "bank_name": row["bank_name"],
+                        "bank_account": row["bank_account"],
+                        "bank_account_tail": (row["bank_account"] or "")[-4:] if row["bank_account"] else None,
+                        "account_holder": row["account_holder"],
+                    })
+
+                parsed = None
+                if text_to_parse:
+                    parsed = banks_mod.parse_bank_message(text_to_parse, default_name=display_name)
+                    if not parsed:
+                        return self._json({"ok": False, "action": "not_bank"})
+                    if parsed.get("action") == "help":
+                        return self._json({
+                            "ok": True,
+                            "action": "query",
+                            "has_bank": bool(row["bank_account"]),
+                            "customer_id": cust_id,
+                            "customer_code": cust_code,
+                            "display_name": display_name,
+                            "bank_name": row["bank_name"],
+                            "bank_account": row["bank_account"],
+                            "bank_account_tail": (row["bank_account"] or "")[-4:] if row["bank_account"] else None,
+                            "account_holder": row["account_holder"],
+                        })
+                    if parsed.get("action") == "invalid_cmd":
+                        return self._json({
+                            "ok": False,
+                            "action": "invalid_cmd",
+                            "has_acc": parsed.get("has_acc"),
+                            "has_bank": parsed.get("has_bank"),
+                        })
+                    if parsed.get("action") == "partial":
+                        return self._json({
+                            "ok": False,
+                            "action": "partial",
+                            "account": parsed.get("account"),
+                            "holder": parsed.get("holder"),
+                        })
+
+                bank_name = parsed["bank_name"] if parsed else explicit_bank
+                bank_account = parsed["bank_account"] if parsed else explicit_acc
+                account_holder = parsed["account_holder"] if parsed else (explicit_holder or display_name)
+
+                clean_account = re.sub(r"[\s\-]", "", bank_account)
+                if not (4 <= len(clean_account) <= 30 and clean_account.isalnum()):
+                    return self._json({"ok": False, "message": "invalid_bank_account"}, 400)
+
+                matched_b = banks_mod.find(bank_name)
+                canonical_bank = matched_b["shortName"] if matched_b else bank_name
+
+                ledger.set_bank_details(
+                    conn, cust_id, canonical_bank, clean_account, account_holder
+                )
+                audit.record(
+                    audit.BANK_CHANGED,
+                    customer_id=cust_id,
+                    bank=canonical_bank,
+                    account=audit.fingerprint(clean_account),
+                    source="bot",
+                )
+                conn.commit()
+                return self._json({
+                    "ok": True,
+                    "action": "updated",
+                    "customer_id": cust_id,
+                    "customer_code": cust_code,
+                    "display_name": display_name,
+                    "bank_name": canonical_bank,
+                    "bank_bin": matched_b.get("bin") if matched_b else None,
+                    "bank_account": clean_account,
+                    "bank_account_tail": clean_account[-4:] if len(clean_account) >= 4 else clean_account,
+                    "account_holder": account_holder,
+                })
+
             return self._json({
                 "ok": True,
                 "customer_id": cust_id,
@@ -3716,6 +3806,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "has_password": bool(row["password_hash"]),
                 "has_bank": bool(row["bank_account"]),
             })
+
 
     def _shopee_preview(self):
         from ..shopee.commission import lookup

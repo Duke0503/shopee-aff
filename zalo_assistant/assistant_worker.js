@@ -233,6 +233,30 @@ async function main() {
     return template;
   }
 
+  // Temporary buffer for sequential bank details in 1-1 DM
+  const pendingBankBuffer = new Map();
+  const BANK_BUFFER_TTL_MS = 3 * 60 * 1000;
+
+  function looksLikeBankMessage(rawText, uid) {
+    if (!rawText) return false;
+    const str = rawText.trim();
+    if (/^[\/!](stk|bank|tk)\b/i.test(str)) return true;
+    if (/(?:stk|s[oố]\s*tk|s[oố]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*tk|ng[aâ]n\s*h[aà]ng|ch[uủ]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*th[eẻ])\b/i.test(str)) {
+      return true;
+    }
+    const hasDigits = /\b\d{6,22}\b/.test(str);
+    const hasBankWord = /\b(?:mb|mbbank|vcb|vietcom|vietcombank|vietin|vietinbank|techcom|techcombank|tcb|bidv|agri|agribank|acb|tpb|tpbank|vpbank|vpb|shb|hdbank|ocb|msb|vib|sacom|sacombank|cake|timo|viettelpay|viettelmoney|momo)\b/i.test(str);
+    if (hasDigits && hasBankWord) return true;
+
+    if (uid && pendingBankBuffer.has(String(uid))) {
+      const buf = pendingBankBuffer.get(String(uid));
+      if (Date.now() - buf.timestamp < BANK_BUFFER_TTL_MS) {
+        if (hasBankWord || str.length < 50) return true;
+      }
+    }
+    return false;
+  }
+
   // Dynamic Group Name Resolver
   const groupNameCache = new Map();
   async function getGroupName(groupId) {
@@ -862,6 +886,175 @@ function extractTextAndUrls(data) {
       const isPassCmd = cmd === "/matkhau" || cmd === "!matkhau" || cmd === "/pass" || cmd === "!pass" || cmd === "/password" || cmd === "!password";
       const isBalanceCmd = cmd === "/sodu" || cmd === "!sodu";
       const isOrdersCmd = ["/donhang", "!donhang", "/don", "!don", "/lichsu", "!lichsu"].includes(cmd);
+      const isBankCmd = ["/stk", "!stk", "/bank", "!bank", "/tk", "!tk"].includes(cmd);
+
+      // Xử lý cập nhật hoặc tra cứu STK ngân hàng (Qua lệnh /stk hoặc tin nhắn tự nhiên)
+      if (isBankCmd || looksLikeBankMessage(text, senderUid)) {
+        try {
+          let textToSend = text.trim();
+          const uidStr = String(senderUid);
+
+          // Gộp tin nhắn rời trong DM nếu có buffer trước đó
+          if (!isGroup && pendingBankBuffer.has(uidStr)) {
+            const buf = pendingBankBuffer.get(uidStr);
+            if (Date.now() - buf.timestamp < BANK_BUFFER_TTL_MS) {
+              if (buf.account && !textToSend.includes(buf.account)) {
+                textToSend = `STK: ${buf.account}\n${textToSend}`;
+              }
+            } else {
+              pendingBankBuffer.delete(uidStr);
+            }
+          }
+
+          const authRes = await fetch(`${config.MAIN_API_URL}/api/bot/customer-auth`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: String(senderUid),
+              name: senderName,
+              action: "update_bank",
+              text: textToSend,
+            }),
+          }).then((r) => r.json()).catch(() => null);
+
+          if (authRes && authRes.ok) {
+            if (authRes.action === "updated") {
+              pendingBankBuffer.delete(uidStr);
+
+              if (isGroup) {
+                const tagText = senderUid ? `@${senderName}` : "";
+                const tagPrefix = tagText ? `${tagText}\n` : "";
+                const reply =
+                  tagPrefix +
+                  `✅ ĐÃ CẬP NHẬT TÀI KHOẢN NGÂN HÀNG THÀNH CÔNG!\n\n` +
+                  `🏦 Ngân hàng: ${authRes.bank_name}\n` +
+                  `🔢 Số tài khoản: ···${authRes.bank_account_tail}\n` +
+                  `👤 Chủ tài khoản: ${authRes.account_holder}\n\n` +
+                  `🎁 Cảm ơn bạn! Tiền hoàn của các đơn hàng thành công sẽ được hệ thống tự động chuyển về tài khoản này khi đến kỳ đối soát nhé.`;
+
+                const mentions = tagText ? [{ uid: String(senderUid), pos: 0, len: tagText.length }] : undefined;
+                const boldTargets = [
+                  "ĐÃ CẬP NHẬT TÀI KHOẢN NGÂN HÀNG THÀNH CÔNG!",
+                  "Ngân hàng:",
+                  "Số tài khoản:",
+                  "Chủ tài khoản:",
+                  "Cảm ơn bạn!",
+                ];
+                const styles = [];
+                for (const t of boldTargets) {
+                  const s = reply.indexOf(t);
+                  if (s !== -1) styles.push({ start: s, len: t.length, st: "b" });
+                }
+                styles.sort((a, b) => a.start - b.start);
+
+                await api.sendMessage(
+                  { msg: reply, mentions, styles: styles.length > 0 ? styles : undefined },
+                  message.threadId,
+                  message.type
+                );
+              } else {
+                const reply =
+                  `✅ ĐÃ CẬP NHẬT TÀI KHOẢN NGÂN HÀNG THÀNH CÔNG!\n\n` +
+                  `🏦 Ngân hàng: ${authRes.bank_name}\n` +
+                  `🔢 Số tài khoản: ${authRes.bank_account}\n` +
+                  `👤 Chủ tài khoản: ${authRes.account_holder}\n\n` +
+                  `🎁 Cảm ơn bạn! Tiền hoàn của các đơn hàng thành công sẽ được hệ thống tự động chuyển về tài khoản ngân hàng này khi đến kỳ đối soát nhé.\n\n` +
+                  `💡 Bạn có thể kiểm tra số dư tích lũy bất cứ lúc nào bằng cách gõ: /sodu\n` +
+                  `🔄 Để cập nhật lại STK khác, bạn chỉ cần gửi lại thông tin mới cho mình bất cứ lúc nào!`;
+
+                const boldTargets = [
+                  "ĐÃ CẬP NHẬT TÀI KHOẢN NGÂN HÀNG THÀNH CÔNG!",
+                  "Ngân hàng:",
+                  "Số tài khoản:",
+                  "Chủ tài khoản:",
+                  "Cảm ơn bạn!",
+                  "/sodu",
+                ];
+                const styles = [];
+                for (const t of boldTargets) {
+                  const s = reply.indexOf(t);
+                  if (s !== -1) styles.push({ start: s, len: t.length, st: "b" });
+                }
+                styles.sort((a, b) => a.start - b.start);
+
+                await api.sendMessage(
+                  { msg: reply, styles: styles.length > 0 ? styles : undefined },
+                  message.threadId,
+                  message.type
+                );
+              }
+              return;
+            }
+
+            if (authRes.action === "query") {
+              if (authRes.has_bank) {
+                const accShow = isGroup ? `···${authRes.bank_account_tail}` : authRes.bank_account;
+                const tagText = isGroup && senderUid ? `@${senderName}\n` : "";
+                const reply =
+                  tagText +
+                  `🏦 THÔNG TIN TÀI KHOẢN NGÂN HÀNG CỦA BẠN\n\n` +
+                  `👤 Khách hàng: ${authRes.display_name}\n` +
+                  `🏦 Ngân hàng: ${authRes.bank_name}\n` +
+                  `🔢 Số tài khoản: ${accShow}\n` +
+                  `👤 Chủ tài khoản: ${authRes.account_holder}\n\n` +
+                  `💡 Để cập nhật STK mới, bạn nhắn theo cú pháp:\n` +
+                  `👉 /stk <Số_tài_khoản> <Tên_ngân_hàng> <Tên_chủ_tài_khoản>\n` +
+                  `(Ví dụ: /stk 0123456789 MB NGUYEN VAN A)`;
+
+                const mentions = isGroup && senderUid ? [{ uid: String(senderUid), pos: 0, len: tagText.length - 1 }] : undefined;
+                await api.sendMessage({ msg: reply, mentions }, message.threadId, message.type);
+              } else {
+                const tagText = isGroup && senderUid ? `@${senderName}\n` : "";
+                const reply =
+                  tagText +
+                  `⚠️ BẠN CHƯA CÀI ĐẶT TÀI KHOẢN NGÂN HÀNG\n\n` +
+                  `Để nhận tiền hoàn tự động, bạn chỉ cần gửi thông tin tài khoản cho mình theo cú pháp:\n` +
+                  `👉 /stk <Số_tài_khoản> <Tên_ngân_hàng> <Tên_chủ_tài_khoản>\n\n` +
+                  `Ví dụ:\n` +
+                  `/stk 0123456789 MB NGUYEN VAN A\n\n` +
+                  `hoặc nhắn tự nhiên:\n` +
+                  `STK: 0123456789\n` +
+                  `Ngân hàng: MB Bank\n` +
+                  `Chủ tài khoản: NGUYEN VAN A`;
+
+                const mentions = isGroup && senderUid ? [{ uid: String(senderUid), pos: 0, len: tagText.length - 1 }] : undefined;
+                await api.sendMessage({ msg: reply, mentions }, message.threadId, message.type);
+              }
+              return;
+            }
+          }
+
+          // Khách nhắn thiếu ngân hàng trong DM
+          if (!isGroup && authRes && authRes.action === "partial" && authRes.account) {
+            pendingBankBuffer.set(uidStr, {
+              account: authRes.account,
+              timestamp: Date.now(),
+            });
+            const reply =
+              `📝 Mình đã nhận được Số tài khoản: ${authRes.account}\n\n` +
+              `👉 Bạn nhắn thêm Tên Ngân Hàng và Tên Chủ Tài Khoản để mình hoàn tất cập nhật nhé!\n` +
+              `(Ví dụ: MB Bank ${senderName || "NGUYEN VAN A"})`;
+            await api.sendMessage(reply, message.threadId, message.type);
+            return;
+          }
+
+          if (isBankCmd) {
+            const reply =
+              `⚠️ CÚ PHÁP CẬP NHẬT TÀI KHOẢN NGÂN HÀNG\n\n` +
+              `Bạn vui lòng gửi thông tin theo cú pháp:\n` +
+              `👉 /stk <Số_tài_khoản> <Tên_ngân_hàng> <Tên_chủ_tài_khoản>\n\n` +
+              `Ví dụ: /stk 0123456789 MB NGUYEN VAN A\n\n` +
+              `hoặc gửi dạng:\n` +
+              `STK: 0123456789\n` +
+              `Ngân hàng: MB Bank\n` +
+              `Chủ tài khoản: NGUYEN VAN A`;
+            await api.sendMessage(reply, message.threadId, message.type);
+            return;
+          }
+        } catch (bankErr) {
+          console.error("[Bank Handler Error]:", bankErr);
+        }
+      }
 
       // Xử lý lệnh lấy ID / Mật khẩu / Số dư / Đơn hàng
       if (isIdCmd || isPassCmd || isBalanceCmd || isOrdersCmd) {
@@ -941,7 +1134,7 @@ function extractTextAndUrls(data) {
                   `🆔 Mã Khách Hàng: ${custId}\n` +
                   `🌐 Website tra cứu: https://hoantiendp.com\n\n` +
                   `💡 Bạn dùng Mã ID này để dán vào website khi tạo link hoàn tiền.\n` +
-                  `🔑 Để lấy mật khẩu đăng nhập website cài đặt STK ngân hàng nhận tiền hoàn, bạn gõ tiếp: /matkhau`,
+                  `🏦 Để cài đặt STK ngân hàng nhận tiền hoàn: Bạn chỉ cần gửi tin nhắn STK cho mình (Ví dụ: /stk 0123456789 MB NGUYEN VAN A) hoặc gõ /matkhau để đăng nhập web.`,
                   String(senderUid),
                   ThreadType.User
                 );
@@ -968,8 +1161,7 @@ function extractTextAndUrls(data) {
               `🌐 Website tra cứu: https://hoantiendp.com\n\n` +
               `📌 HƯỚNG DẪN SỬ DỤNG:\n` +
               `1️⃣ Khi dán link sản phẩm Shopee hoặc TikTok Shop trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n` +
-              `2️⃣ Để đăng nhập website cài đặt Số Tài Khoản Ngân Hàng nhận tiền hoàn, bạn gõ lệnh:\n` +
-              `👉 /matkhau (Mình sẽ cấp mật khẩu đăng nhập bảo mật cho bạn ngay)`;
+              `2️⃣ Để cài đặt STK ngân hàng nhận tiền hoàn, bạn có thể nhắn trực tiếp cho mình theo cú pháp /stk <Số_tài_khoản> <Tên_ngân_hàng> <Tên_chủ_tài_khoản> (hoặc gõ /matkhau để đăng nhập web cài đặt nhé).`;
 
             await api.sendMessage(reply, message.threadId, message.type);
           } catch (err) {
@@ -1010,7 +1202,7 @@ function extractTextAndUrls(data) {
               const formatVND = (num) => (num || 0).toLocaleString("vi-VN") + "đ";
               const bankStatus = balRes.has_bank
                 ? `✅ Đã cài đặt STK (${balRes.bank_name} - ···${balRes.bank_account_tail})`
-                : `⚠️ Chưa cài đặt STK ngân hàng (Đăng nhập web để cài đặt nhé)`;
+                : `⚠️ Chưa cài đặt STK ngân hàng (Nhắn /stk để cài đặt ngay nhé)`;
 
               const reply =
                 `💰 SỐ DƯ TIỀN HOÀN CỦA BẠN 💰\n\n` +
@@ -1067,10 +1259,11 @@ function extractTextAndUrls(data) {
           `2️⃣ Nhận lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n` +
           `3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên sàn Shopee hoặc TikTok Shop.\n` +
           `4️⃣ Nhắn tin riêng cho mình gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n` +
-          `5️⃣ Cài đặt số tài khoản ngân hàng trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n` +
+          `5️⃣ Cài đặt số tài khoản ngân hàng bằng cách nhắn tin trực tiếp (lệnh /stk) hoặc trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n` +
           `• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n` +
           `• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n` +
           `• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n` +
+          `• /stk: Cập nhật hoặc tra cứu số tài khoản ngân hàng nhận tiền hoàn\n` +
           `• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n` +
           `• /web: Website tra cứu đơn & cập nhật STK ngân hàng`;
 
