@@ -353,6 +353,27 @@ def notify_new_member_joined(
     return True
 
 
+def _format_datetime(val: str | datetime | None) -> str:
+    """Format an ISO string or datetime into a user-friendly Vietnamese time string: HH:MM:SS - DD/MM/YYYY."""
+    if not val:
+        return "Chưa xác định"
+    if isinstance(val, datetime):
+        return val.strftime("%H:%M:%S - %d/%m/%Y")
+    val_str = str(val).strip()
+    try:
+        dt = datetime.fromisoformat(val_str)
+        return dt.strftime("%H:%M:%S - %d/%m/%Y")
+    except Exception:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(val_str[:19], fmt[:len(val_str[:19])])
+            return dt.strftime("%H:%M:%S - %d/%m/%Y")
+        except Exception:
+            pass
+    return val_str
+
+
 def notify_new_order_received(
     order_id: str,
     platform: str,
@@ -361,9 +382,12 @@ def notify_new_order_received(
     order_value: int | None = None,
     estimated_commission: int | None = None,
     cashback_amount: int | None = None,
+    order_time: str | None = None,
 ) -> bool:
     """Notify DP Business group about a new order recorded."""
-    time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+    sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+    order_time_str = _format_datetime(order_time) if order_time else sync_time_str
+
     platform_icon = {
         "shopee": "🟠 Shopee",
         "tiktok": "⚫ TikTok Shop",
@@ -373,8 +397,9 @@ def notify_new_order_received(
     }.get(platform.lower(), f"🛒 {platform.title()}")
 
     lines = [
-        f"🛒 <b>[ĐƠN HÀNG MỚI PHÁT SINH] {platform_icon}</b>\n",
+        f"🛒 <b>[ĐƠN HÀNG MỚI GHI NHẬN] {platform_icon}</b>\n",
         f"📦 <b>Mã đơn hàng:</b> <code>{order_id}</code>",
+        f"📊 <b>Trạng thái:</b> ⏳ <b>Chờ duyệt</b> (Awaiting Approval)",
     ]
 
     cust_display = customer_name or customer_id or "Chưa gắn mã (Khách vãng lai)"
@@ -392,7 +417,157 @@ def notify_new_order_received(
         est_cb = round(estimated_commission * 0.8)
         lines.append(f"🎁 <b>Hoàn tiền tạm tính (80%):</b> <b>{est_cb:,.0f}đ</b>".replace(",", "."))
 
-    lines.append(f"⏱ <b>Thời gian:</b> <code>{time_str}</code>")
+    if order_time:
+        lines.append(f"📅 <b>Thời gian đặt hàng:</b> <code>{order_time_str}</code>")
+        lines.append(f"⏱ <b>Thời gian đồng bộ:</b> <code>{sync_time_str}</code>")
+    else:
+        lines.append(f"⏱ <b>Thời gian ghi nhận:</b> <code>{sync_time_str}</code>")
+
+    cfg = get_telegram_config()
+    _send_async("\n".join(lines), cfg["business_chat_id"])
+    return True
+
+
+def notify_order_approved(
+    order_id: str,
+    platform: str = "shopee",
+    customer_id: str | None = None,
+    customer_name: str | None = None,
+    order_value: int | None = None,
+    approved_commission: int | None = None,
+    cashback_amount: int | None = None,
+    order_time: str | None = None,
+) -> bool:
+    """Notify DP Business group about an order being approved."""
+    sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+    order_time_str = _format_datetime(order_time) if order_time else sync_time_str
+
+    platform_icon = {
+        "shopee": "🟠 Shopee",
+        "tiktok": "⚫ TikTok Shop",
+        "lazada": "🔵 Lazada",
+        "shopeefood": "🍔 ShopeeFood",
+        "fnb": "☕ F&B Voucher",
+    }.get(platform.lower(), f"🛒 {platform.title()}")
+
+    lines = [
+        f"✅ <b>[ĐƠN HÀNG ĐƯỢC DUYỆT THÀNH CÔNG] {platform_icon}</b>\n",
+        f"📦 <b>Mã đơn hàng:</b> <code>{order_id}</code>",
+        f"📊 <b>Trạng thái:</b> 🎉 <b>Đã duyệt</b> (Approved - Sẵn sàng chi trả)",
+    ]
+
+    cust_display = customer_name or customer_id or "Chưa gắn mã (Khách vãng lai)"
+    if customer_id and customer_name and customer_name != customer_id:
+        cust_display = f"{customer_name} (ID: {customer_id})"
+    lines.append(f"👤 <b>Khách hàng:</b> {_sanitize_html(cust_display)}")
+
+    if order_value:
+        lines.append(f"💰 <b>Giá trị đơn hàng:</b> <b>{order_value:,.0f}đ</b>".replace(",", "."))
+    if approved_commission:
+        lines.append(f"💵 <b>Hoa hồng chính thức:</b> <b>{approved_commission:,.0f}đ</b>".replace(",", "."))
+    if cashback_amount:
+        lines.append(f"🎁 <b>Hoàn tiền cho khách:</b> <b>{cashback_amount:,.0f}đ</b>".replace(",", "."))
+
+    if order_time:
+        lines.append(f"📅 <b>Thời gian đặt hàng:</b> <code>{order_time_str}</code>")
+        lines.append(f"⏱ <b>Thời gian duyệt đơn:</b> <code>{sync_time_str}</code>")
+    else:
+        lines.append(f"⏱ <b>Thời gian duyệt đơn:</b> <code>{sync_time_str}</code>")
+
+    cfg = get_telegram_config()
+    _send_async("\n".join(lines), cfg["business_chat_id"])
+    return True
+
+
+def notify_order_rejected(
+    order_id: str,
+    platform: str = "shopee",
+    customer_id: str | None = None,
+    customer_name: str | None = None,
+    order_value: int | None = None,
+    reason: str = "Bị hủy trong báo cáo đối soát",
+    order_time: str | None = None,
+) -> bool:
+    """Notify DP Business group about an order being cancelled or rejected."""
+    sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+    order_time_str = _format_datetime(order_time) if order_time else sync_time_str
+
+    platform_icon = {
+        "shopee": "🟠 Shopee",
+        "tiktok": "⚫ TikTok Shop",
+        "lazada": "🔵 Lazada",
+        "shopeefood": "🍔 ShopeeFood",
+        "fnb": "☕ F&B Voucher",
+    }.get(platform.lower(), f"🛒 {platform.title()}")
+
+    lines = [
+        f"❌ <b>[ĐƠN HÀNG BỊ HỦY / TỪ CHỐI] {platform_icon}</b>\n",
+        f"📦 <b>Mã đơn hàng:</b> <code>{order_id}</code>",
+        f"📊 <b>Trạng thái:</b> 🚫 <b>Đã hủy / Từ chối</b> (Rejected)",
+    ]
+
+    cust_display = customer_name or customer_id or "Chưa gắn mã (Khách vãng lai)"
+    if customer_id and customer_name and customer_name != customer_id:
+        cust_display = f"{customer_name} (ID: {customer_id})"
+    lines.append(f"👤 <b>Khách hàng:</b> {_sanitize_html(cust_display)}")
+
+    if order_value:
+        lines.append(f"💰 <b>Giá trị đơn hàng:</b> <b>{order_value:,.0f}đ</b>".replace(",", "."))
+    lines.append(f"⚠️ <b>Lý do:</b> {_sanitize_html(reason)}")
+
+    if order_time:
+        lines.append(f"📅 <b>Thời gian đặt hàng:</b> <code>{order_time_str}</code>")
+        lines.append(f"⏱ <b>Thời gian ghi nhận hủy:</b> <code>{sync_time_str}</code>")
+    else:
+        lines.append(f"⏱ <b>Thời gian ghi nhận:</b> <code>{sync_time_str}</code>")
+
+    cfg = get_telegram_config()
+    _send_async("\n".join(lines), cfg["business_chat_id"])
+    return True
+
+
+def notify_order_paid(
+    order_id: str,
+    platform: str = "shopee",
+    customer_id: str | None = None,
+    customer_name: str | None = None,
+    cashback_amount: int | None = None,
+    order_time: str | None = None,
+    note: str = "",
+) -> bool:
+    """Notify DP Business group when an order is paid / cashback transferred."""
+    sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+    order_time_str = _format_datetime(order_time) if order_time else sync_time_str
+
+    platform_icon = {
+        "shopee": "🟠 Shopee",
+        "tiktok": "⚫ TikTok Shop",
+        "lazada": "🔵 Lazada",
+        "shopeefood": "🍔 ShopeeFood",
+        "fnb": "☕ F&B Voucher",
+    }.get(platform.lower(), f"🛒 {platform.title()}")
+
+    lines = [
+        f"💸 <b>[HOÀN TIỀN THÀNH CÔNG] {platform_icon}</b>\n",
+        f"📦 <b>Mã đơn hàng:</b> <code>{order_id}</code>",
+        f"📊 <b>Trạng thái:</b> ✅ <b>Đã thanh toán</b> (Paid - Tiền đã chuyển tới khách)",
+    ]
+
+    cust_display = customer_name or customer_id or "Chưa gắn mã (Khách vãng lai)"
+    if customer_id and customer_name and customer_name != customer_id:
+        cust_display = f"{customer_name} (ID: {customer_id})"
+    lines.append(f"👤 <b>Khách hàng:</b> {_sanitize_html(cust_display)}")
+
+    if cashback_amount:
+        lines.append(f"💰 <b>Số tiền hoàn:</b> <b>{cashback_amount:,.0f}đ</b>".replace(",", "."))
+    if note:
+        lines.append(f"📝 <b>Ghi chú:</b> {_sanitize_html(note)}")
+
+    if order_time:
+        lines.append(f"📅 <b>Thời gian đặt hàng:</b> <code>{order_time_str}</code>")
+        lines.append(f"⏱ <b>Thời gian hoàn tất:</b> <code>{sync_time_str}</code>")
+    else:
+        lines.append(f"⏱ <b>Thời gian chuyển tiền:</b> <code>{sync_time_str}</code>")
 
     cfg = get_telegram_config()
     _send_async("\n".join(lines), cfg["business_chat_id"])

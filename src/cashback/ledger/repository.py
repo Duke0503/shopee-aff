@@ -867,6 +867,7 @@ def add_order(
             customer_name=customer_name,
             order_value=order_value,
             estimated_commission=estimated_commission,
+            order_time=order_time,
         )
     except Exception:
         pass
@@ -907,6 +908,26 @@ def mark_approved(
         conn, order_id, row["status"], APPROVED,
         f"approved commission {approved_commission} VND -> cashback {cashback_amount} VND",
     )
+    try:
+        from ..core import telegram_alerts
+        customer_name = None
+        cid = row["customer_id"]
+        if cid:
+            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+            if c_row and c_row[0]:
+                customer_name = c_row[0]
+        telegram_alerts.notify_order_approved(
+            order_id=order_id,
+            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+            customer_id=cid,
+            customer_name=customer_name,
+            order_value=row["order_value"],
+            approved_commission=approved_commission,
+            cashback_amount=cashback_amount,
+            order_time=row["recorded_at"],
+        )
+    except Exception:
+        pass
     return True
 
 
@@ -921,6 +942,25 @@ def mark_rejected(conn: sqlite3.Connection, order_id: str, reason: str) -> bool:
         (REJECTED, reason, now(), order_id),
     )
     _record_transition(conn, order_id, row["status"], REJECTED, reason)
+    try:
+        from ..core import telegram_alerts
+        customer_name = None
+        cid = row["customer_id"]
+        if cid:
+            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+            if c_row and c_row[0]:
+                customer_name = c_row[0]
+        telegram_alerts.notify_order_rejected(
+            order_id=order_id,
+            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+            customer_id=cid,
+            customer_name=customer_name,
+            order_value=row["order_value"],
+            reason=reason,
+            order_time=row["recorded_at"],
+        )
+    except Exception:
+        pass
     return True
 
 
@@ -941,6 +981,25 @@ def mark_paid(conn: sqlite3.Connection, order_id: str, note: str = "") -> bool:
     # A campaign bonus riding on this order went out in the same transfer.
     from . import campaigns
     campaigns.settle(conn, order_id)
+    try:
+        from ..core import telegram_alerts
+        customer_name = None
+        cid = row["customer_id"]
+        if cid:
+            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+            if c_row and c_row[0]:
+                customer_name = c_row[0]
+        telegram_alerts.notify_order_paid(
+            order_id=order_id,
+            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+            customer_id=cid,
+            customer_name=customer_name,
+            cashback_amount=row["cashback_amount"],
+            order_time=row["recorded_at"],
+            note=note,
+        )
+    except Exception:
+        pass
     return True
 
 

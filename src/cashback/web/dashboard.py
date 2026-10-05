@@ -3428,6 +3428,41 @@ class _Handler(BaseHTTPRequestHandler):
                 order_value=body.get("order_value"),
                 estimated_commission=body.get("estimated_commission"),
                 cashback_amount=body.get("cashback_amount"),
+                order_time=body.get("order_time") or body.get("recorded_at"),
+            )
+            return self._json({"ok": True})
+        elif alert_type == "order_approved":
+            telegram_alerts.notify_order_approved(
+                order_id=body.get("order_id", ""),
+                platform=body.get("platform", "shopee"),
+                customer_id=body.get("customer_id"),
+                customer_name=body.get("customer_name"),
+                order_value=body.get("order_value"),
+                approved_commission=body.get("approved_commission"),
+                cashback_amount=body.get("cashback_amount"),
+                order_time=body.get("order_time") or body.get("recorded_at"),
+            )
+            return self._json({"ok": True})
+        elif alert_type == "order_rejected":
+            telegram_alerts.notify_order_rejected(
+                order_id=body.get("order_id", ""),
+                platform=body.get("platform", "shopee"),
+                customer_id=body.get("customer_id"),
+                customer_name=body.get("customer_name"),
+                order_value=body.get("order_value"),
+                reason=body.get("reason", "Bị hủy trong báo cáo đối soát"),
+                order_time=body.get("order_time") or body.get("recorded_at"),
+            )
+            return self._json({"ok": True})
+        elif alert_type == "order_paid":
+            telegram_alerts.notify_order_paid(
+                order_id=body.get("order_id", ""),
+                platform=body.get("platform", "shopee"),
+                customer_id=body.get("customer_id"),
+                customer_name=body.get("customer_name"),
+                cashback_amount=body.get("cashback_amount"),
+                order_time=body.get("order_time") or body.get("recorded_at"),
+                note=body.get("note", ""),
             )
             return self._json({"ok": True})
         elif alert_type == "bug_report":
