@@ -56,6 +56,16 @@ def test_parse_bank_messages():
     assert res5["action"] == "partial"
     assert res5["account"] == "5300205813110"
 
+    # Bank only
+    res_bank = banks.parse_bank_message("Agribank", "User")
+    assert res_bank["action"] == "bank_only"
+    assert res_bank["bank_name"] == "Agribank"
+
+    # Holder only
+    res_holder = banks.parse_bank_message("Chủ tài khoản: NONG THE VINH", "User")
+    assert res_holder["action"] == "holder_only"
+    assert res_holder["holder"] == "NONG THE VINH"
+
     # Non-bank message
     res6 = banks.parse_bank_message("Xin chao bot", "User")
     assert res6 is None
@@ -82,3 +92,17 @@ def test_bot_update_bank_in_ledger(db):
         assert cust["bank_name"] == "Vietcombank"
         assert cust["bank_account"] == "1053518375"
         assert cust["account_holder"] == "NGUYEN THI QUYNH ANH"
+
+        # Sequential update: customer later updates holder name
+        msg_holder = "Chủ TK: NGUYEN THI QUYNH ANH VIP"
+        parsed_holder = banks.parse_bank_message(msg_holder)
+        assert parsed_holder["action"] == "holder_only"
+        assert parsed_holder["holder"] == "NGUYEN THI QUYNH ANH VIP"
+
+        ledger.set_bank_details(
+            conn, "test_cust_1", cust["bank_name"], cust["bank_account"], parsed_holder["holder"]
+        )
+        conn.commit()
+
+        cust_updated = ledger.get_customer(conn, "test_cust_1")
+        assert cust_updated["account_holder"] == "NGUYEN THI QUYNH ANH VIP"

@@ -262,19 +262,24 @@ def parse_bank_message(text: str, default_name: str = "") -> dict | None:
         if len(rem_raw) >= 2:
             holder = rem_raw
 
+    clean_holder = re.sub(r"[\t\r\n]", " ", holder).strip()
+    clean_holder = re.sub(
+        r"^(ch[uủ]\s*tk|ch[uủ]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*th[eẻ]|t[eê]n|ctk)\s*[:=\-]?\s*",
+        "", clean_holder, flags=re.IGNORECASE
+    ).strip()
+    clean_holder = re.sub(r"\s+", " ", clean_holder)
+
     if not clean_account or not (6 <= len(clean_account) <= 22) or not matched_bank:
         if is_explicit_cmd:
             return {"action": "invalid_cmd", "has_acc": bool(clean_account), "has_bank": bool(matched_bank)}
         if clean_account and not matched_bank:
-            return {"action": "partial", "account": clean_account, "holder": holder}
+            return {"action": "partial", "account": clean_account, "holder": clean_holder}
+        if matched_bank and not clean_account:
+            return {"action": "bank_only", "bank_name": matched_bank["shortName"], "holder": clean_holder}
+        if clean_holder and (holder_m or any(k in _plain(raw) for k in ("chutaikhoan", "chutk", "chuthe", "tenchutk"))):
+            return {"action": "holder_only", "holder": clean_holder.upper()}
         return None
 
-    clean_holder = re.sub(r"[\t\r\n]", " ", holder).strip()
-    clean_holder = re.sub(
-        r"^(ch[uủ]\s*tk|ch[uủ]\s*t[aà]i\s*kho[aả]n|t[eê]n|ctk)\s*[:=\-]?\s*",
-        "", clean_holder, flags=re.IGNORECASE
-    ).strip()
-    clean_holder = re.sub(r"\s+", " ", clean_holder)
     if not clean_holder or len(clean_holder) < 2:
         clean_holder = default_name or ""
 

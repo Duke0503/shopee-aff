@@ -235,23 +235,37 @@ async function main() {
 
   // Temporary buffer for sequential bank details in 1-1 DM
   const pendingBankBuffer = new Map();
-  const BANK_BUFFER_TTL_MS = 3 * 60 * 1000;
+  const BANK_BUFFER_TTL_MS = 2 * 60 * 1000; // 2 phút chờ giữa các tin nhắn rời
+
+  const NON_HOLDER_WORDS = new Set([
+    "ok", "oke", "oki", "okey", "yes", "roi", "rồi", "da", "dạ", "vang", "vâng",
+    "cam on", "cảm ơn", "cmon", "tks", "thanks", "thank", "thank you",
+    "alo", "ad", "admin", "shop", "bot", "check", "xem", "ho", "hộ",
+    "duoc chua", "được chưa", "chua", "chưa", "sao", "gi", "gì", "the", "thế"
+  ]);
 
   function looksLikeBankMessage(rawText, uid) {
     if (!rawText) return false;
     const str = rawText.trim();
     if (/^[\/!](stk|bank|tk)\b/i.test(str)) return true;
-    if (/(?:stk|s[oố]\s*tk|s[oố]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*tk|ng[aâ]n\s*h[aà]ng|ch[uủ]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*th[eẻ])\b/i.test(str)) {
+    if (/(?:stk|s[oố]\s*tk|s[oố]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*tk|ng[aâ]n\s*h[aà]ng|ch[uủ]\s*t[aà]i\s*kho[aả]n|ch[uủ]\s*th[eẻ]|ctk)\b/i.test(str)) {
       return true;
     }
     const hasDigits = /\b\d{6,22}\b/.test(str);
     const hasBankWord = /\b(?:mb|mbbank|vcb|vietcom|vietcombank|vietin|vietinbank|techcom|techcombank|tcb|bidv|agri|agribank|acb|tpb|tpbank|vpbank|vpb|shb|hdbank|ocb|msb|vib|sacom|sacombank|cake|timo|viettelpay|viettelmoney|momo)\b/i.test(str);
-    if (hasDigits && hasBankWord) return true;
+    if (hasDigits || hasBankWord) return true;
 
     if (uid && pendingBankBuffer.has(String(uid))) {
       const buf = pendingBankBuffer.get(String(uid));
       if (Date.now() - buf.timestamp < BANK_BUFFER_TTL_MS) {
-        if (hasBankWord || str.length < 50) return true;
+        if (hasBankWord || hasDigits) return true;
+        if (buf.awaiting_holder) {
+          const lower = str.toLowerCase().replace(/[^a-z0-9à-ỹ\s]/g, "").trim();
+          if (NON_HOLDER_WORDS.has(lower)) return false;
+          if (str.length >= 2 && str.length <= 50 && !str.startsWith("http")) return true;
+        } else if (str.length < 50 && !str.startsWith("http")) {
+          return true;
+        }
       }
     }
     return false;
@@ -898,8 +912,16 @@ function extractTextAndUrls(data) {
           if (!isGroup && pendingBankBuffer.has(uidStr)) {
             const buf = pendingBankBuffer.get(uidStr);
             if (Date.now() - buf.timestamp < BANK_BUFFER_TTL_MS) {
-              if (buf.account && !textToSend.includes(buf.account)) {
+              if (buf.awaiting_holder) {
+                if (!/(?:ch[uủ]\s*tk|ch[uủ]\s*t[aà]i\s*kho[aả]n|ctk)\b/i.test(textToSend)) {
+                  textToSend = `Chủ tài khoản: ${textToSend}`;
+                }
+              } else if (buf.account && !textToSend.includes(buf.account)) {
                 textToSend = `STK: ${buf.account}\n${textToSend}`;
+              } else if (buf.bank_name && !textToSend.toLowerCase().includes(buf.bank_name.toLowerCase())) {
+                textToSend = `Ngân hàng: ${buf.bank_name}\n${textToSend}`;
+              } else if (buf.holder && !textToSend.toLowerCase().includes(buf.holder.toLowerCase())) {
+                textToSend = `Chủ tài khoản: ${buf.holder}\n${textToSend}`;
               }
             } else {
               pendingBankBuffer.delete(uidStr);
@@ -918,10 +940,42 @@ function extractTextAndUrls(data) {
           }).then((r) => r.json()).catch(() => null);
 
           if (authRes && authRes.ok) {
-            if (authRes.action === "updated") {
+            // TRƯỜNG HỢP CẬP NHẬT TÊN CHỦ TÀI KHOẢN (KHI ĐÃ CÓ STK VÀ BANK TRƯỚC ĐÓ)
+            if (authRes.action === "holder_updated") {
               pendingBankBuffer.delete(uidStr);
+              const reply =
+                `✅ ĐÃ CẬP NHẬT TÊN CHỦ TÀI KHOẢN THÀNH CÔNG!\n\n` +
+                `👤 Chủ tài khoản: ${authRes.account_holder}\n` +
+                `🏦 Ngân hàng: ${authRes.bank_name}\n` +
+                `🔢 Số tài khoản: ${isGroup ? '···' + authRes.bank_account_tail : authRes.bank_account}\n\n` +
+                `🎁 Cảm ơn bạn! Thông tin tài khoản ngân hàng của bạn đã hoàn tất 100%. Tiền hoàn sẽ được chuyển về tài khoản này khi đến kỳ đối soát nhé.`;
 
+              const boldTargets = [
+                "ĐÃ CẬP NHẬT TÊN CHỦ TÀI KHOẢN THÀNH CÔNG!",
+                "Chủ tài khoản:",
+                "Ngân hàng:",
+                "Số tài khoản:",
+                "Cảm ơn bạn!",
+              ];
+              const styles = [];
+              for (const t of boldTargets) {
+                const s = reply.indexOf(t);
+                if (s !== -1) styles.push({ start: s, len: t.length, st: "b" });
+              }
+              styles.sort((a, b) => a.start - b.start);
+
+              await api.sendMessage(
+                { msg: reply, styles: styles.length > 0 ? styles : undefined },
+                message.threadId,
+                message.type
+              );
+              return;
+            }
+
+            // TRƯỜNG HỢP CẬP NHẬT THÀNH CÔNG CẢ STK + NGÂN HÀNG
+            if (authRes.action === "updated") {
               if (isGroup) {
+                pendingBankBuffer.delete(uidStr);
                 const tagText = senderUid ? `@${senderName}` : "";
                 const tagPrefix = tagText ? `${tagText}\n` : "";
                 const reply =
@@ -953,6 +1007,14 @@ function extractTextAndUrls(data) {
                   message.type
                 );
               } else {
+                // Trong DM: lưu buffer awaiting_holder trong 2 phút phòng trường hợp khách gửi thêm tên chủ tài khoản ở tin sau
+                pendingBankBuffer.set(uidStr, {
+                  account: authRes.bank_account,
+                  bank_name: authRes.bank_name,
+                  awaiting_holder: true,
+                  timestamp: Date.now(),
+                });
+
                 const reply =
                   `✅ ĐÃ CẬP NHẬT TÀI KHOẢN NGÂN HÀNG THÀNH CÔNG!\n\n` +
                   `🏦 Ngân hàng: ${authRes.bank_name}\n` +
@@ -1024,7 +1086,7 @@ function extractTextAndUrls(data) {
             }
           }
 
-          // Khách nhắn thiếu ngân hàng trong DM
+          // Khách nhắn thiếu ngân hàng trong DM (chỉ có STK)
           if (!isGroup && authRes && authRes.action === "partial" && authRes.account) {
             pendingBankBuffer.set(uidStr, {
               account: authRes.account,
@@ -1032,8 +1094,36 @@ function extractTextAndUrls(data) {
             });
             const reply =
               `📝 Mình đã nhận được Số tài khoản: ${authRes.account}\n\n` +
-              `👉 Bạn nhắn thêm Tên Ngân Hàng và Tên Chủ Tài Khoản để mình hoàn tất cập nhật nhé!\n` +
-              `(Ví dụ: MB Bank ${senderName || "NGUYEN VAN A"})`;
+              `👉 Bạn nhắn thêm Tên Ngân Hàng (và Tên Chủ Tài Khoản) để mình hoàn tất cập nhật nhé!\n` +
+              `(Ví dụ: MB Bank hoặc Agribank)`;
+            await api.sendMessage(reply, message.threadId, message.type);
+            return;
+          }
+
+          // Khách nhắn thiếu STK trong DM (chỉ có tên Ngân hàng)
+          if (!isGroup && authRes && authRes.action === "bank_only" && authRes.bank_name) {
+            pendingBankBuffer.set(uidStr, {
+              bank_name: authRes.bank_name,
+              timestamp: Date.now(),
+            });
+            const reply =
+              `🏦 Mình đã nhận được Ngân hàng: ${authRes.bank_name}\n\n` +
+              `👉 Bạn nhắn thêm Số Tài Khoản để mình hoàn tất lưu nhé!\n` +
+              `(Ví dụ: 0123456789)`;
+            await api.sendMessage(reply, message.threadId, message.type);
+            return;
+          }
+
+          // Khách nhắn chỉ có tên chủ tài khoản (khi chưa có STK trong hệ thống)
+          if (!isGroup && authRes && authRes.action === "holder_only" && authRes.holder) {
+            pendingBankBuffer.set(uidStr, {
+              holder: authRes.holder,
+              timestamp: Date.now(),
+            });
+            const reply =
+              `👤 Mình đã nhận được Tên Chủ Tài Khoản: ${authRes.holder}\n\n` +
+              `👉 Bạn nhắn thêm Số Tài Khoản và Tên Ngân Hàng để mình hoàn tất lưu nhé!\n` +
+              `(Ví dụ: 0123456789 MB Bank)`;
             await api.sendMessage(reply, message.threadId, message.type);
             return;
           }

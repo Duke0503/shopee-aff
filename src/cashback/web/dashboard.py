@@ -3762,6 +3762,43 @@ class _Handler(BaseHTTPRequestHandler):
                             "account": parsed.get("account"),
                             "holder": parsed.get("holder"),
                         })
+                    if parsed.get("action") == "bank_only":
+                        return self._json({
+                            "ok": False,
+                            "action": "bank_only",
+                            "bank_name": parsed.get("bank_name"),
+                            "holder": parsed.get("holder"),
+                        })
+                    if parsed.get("action") == "holder_only":
+                        new_holder = parsed.get("holder") or ""
+                        if new_holder and len(new_holder) >= 2 and row["bank_account"]:
+                            ledger.set_bank_details(
+                                conn, cust_id, row["bank_name"], row["bank_account"], new_holder
+                            )
+                            audit.record(
+                                audit.BANK_CHANGED,
+                                customer_id=cust_id,
+                                bank=row["bank_name"],
+                                account=audit.fingerprint(row["bank_account"]),
+                                source="bot_holder_update",
+                            )
+                            conn.commit()
+                            return self._json({
+                                "ok": True,
+                                "action": "holder_updated",
+                                "customer_id": cust_id,
+                                "customer_code": cust_code,
+                                "display_name": display_name,
+                                "bank_name": row["bank_name"],
+                                "bank_account": row["bank_account"],
+                                "bank_account_tail": (row["bank_account"] or "")[-4:],
+                                "account_holder": new_holder,
+                            })
+                        return self._json({
+                            "ok": False,
+                            "action": "holder_only",
+                            "holder": new_holder,
+                        })
 
                 bank_name = parsed["bank_name"] if parsed else explicit_bank
                 bank_account = parsed["bank_account"] if parsed else explicit_acc
