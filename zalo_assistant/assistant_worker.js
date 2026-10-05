@@ -676,13 +676,20 @@ function extractTextAndUrls(data) {
           }
         }
         if (commissionLines.length === 0) {
-          commissionLines.push(`• Đang cập nhật`);
+          if (productData.price > 0) {
+            commissionLines.push(`• Người bán không áp dụng hoa hồng cho sản phẩm này`);
+          } else {
+            commissionLines.push(`• Đang cập nhật`);
+          }
         }
         const commissionSection = commissionLines.join("\n");
 
         const ratePercent = productData.rate_percent || "80%";
         const cashbackFormatted = productData.cashback_formatted || `${productData.cashback || 0}đ`;
-        const payoutLine = `Bạn nhận ${ratePercent} → dự kiến ${cashbackFormatted}`;
+        const isZeroCommission = productData.price > 0 && (productData.cashback || 0) === 0 && commissionLines[0].includes("không áp dụng");
+        const payoutLine = isZeroCommission
+          ? `Sản phẩm này người bán không áp dụng hoa hồng`
+          : `Bạn nhận ${ratePercent} → dự kiến ${cashbackFormatted}`;
         boldTargets.push(...commissionItems, payoutLine);
 
         replyText =

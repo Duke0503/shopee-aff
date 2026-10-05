@@ -301,3 +301,55 @@ def serve_in_background(bridge: Bridge, port: int) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
+
+
+class HttpBridge:
+    """HTTP client talking to a local Bridge server at 127.0.0.1:port."""
+
+    def __init__(self, port: int, token: str):
+        self.port = port
+        self.token = token
+        self.base_url = f"http://127.0.0.1:{port}"
+
+    def connected(self) -> bool:
+        if not self.token or not self.port:
+            return False
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{self.base_url}/status",
+                headers={"X-Bridge-Token": self.token},
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode())
+                return bool(data.get("connected"))
+        except Exception:
+            return False
+
+    def submit(self, job: Job, timeout: float | None = None) -> Any:
+        import urllib.request
+        wait_s = timeout if timeout is not None else (job.timeout_ms / 1000) + 10
+        body = {
+            "connector": job.connector,
+            "action": job.action,
+            "params": job.params,
+            "timeout_ms": job.timeout_ms,
+        }
+        data_bytes = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.base_url}/execute",
+            data=data_bytes,
+            headers={
+                "X-Bridge-Token": self.token,
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=wait_s) as resp:
+                res = json.loads(resp.read().decode())
+                if not res.get("ok"):
+                    raise RuntimeError(res.get("error") or "bridge execution failed")
+                return res.get("value")
+        except Exception as exc:
+            raise RuntimeError(f"HttpBridge submit failed: {exc}") from exc
+

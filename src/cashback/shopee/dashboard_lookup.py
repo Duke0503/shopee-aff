@@ -108,6 +108,7 @@ class Commission:
     total_rate: float           # percent, XTRA included
     seller_rate: float          # percent, the XTRA portion within the total
     long_link: str
+    image_url: str = ""
 
     @property
     def base_rate(self) -> float:
@@ -181,6 +182,27 @@ def parse_url(url: str) -> tuple[str, str, str] | None:
     return None
 
 
+def candidate_keywords(name: str) -> list[str]:
+    cleaned = re.sub(r"\s+", " ", name or "").strip()
+    words = cleaned.split(" ")
+    candidates = []
+    # 1. 8 words (often includes the defining subcategory/model)
+    if len(words) >= 8:
+        candidates.append(" ".join(words[:8]))
+    # 2. First comma/dash clause if distinctive
+    first_clause = re.split(r"[,|\-–]", cleaned)[0].strip()
+    if first_clause and first_clause not in candidates:
+        candidates.append(first_clause)
+    # 3. 6 words (traditional fallback)
+    six_words = " ".join(words[:6])
+    if six_words not in candidates:
+        candidates.append(six_words)
+    # 4. Short names
+    if len(words) < 6 and cleaned and cleaned not in candidates:
+        candidates.append(cleaned)
+    return [c for c in candidates if c]
+
+
 def keyword_from_name(name: str, words: int = KEYWORD_WORDS) -> str:
     cleaned = re.sub(r"\s+", " ", name or "").strip()
     return " ".join(cleaned.split(" ")[:words])
@@ -207,13 +229,18 @@ _NAME_JS = """
   const body = await response.json();
   const item = body && body.data && body.data.item;
   if (!item || !item.title) return { ok: false, why: 'no title' };
-  return { ok: true, name: item.title };
+  return {
+    ok: true,
+    name: item.title,
+    price: item.price ? Math.round(Number(item.price) / 100000) : 0,
+    image: item.image || ''
+  };
 })()
 """
 
 
-def product_name(bridge: Bridge, shop_id: str, item_id: str) -> str:
-    """Read a product's name from the storefront. '' when unavailable."""
+def product_info(bridge: Bridge, shop_id: str, item_id: str) -> dict:
+    """Read product name, price, and image ID from storefront pdp."""
     code = _NAME_JS % {
         "path": json.dumps(NAME_PATH),
         "item": item_id,
@@ -222,8 +249,16 @@ def product_name(bridge: Bridge, shop_id: str, item_id: str) -> str:
     try:
         found = _run(bridge, code, STORE_ROUTING, STORE_SCOPE)
     except RuntimeError:
-        return ""
-    return str(found.get("name") or "") if found.get("ok") else ""
+        return {}
+    if not isinstance(found, dict) or not found.get("ok"):
+        return {}
+    return found
+
+
+def product_name(bridge: Bridge, shop_id: str, item_id: str) -> str:
+    """Read a product's name from the storefront. '' when unavailable."""
+    info = product_info(bridge, shop_id, item_id)
+    return str(info.get("name") or "")
 
 
 _SEARCH_JS = """
@@ -245,6 +280,7 @@ _SEARCH_JS = """
     total_rate: hit.default_commission_rate || '',
     seller_rate: hit.seller_commission_rate || '',
     long_link: hit.long_link || '',
+    image: card.image || '',
   };
 })()
 """
@@ -264,31 +300,56 @@ def lookup(bridge: Bridge, url: str, page_limit: int = 50) -> Commission | None:
         return None
     slug, shop_id, item_id = parsed
 
-    # The storefront name is what the dashboard indexes. A slug is only a
-    # fallback for when the storefront will not answer.
-    name = product_name(bridge, shop_id, item_id) or slug
-    keyword = keyword_from_name(name)
-    if not keyword:
-        return None
+    # The storefront name and info is authoritative
+    info = product_info(bridge, shop_id, item_id)
+    name = str(info.get("name") or slug)
+    pdp_price = int(info.get("price") or 0)
+    raw_image = str(info.get("image") or "")
 
-    code = _SEARCH_JS % {
-        "path": json.dumps(SEARCH_PATH),
-        "keyword": json.dumps(keyword),
-        "item_id": json.dumps(item_id),
-        "limit": page_limit,
-    }
-    try:
-        found = _run(bridge, code)
-    except RuntimeError:
-        return None
-    if not found.get("ok"):
-        return None
+    keywords = candidate_keywords(name)
+    if not keywords and slug:
+        keywords = candidate_keywords(slug)
 
-    return Commission(
-        item_id=item_id,
-        name=str(found.get("name") or name),
-        price=int(found.get("price") or 0) // PRICE_SCALE,
-        total_rate=parse_rate(found.get("total_rate")),
-        seller_rate=parse_rate(found.get("seller_rate")),
-        long_link=str(found.get("long_link") or ""),
-    )
+    found = None
+    for kw in keywords:
+        code = _SEARCH_JS % {
+            "path": json.dumps(SEARCH_PATH),
+            "keyword": json.dumps(kw),
+            "item_id": json.dumps(item_id),
+            "limit": page_limit,
+        }
+        try:
+            res = _run(bridge, code)
+        except RuntimeError:
+            res = None
+        if res and res.get("ok"):
+            found = res
+            break
+
+    if found and found.get("ok"):
+        img = found.get("image") or raw_image
+        img_url = f"https://down-vn.img.susercontent.com/file/{img}" if img else ""
+        price = int(found.get("price") or 0) // PRICE_SCALE or pdp_price
+        return Commission(
+            item_id=item_id,
+            name=str(found.get("name") or name),
+            price=price,
+            total_rate=parse_rate(found.get("total_rate")),
+            seller_rate=parse_rate(found.get("seller_rate")),
+            long_link=str(found.get("long_link") or ""),
+            image_url=img_url,
+        )
+
+    if pdp_price > 0 and name:
+        img_url = f"https://down-vn.img.susercontent.com/file/{raw_image}" if raw_image else ""
+        return Commission(
+            item_id=item_id,
+            name=name,
+            price=pdp_price,
+            total_rate=0.0,
+            seller_rate=0.0,
+            long_link="",
+            image_url=img_url,
+        )
+
+    return None

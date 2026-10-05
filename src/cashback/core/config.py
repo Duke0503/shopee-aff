@@ -168,7 +168,7 @@ def load() -> Config:
         batch_max_size=int(os.getenv("BATCH_MAX_SIZE", "20")),
         batch_min_gap_seconds=int(os.getenv("BATCH_MIN_GAP_SECONDS", "20")),
         third_party_fallback=os.getenv(
-            "THIRD_PARTY_FALLBACK", "true"
+            "THIRD_PARTY_FALLBACK", "false"
         ).strip().lower() in ("1", "true", "yes"),
         reconcile_interval_minutes=int(
             os.getenv("RECONCILE_INTERVAL_MINUTES", "60")),

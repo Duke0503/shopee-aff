@@ -118,7 +118,7 @@ def _build(price: int, shopee_rate: float, seller_rate: float,
     )
 
 
-def lookup(url: str, bridge=None, third_party: bool = True, api_key: str = "") -> Estimate | None:
+def lookup(url: str, bridge=None, third_party: bool = False, api_key: str = "") -> Estimate | None:
     """Best available estimate for a product URL, or None.
 
     Never raises. A missing estimate is a normal outcome: the link is
@@ -137,7 +137,7 @@ def lookup(url: str, bridge=None, third_party: bool = True, api_key: str = "") -
         # promise a share of a commission that does not exist.
         if found and found.price > 0:
             return _build(found.price, found.base_rate, found.seller_rate,
-                          found.name, SOURCE_SHOPEE)
+                          found.name, SOURCE_SHOPEE, image_url=getattr(found, "image_url", "") or "")
 
     if not third_party:
         return None

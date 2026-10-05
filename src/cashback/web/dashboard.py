@@ -724,6 +724,15 @@ def _cache_payload(product, own, rate: float, source: str,
 class _Handler(BaseHTTPRequestHandler):
     cfg: Config
 
+    @property
+    def bridge(self):
+        inst = getattr(self, "_bridge_instance", None)
+        if inst is not None:
+            return inst
+        from ..shopee.browser_bridge import HttpBridge
+        self._bridge_instance = HttpBridge(self.cfg.bridge_port, self.cfg.bridge_token)
+        return self._bridge_instance
+
     def log_message(self, fmt, *args):
         return
 
@@ -3761,6 +3770,7 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             est = lookup(
                 target_url,
+                bridge=self.bridge,
                 third_party=self.cfg.third_party_fallback,
                 api_key=self.cfg.addlivetag_api_key,
             )
@@ -3823,6 +3833,7 @@ class _Handler(BaseHTTPRequestHandler):
             "cashback": cb,
             "cashback_formatted": _vnd(cb),
             "rate_percent": f"{rate:.0%}",
+            "image_url": getattr(est, "image_url", "") or "",
         })
 
     def _requester(self, conn, body: dict) -> tuple[str | None, tuple | None]:
@@ -4129,6 +4140,41 @@ class _Handler(BaseHTTPRequestHandler):
                 parsed = parse_url(src_url)
                 if parsed:
                     cached = ledger.get_product_cache(conn, parsed[2])
+                    if not cached or not cached.get("name") or not cached.get("price"):
+                        try:
+                            from ..shopee.commission import lookup
+                            est = lookup(src_url, bridge=self.bridge, third_party=False)
+                            if est and est.price > 0:
+                                rate = self.cfg.advertised_cashback_rate
+                                raw_comm = est.commission
+                                net_comm = round_dong(raw_comm * (1 - 0.10 - 0.0098))
+                                cb = round_dong(net_comm * rate)
+                                cached = ledger.upsert_product_cache(
+                                    conn,
+                                    item_id=parsed[2],
+                                    shop_id=parsed[1],
+                                    name=est.name,
+                                    price=est.price,
+                                    price_formatted=_vnd(est.price),
+                                    shopee_rate=est.shopee_rate,
+                                    seller_rate=est.seller_rate,
+                                    shopee_part=est.shopee_part,
+                                    shopee_part_formatted=_vnd(est.shopee_part),
+                                    seller_part=est.seller_part,
+                                    seller_part_formatted=_vnd(est.seller_part),
+                                    total_commission=raw_comm,
+                                    commission_formatted=_vnd(raw_comm),
+                                    is_capped=est.is_capped,
+                                    cashback=cb,
+                                    cashback_formatted=_vnd(cb),
+                                    rate_percent=f"{rate:.0%}",
+                                    canonical_url=src_url,
+                                    image_url=getattr(est, "image_url", "") or "",
+                                    increment_count=False,
+                                )
+                                conn.commit()
+                        except Exception:
+                            pass
                     if cached and cached["name"]:
                         detail_json = json.dumps({
                             "name": cached["name"],
@@ -4786,6 +4832,7 @@ class _Handler(BaseHTTPRequestHandler):
                 try:
                     est = lookup(
                         target_url,
+                        bridge=self.bridge,
                         third_party=self.cfg.third_party_fallback,
                         api_key=self.cfg.addlivetag_api_key,
                     )
@@ -4863,6 +4910,7 @@ class _Handler(BaseHTTPRequestHandler):
                 try:
                     est = lookup(
                         target_url,
+                        bridge=self.bridge,
                         third_party=self.cfg.third_party_fallback,
                         api_key=self.cfg.addlivetag_api_key,
                     )
