@@ -15,6 +15,16 @@ const TIKI_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:tiki\.vn|ti\.ki)\/[^
 const SHOPEEFOOD_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopeefood\.vn|food\.shopee\.vn|shopee\.vn\/now-food)\/[^\s]+/i;
 const PRODUCT_LINK_REGEX = /https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:shopee\.vn|s\.shopee\.vn|shp\.ee|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.shop|lazada\.vn|s\.lazada\.vn|c\.lazada\.vn|tiki\.vn|ti\.ki|shopeefood\.vn|food\.shopee\.vn)\/[^\s]+/i;
 
+function formatShortTitle(title, maxLength = 60) {
+  if (!title) return "";
+  const cleaned = String(title).trim().replace(/\s+/g, " ");
+  if (cleaned.length <= maxLength) return cleaned;
+  const cut = cleaned.slice(0, maxLength);
+  const lastSpace = cut.lastIndexOf(" ");
+  const base = (lastSpace > 25 ? cut.slice(0, lastSpace) : cut).replace(/[,.\-_–\s]+$/, "");
+  return base + "...";
+}
+
 async function reportBugToTelegram({ title, details, severity = "HIGH", source = "zalo_assistant", trace = "", actionNeeded = "" }) {
   try {
     await fetch(`${config.MAIN_API_URL}/api/alerts/telegram`, {
@@ -690,10 +700,11 @@ function extractTextAndUrls(data) {
           : `Bạn nhận ${ratePercent} → dự kiến ${cashbackFormatted}`;
         boldTargets.push(...commissionItems, payoutLine);
 
+        const shortName = formatShortTitle(productData?.name, 60);
         replyText =
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
-          (productData.name ? `📦 ${productData.name}\n` : "") +
+          (shortName ? `📦 ${shortName}\n` : "") +
           `🔗 ${linkUrl}\n\n` +
           `📊 Hoa hồng hiện tại:\n` +
           `${commissionSection}\n\n` +
@@ -703,10 +714,11 @@ function extractTextAndUrls(data) {
       } else {
         const ratePercent = productData?.rate_percent || "80%";
         boldTargets.push(`nhận ${ratePercent} hoa hồng`);
+        const shortName = formatShortTitle(productData?.name, 60);
         replyText =
           tagPrefix +
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
-          (productData?.name ? `📦 ${productData.name}\n` : "") +
+          (shortName ? `📦 ${shortName}\n` : "") +
           `🔗 ${linkUrl}\n\n` +
           `🎁 Bạn sẽ nhận ${ratePercent} hoa hồng của đơn hàng này sau khi đặt mua thành công (tiền hoàn sẽ tự động ghi nhận và cộng vào tài khoản khi đơn hàng đồng bộ)!\n\n` +
           `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
