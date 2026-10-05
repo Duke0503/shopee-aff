@@ -581,7 +581,6 @@ function extractTextAndUrls(data) {
       // before Shopee: opened in Zalo's in-app browser, the purchase is not
       // credited (see src/cashback/web/share_page.py).
       const linkUrl = productData?.share_url || resolveRes.share_url || affUrl;
-      const openHint = linkUrl !== affUrl && wording.link_open_hint ? `${wording.link_open_hint}\n\n` : "";
 
       // A link made for this customer just now arrives with a name at most
       // (link-status carries no figures), so a name alone is not enough to
@@ -636,7 +635,6 @@ function extractTextAndUrls(data) {
           `🍜 ${readyTitle}\n\n` +
           storeSection +
           `🔗 ${linkUrl}\n\n` +
-          openHint +
           `🎁 Bạn sẽ nhận 80% hoa hồng tích lũy của đơn sau khi giao hàng thành công (Shopee áp dụng trần hoa hồng cho từng quán)!\n` +
           groupOrderTip +
           `\n👉 ${actionTitle}.\n` +
@@ -697,7 +695,6 @@ function extractTextAndUrls(data) {
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
           (productData.name ? `📦 ${productData.name}\n` : "") +
           `🔗 ${linkUrl}\n\n` +
-          openHint +
           `📊 Hoa hồng hiện tại:\n` +
           `${commissionSection}\n\n` +
           `🎁 ${payoutLine}\n\n` +
@@ -711,7 +708,6 @@ function extractTextAndUrls(data) {
           `🎉 Link hoàn tiền ${platformLabel} của bạn đã sẵn sàng\n\n` +
           (productData?.name ? `📦 ${productData.name}\n` : "") +
           `🔗 ${linkUrl}\n\n` +
-          openHint +
           `🎁 Bạn sẽ nhận ${ratePercent} hoa hồng của đơn hàng này sau khi đặt mua thành công (tiền hoàn sẽ tự động ghi nhận và cộng vào tài khoản khi đơn hàng đồng bộ)!\n\n` +
           `👉 Bấm link trên và đặt hàng trực tiếp trên ${platformLabel}.\n` +
           `💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.`;
