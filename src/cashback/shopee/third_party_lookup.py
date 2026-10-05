@@ -139,15 +139,19 @@ def lookup(url: str, timeout: float = TIMEOUT, api_key: str | None = None) -> Pr
     headers: dict[str, str] = {}
 
     key = (api_key or os.getenv("ADDLIVETAG_API_KEY", "")).strip()
-    if key:
-        headers["X-API-Key"] = key
-        params["key"] = key
+    if not key:
+        # addlivetag.com requires an API key since 2026-10-01.
+        # When no key is configured, do not make request or generate alert warnings.
+        return None
+
+    headers["X-API-Key"] = key
+    params["key"] = key
 
     try:
         with httpx.Client(timeout=timeout) as client:
             response = client.get(API_URL, params=params, headers=headers)
         if response.status_code == 401:
-            _log.warning("[third_party_lookup] addlivetag.com returned 401 Unauthorized: API Key is required since 2026-10-01. Please configure ADDLIVETAG_API_KEY.")
+            _log.debug("[third_party_lookup] addlivetag.com returned 401 Unauthorized.")
             return None
         body = response.json()
     except (httpx.HTTPError, ValueError):

@@ -51,7 +51,7 @@ class ShopeeProvider(BaseAffiliateProvider):
     def preview(self, url: str, advertised_rate: float) -> Optional[ProductPreview]:
         target_url = self.normalize_url(url)
         try:
-            est = lookup(target_url, third_party=True)
+            est = lookup(target_url, third_party=False)
         except Exception:
             return None
 
