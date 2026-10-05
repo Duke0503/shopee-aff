@@ -470,6 +470,16 @@ CREATE TABLE IF NOT EXISTS system_kv (
 );
 """
 
+_TELEGRAM_ALERTS_DDL = """
+CREATE TABLE IF NOT EXISTS telegram_order_alerts (
+    order_id    TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    notified_at TEXT NOT NULL,
+    PRIMARY KEY (order_id, status)
+);
+CREATE INDEX IF NOT EXISTS idx_tg_alerts_order ON telegram_order_alerts(order_id);
+"""
+
 
 def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SESSIONS_DDL)
@@ -477,6 +487,7 @@ def _add_missing_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(_SHARE_DDL)
     conn.executescript(_FNB_VOUCHERS_DDL)
     conn.executescript(_SYSTEM_KV_DDL)
+    conn.executescript(_TELEGRAM_ALERTS_DDL)
 
 
 def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) -> None:
@@ -826,6 +837,33 @@ def get_order(conn: sqlite3.Connection, order_id: str) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM orders WHERE order_id=?", (order_id,)).fetchone()
 
 
+def should_notify_telegram_order(conn: sqlite3.Connection, order_id: str, status: str) -> bool:
+    """True if this (order_id, status) has NEVER been recorded as notified to Telegram."""
+    if not order_id or not status:
+        return False
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM telegram_order_alerts WHERE order_id=? AND status=?",
+            (str(order_id), str(status)),
+        ).fetchone()
+        return row is None
+    except Exception:
+        return True
+
+
+def record_telegram_order_notified(conn: sqlite3.Connection, order_id: str, status: str) -> None:
+    """Mark this (order_id, status) as notified in the database."""
+    if not order_id or not status:
+        return
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO telegram_order_alerts (order_id, status, notified_at) VALUES (?, ?, ?)",
+            (str(order_id), str(status), now()),
+        )
+    except Exception:
+        pass
+
+
 def add_order(
     conn: sqlite3.Connection,
     order_id: str,
@@ -852,23 +890,25 @@ def add_order(
             (CONVERTED, request_id, PENDING),
         )
 
-    # Dispatch notification to DP Business Telegram group
+    # Dispatch notification to DP Business Telegram group ONLY if never notified
     try:
         from ..core import telegram_alerts
-        customer_name = None
-        if customer_id:
-            row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (customer_id,)).fetchone()
-            if row and row[0]:
-                customer_name = row[0]
-        telegram_alerts.notify_new_order_received(
-            order_id=order_id,
-            platform=platform,
-            customer_id=customer_id,
-            customer_name=customer_name,
-            order_value=order_value,
-            estimated_commission=estimated_commission,
-            order_time=order_time,
-        )
+        if should_notify_telegram_order(conn, order_id, AWAITING_APPROVAL):
+            record_telegram_order_notified(conn, order_id, AWAITING_APPROVAL)
+            customer_name = None
+            if customer_id:
+                row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (customer_id,)).fetchone()
+                if row and row[0]:
+                    customer_name = row[0]
+            telegram_alerts.notify_new_order_received(
+                order_id=order_id,
+                platform=platform,
+                customer_id=customer_id,
+                customer_name=customer_name,
+                order_value=order_value,
+                estimated_commission=estimated_commission,
+                order_time=order_time,
+            )
     except Exception:
         pass
 
@@ -910,22 +950,24 @@ def mark_approved(
     )
     try:
         from ..core import telegram_alerts
-        customer_name = None
-        cid = row["customer_id"]
-        if cid:
-            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
-            if c_row and c_row[0]:
-                customer_name = c_row[0]
-        telegram_alerts.notify_order_approved(
-            order_id=order_id,
-            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
-            customer_id=cid,
-            customer_name=customer_name,
-            order_value=row["order_value"],
-            approved_commission=approved_commission,
-            cashback_amount=cashback_amount,
-            order_time=row["recorded_at"],
-        )
+        if should_notify_telegram_order(conn, order_id, APPROVED):
+            record_telegram_order_notified(conn, order_id, APPROVED)
+            customer_name = None
+            cid = row["customer_id"]
+            if cid:
+                c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+                if c_row and c_row[0]:
+                    customer_name = c_row[0]
+            telegram_alerts.notify_order_approved(
+                order_id=order_id,
+                platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+                customer_id=cid,
+                customer_name=customer_name,
+                order_value=row["order_value"],
+                approved_commission=approved_commission,
+                cashback_amount=cashback_amount,
+                order_time=row["recorded_at"],
+            )
     except Exception:
         pass
     return True
@@ -944,21 +986,23 @@ def mark_rejected(conn: sqlite3.Connection, order_id: str, reason: str) -> bool:
     _record_transition(conn, order_id, row["status"], REJECTED, reason)
     try:
         from ..core import telegram_alerts
-        customer_name = None
-        cid = row["customer_id"]
-        if cid:
-            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
-            if c_row and c_row[0]:
-                customer_name = c_row[0]
-        telegram_alerts.notify_order_rejected(
-            order_id=order_id,
-            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
-            customer_id=cid,
-            customer_name=customer_name,
-            order_value=row["order_value"],
-            reason=reason,
-            order_time=row["recorded_at"],
-        )
+        if should_notify_telegram_order(conn, order_id, REJECTED):
+            record_telegram_order_notified(conn, order_id, REJECTED)
+            customer_name = None
+            cid = row["customer_id"]
+            if cid:
+                c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+                if c_row and c_row[0]:
+                    customer_name = c_row[0]
+            telegram_alerts.notify_order_rejected(
+                order_id=order_id,
+                platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+                customer_id=cid,
+                customer_name=customer_name,
+                order_value=row["order_value"],
+                reason=reason,
+                order_time=row["recorded_at"],
+            )
     except Exception:
         pass
     return True
@@ -983,21 +1027,23 @@ def mark_paid(conn: sqlite3.Connection, order_id: str, note: str = "") -> bool:
     campaigns.settle(conn, order_id)
     try:
         from ..core import telegram_alerts
-        customer_name = None
-        cid = row["customer_id"]
-        if cid:
-            c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
-            if c_row and c_row[0]:
-                customer_name = c_row[0]
-        telegram_alerts.notify_order_paid(
-            order_id=order_id,
-            platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
-            customer_id=cid,
-            customer_name=customer_name,
-            cashback_amount=row["cashback_amount"],
-            order_time=row["recorded_at"],
-            note=note,
-        )
+        if should_notify_telegram_order(conn, order_id, PAID):
+            record_telegram_order_notified(conn, order_id, PAID)
+            customer_name = None
+            cid = row["customer_id"]
+            if cid:
+                c_row = conn.execute("SELECT display_name FROM customers WHERE customer_id=?", (cid,)).fetchone()
+                if c_row and c_row[0]:
+                    customer_name = c_row[0]
+            telegram_alerts.notify_order_paid(
+                order_id=order_id,
+                platform=(row["platform"] if "platform" in row.keys() and row["platform"] else "shopee"),
+                customer_id=cid,
+                customer_name=customer_name,
+                cashback_amount=row["cashback_amount"],
+                order_time=row["recorded_at"],
+                note=note,
+            )
     except Exception:
         pass
     return True

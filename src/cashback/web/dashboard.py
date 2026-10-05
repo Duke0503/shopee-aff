@@ -3420,8 +3420,17 @@ class _Handler(BaseHTTPRequestHandler):
             )
             return self._json({"ok": True})
         elif alert_type == "new_order":
+            oid = body.get("order_id", "")
+            if self.db_path and oid:
+                try:
+                    with ledger.connect(self.db_path) as conn:
+                        if not ledger.should_notify_telegram_order(conn, oid, ledger.AWAITING_APPROVAL):
+                            return self._json({"ok": True, "suppressed": True})
+                        ledger.record_telegram_order_notified(conn, oid, ledger.AWAITING_APPROVAL)
+                except Exception:
+                    pass
             telegram_alerts.notify_new_order_received(
-                order_id=body.get("order_id", ""),
+                order_id=oid,
                 platform=body.get("platform", "shopee"),
                 customer_id=body.get("customer_id"),
                 customer_name=body.get("customer_name"),
@@ -3432,8 +3441,17 @@ class _Handler(BaseHTTPRequestHandler):
             )
             return self._json({"ok": True})
         elif alert_type == "order_approved":
+            oid = body.get("order_id", "")
+            if self.db_path and oid:
+                try:
+                    with ledger.connect(self.db_path) as conn:
+                        if not ledger.should_notify_telegram_order(conn, oid, ledger.APPROVED):
+                            return self._json({"ok": True, "suppressed": True})
+                        ledger.record_telegram_order_notified(conn, oid, ledger.APPROVED)
+                except Exception:
+                    pass
             telegram_alerts.notify_order_approved(
-                order_id=body.get("order_id", ""),
+                order_id=oid,
                 platform=body.get("platform", "shopee"),
                 customer_id=body.get("customer_id"),
                 customer_name=body.get("customer_name"),
@@ -3444,8 +3462,17 @@ class _Handler(BaseHTTPRequestHandler):
             )
             return self._json({"ok": True})
         elif alert_type == "order_rejected":
+            oid = body.get("order_id", "")
+            if self.db_path and oid:
+                try:
+                    with ledger.connect(self.db_path) as conn:
+                        if not ledger.should_notify_telegram_order(conn, oid, ledger.REJECTED):
+                            return self._json({"ok": True, "suppressed": True})
+                        ledger.record_telegram_order_notified(conn, oid, ledger.REJECTED)
+                except Exception:
+                    pass
             telegram_alerts.notify_order_rejected(
-                order_id=body.get("order_id", ""),
+                order_id=oid,
                 platform=body.get("platform", "shopee"),
                 customer_id=body.get("customer_id"),
                 customer_name=body.get("customer_name"),
@@ -3455,8 +3482,17 @@ class _Handler(BaseHTTPRequestHandler):
             )
             return self._json({"ok": True})
         elif alert_type == "order_paid":
+            oid = body.get("order_id", "")
+            if self.db_path and oid:
+                try:
+                    with ledger.connect(self.db_path) as conn:
+                        if not ledger.should_notify_telegram_order(conn, oid, ledger.PAID):
+                            return self._json({"ok": True, "suppressed": True})
+                        ledger.record_telegram_order_notified(conn, oid, ledger.PAID)
+                except Exception:
+                    pass
             telegram_alerts.notify_order_paid(
-                order_id=body.get("order_id", ""),
+                order_id=oid,
                 platform=body.get("platform", "shopee"),
                 customer_id=body.get("customer_id"),
                 customer_name=body.get("customer_name"),

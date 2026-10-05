@@ -374,6 +374,21 @@ def _format_datetime(val: str | datetime | None) -> str:
     return val_str
 
 
+_notified_order_fingerprints: set[str] = set()
+
+
+def is_order_alert_duplicate(order_id: str, status: str) -> bool:
+    """Return True if this (order_id, status) alert was already sent in this process."""
+    if not order_id or not status:
+        return False
+    key = f"{str(order_id).strip().upper()}:{str(status).strip().lower()}"
+    with _lock:
+        if key in _notified_order_fingerprints:
+            return True
+        _notified_order_fingerprints.add(key)
+        return False
+
+
 def notify_new_order_received(
     order_id: str,
     platform: str,
@@ -385,6 +400,10 @@ def notify_new_order_received(
     order_time: str | None = None,
 ) -> bool:
     """Notify DP Business group about a new order recorded."""
+    if is_order_alert_duplicate(order_id, "awaiting_approval"):
+        log.info(f"[telegram_alerts] Suppressed duplicate alert for order {order_id} (awaiting_approval)")
+        return False
+
     sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
     order_time_str = _format_datetime(order_time) if order_time else sync_time_str
 
@@ -439,6 +458,10 @@ def notify_order_approved(
     order_time: str | None = None,
 ) -> bool:
     """Notify DP Business group about an order being approved."""
+    if is_order_alert_duplicate(order_id, "approved"):
+        log.info(f"[telegram_alerts] Suppressed duplicate alert for order {order_id} (approved)")
+        return False
+
     sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
     order_time_str = _format_datetime(order_time) if order_time else sync_time_str
 
@@ -489,6 +512,10 @@ def notify_order_rejected(
     order_time: str | None = None,
 ) -> bool:
     """Notify DP Business group about an order being cancelled or rejected."""
+    if is_order_alert_duplicate(order_id, "rejected"):
+        log.info(f"[telegram_alerts] Suppressed duplicate alert for order {order_id} (rejected)")
+        return False
+
     sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
     order_time_str = _format_datetime(order_time) if order_time else sync_time_str
 
@@ -536,6 +563,10 @@ def notify_order_paid(
     note: str = "",
 ) -> bool:
     """Notify DP Business group when an order is paid / cashback transferred."""
+    if is_order_alert_duplicate(order_id, "paid"):
+        log.info(f"[telegram_alerts] Suppressed duplicate alert for order {order_id} (paid)")
+        return False
+
     sync_time_str = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
     order_time_str = _format_datetime(order_time) if order_time else sync_time_str
 
