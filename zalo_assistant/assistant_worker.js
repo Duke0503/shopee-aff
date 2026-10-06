@@ -522,9 +522,38 @@ function extractTextAndUrls(data) {
 
   // Bộ nhớ đệm RAM (Level-1 Cache) lưu sản phẩm trong 12 tiếng để phản hồi tức thì 0.001s
   const memoryProductCache = new Map(); // key: item_id, val: { data, cachedAt }
+  const inflightLinks = new Map(); // key: `${threadId}:${url}` -> Promise
+  const recentLinkDebounce = new Map(); // key: `${threadId}:${url}` -> timestamp
 
   // 3. Helper xử lý link Shopee & TikTok Shop (Áp dụng Smart Resolve đa sàn + Cache RAM + DB SQLite)
   async function handleProductLink(rawUrl, threadId, threadType, senderName, senderUid, customerId = null) {
+    const lockKey = `${threadId || senderUid}:${rawUrl}`;
+    const now = Date.now();
+    const lastSeen = recentLinkDebounce.get(lockKey);
+    if (lastSeen && now - lastSeen < 6000) {
+      console.log(`[Link Debounce] Bỏ qua yêu cầu gửi trùng trong 6s: ${rawUrl}`);
+      return;
+    }
+    if (inflightLinks.has(lockKey)) {
+      console.log(`[Link Inflight] Yêu cầu chuyển đổi link đang xử lý, đợi hoàn tất: ${rawUrl}`);
+      return await inflightLinks.get(lockKey);
+    }
+
+    const processPromise = (async () => {
+      return await _executeHandleProductLink(rawUrl, threadId, threadType, senderName, senderUid, customerId);
+    })();
+
+    inflightLinks.set(lockKey, processPromise);
+    try {
+      const res = await processPromise;
+      recentLinkDebounce.set(lockKey, Date.now());
+      return res;
+    } finally {
+      inflightLinks.delete(lockKey);
+    }
+  }
+
+  async function _executeHandleProductLink(rawUrl, threadId, threadType, senderName, senderUid, customerId = null) {
     try {
       const isTikTok = TIKTOK_LINK_REGEX.test(rawUrl);
       const isLazada = LAZADA_LINK_REGEX.test(rawUrl);
@@ -610,11 +639,41 @@ function extractTextAndUrls(data) {
               console.log(`[${platformLabel} Link] Đã tạo thành công link Affiliate sau ${((i + 1) * 0.8).toFixed(1)}s: ${affUrl}`);
               break;
             }
-          } catch (_) {}
+          } catch (pollErr) {
+            if (i % 10 === 0) {
+              console.warn(`[${platformLabel} Link Poll Error] Lỗi kiểm tra link-status: ${pollErr?.message || pollErr}`);
+            }
+          }
         }
       }
 
-      // Nếu sau thời gian chờ vẫn không có link Affiliate, TUYỆT ĐỐI KHÔNG gửi link gốc rawUrl
+      // Nếu sau thời gian chờ vẫn chưa có link: Kiểm tra smart-resolve một lần cuối cùng
+      // (phòng trường hợp worker vừa hoàn thành hoặc link-status gặp sự cố mạng tạm thời)
+      if (!affUrl) {
+        try {
+          const finalCheck = await fetch(`${config.MAIN_API_URL}/api/shopee/smart-resolve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: rawUrl,
+              customer_id: effectiveCustomerId,
+              display_name: senderName,
+              channel: threadType === ThreadType.Group ? "zalo_group" : "zalo_dm",
+              max_age_hours: 12
+            }),
+          }).then((r) => r.json()).catch(() => null);
+          if (finalCheck && finalCheck.ok && finalCheck.ready && finalCheck.affiliate_url) {
+            affUrl = finalCheck.affiliate_url;
+            productData = { ...(productData || {}), ...finalCheck };
+            if (finalCheck.is_group_order || resolveRes?.is_group_order) {
+              productData.is_group_order = true;
+            }
+            console.log(`[${platformLabel} Link] Thu hồi link thành công ở bước kiểm tra cuối: ${affUrl}`);
+          }
+        } catch (_) {}
+      }
+
+      // Nếu sau tất cả các bước vẫn không có link Affiliate, TUYỆT ĐỐI KHÔNG gửi link gốc rawUrl
       if (!affUrl) {
         console.warn(`[${platformLabel} Link] Không lấy được link affiliate cho: ${rawUrl}`);
         const busyMsg =
