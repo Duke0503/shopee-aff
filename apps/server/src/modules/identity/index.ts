@@ -9,5 +9,7 @@ export * from "./domain/order-eligibility";
 export * from "./domain/forget-customer";
 export * from "./domain/owed-amount.port";
 export * from "./domain/session-cookie";
+export * from "./application/sign-in.use-case";
+export * from "./application/register-from-zalo.use-case";
 export * from "./infrastructure/customer.repository";
 export * from "./infrastructure/session.repository";
