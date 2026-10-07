@@ -6,3 +6,4 @@ export * from "./infrastructure/shop-hosts";
 export * from "./infrastructure/link-request.repository";
 export * from "./providers/base.provider";
 export * from "./providers/provider.registry";
+export * from "./providers/shopee.provider";
