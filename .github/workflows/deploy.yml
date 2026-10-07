@@ -96,12 +96,12 @@ jobs:
             $shortSha = if ($env:SHA) { $env:SHA.Substring(0, 7) } else { "latest" }
             $cleanMsg = if ($env:COMMIT_MSG) { $env:COMMIT_MSG.Split("`n")[0] } else { "Deploy tu dong" }
             
-            $msg = "🚀 <b>[CI/CD DEPLOY THÀNH CÔNG]</b>`n`n" +
-                   "📦 <b>Nhánh:</b> <code>main</code>`n" +
-                   "📝 <b>Commit:</b> <code>$shortSha</code> - $cleanMsg`n" +
-                   "👤 <b>Tác giả:</b> $env:ACTOR`n" +
-                   "⏱ <b>Thời gian:</b> $(Get-Date -Format 'HH:mm:ss dd/MM/yyyy')`n`n" +
-                   "✅ <i>Mã nguồn trên VPS đã được tự động cập nhật và nạp lại dịch vụ mới nhất!</i>"
+            $msg = "[CI/CD DEPLOY THANH CONG]`n`n" +
+                   "Nhanh: main`n" +
+                   "Commit: $shortSha - $cleanMsg`n" +
+                   "Tac gia: $env:ACTOR`n" +
+                   "Thoi gian: $(Get-Date -Format 'HH:mm:ss dd/MM/yyyy')`n`n" +
+                   "Ma nguon tren VPS da duoc cap nhat va nap lai dich vu moi nhat!"
             
             $envPath = "C:\Project\mmo\.env"
             if (Test-Path $envPath) {
