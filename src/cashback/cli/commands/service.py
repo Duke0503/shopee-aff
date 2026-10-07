@@ -23,19 +23,37 @@ PAYOUT_WINDOW_TEXT = messages.render("payout_window")
 NOTIFY_INTERVAL_SECONDS = 10
 
 
+def _open_bridge(cfg: Config, args: argparse.Namespace):
+    """Return (bridge, server).
+
+    Normally we serve the local bridge ourselves. With --no-bridge we do NOT
+    bind the port: we talk to the bridge that is already running (from Phase 3
+    the new Node server owns 8787). `server` is None in that case, so callers
+    must guard any shutdown.
+    """
+    from ...shopee.browser_bridge import HttpBridge, serve_in_background
+
+    port = args.port or cfg.bridge_port
+    if getattr(args, "no_bridge", False):
+        return HttpBridge(port, cfg.bridge_token), None
+    bridge = _bridge_for(cfg)
+    return bridge, serve_in_background(bridge, port)
+
+
 def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     from ...worker import runner as worker
-    from ...shopee.browser_bridge import serve_in_background
     from ...worker.batch_queue import BatchSettings
 
     if not cfg.bridge_token:
         print("BRIDGE_TOKEN is empty. Run: cashback setup-token")
         return 1
 
-    bridge = _bridge_for(cfg)
-    server = serve_in_background(bridge, args.port or cfg.bridge_port)
-    print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}. "
-          "Waiting for the extension...")
+    bridge, server = _open_bridge(cfg, args)
+    port = args.port or cfg.bridge_port
+    if server:
+        print(f"Bridge up on 127.0.0.1:{port}. Waiting for the extension...")
+    else:
+        print(f"Using the bridge already on 127.0.0.1:{port}.")
 
     # A late extension is not a reason to take the whole bot down. After a
     # restart it can take a poll cycle to notice the bridge is back, and
@@ -57,7 +75,8 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     try:
         worker.loop(cfg.db_path, bridge, settings, cfg.link_attribution_days)
     finally:
-        server.shutdown()
+        if server:
+            server.shutdown()
     return 0
 
 
@@ -80,7 +99,6 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     from ...worker import runner as worker
     from ...messaging import notifications
     from ...messaging.assistant_bridge import AssistantSender
-    from ...shopee.browser_bridge import serve_in_background
     from ...worker.batch_queue import BatchSettings
 
     if not cfg.bridge_token:
@@ -99,8 +117,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
     ledger.initialise(cfg.db_path)
 
     stop = threading.Event()
-    bridge = _bridge_for(cfg)
-    server = serve_in_background(bridge, args.port or cfg.bridge_port)
+    bridge, server = _open_bridge(cfg, args)
 
     dashboard_server = None
     if not args.no_dashboard:
@@ -109,7 +126,10 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
             cfg, port=args.dashboard_port or cfg.dashboard_port)
         print("Payout page on http://127.0.0.1:"
               f"{args.dashboard_port or cfg.dashboard_port}")
-    print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}.")
+    if server:
+        print(f"Bridge up on 127.0.0.1:{args.port or cfg.bridge_port}.")
+    else:
+        print(f"Using the bridge already on 127.0.0.1:{args.port or cfg.bridge_port}.")
 
     if not args.no_browser:
         print("Waiting for the extension...")
@@ -357,5 +377,6 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
         print("\nStopping...")
     finally:
         stop.set()
-        server.shutdown()
+        if server:
+            server.shutdown()
     return 0

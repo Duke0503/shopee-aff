@@ -181,6 +181,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--window", type=int, default=None, help="batch window seconds")
     p.add_argument("--max-size", type=int, default=None)
     p.add_argument("--connect-timeout", type=int, default=45)
+    p.add_argument(
+        "--no-bridge", action="store_true",
+        help="do not serve the local bridge; use the one already on BRIDGE_PORT"
+    )
 
     p = sub.add_parser(
         "serve", help="run everything: links, notifications, payout page"
@@ -202,6 +206,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--no-dashboard", action="store_true",
         help="do not serve the payout page"
+    )
+    p.add_argument(
+        "--no-bridge", action="store_true",
+        help="do not serve the local bridge; use the one already on BRIDGE_PORT"
     )
 
     p = sub.add_parser(

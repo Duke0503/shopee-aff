@@ -13,6 +13,7 @@ was quoted, and rewriting them after the fact would change history.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from dataclasses import dataclass

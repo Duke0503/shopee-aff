@@ -1,0 +1,31 @@
+{
+  "rule": "commission_estimate",
+  "source": "src/cashback/shopee/commission.py::_build",
+  "cases": [
+    {
+      "name": "5,290,000d at 7% + 3% is 198,700d with the cap (would be 529,000d without)",
+      "input": { "price": 5290000, "shopee_rate": 7, "seller_rate": 3 },
+      "expected": {
+        "commission": 198700,
+        "shopee_part": 40000,
+        "seller_part": 158700,
+        "is_capped": true
+      }
+    },
+    {
+      "name": "below the cap, no XTRA part",
+      "input": { "price": 100000, "shopee_rate": 5, "seller_rate": 0 },
+      "expected": { "commission": 5000, "shopee_part": 5000, "seller_part": 0, "is_capped": false }
+    },
+    {
+      "name": "Shopee part exactly at the cap is not flagged as capped",
+      "input": { "price": 400000, "shopee_rate": 10, "seller_rate": 0 },
+      "expected": {
+        "commission": 40000,
+        "shopee_part": 40000,
+        "seller_part": 0,
+        "is_capped": false
+      }
+    }
+  ]
+}

@@ -41,7 +41,7 @@ class TestFilling:
         _request(conn)
         [r] = product_backfill.run(conn, apply=True, only_ordered=False, pause_seconds=0,
                                    resolve=lambda url: LONG,
-                                   look_up=lambda url, third_party: _estimate())
+                                   look_up=lambda url, third_party, api_key="": _estimate())
         assert r.source == "lookup"
         detail = _detail(conn)
         assert detail["image_url"] == "https://cf.shopee.vn/pic.jpg"
@@ -51,7 +51,7 @@ class TestFilling:
         _request(conn)
         product_backfill.run(conn, apply=True, only_ordered=False, pause_seconds=0,
                              resolve=lambda url: LONG,
-                             look_up=lambda url, third_party: _estimate())
+                             look_up=lambda url, third_party, api_key="": _estimate())
         detail = _detail(conn)
         assert detail["commission"] == 5000
         assert detail["name"] == "Chuot"
@@ -63,7 +63,7 @@ class TestFilling:
         ledger.upsert_product_cache(conn, item_id="10096389022", name="Chuot",
                                     price=1, image_url="https://cf/c.jpg")
 
-        def must_not_look_up(url, third_party):
+        def must_not_look_up(url, third_party, api_key=""):
             raise AssertionError("looked up a product already cached")
 
         [r] = product_backfill.run(conn, apply=True, only_ordered=False, pause_seconds=0,
@@ -74,7 +74,7 @@ class TestFilling:
         _request(conn)
         product_backfill.run(conn, apply=True, only_ordered=False, pause_seconds=0,
                              resolve=lambda url: LONG,
-                             look_up=lambda url, third_party: _estimate())
+                             look_up=lambda url, third_party, api_key="": _estimate())
         cached = ledger.get_product_cache(conn, "10096389022")
         assert cached["image_url"] and not cached["affiliate_url"]
 
@@ -84,14 +84,14 @@ class TestFilling:
                                     price=84_600_000, is_capped=True)
         product_backfill.run(conn, apply=True, only_ordered=False, pause_seconds=0,
                              resolve=lambda url: LONG,
-                             look_up=lambda url, third_party: _estimate())
+                             look_up=lambda url, third_party, api_key="": _estimate())
         assert ledger.get_product_cache(conn, "10096389022")["is_capped"] == 1
 
     def test_a_dry_run_writes_nothing(self, conn):
         _request(conn)
         product_backfill.run(conn, apply=False, only_ordered=False, pause_seconds=0,
                              resolve=lambda url: LONG,
-                             look_up=lambda url, third_party: _estimate())
+                             look_up=lambda url, third_party, api_key="": _estimate())
         assert "image_url" not in _detail(conn)
         assert ledger.get_product_cache(conn, "10096389022") is None
 

@@ -1,0 +1,34 @@
+# Caddyfile — migration path router (ADR-15).
+#
+# Two listeners, both on 127.0.0.1 only. Nothing here faces the internet
+# directly; the Cloudflare tunnel is the only way in, and it points at 8899.
+#
+#   8899  public side   -> the tunnel. Internal addresses are refused (404).
+#   8898  internal side -> the Zalo assistant only. Never a tunnel target.
+#
+# During the migration BOTH sides forward to the old Python server (8900).
+# Each phase moves addresses to the new server by editing the handlers below;
+# that one edit is also the rollback.
+{
+	admin off
+	auto_https off
+}
+
+# Public side: what customers and admins reach through the tunnel.
+http://127.0.0.1:8899 {
+	# Internal addresses must never be reachable from the internet.
+	@internal path /api/bot/* /api/notify /api/alerts/* /api/activity/* /api/campaigns/offer
+	handle @internal {
+		respond 404
+	}
+
+	# Everything else: Python for now. Phases 2-5 move paths to 8901.
+	handle {
+		reverse_proxy 127.0.0.1:8900
+	}
+}
+
+# Internal side: the assistant calls this one address and never changes it.
+http://127.0.0.1:8898 {
+	reverse_proxy 127.0.0.1:8900
+}

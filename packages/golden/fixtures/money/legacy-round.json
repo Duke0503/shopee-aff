@@ -1,0 +1,16 @@
+{
+  "rule": "legacy_round_half_even",
+  "source": "python built-in round() as used inside core/policy.py::split_commission",
+  "cases": [
+    { "name": "122.5 (fee for 12,500) goes to even 122", "input": { "value": 122.5 }, "expected": 122 },
+    {
+      "name": "1234.5 (tax for 12,345) goes to even 1234",
+      "input": { "value": 1234.5 },
+      "expected": 1234
+    },
+    { "name": "123.5 goes to even 124", "input": { "value": 123.5 }, "expected": 124 },
+    { "name": "117.6 goes to 118", "input": { "value": 117.6 }, "expected": 118 },
+    { "name": "120.981 goes to 121", "input": { "value": 120.981 }, "expected": 121 },
+    { "name": "1250 stays 1250", "input": { "value": 1250 }, "expected": 1250 }
+  ]
+}

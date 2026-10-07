@@ -1,0 +1,106 @@
+{
+  "rule": "split_commission",
+  "source": "src/cashback/core/policy.py::split_commission",
+  "cases": [
+    {
+      "name": "normal period, 12,000d approved, 80%",
+      "input": {
+        "approved_commission": 12000,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": false
+      },
+      "expected": {
+        "service_fee": 118,
+        "withheld_tax": 0,
+        "customer_receives": 9506,
+        "operator_keeps": 2376
+      }
+    },
+    {
+      "name": "withheld period, 12,000d approved, 80%",
+      "input": {
+        "approved_commission": 12000,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": true
+      },
+      "expected": {
+        "service_fee": 118,
+        "withheld_tax": 1200,
+        "customer_receives": 8546,
+        "operator_keeps": 2136
+      }
+    },
+    {
+      "name": "withheld period, 12,345d — tax rounds a half to even (1,234)",
+      "input": {
+        "approved_commission": 12345,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": true
+      },
+      "expected": {
+        "service_fee": 121,
+        "withheld_tax": 1234,
+        "customer_receives": 8792,
+        "operator_keeps": 2198
+      }
+    },
+    {
+      "name": "normal period, 12,345d",
+      "input": {
+        "approved_commission": 12345,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": false
+      },
+      "expected": {
+        "service_fee": 121,
+        "withheld_tax": 0,
+        "customer_receives": 9779,
+        "operator_keeps": 2445
+      }
+    },
+    {
+      "name": "withheld period, 12,500d — fee rounds a half to even (122)",
+      "input": {
+        "approved_commission": 12500,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": true
+      },
+      "expected": {
+        "service_fee": 122,
+        "withheld_tax": 1250,
+        "customer_receives": 8902,
+        "operator_keeps": 2226
+      }
+    },
+    {
+      "name": "owner_absorbs gives the same result as user_absorbs (known deviation)",
+      "input": {
+        "approved_commission": 12000,
+        "cashback_rate": 0.8,
+        "tax_policy": "owner_absorbs",
+        "period_is_withheld": true
+      },
+      "expected": {
+        "service_fee": 118,
+        "withheld_tax": 1200,
+        "customer_receives": 8546,
+        "operator_keeps": 2136
+      }
+    },
+    {
+      "name": "zero commission splits to all zeros",
+      "input": {
+        "approved_commission": 0,
+        "cashback_rate": 0.8,
+        "tax_policy": "user_absorbs",
+        "period_is_withheld": true
+      },
+      "expected": { "service_fee": 0, "withheld_tax": 0, "customer_receives": 0, "operator_keeps": 0 }
+    }
+  ]
+}
