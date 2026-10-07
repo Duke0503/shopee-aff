@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { Db } from "../../../shared/database/connection";
 import { orders, stateHistory } from "../../../shared/database/schema";
@@ -116,4 +116,18 @@ export function markPaid(db: Db, orderId: string, nowIso: string): void {
     .where(eq(orders.orderId, orderId))
     .run();
   appendHistory(db, orderId, statusOf(order), PAID, nowIso, "paid");
+}
+
+/** Orders, newest purchase first, optionally filtered. */
+export function listOrders(
+  db: Db,
+  filter: { customerId?: string; status?: OrderStatus } = {},
+) {
+  const conditions = [];
+  if (filter.customerId) conditions.push(eq(orders.customerId, filter.customerId));
+  if (filter.status) conditions.push(eq(orders.status, filter.status));
+
+  const base = db.select().from(orders);
+  const rows = conditions.length > 0 ? base.where(and(...conditions)).all() : base.all();
+  return rows.sort((a, b) => (b.recordedAt ?? "").localeCompare(a.recordedAt ?? ""));
 }

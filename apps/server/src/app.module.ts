@@ -2,14 +2,15 @@ import { Module } from "@nestjs/common";
 
 import { IdentityModule } from "./modules/identity/identity.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
+import { OrdersModule } from "./modules/orders/orders.module";
 import { HealthController } from "./shared/health.controller";
 
 /**
- * Root module. Identity first, then Ledger (payouts) — the business modules
- * plug in here as each area moves.
+ * Root module. Each business area plugs in here as it moves: Identity,
+ * Orders, Ledger. Affiliate follows in Phase 3.
  */
 @Module({
-  imports: [IdentityModule, LedgerModule],
+  imports: [IdentityModule, OrdersModule, LedgerModule],
   controllers: [HealthController],
 })
 export class AppModule {}
