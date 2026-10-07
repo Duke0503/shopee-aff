@@ -95,29 +95,24 @@ jobs:
         shell: powershell
         run: |
           try {
-            $shortSha = if ($env:SHA) { $env:SHA.Substring(0, 7) } else { "latest" }
-            $cleanMsg = if ($env:COMMIT_MSG) { $env:COMMIT_MSG.Split("`n")[0] } else { "Deploy tu dong" }
-            
-            $msg = "[CI/CD DEPLOY THANH CONG]`n`n" +
-                   "Nhanh: main`n" +
-                   "Commit: $shortSha - $cleanMsg`n" +
-                   "Tac gia: $env:ACTOR`n" +
-                   "Thoi gian: $(Get-Date -Format 'HH:mm:ss dd/MM/yyyy')`n`n" +
-                   "Ma nguon tren VPS da duoc cap nhat va nap lai dich vu moi nhat!"
-            
-            $envPath = "C:\Project\mmo\.env"
-            if (Test-Path $envPath) {
-                $botToken = ""
-                $devChatId = ""
-                Get-Content $envPath | ForEach-Object {
-                    if ($_ -match "^TELEGRAM_BOT_TOKEN=(.+)$") { $botToken = $Matches[1].Trim() }
-                    if ($_ -match "^TELEGRAM_DEV_CHAT_ID=(.+)$") { $devChatId = $Matches[1].Trim() }
-                    if (-not $devChatId -and $_ -match "^TELEGRAM_CHAT_ID=(.+)$") { $devChatId = $Matches[1].Trim() }
+            $uvCandidateDirs = @(
+                "$env:USERPROFILE\.local\bin",
+                "$env:USERPROFILE\.cargo\bin",
+                "$env:LOCALAPPDATA\Programs\uv",
+                "C:\Users\Administrator\.local\bin",
+                "C:\Users\Administrator\.cargo\bin",
+                "C:\Program Files\uv"
+            )
+            foreach ($dir in $uvCandidateDirs) {
+                if (Test-Path (Join-Path $dir "uv.exe")) {
+                    $env:Path = "$dir;$env:Path"
+                    break
                 }
-                if ($botToken -and $devChatId) {
-                    $body = @{ chat_id = $devChatId; text = $msg; parse_mode = "HTML" } | ConvertTo-Json
-                    Invoke-RestMethod -Uri "https://api.telegram.org/bot$botToken/sendMessage" -Method Post -ContentType "application/json" -Body $body | Out-Null
-                }
+            }
+            $prodDir = "C:\Project\mmo"
+            if (Test-Path "$prodDir\scripts\notify_deploy.py") {
+                Set-Location $prodDir
+                uv run python scripts/notify_deploy.py
             }
           } catch {
             Write-Host "Warning: Failed to send Telegram notification: $_"
