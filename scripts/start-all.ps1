@@ -62,6 +62,14 @@ function Stop-Port([int]$Port) {
 }
 
 function Start-Recorded([string]$Name, [string]$Command) {
+    $env:RUNNER_TRACKING_ID = ""
+    try {
+        $cim = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = "powershell.exe -NoExit -Command `"$Command`""}
+        if ($cim.ReturnValue -eq 0 -and $cim.ProcessId -gt 0) {
+            Set-Content -Path (Join-Path $PidDir "$Name.pid") -Value $cim.ProcessId
+            return
+        }
+    } catch {}
     $p = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", $Command -PassThru
     Set-Content -Path (Join-Path $PidDir "$Name.pid") -Value $p.Id
 }

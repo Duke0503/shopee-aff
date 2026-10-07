@@ -16,6 +16,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy & Sync to Production Directory
+        env:
+          RUNNER_TRACKING_ID: ""
         shell: powershell
         run: |
           # 0. Dam bao uv co trong PATH
