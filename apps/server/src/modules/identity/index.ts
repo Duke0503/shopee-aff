@@ -4,4 +4,8 @@ export * from "./domain/password-policy";
 export * from "./domain/password-hash";
 export * from "./domain/login-decision";
 export * from "./domain/merge-customers";
+export * from "./domain/bank-details";
+export * from "./domain/order-eligibility";
+export * from "./domain/forget-customer";
+export * from "./domain/owed-amount.port";
 export * from "./infrastructure/customer.repository";
