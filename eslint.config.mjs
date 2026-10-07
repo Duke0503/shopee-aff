@@ -34,10 +34,10 @@ const ROLES = [
 
 // check-file uses micromatch (glob/extglob), NOT regular expressions. The
 // tested name has its LAST extension stripped, e.g. "customer.repository".
-//   KEBAB      = one or more kebab-case words
-//   ?(.@(...)) = an optional dot plus exactly one allowed role suffix
+//   KEBAB       = one or more kebab-case words
+//   *(.@(...))  = zero or more dot-role segments, e.g. "customer.repository.spec"
 const KEBAB = "+([a-z])*([a-z0-9])*(-+([a-z0-9]))";
-const FILE_NAME_PATTERN = `${KEBAB}?(.@(${ROLES.join("|")}))`;
+const FILE_NAME_PATTERN = `${KEBAB}*(.@(${ROLES.join("|")}))`;
 
 const SIZE_400 = ["error", { max: 400, skipBlankLines: true, skipComments: true }];
 const SIZE_300 = ["error", { max: 300, skipBlankLines: true, skipComments: true }];
