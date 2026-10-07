@@ -74,12 +74,54 @@ Stop-Port 8891
 Start-Sleep -Seconds 1
 
 # 2. Kiem tra uv va dong bo moi truong Python
+$uvCandidateDirs = @(
+    "$env:USERPROFILE\.local\bin",
+    "$env:USERPROFILE\.cargo\bin",
+    "$env:LOCALAPPDATA\Programs\uv",
+    "C:\Users\Administrator\.local\bin",
+    "C:\Users\Administrator\.cargo\bin",
+    "C:\Program Files\uv"
+)
+foreach ($dir in $uvCandidateDirs) {
+    if (Test-Path (Join-Path $dir "uv.exe")) {
+        $env:Path = "$dir;$env:Path"
+        break
+    }
+}
+
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "[2/5] 'uv' chua duoc cai dat. Dang cai dat qua winget..." -ForegroundColor Yellow
     winget install --id astral-sh.uv --silent --accept-source-agreements --accept-package-agreements
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 } else {
     Write-Host "[2/5] Da tim thay 'uv'." -ForegroundColor Green
+}
+
+# Dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env
+$envFile = Join-Path $Root ".env"
+if (Test-Path $envFile) {
+    try {
+        $rawEnv = Get-Content $envFile -Raw
+        $changed = $false
+        if ($rawEnv -notmatch "ADDLIVETAG_API_KEY=") {
+            $rawEnv += "`r`nADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212"
+            $changed = $true
+        } elseif ($rawEnv -match "ADDLIVETAG_API_KEY=\s*(`r?`n|$)") {
+            $rawEnv = $rawEnv -replace "ADDLIVETAG_API_KEY=\s*(`r?`n|$)", "ADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212`$1"
+            $changed = $true
+        }
+        if ($rawEnv -notmatch "THIRD_PARTY_FALLBACK=") {
+            $rawEnv += "`r`nTHIRD_PARTY_FALLBACK=true"
+            $changed = $true
+        } elseif ($rawEnv -match "THIRD_PARTY_FALLBACK=\s*(false|0|no)") {
+            $rawEnv = $rawEnv -replace "THIRD_PARTY_FALLBACK=\s*(false|0|no)", "THIRD_PARTY_FALLBACK=true"
+            $changed = $true
+        }
+        if ($changed) {
+            Set-Content -Path $envFile -Value $rawEnv -NoNewline
+            Write-Host "  -> Da tu dong dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env" -ForegroundColor Green
+        }
+    } catch {}
 }
 
 # 3. Kiem tra token extension
@@ -95,7 +137,7 @@ Write-Host "[4/5] Dang khoi chay cac thanh phan he thong..." -ForegroundColor Cy
 
 # --- DICH VU 1: BACKEND CASHBACK SERVER (Port 8899 & Port 80) ---
 Write-Host "  [+] 1. Khoi chay Backend Cashback Server..." -ForegroundColor Green
-$BackendCmd = "Set-Location '$Root'; try { [System.Console]::Title = '[1] CASHBACK BACKEND (Port 8899 & 80)' } catch {}; Write-Host '=== CASHBACK BACKEND SERVER (Port 8899 & 80) ===' -ForegroundColor Green; uv run cashback serve"
+$BackendCmd = "`$env:Path = '$($env:Path.Replace("'", "''"))'; Set-Location '$Root'; try { [System.Console]::Title = '[1] CASHBACK BACKEND (Port 8899 & 80)' } catch {}; Write-Host '=== CASHBACK BACKEND SERVER (Port 8899 & 80) ===' -ForegroundColor Green; uv run cashback serve"
 Start-Recorded "backend" $BackendCmd
 
 Start-Sleep -Seconds 2

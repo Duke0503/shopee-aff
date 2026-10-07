@@ -4283,7 +4283,12 @@ class _Handler(BaseHTTPRequestHandler):
                         if not cached or not cached.get("name") or not cached.get("price"):
                             try:
                                 from ..shopee.commission import lookup
-                                est = lookup(src_url, bridge=self.bridge, third_party=False)
+                                est = lookup(
+                                    src_url,
+                                    bridge=self.bridge,
+                                    third_party=self.cfg.third_party_fallback,
+                                    api_key=self.cfg.addlivetag_api_key,
+                                )
                                 if est and est.price > 0:
                                     rate = self.cfg.advertised_cashback_rate
                                     raw_comm = est.commission

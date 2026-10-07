@@ -80,7 +80,11 @@ def fill(
         name, image, found_by = cached["name"] or "", cached["image_url"], "cache"
     else:
         target = target if parse_url(target) else f"https://shopee.vn/product/{shop_id}/{item_id}"
-        estimate = look_up(target, third_party=False)
+        estimate = look_up(
+            target,
+            third_party=os.getenv("THIRD_PARTY_FALLBACK", "true").lower() in ("1", "true", "yes"),
+            api_key=os.getenv("ADDLIVETAG_API_KEY", ""),
+        )
         if estimate is None or not getattr(estimate, "image_url", ""):
             return Filled(row["request_id"], item_id, "", "", "no picture from lookup")
         name, image, found_by = estimate.name or "", estimate.image_url, "lookup"

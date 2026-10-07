@@ -16,17 +16,58 @@ from ..core.policy import TaxPolicy
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
+DEFAULT_ADDLIVETAG_KEY = "621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212"
+
+
 def _load_dotenv() -> None:
-    """Minimal .env reader so the package needs no extra dependency."""
+    """Minimal .env reader and auto-migrator so configuration is consistently persisted."""
     path = PROJECT_ROOT / ".env"
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except Exception:
+        return
+
+    lines = raw_text.splitlines()
+    has_key = False
+    has_fallback = False
+    new_lines: list[str] = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
+            new_lines.append(raw_line)
             continue
         key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+        k_clean = key.strip()
+        v_clean = value.strip()
+        if k_clean == "THIRD_PARTY_FALLBACK":
+            has_fallback = True
+            new_lines.append("THIRD_PARTY_FALLBACK=true")
+            os.environ["THIRD_PARTY_FALLBACK"] = "true"
+        elif k_clean == "ADDLIVETAG_API_KEY":
+            has_key = True
+            val = v_clean if v_clean else DEFAULT_ADDLIVETAG_KEY
+            new_lines.append(f"ADDLIVETAG_API_KEY={val}")
+            os.environ["ADDLIVETAG_API_KEY"] = val
+        else:
+            new_lines.append(raw_line)
+            os.environ.setdefault(k_clean, v_clean)
+
+    if not has_fallback:
+        new_lines.append("THIRD_PARTY_FALLBACK=true")
+        os.environ["THIRD_PARTY_FALLBACK"] = "true"
+    if not has_key:
+        new_lines.append(f"ADDLIVETAG_API_KEY={DEFAULT_ADDLIVETAG_KEY}")
+        os.environ["ADDLIVETAG_API_KEY"] = DEFAULT_ADDLIVETAG_KEY
+
+    try:
+        updated_text = "\n".join(new_lines) + "\n"
+        if updated_text != raw_text:
+            path.write_text(updated_text, encoding="utf-8")
+    except Exception:
+        pass
 
 
 @dataclass(frozen=True)
@@ -168,7 +209,7 @@ def load() -> Config:
         batch_max_size=int(os.getenv("BATCH_MAX_SIZE", "20")),
         batch_min_gap_seconds=int(os.getenv("BATCH_MIN_GAP_SECONDS", "20")),
         third_party_fallback=os.getenv(
-            "THIRD_PARTY_FALLBACK", "false"
+            "THIRD_PARTY_FALLBACK", "true"
         ).strip().lower() in ("1", "true", "yes"),
         reconcile_interval_minutes=int(
             os.getenv("RECONCILE_INTERVAL_MINUTES", "60")),
@@ -180,7 +221,7 @@ def load() -> Config:
         accesstrade_base_url=os.getenv(
             "ACCESSTRADE_BASE_URL", "https://api.accesstrade.vn"
         ).strip(),
-        addlivetag_api_key=os.getenv("ADDLIVETAG_API_KEY", "").strip(),
+        addlivetag_api_key=(os.getenv("ADDLIVETAG_API_KEY", "").strip() or DEFAULT_ADDLIVETAG_KEY),
         backup_dir=Path(os.getenv("BACKUP_DIR", "./backups")),
         backup_keep=int(os.getenv("BACKUP_KEEP", "30")),
         backup_interval_hours=int(os.getenv("BACKUP_INTERVAL_HOURS", "24")),

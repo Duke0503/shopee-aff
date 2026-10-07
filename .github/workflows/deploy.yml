@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -17,6 +18,22 @@ jobs:
       - name: Deploy & Sync to Production Directory
         shell: powershell
         run: |
+          # 0. Dam bao uv co trong PATH
+          $uvCandidateDirs = @(
+              "$env:USERPROFILE\.local\bin",
+              "$env:USERPROFILE\.cargo\bin",
+              "$env:LOCALAPPDATA\Programs\uv",
+              "C:\Users\Administrator\.local\bin",
+              "C:\Users\Administrator\.cargo\bin",
+              "C:\Program Files\uv"
+          )
+          foreach ($dir in $uvCandidateDirs) {
+              if (Test-Path (Join-Path $dir "uv.exe")) {
+                  $env:Path = "$dir;$env:Path"
+                  break
+              }
+          }
+
           $prodDir = "C:\Project\mmo"
           Write-Host ">>> [1/4] Kiem tra thu muc ung dung $prodDir..."
           if (Test-Path $prodDir) {
@@ -25,6 +42,31 @@ jobs:
             Write-Host ">>> [2/4] Dong bo ma nguon moi nhat tu Git..."
             git fetch origin main
             git reset --hard origin/main
+
+            # Dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env
+            $envFile = "$prodDir\.env"
+            if (Test-Path $envFile) {
+                $rawEnv = Get-Content $envFile -Raw
+                $changed = $false
+                if ($rawEnv -notmatch "ADDLIVETAG_API_KEY=") {
+                    $rawEnv += "`r`nADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212"
+                    $changed = $true
+                } elseif ($rawEnv -match "ADDLIVETAG_API_KEY=\s*(`r?`n|$)") {
+                    $rawEnv = $rawEnv -replace "ADDLIVETAG_API_KEY=\s*(`r?`n|$)", "ADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212`$1"
+                    $changed = $true
+                }
+                if ($rawEnv -notmatch "THIRD_PARTY_FALLBACK=") {
+                    $rawEnv += "`r`nTHIRD_PARTY_FALLBACK=true"
+                    $changed = $true
+                } elseif ($rawEnv -match "THIRD_PARTY_FALLBACK=\s*(false|0|no)") {
+                    $rawEnv = $rawEnv -replace "THIRD_PARTY_FALLBACK=\s*(false|0|no)", "THIRD_PARTY_FALLBACK=true"
+                    $changed = $true
+                }
+                if ($changed) {
+                    Set-Content -Path $envFile -Value $rawEnv -NoNewline
+                    Write-Host "  -> Da tu dong dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env" -ForegroundColor Green
+                }
+            }
             
             Write-Host ">>> [3/4] Cai dat va cap nhat goi thu vien (uv sync & npm install)..."
             uv sync

@@ -138,10 +138,9 @@ def lookup(url: str, timeout: float = TIMEOUT, api_key: str | None = None) -> Pr
     params: dict[str, str] = {"item_id": ids[1]} if ids else {"url": target}
     headers: dict[str, str] = {}
 
-    key = (api_key or os.getenv("ADDLIVETAG_API_KEY", "")).strip()
+    DEFAULT_KEY = "621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212"
+    key = (api_key or os.getenv("ADDLIVETAG_API_KEY", "")).strip() or DEFAULT_KEY
     if not key:
-        # addlivetag.com requires an API key since 2026-10-01.
-        # When no key is configured, do not make request or generate alert warnings.
         return None
 
     headers["X-API-Key"] = key
