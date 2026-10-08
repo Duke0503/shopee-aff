@@ -6,3 +6,4 @@ export * from "./bank-details";
 export * from "./pacer";
 export * from "./routing";
 export * from "./friend-requests";
+export * from "./handler";
