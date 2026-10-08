@@ -5,3 +5,4 @@ export * from "./commands";
 export * from "./bank-details";
 export * from "./pacer";
 export * from "./routing";
+export * from "./friend-requests";
