@@ -1,6 +1,6 @@
 import type { ApiOrder } from "@mmo/contracts";
 
-import type { BankDetails } from "./bank-details";
+import type { BankRead } from "./commands";
 import type { Reply } from "./handler";
 import { formatVnd, render, type Messages } from "./messages";
 
@@ -44,11 +44,11 @@ function ordersWorded(messages: Messages, orders: ApiOrder[], ctx: WordingContex
   };
 }
 
-function bankSavedWorded(details: BankDetails): WordedReply {
-  const name = [details.bankName, details.bankAccount, details.accountHolder]
-    .filter((part) => part !== "")
+/** How an account is written for the customer: "VCB - 123 - LAN". */
+function bankLine(bank: Pick<BankRead, "bankName" | "bankAccount" | "accountHolder">): string {
+  return [bank.bankName, bank.bankAccount, bank.accountHolder]
+    .filter((part): part is string => part !== null && part !== "")
     .join(" - ");
-  return { key: "bank_saved", values: { name } };
 }
 
 /** Which message-file key answers a reply, and with what values. */
@@ -76,12 +76,29 @@ export function wordingFor(
       return { key: "link_failed", values: {} };
     case "orders":
       return ordersWorded(messages, reply.orders, ctx);
-    case "bank_prompt":
-    case "bank_needs_details":
-    case "bank_unmatched":
-      return { key: "need_bank", values: {} };
+    case "account":
+      return {
+        key: "account_id",
+        values: { customer_id: reply.customerCode ?? reply.customerId, zalo_id: reply.customerId },
+      };
+    case "password":
+      return {
+        key: "password_issued",
+        values: {
+          customer_id: reply.customerCode ?? reply.customerId,
+          password: reply.password,
+        },
+      };
+    case "password_failed":
+      return { key: "password_failed", values: {} };
     case "bank_saved":
-      return bankSavedWorded(reply.details);
+      return { key: "bank_saved", values: { name: bankLine(reply.details) } };
+    case "bank_current":
+      return reply.bank.hasBank
+        ? { key: "bank_current", values: { name: bankLine(reply.bank) } }
+        : { key: "need_bank", values: {} };
+    case "bank_needs_details":
+      return { key: "need_bank", values: {} };
     case "unknown_command":
       return {
         key: "unknown_command",

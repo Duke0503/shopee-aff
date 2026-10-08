@@ -48,6 +48,33 @@ describe("createAssistantClient", () => {
     expect(JSON.parse(String(init.body))).toEqual(details);
   });
 
+  it("registers a person on first contact", async () => {
+    const fetchImpl = fakeFetch({ customerId: "999", customerCode: "DP00001", created: true });
+    const created = await createAssistantClient(fetchImpl, "", "tok").register({
+      zaloUserId: "999",
+      displayName: "New Person",
+    });
+    expect(created).toMatchObject({ customerId: "999", customerCode: "DP00001", created: true });
+    const [url, init] = callOf(fetchImpl);
+    expect(url).toBe("/internal/customers");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ zaloUserId: "999", displayName: "New Person" });
+  });
+
+  it("asks for a new password", async () => {
+    const fetchImpl = fakeFetch({ customerId: "C1", customerCode: "DP00012", password: "ABCDEFGH" });
+    const issued = await createAssistantClient(fetchImpl, "", "tok").issuePassword("DP00012");
+    expect(issued.password).toBe("ABCDEFGH");
+    expect(callOf(fetchImpl)[0]).toBe("/internal/customers/DP00012/password");
+  });
+
+  it("reads the saved bank details", async () => {
+    const fetchImpl = fakeFetch({ hasBank: true, bankName: "VCB", bankAccount: "123", accountHolder: "LAN" });
+    const bank = await createAssistantClient(fetchImpl, "", "tok").bank("DP00012");
+    expect(bank).toMatchObject({ hasBank: true, bankName: "VCB" });
+    expect(callOf(fetchImpl)[0]).toBe("/internal/customers/DP00012/bank");
+  });
+
   it("throws an ApiError when the token is rejected", async () => {
     const client = createAssistantClient(fakeFetch("nope", false, 401), "", "bad");
     await expect(client.balance("C1")).rejects.toBeInstanceOf(ApiError);

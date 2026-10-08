@@ -7,10 +7,28 @@ export interface AssistantCustomer {
   role: string;
 }
 
+export interface AssistantRegistration extends AssistantCustomer {
+  created: boolean;
+}
+
+export interface AssistantBank {
+  hasBank: boolean;
+  bankName: string | null;
+  bankAccount: string | null;
+  accountHolder: string | null;
+}
+
 export interface AssistantClient {
+  register(input: {
+    zaloUserId: string;
+    displayName?: string;
+    privateChatId?: string;
+  }): Promise<AssistantRegistration>;
   resolveCustomer(key: string): Promise<AssistantCustomer>;
   orders(key: string): Promise<ApiOrder[]>;
   balance(key: string): Promise<ApiBalance>;
+  bank(key: string): Promise<AssistantBank>;
+  issuePassword(key: string): Promise<AssistantCustomer & { password: string }>;
   saveBank(key: string, details: ApiBankDetails): Promise<{ ok: boolean }>;
 }
 
@@ -37,9 +55,20 @@ export function createAssistantClient(
   }
 
   return {
+    register: (input) =>
+      request<AssistantRegistration>("/internal/customers", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     resolveCustomer: (key) => request<AssistantCustomer>(`/internal/customers/${encode(key)}`),
     orders: (key) => request<ApiOrder[]>(`/internal/customers/${encode(key)}/orders`),
     balance: (key) => request<ApiBalance>(`/internal/customers/${encode(key)}/balance`),
+    bank: (key) => request<AssistantBank>(`/internal/customers/${encode(key)}/bank`),
+    issuePassword: (key) =>
+      request<AssistantCustomer & { password: string }>(
+        `/internal/customers/${encode(key)}/password`,
+        { method: "POST", body: "{}" },
+      ),
     saveBank: (key, details) =>
       request<{ ok: boolean }>(`/internal/customers/${encode(key)}/bank`, {
         method: "POST",

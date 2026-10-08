@@ -4,8 +4,21 @@ import { handleIncoming, type HandlerDeps, type IncomingMessage } from "../src/h
 const message = (text: string): IncomingMessage => ({ text, customerId: "C1", nowMs: 1000 });
 
 const deps = (over: Partial<HandlerDeps> = {}): HandlerDeps => ({
-  convert: async () => ({ ready: true, affiliate_url: "https://s.shopee.vn/aff", request_id: "R1", house: false }),
+  convert: async () => ({
+    ready: true,
+    affiliate_url: "https://s.shopee.vn/aff",
+    request_id: "R1",
+    house: false,
+  }),
   myOrders: async () => [{ orderId: "O1" } as never],
+  resolveCustomer: async () => ({ customerId: "C1", customerCode: "DP00012" }),
+  issuePassword: async () => ({ customerCode: "DP00012", password: "ABCDEFGH" }),
+  bankDetails: async () => ({
+    hasBank: false,
+    bankName: null,
+    bankAccount: null,
+    accountHolder: null,
+  }),
   saveBank: async () => undefined,
   ...over,
 });
@@ -38,16 +51,36 @@ describe("handleIncoming", () => {
   });
 
   it("answers /donhang with orders", async () => {
-    const reply = await handleIncoming(message("/donhang"), deps());
-    expect(reply.kind).toBe("orders");
+    expect((await handleIncoming(message("/donhang"), deps())).kind).toBe("orders");
   });
 
-  it("saves bank details on /bank", async () => {
+  it("answers /id with the customer's account", async () => {
+    expect(await handleIncoming(message("/id"), deps())).toEqual({
+      kind: "account",
+      customerId: "C1",
+      customerCode: "DP00012",
+    });
+  });
+
+  it("issues a password on /matkhau", async () => {
+    const reply = await handleIncoming(message("/matkhau"), deps());
+    expect(reply).toMatchObject({ kind: "password", password: "ABCDEFGH" });
+  });
+
+  it("saves bank details on /bank with details", async () => {
     expect((await handleIncoming(message("/bank VCB 123"), deps())).kind).toBe("bank_saved");
   });
 
-  it("asks for details on a bare /bank", async () => {
-    expect((await handleIncoming(message("/bank"), deps())).kind).toBe("bank_needs_details");
+  it("shows the saved account on a bare /bank", async () => {
+    const d = deps({
+      bankDetails: async () => ({
+        hasBank: true,
+        bankName: "VCB",
+        bankAccount: "123",
+        accountHolder: "LAN",
+      }),
+    });
+    expect((await handleIncoming(message("/bank"), d)).kind).toBe("bank_current");
   });
 
   it("reports an unknown command", async () => {

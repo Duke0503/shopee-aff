@@ -42,6 +42,12 @@ export function createServerApi(config: AssistantConfig): HandlerDeps {
   return {
     convert: (url, customerId) => api.convert(url, customerId),
     myOrders: (customerId) => internal.orders(customerId),
+    resolveCustomer: (customerId) => internal.resolveCustomer(customerId),
+    issuePassword: async (customerId) => {
+      const issued = await internal.issuePassword(customerId);
+      return { customerCode: issued.customerCode, password: issued.password };
+    },
+    bankDetails: (customerId) => internal.bank(customerId),
     saveBank: async (customerId, details) => {
       await internal.saveBank(customerId, details);
     },

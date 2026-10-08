@@ -1,4 +1,4 @@
-import { BANK_COMMANDS } from "./commands";
+import { BANK_COMMANDS } from "./command-names";
 import { parseCommand } from "./parse-message";
 
 /**

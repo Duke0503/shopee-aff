@@ -14,6 +14,10 @@ const messages: Messages = {
   order_item_recent: "{index}. {order_id} ({date}) {cashback}",
   need_bank: "need bank",
   bank_saved: "saved {name}",
+  bank_current: "current {name}",
+  account_id: "code {customer_id} zalo {zalo_id}",
+  password_issued: "password {customer_id} {password}",
+  password_failed: "no password",
   unknown_command: "unknown {command} :: {commands}",
   command_list: "list",
 };
@@ -61,6 +65,42 @@ describe("wordingFor", () => {
     const worded = wordingFor(messages, { kind: "unknown_command", command: "xyz" }, ctx);
     expect(worded).toEqual({ key: "unknown_command", values: { command: "xyz", commands: "list" } });
   });
+
+  it("shows the login code and the Zalo id for /id", () => {
+    const worded = wordingFor(messages, { kind: "account", customerId: "C1", customerCode: "DP00012" }, ctx);
+    expect(worded).toEqual({ key: "account_id", values: { customer_id: "DP00012", zalo_id: "C1" } });
+  });
+
+  it("shows the code and the new password for /matkhau", () => {
+    const worded = wordingFor(
+      messages,
+      { kind: "password", customerId: "C1", customerCode: null, password: "ABCDEFGH" },
+      ctx,
+    );
+    expect(worded).toEqual({
+      key: "password_issued",
+      values: { customer_id: "C1", password: "ABCDEFGH" },
+    });
+  });
+
+  it("shows a saved account, and asks for one when there is none", () => {
+    const saved = wordingFor(
+      messages,
+      {
+        kind: "bank_current",
+        bank: { hasBank: true, bankName: "VCB", bankAccount: "123", accountHolder: "LAN" },
+      },
+      ctx,
+    );
+    expect(saved).toEqual({ key: "bank_current", values: { name: "VCB - 123 - LAN" } });
+
+    const none = wordingFor(
+      messages,
+      { kind: "bank_current", bank: { hasBank: false, bankName: null, bankAccount: null, accountHolder: null } },
+      ctx,
+    );
+    expect(none).toEqual({ key: "need_bank", values: {} });
+  });
 });
 
 describe("the real message file", () => {
@@ -78,6 +118,10 @@ describe("the real message file", () => {
       "order_item_recent",
       "need_bank",
       "bank_saved",
+      "bank_current",
+      "account_id",
+      "password_issued",
+      "password_failed",
       "unknown_command",
       "command_list",
     ];

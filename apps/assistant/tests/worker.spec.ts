@@ -24,6 +24,14 @@ function build(over: Partial<Omit<WorkerDeps, "client">> = {}) {
         house: false,
       }),
       myOrders: async () => [],
+      resolveCustomer: async () => ({ customerId: "C1", customerCode: "DP00012" }),
+      issuePassword: async () => ({ customerCode: "DP00012", password: "ABCDEFGH" }),
+      bankDetails: async () => ({
+        hasBank: false,
+        bankName: null,
+        bankAccount: null,
+        accountHolder: null,
+      }),
       saveBank: async () => undefined,
     },
     now: () => 0,
@@ -76,6 +84,37 @@ describe("the assistant worker", () => {
     const { client, worker } = build();
     await worker.onMessage(incoming({ text: "/donhang" }));
     expect(client.sent[0]?.text).toContain("chưa có đơn hàng nào");
+  });
+
+  it("answers /id with the customer's code", async () => {
+    const { client, worker } = build();
+    await worker.onMessage(incoming({ text: "/id" }));
+    expect(client.sent[0]?.text).toContain("DP00012");
+  });
+
+  it("shows the saved bank account on a bare /bank", async () => {
+    const { client, worker } = build({
+      api: {
+        convert: async () => ({
+          ready: true,
+          affiliate_url: "https://s.shopee.vn/aff",
+          request_id: "R1",
+          house: false,
+        }),
+        myOrders: async () => [],
+        resolveCustomer: async () => ({ customerId: "C1", customerCode: "DP00012" }),
+        issuePassword: async () => ({ customerCode: "DP00012", password: "ABCDEFGH" }),
+        bankDetails: async () => ({
+          hasBank: true,
+          bankName: "VCB",
+          bankAccount: "123",
+          accountHolder: "LAN",
+        }),
+        saveBank: async () => undefined,
+      },
+    });
+    await worker.onMessage(incoming({ text: "/bank" }));
+    expect(client.sent[0]?.text).toContain("VCB - 123 - LAN");
   });
 
   it("names an unknown command and offers the command list", async () => {
