@@ -3,3 +3,4 @@ export * from "./parse-message";
 export * from "./paste-link";
 export * from "./commands";
 export * from "./bank-details";
+export * from "./pacer";
