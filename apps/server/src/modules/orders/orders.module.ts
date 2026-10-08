@@ -1,8 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../../shared/database/database.module";
-import { AdminGuard } from "../identity/http/admin.guard";
-import { SessionGuard } from "../identity/http/session.guard";
+import { AdminGuard, SessionGuard } from "../identity";
 import { CampaignsController } from "./http/campaigns.controller";
 import { MyOrdersController } from "./http/my-orders.controller";
 import { OrdersController } from "./http/orders.controller";

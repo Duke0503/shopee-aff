@@ -13,11 +13,13 @@
     "test": "pnpm -r --if-present test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "depcruise": "depcruise apps packages --config .dependency-cruiser.cjs",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@types/node": "^22.0.0",
+    "dependency-cruiser": "^18.5.0",
     "eslint": "^9.13.0",
     "eslint-plugin-check-file": "^2.8.0",
     "prettier": "^3.3.0",

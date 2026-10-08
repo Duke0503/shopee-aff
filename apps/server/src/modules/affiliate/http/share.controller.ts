@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
-import { nowLocalIso } from "../../identity/application/sign-in.use-case";
+import { nowLocalIso } from "../../identity";
 import { findByShareCode } from "../infrastructure/link-request.repository";
 import { recordClick } from "../infrastructure/link-click.repository";
 import { renderSharePage } from "../template/share-page.template";

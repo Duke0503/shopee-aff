@@ -2,7 +2,7 @@ import { Controller, Get, Inject, UseGuards } from "@nestjs/common";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
-import { AdminGuard } from "../../identity/http/admin.guard";
+import { AdminGuard } from "../../identity";
 import { listCampaigns } from "../infrastructure/campaign.repository";
 
 @Controller("api/admin/campaigns")

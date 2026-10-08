@@ -79,6 +79,7 @@ export default tseslint.config(
       ".venv/**",
       "**/site-packages/**",
       "**/*.d.ts",
+      "**/*.cjs",
     ],
   },
   js.configs.recommended,
