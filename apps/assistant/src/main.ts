@@ -1,4 +1,4 @@
-import { createApiClient } from "@mmo/contracts";
+import { createApiClient, createAssistantClient } from "@mmo/contracts";
 
 import { readConfig, type AssistantConfig } from "./config";
 import type { HandlerDeps } from "./handler";
@@ -35,19 +35,15 @@ export function buildWorker(
   });
 }
 
-/** The server calls the assistant makes, with the assistant's own token. */
+/** The server calls the assistant makes: public routes, and the internal ones. */
 export function createServerApi(config: AssistantConfig): HandlerDeps {
-  const authorized: typeof fetch = (input, init) =>
-    fetch(input, {
-      ...init,
-      headers: { ...(init?.headers ?? {}), "x-assistant-token": config.assistantToken },
-    });
-  const api = createApiClient(authorized, config.serverUrl);
+  const api = createApiClient(fetch, config.serverUrl);
+  const internal = createAssistantClient(fetch, config.internalUrl, config.assistantToken);
   return {
     convert: (url, customerId) => api.convert(url, customerId),
-    myOrders: () => api.myOrders(),
-    saveBank: async (_customerId, details) => {
-      await api.saveBank(details);
+    myOrders: (customerId) => internal.orders(customerId),
+    saveBank: async (customerId, details) => {
+      await internal.saveBank(customerId, details);
     },
   };
 }

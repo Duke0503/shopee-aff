@@ -5,3 +5,4 @@ export * from "./link-request.schema";
 export * from "./ledger.schema";
 export * from "./bridge.schema";
 export * from "./api-client";
+export * from "./assistant-client";

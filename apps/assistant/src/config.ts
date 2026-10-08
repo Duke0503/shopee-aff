@@ -7,6 +7,7 @@ import type { Env } from "./routing";
  */
 export interface AssistantConfig {
   serverUrl: string;
+  internalUrl: string;
   assistantToken: string;
   zaloCookie: string;
   env: Env;
@@ -43,6 +44,7 @@ function groupList(raw: string | undefined): string[] {
 export function readConfig(env: NodeJS.ProcessEnv = process.env): AssistantConfig {
   return {
     serverUrl: required(env, "ASSISTANT_SERVER_URL"),
+    internalUrl: required(env, "ASSISTANT_INTERNAL_URL"),
     assistantToken: required(env, "ASSISTANT_TOKEN"),
     zaloCookie: required(env, "ZALO_COOKIE"),
     env: env.ASSISTANT_ENV === "production" ? "production" : "dev",

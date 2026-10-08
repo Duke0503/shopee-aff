@@ -8,7 +8,7 @@ import { parseCommand } from "./parse-message";
  * comes from the message file at the point of sending.
  */
 export interface CommandDeps {
-  myOrders: () => Promise<ApiOrder[]>;
+  myOrders: (customerId: string) => Promise<ApiOrder[]>;
 }
 
 export type CommandOutcome =
@@ -20,12 +20,16 @@ export type CommandOutcome =
 export const ORDERS_COMMANDS = new Set(["donhang", "orders"]);
 export const BANK_COMMANDS = new Set(["bank", "stk", "taikhoan"]);
 
-export async function handleCommand(text: string, deps: CommandDeps): Promise<CommandOutcome> {
+export async function handleCommand(
+  text: string,
+  customerId: string,
+  deps: CommandDeps,
+): Promise<CommandOutcome> {
   const parsed = parseCommand(text);
   if (!parsed) return { kind: "not_a_command" };
 
   if (ORDERS_COMMANDS.has(parsed.command)) {
-    const orders = await deps.myOrders().catch(() => []);
+    const orders = await deps.myOrders(customerId).catch(() => []);
     return { kind: "orders", orders };
   }
   if (BANK_COMMANDS.has(parsed.command)) return { kind: "bank_prompt" };

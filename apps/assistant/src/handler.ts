@@ -18,7 +18,7 @@ export interface IncomingMessage {
 
 export interface HandlerDeps {
   convert: (url: string, customerId?: string) => Promise<ApiConvertResult>;
-  myOrders: () => Promise<ApiOrder[]>;
+  myOrders: (customerId: string) => Promise<ApiOrder[]>;
   saveBank: (customerId: string, details: BankDetails) => Promise<void>;
 }
 
@@ -55,7 +55,9 @@ export async function handleIncoming(message: IncomingMessage, deps: HandlerDeps
   if (!parsed) return { kind: "silent" };
 
   if (parsed.command === "donhang" || parsed.command === "orders") {
-    const outcome = await handleCommand(message.text, { myOrders: deps.myOrders });
+    const outcome = await handleCommand(message.text, message.customerId, {
+      myOrders: deps.myOrders,
+    });
     return outcome.kind === "orders" ? { kind: "orders", orders: outcome.orders } : { kind: "silent" };
   }
 

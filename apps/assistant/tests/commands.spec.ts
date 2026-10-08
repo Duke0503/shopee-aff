@@ -10,23 +10,38 @@ const deps = (orders: unknown = [], throws = false): CommandDeps => ({
 
 describe("handleCommand", () => {
   it("ignores plain chat", async () => {
-    expect(await handleCommand("xin chao", deps())).toEqual({ kind: "not_a_command" });
+    expect(await handleCommand("xin chao", "C1", deps())).toEqual({ kind: "not_a_command" });
   });
 
   it("answers /donhang with the customer's orders", async () => {
-    const outcome = await handleCommand("/donhang", deps([{ orderId: "O1" }]));
+    const outcome = await handleCommand("/donhang", "C1", deps([{ orderId: "O1" }]));
     expect(outcome).toEqual({ kind: "orders", orders: [{ orderId: "O1" }] });
   });
 
+  it("asks the server for the orders of the customer who typed", async () => {
+    const asked: string[] = [];
+    const d: CommandDeps = {
+      myOrders: async (customerId) => {
+        asked.push(customerId);
+        return [];
+      },
+    };
+    await handleCommand("/donhang", "DP00012", d);
+    expect(asked).toEqual(["DP00012"]);
+  });
+
   it("answers /bank with a prompt", async () => {
-    expect(await handleCommand("/bank", deps())).toEqual({ kind: "bank_prompt" });
+    expect(await handleCommand("/bank", "C1", deps())).toEqual({ kind: "bank_prompt" });
   });
 
   it("reports an unknown command instead of staying silent", async () => {
-    expect(await handleCommand("/xyz", deps())).toEqual({ kind: "unknown", command: "xyz" });
+    expect(await handleCommand("/xyz", "C1", deps())).toEqual({ kind: "unknown", command: "xyz" });
   });
 
   it("still replies when the server is unreachable", async () => {
-    expect(await handleCommand("/donhang", deps([], true))).toEqual({ kind: "orders", orders: [] });
+    expect(await handleCommand("/donhang", "C1", deps([], true))).toEqual({
+      kind: "orders",
+      orders: [],
+    });
   });
 });
