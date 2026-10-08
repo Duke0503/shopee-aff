@@ -91,6 +91,12 @@ export interface ApiDeal {
   url: string;
 }
 
+export interface ApiBankDetails {
+  bankName: string;
+  bankAccount: string;
+  accountHolder: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -115,6 +121,7 @@ export interface ApiClient {
   adminCampaigns(): Promise<ApiCampaign[]>;
   adminTransfers(): Promise<ApiTransfer[]>;
   deals(): Promise<ApiDeal[]>;
+  saveBank(details: ApiBankDetails): Promise<{ ok: boolean }>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -156,5 +163,10 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
     adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
     adminTransfers: () => request<ApiTransfer[]>("/api/admin/transfers"),
     deals: () => request<ApiDeal[]>("/api/deals"),
+    saveBank: (details) =>
+      request<{ ok: boolean }>("/api/me/bank", {
+        method: "POST",
+        body: JSON.stringify(details),
+      }),
   };
 }

@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { loadMessages, render, type Messages } from "../src/messages";
+import { loadMessages, formatVnd, render, type Messages } from "../src/messages";
 
 const sample: Messages = {
   greeting: "Hello {name}",
@@ -37,5 +37,11 @@ describe("the real message file", () => {
   it("has the currency and separator keys", () => {
     expect(messages.currency).toBe("đ");
     expect(messages.thousands_separator).toBe(".");
+  });
+
+  it("formats whole dong the way the customer reads it", () => {
+    expect(formatVnd(messages, 40000)).toBe("40.000đ");
+    expect(formatVnd(messages, 1234.6)).toBe("1.234đ");
+    expect(formatVnd(messages, 0)).toBe("0đ");
   });
 });

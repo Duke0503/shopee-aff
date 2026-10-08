@@ -29,7 +29,7 @@ export type Reply =
   | { kind: "unsupported_link" }
   | { kind: "orders"; orders: ApiOrder[] }
   | { kind: "bank_prompt" }
-  | { kind: "bank_saved" }
+  | { kind: "bank_saved"; details: BankDetails }
   | { kind: "bank_needs_details" }
   | { kind: "bank_unmatched" }
   | { kind: "unknown_command"; command: string };
@@ -65,7 +65,7 @@ export async function handleIncoming(message: IncomingMessage, deps: HandlerDeps
     });
     switch (outcome.kind) {
       case "saved":
-        return { kind: "bank_saved" };
+        return { kind: "bank_saved", details: outcome.details };
       case "need_details":
         return { kind: "bank_needs_details" };
       case "bank_not_matched":

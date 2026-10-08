@@ -28,7 +28,7 @@ describe("handleBankDetails", () => {
   it("saves the bank, account and holder", async () => {
     const { deps: d, saved } = deps();
     const outcome = await handleBankDetails("/bank VCB 123456 LE VAN C", "C1", d);
-    expect(outcome).toEqual({ kind: "saved" });
+    expect(outcome).toMatchObject({ kind: "saved" });
     expect(saved[0]).toEqual({ bankName: "VCB", bankAccount: "123456", accountHolder: "LE VAN C" });
   });
 

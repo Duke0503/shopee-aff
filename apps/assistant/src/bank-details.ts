@@ -19,7 +19,7 @@ export interface BankDeps {
 export type BankOutcome =
   | { kind: "not_a_command" }
   | { kind: "need_details" }
-  | { kind: "saved" }
+  | { kind: "saved"; details: BankDetails }
   | { kind: "bank_not_matched" };
 
 export async function handleBankDetails(
@@ -33,13 +33,14 @@ export async function handleBankDetails(
   const [bankName, bankAccount, ...holderParts] = parsed.args;
   if (!bankName || !bankAccount) return { kind: "need_details" };
 
+  const details: BankDetails = {
+    bankName,
+    bankAccount,
+    accountHolder: holderParts.join(" "),
+  };
   try {
-    await deps.saveBank(customerId, {
-      bankName,
-      bankAccount,
-      accountHolder: holderParts.join(" "),
-    });
-    return { kind: "saved" };
+    await deps.saveBank(customerId, details);
+    return { kind: "saved", details };
   } catch {
     return { kind: "bank_not_matched" };
   }
