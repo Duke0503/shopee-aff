@@ -46,6 +46,7 @@ export interface ApiClient {
   login(name: string, password: string): Promise<{ customerId: string }>;
   logout(): Promise<{ ok: boolean }>;
   myOrders(): Promise<ApiOrder[]>;
+  adminOrders(status?: string): Promise<ApiOrder[]>;
   payouts(): Promise<ApiPayables>;
 }
 
@@ -68,6 +69,10 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       }),
     logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: "{}" }),
     myOrders: () => request<ApiOrder[]>("/api/me/orders"),
+    adminOrders: (status) =>
+      request<ApiOrder[]>(
+        status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders",
+      ),
     payouts: () => request<ApiPayables>("/api/payouts"),
   };
 }

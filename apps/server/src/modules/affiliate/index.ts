@@ -1,6 +1,7 @@
 export * from "./domain/sub-id";
 export * from "./domain/share-code";
 export * from "./domain/reuse-policy";
+export * from "./domain/request-id";
 export * from "./application/request-link.use-case";
 export * from "./infrastructure/shop-hosts";
 export * from "./infrastructure/link-request.repository";

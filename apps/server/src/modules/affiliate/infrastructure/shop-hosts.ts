@@ -16,3 +16,17 @@ export function belongsTo(hostname: string, platform: string): boolean {
   const host = (hostname ?? "").toLowerCase();
   return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
 }
+
+/** The platform that recognises a URL, or null when none does. */
+export function platformForUrl(url: string): string | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  for (const platform of Object.keys(SHOP_HOSTS)) {
+    if (belongsTo(host, platform)) return platform;
+  }
+  return null;
+}

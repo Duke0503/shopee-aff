@@ -40,6 +40,14 @@ describe("createApiClient", () => {
     expect(await client.myOrders()).toEqual([{ orderId: "O1" }]);
   });
 
+  it("filters admin orders by status", async () => {
+    const fetchImpl = fakeFetch([]);
+    await createApiClient(fetchImpl, "").adminOrders("approved");
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/orders?status=approved",
+    );
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));
