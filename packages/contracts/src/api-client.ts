@@ -64,6 +64,15 @@ export interface ApiCampaign {
   status: string;
 }
 
+export interface ApiTransfer {
+  id: number;
+  customerId: string;
+  amountVnd: number;
+  note: string | null;
+  orderIds: string[];
+  createdAt: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -85,6 +94,7 @@ export interface ApiClient {
   linkStatus(requestId: string): Promise<ApiLinkStatus>;
   adminCustomers(query?: string): Promise<ApiCustomerProfile[]>;
   adminCampaigns(): Promise<ApiCampaign[]>;
+  adminTransfers(): Promise<ApiTransfer[]>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -123,5 +133,6 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
         query ? `/api/admin/customers?q=${encodeURIComponent(query)}` : "/api/admin/customers",
       ),
     adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
+    adminTransfers: () => request<ApiTransfer[]>("/api/admin/transfers"),
   };
 }

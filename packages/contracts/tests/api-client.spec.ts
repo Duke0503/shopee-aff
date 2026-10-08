@@ -71,6 +71,14 @@ describe("createApiClient", () => {
     );
   });
 
+  it("lists admin transfers", async () => {
+    const fetchImpl = fakeFetch([]);
+    await createApiClient(fetchImpl, "").adminTransfers();
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/transfers",
+    );
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));

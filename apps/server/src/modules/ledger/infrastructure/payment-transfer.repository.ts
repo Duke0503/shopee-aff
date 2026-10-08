@@ -48,3 +48,13 @@ export function listTransfersForCustomer(db: Db, customerId: string) {
     .orderBy(desc(paymentTransfers.createdAt))
     .all();
 }
+
+/** Every payout we made, newest first. */
+export function listTransfers(db: Db, limit = 100) {
+  return db
+    .select()
+    .from(paymentTransfers)
+    .orderBy(desc(paymentTransfers.createdAt))
+    .limit(limit)
+    .all();
+}
