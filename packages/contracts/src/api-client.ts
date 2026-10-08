@@ -79,6 +79,18 @@ export interface ApiBalance {
   alreadyPaidVnd: number;
 }
 
+export interface ApiDeal {
+  id: string;
+  name: string;
+  platform: string;
+  category: string;
+  originalPriceVnd: number;
+  salePriceVnd: number;
+  cashbackVnd: number;
+  imageUrl: string;
+  url: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -102,6 +114,7 @@ export interface ApiClient {
   adminCustomers(query?: string): Promise<ApiCustomerProfile[]>;
   adminCampaigns(): Promise<ApiCampaign[]>;
   adminTransfers(): Promise<ApiTransfer[]>;
+  deals(): Promise<ApiDeal[]>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -142,5 +155,6 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       ),
     adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
     adminTransfers: () => request<ApiTransfer[]>("/api/admin/transfers"),
+    deals: () => request<ApiDeal[]>("/api/deals"),
   };
 }

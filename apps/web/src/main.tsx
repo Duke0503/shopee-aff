@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 
-import { App } from "./app.page";
+import { ShellPage } from "./shell.page";
 
 const container = document.getElementById("root");
 if (container) {
-  createRoot(container).render(<App />);
+  createRoot(container).render(<ShellPage />);
 }

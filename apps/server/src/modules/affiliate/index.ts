@@ -5,6 +5,7 @@ export * from "./domain/request-id";
 export * from "./application/request-link.use-case";
 export * from "./infrastructure/shop-hosts";
 export * from "./infrastructure/link-request.repository";
+export * from "./infrastructure/featured-deal.repository";
 export * from "./providers/base.provider";
 export * from "./providers/provider.registry";
 export * from "./providers/shopee.provider";
