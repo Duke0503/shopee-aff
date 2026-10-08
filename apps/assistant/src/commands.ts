@@ -17,8 +17,8 @@ export type CommandOutcome =
   | { kind: "bank_prompt" }
   | { kind: "unknown"; command: string };
 
-const ORDERS_COMMANDS = new Set(["donhang", "orders"]);
-const BANK_COMMANDS = new Set(["bank", "stk", "taikhoan"]);
+export const ORDERS_COMMANDS = new Set(["donhang", "orders"]);
+export const BANK_COMMANDS = new Set(["bank", "stk", "taikhoan"]);
 
 export async function handleCommand(text: string, deps: CommandDeps): Promise<CommandOutcome> {
   const parsed = parseCommand(text);
