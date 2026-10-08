@@ -35,6 +35,11 @@ describe("createApiClient", () => {
     await expect(client.me()).rejects.toBeInstanceOf(ApiError);
   });
 
+  it("returns the customer's own orders", async () => {
+    const client = createApiClient(fakeFetch([{ orderId: "O1" }]));
+    expect(await client.myOrders()).toEqual([{ orderId: "O1" }]);
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));

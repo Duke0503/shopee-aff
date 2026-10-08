@@ -22,6 +22,15 @@ export interface ApiPayables {
   blocked: ApiPayable[];
 }
 
+export interface ApiOrder {
+  orderId: string;
+  status: string;
+  orderValueVnd: number | null;
+  cashbackVnd: number | null;
+  recordedAt: string | null;
+  paidAt: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -36,6 +45,7 @@ export interface ApiClient {
   me(): Promise<ApiCustomer>;
   login(name: string, password: string): Promise<{ customerId: string }>;
   logout(): Promise<{ ok: boolean }>;
+  myOrders(): Promise<ApiOrder[]>;
   payouts(): Promise<ApiPayables>;
 }
 
@@ -57,6 +67,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
         body: JSON.stringify({ name, password }),
       }),
     logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: "{}" }),
+    myOrders: () => request<ApiOrder[]>("/api/me/orders"),
     payouts: () => request<ApiPayables>("/api/payouts"),
   };
 }
