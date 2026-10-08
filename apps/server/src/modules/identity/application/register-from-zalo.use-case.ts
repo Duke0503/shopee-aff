@@ -14,7 +14,7 @@ import { findCustomerIdByAnyId } from "../infrastructure/customer.repository";
  */
 export interface ZaloIdentity {
   zaloUserId: string;
-  displayName: string;
+  displayName: string | null;
   privateChatId: string;
   nowIso: string;
 }

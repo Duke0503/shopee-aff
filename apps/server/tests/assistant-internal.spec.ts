@@ -20,6 +20,16 @@ const DDL = [
      login_count INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE customer_aliases (alias TEXT PRIMARY KEY, customer_id TEXT NOT NULL,
      created_at TEXT NOT NULL, note TEXT)`,
+  `CREATE TABLE customer_code_counter (id INTEGER PRIMARY KEY CHECK (id = 1), last INTEGER NOT NULL)`,
+  `INSERT OR IGNORE INTO customer_code_counter (id, last) VALUES (1, 0)`,
+  `CREATE TRIGGER trg_customer_code AFTER INSERT ON customers
+     WHEN NEW.customer_code IS NULL AND COALESCE(NEW.role, 'user') NOT IN ('admin','employee','house')
+   BEGIN
+     UPDATE customer_code_counter SET last = last + 1 WHERE id = 1;
+     UPDATE customers SET customer_code = 'DP' || printf('%05d',
+       (SELECT last FROM customer_code_counter WHERE id = 1))
+     WHERE rowid = NEW.rowid;
+   END`,
   `CREATE TABLE orders (order_id TEXT PRIMARY KEY, customer_id TEXT, request_id TEXT,
      order_value INTEGER, estimated_commission INTEGER, approved_commission INTEGER,
      cashback_amount INTEGER, status TEXT NOT NULL, rejection_reason TEXT, recorded_at TEXT,
@@ -103,6 +113,62 @@ describe("the internal assistant listener", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("registers a person the assistant has just met, with a code from the database", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/internal/customers",
+      headers: auth,
+      payload: { zaloUserId: "555000111", displayName: "New Person" },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      customerId: "555000111",
+      customerCode: "DP00001",
+      role: "user",
+      created: true,
+    });
+  });
+
+  it("returns the same customer on a second contact, never a second row", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/internal/customers",
+      headers: auth,
+      payload: { zaloUserId: "555000111", displayName: "New Person" },
+    });
+    expect(res.json()).toMatchObject({ customerId: "555000111", created: false });
+  });
+
+  it("needs a Zalo id to register anyone", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/internal/customers",
+      headers: auth,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("issues a password that is returned once and never stored in the clear", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/internal/customers/DP00012/password",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as { password: string };
+    expect(body.password).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
+
+    const raw = new Database(dbPath, { readonly: true });
+    const row = raw
+      .prepare("SELECT password_hash, password_set_at FROM customers WHERE customer_id = 'C1'")
+      .get() as { password_hash: string; password_set_at: string | null };
+    raw.close();
+    expect(row.password_hash.startsWith("pbkdf2$")).toBe(true);
+    expect(row.password_hash).not.toContain(body.password);
+    expect(row.password_set_at).not.toBeNull();
+  });
+
   it("returns the customer's orders, newest purchase first", async () => {
     const res = await server.inject({ method: "GET", url: "/internal/customers/DP00012/orders", headers: auth });
     const orders = res.json();
@@ -138,5 +204,23 @@ describe("the internal assistant listener", () => {
       payload: { bankName: "VCB", bankAccount: "123" },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it("reads back the bank details it stored", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/internal/customers/DP00012/bank",
+      headers: auth,
+    });
+    expect(res.json()).toMatchObject({ hasBank: true, bankName: "VCB", bankAccount: "123" });
+  });
+
+  it("reports no bank details for someone who has none", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/internal/customers/HOUSE/bank",
+      headers: auth,
+    });
+    expect(res.json()).toMatchObject({ hasBank: false, bankAccount: null });
   });
 });

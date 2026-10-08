@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -18,7 +19,9 @@ import { AssistantTokenGuard } from "../../../shared/guards/assistant-token.guar
 import {
   findCustomerIdByAnyId,
   isHouse,
+  issuePassword,
   nowLocalIso,
+  registerFromZalo,
   saveBankDetails,
   type CustomerRole,
 } from "../../identity";
@@ -31,11 +34,21 @@ interface BankBody {
   accountHolder?: string;
 }
 
+interface RegisterBody {
+  zaloUserId?: string;
+  displayName?: string;
+  privateChatId?: string;
+}
+
 type CustomerRow = typeof customers.$inferSelect;
 
 /**
  * The assistant's view of a customer, addressed by any identifier the person
  * can type (DP code, Zalo UID, old id, alias).
+ *
+ * This covers what the old `POST /api/bot/customer-auth` did in one call:
+ * first-contact registration, the customer's own code, their orders, their
+ * balance, issuing a password and reading/saving bank details.
  *
  * Only the INTERNAL listener mounts this module, and every call needs the
  * assistant token (ADR-16) — the caller's address is never proof of anything.
@@ -45,15 +58,23 @@ type CustomerRow = typeof customers.$inferSelect;
 export class AssistantController {
   constructor(@Inject(DB) private readonly db: Db) {}
 
+  /** First contact: the assistant has just met this person on Zalo. */
+  @Post()
+  register(@Body() body: RegisterBody) {
+    const zaloUserId = (body.zaloUserId ?? "").trim();
+    if (!zaloUserId) throw new BadRequestException("zaloUserId is required");
+    const result = registerFromZalo(this.db, {
+      zaloUserId,
+      displayName: (body.displayName ?? "").trim() || null,
+      privateChatId: (body.privateChatId ?? "").trim(),
+      nowIso: nowLocalIso(),
+    });
+    return { ...this.profile(this.customer(result.customerId)), created: result.created };
+  }
+
   @Get(":key")
   resolve(@Param("key") key: string) {
-    const row = this.customer(key);
-    return {
-      customerId: row.customerId,
-      customerCode: row.customerCode,
-      displayName: row.displayName,
-      role: row.role,
-    };
+    return this.profile(this.customer(key));
   }
 
   @Get(":key/orders")
@@ -65,6 +86,26 @@ export class AssistantController {
   @Get(":key/balance")
   balance(@Param("key") key: string) {
     return computeBalanceFor(this.db, this.customer(key).customerId);
+  }
+
+  @Get(":key/bank")
+  bank(@Param("key") key: string) {
+    const row = this.customer(key);
+    return {
+      hasBank: Boolean(row.bankAccount),
+      bankName: row.bankName,
+      bankAccount: row.bankAccount,
+      accountHolder: row.accountHolder,
+    };
+  }
+
+  /** `/matkhau`: a fresh password, returned once and never readable again. */
+  @Post(":key/password")
+  password(@Param("key") key: string) {
+    const customerId = this.customer(key).customerId;
+    const issued = issuePassword(this.db, customerId, nowLocalIso());
+    if (!issued) throw new NotFoundException("customer not found");
+    return { ...this.profile(this.customer(customerId)), password: issued.password };
   }
 
   @Post(":key/bank")
@@ -81,6 +122,15 @@ export class AssistantController {
     );
     this.db.update(customers).set(details).where(eq(customers.customerId, row.customerId)).run();
     return { ok: true };
+  }
+
+  private profile(row: CustomerRow) {
+    return {
+      customerId: row.customerId,
+      customerCode: row.customerCode,
+      displayName: row.displayName,
+      role: row.role,
+    };
   }
 
   private customer(key: string): CustomerRow {

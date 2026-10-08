@@ -11,6 +11,7 @@ export * from "./domain/owed-amount.port";
 export * from "./domain/session-cookie";
 export * from "./application/sign-in.use-case";
 export * from "./application/register-from-zalo.use-case";
+export * from "./application/issue-password.use-case";
 export * from "./infrastructure/customer.repository";
 export * from "./infrastructure/session.repository";
 export * from "./http/session.guard";
