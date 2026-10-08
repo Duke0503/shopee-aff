@@ -6,3 +6,4 @@ export * from "./application/reconcile.use-case";
 export * from "./infrastructure/order.repository";
 export * from "./infrastructure/manual-review.repository";
 export * from "./infrastructure/reconciliation-run.repository";
+export * from "./infrastructure/campaign.repository";

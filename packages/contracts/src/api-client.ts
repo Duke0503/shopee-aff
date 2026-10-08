@@ -53,6 +53,17 @@ export interface ApiCustomerProfile {
   hasBankDetails: boolean;
 }
 
+export interface ApiCampaign {
+  campaignId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  slots: number;
+  bonusVnd: number;
+  perCustomer: number;
+  status: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -73,6 +84,7 @@ export interface ApiClient {
   convert(url: string, customerId?: string): Promise<ApiConvertResult>;
   linkStatus(requestId: string): Promise<ApiLinkStatus>;
   adminCustomers(query?: string): Promise<ApiCustomerProfile[]>;
+  adminCampaigns(): Promise<ApiCampaign[]>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -110,5 +122,6 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       request<ApiCustomerProfile[]>(
         query ? `/api/admin/customers?q=${encodeURIComponent(query)}` : "/api/admin/customers",
       ),
+    adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
   };
 }
