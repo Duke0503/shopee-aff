@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 
-import { PayoutsPage } from "./payouts.page";
+import { ConsolePage } from "./console.page";
 
 const container = document.getElementById("root");
 if (container) {
-  createRoot(container).render(<PayoutsPage />);
+  createRoot(container).render(<ConsolePage />);
 }
