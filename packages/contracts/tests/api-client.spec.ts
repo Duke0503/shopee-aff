@@ -79,6 +79,12 @@ describe("createApiClient", () => {
     );
   });
 
+  it("reads the customer balance", async () => {
+    const fetchImpl = fakeFetch({ approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 });
+    await createApiClient(fetchImpl, "").balance();
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe("/api/me/balance");
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));

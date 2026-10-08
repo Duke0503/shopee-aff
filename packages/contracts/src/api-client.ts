@@ -73,6 +73,12 @@ export interface ApiTransfer {
   createdAt: string;
 }
 
+export interface ApiBalance {
+  approvedWaitingVnd: number;
+  stillWithShopVnd: number;
+  alreadyPaidVnd: number;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -88,6 +94,7 @@ export interface ApiClient {
   login(name: string, password: string): Promise<{ customerId: string }>;
   logout(): Promise<{ ok: boolean }>;
   myOrders(): Promise<ApiOrder[]>;
+  balance(): Promise<ApiBalance>;
   adminOrders(status?: string): Promise<ApiOrder[]>;
   payouts(): Promise<ApiPayables>;
   convert(url: string, customerId?: string): Promise<ApiConvertResult>;
@@ -116,6 +123,7 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       }),
     logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: "{}" }),
     myOrders: () => request<ApiOrder[]>("/api/me/orders"),
+    balance: () => request<ApiBalance>("/api/me/balance"),
     adminOrders: (status) =>
       request<ApiOrder[]>(
         status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders",
