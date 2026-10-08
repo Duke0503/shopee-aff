@@ -48,6 +48,13 @@ describe("createApiClient", () => {
     );
   });
 
+  it("posts a link to convert", async () => {
+    const fetchImpl = fakeFetch({ ready: false, request_id: "R1", house: false });
+    await createApiClient(fetchImpl, "").convert("https://shopee.vn/x", "C1");
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toEqual({ url: "https://shopee.vn/x", customerId: "C1" });
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));

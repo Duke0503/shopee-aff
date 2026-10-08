@@ -31,6 +31,20 @@ export interface ApiOrder {
   paidAt: string | null;
 }
 
+export interface ApiConvertResult {
+  ready: boolean;
+  affiliate_url: string | null;
+  request_id: string;
+  house: boolean;
+}
+
+export interface ApiLinkStatus {
+  ready: boolean;
+  affiliate_url: string | null;
+  status: string;
+  notified_at: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -48,6 +62,8 @@ export interface ApiClient {
   myOrders(): Promise<ApiOrder[]>;
   adminOrders(status?: string): Promise<ApiOrder[]>;
   payouts(): Promise<ApiPayables>;
+  convert(url: string, customerId?: string): Promise<ApiConvertResult>;
+  linkStatus(requestId: string): Promise<ApiLinkStatus>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -74,5 +90,12 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
         status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders",
       ),
     payouts: () => request<ApiPayables>("/api/payouts"),
+    convert: (url, customerId) =>
+      request<ApiConvertResult>("/api/shopee/convert", {
+        method: "POST",
+        body: JSON.stringify({ url, customerId }),
+      }),
+    linkStatus: (requestId) =>
+      request<ApiLinkStatus>(`/api/shopee/link-status?request_id=${encodeURIComponent(requestId)}`),
   };
 }
