@@ -55,6 +55,14 @@ describe("createApiClient", () => {
     expect(JSON.parse(String(init.body))).toEqual({ url: "https://shopee.vn/x", customerId: "C1" });
   });
 
+  it("searches admin customers", async () => {
+    const fetchImpl = fakeFetch([]);
+    await createApiClient(fetchImpl, "").adminCustomers("dp00012");
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/customers?q=dp00012",
+    );
+  });
+
   it("returns payables", async () => {
     const payables: ApiPayables = { ready: [], blocked: [] };
     const client = createApiClient(fakeFetch(payables));

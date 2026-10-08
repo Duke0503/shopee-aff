@@ -45,6 +45,14 @@ export interface ApiLinkStatus {
   notified_at: string | null;
 }
 
+export interface ApiCustomerProfile {
+  customerId: string;
+  customerCode: string | null;
+  displayName: string | null;
+  role: string;
+  hasBankDetails: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -64,6 +72,7 @@ export interface ApiClient {
   payouts(): Promise<ApiPayables>;
   convert(url: string, customerId?: string): Promise<ApiConvertResult>;
   linkStatus(requestId: string): Promise<ApiLinkStatus>;
+  adminCustomers(query?: string): Promise<ApiCustomerProfile[]>;
 }
 
 export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
@@ -97,5 +106,9 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       }),
     linkStatus: (requestId) =>
       request<ApiLinkStatus>(`/api/shopee/link-status?request_id=${encodeURIComponent(requestId)}`),
+    adminCustomers: (query) =>
+      request<ApiCustomerProfile[]>(
+        query ? `/api/admin/customers?q=${encodeURIComponent(query)}` : "/api/admin/customers",
+      ),
   };
 }
