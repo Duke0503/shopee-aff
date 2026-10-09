@@ -1,5 +1,6 @@
 import { notifyFailedLinks } from "../modules/affiliate/application/notify-failed-links.use-case";
 import { notifyPayouts } from "../modules/ledger/application/notify-payouts.use-case";
+import { notifyCampaignChanges } from "../modules/orders/application/notify-campaign-changes.use-case";
 import { notifyOrderChanges } from "../modules/orders/application/notify-order-changes.use-case";
 import type { Db } from "../shared/database/connection";
 import type { DeliveryPort } from "../notifications/delivery";
@@ -8,7 +9,8 @@ import type { ScheduledJob } from "./job-runner";
 
 /**
  * The notify loop. Every 10 s the server tells customers what changed while
- * they were not looking. Each step stands alone: order news first, then money
+ * they were not looking. Each step stands alone: campaign slots are settled
+ * first (so an approval already knows its bonus), then order news, then money
  * sent, then apologies for links we could not make. A failing step does not
  * skip the others, but the pass still reports failure so the alert-after-3
  * rule can fire.
@@ -41,6 +43,13 @@ export function createNotifyJob(deps: NotifyJobDeps): ScheduledJob {
     runOnStart: true,
     run: () =>
       runSteps([
+        () =>
+          notifyCampaignChanges({
+            db: deps.db,
+            delivery: deps.delivery,
+            messages: deps.messages,
+            now: deps.now,
+          }),
         () =>
           notifyOrderChanges({ db: deps.db, delivery: deps.delivery, messages: deps.messages }),
         () =>

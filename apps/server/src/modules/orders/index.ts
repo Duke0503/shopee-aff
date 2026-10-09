@@ -5,6 +5,7 @@ export * from "./domain/reconcile";
 export * from "./domain/campaign";
 export * from "./application/reconcile.use-case";
 export * from "./application/notify-order-changes.use-case";
+export * from "./application/notify-campaign-changes.use-case";
 export * from "./infrastructure/order.repository";
 export * from "./infrastructure/manual-review.repository";
 export * from "./infrastructure/reconciliation-run.repository";
