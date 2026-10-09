@@ -26,6 +26,9 @@ const DDL = [
      created_at TEXT NOT NULL, note TEXT)`,
   `CREATE TABLE orders (order_id TEXT PRIMARY KEY, customer_id TEXT, cashback_amount INTEGER,
      status TEXT NOT NULL, paid_at TEXT)`,
+  `CREATE TABLE campaign_awards (id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id TEXT NOT NULL,
+     customer_id TEXT NOT NULL, order_id TEXT NOT NULL, amount INTEGER NOT NULL, status TEXT NOT NULL,
+     created_at TEXT NOT NULL, confirmed_at TEXT, paid_at TEXT, voided_at TEXT, notified_status TEXT)`,
 ];
 
 const dbPath = join(tmpdir(), `cashback-payouts-${randomBytes(6).toString("hex")}.db`);

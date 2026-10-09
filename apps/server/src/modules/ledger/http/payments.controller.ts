@@ -25,7 +25,6 @@ interface ConfirmBody {
   order_ids?: string[];
   note?: string;
   transfer_code?: string;
-  confirmed_bonus?: number;
 }
 
 interface AskBankBody {
@@ -34,9 +33,10 @@ interface AskBankBody {
 
 /**
  * The money-out desk. `confirm` records a transfer that already happened in the
- * banking app; the AMOUNT is computed by the ledger from the orders, never
- * taken from the request, so a wrong figure cannot reach the bank. The orders
- * are then marked paid through Orders' guarded `markPaid` — never twice.
+ * banking app; the AMOUNT is computed by the ledger from the orders and their
+ * confirmed campaign bonuses, never taken from the request, so a wrong figure
+ * cannot reach the bank. The orders are then marked paid through Orders'
+ * guarded `markPaid` — never twice — and their bonuses settled.
  */
 @Controller("api/admin/payments")
 @UseGuards(StaffGuard)
@@ -84,7 +84,6 @@ export class PaymentsController {
     const result = confirmPayout(this.db, {
       customerId,
       orderIds,
-      confirmedBonusVnd: Number(body?.confirmed_bonus ?? 0),
       note: body?.note ?? "",
       transferCode: body?.transfer_code ?? "",
       nowIso: nowLocalIso(),

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  balanceFor,
   buildEstimate,
   estimateCashback,
   legacyRoundHalfEven,
@@ -30,6 +31,14 @@ function num(input: Input, key: string): number {
   return value;
 }
 
+function numArray(input: Input, key: string): number[] {
+  const value = input[key];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "number")) {
+    throw new Error(`golden input "${key}" must be a number array`);
+  }
+  return value as number[];
+}
+
 function bool(input: Input, key: string): boolean {
   const value = input[key];
   if (typeof value !== "boolean") throw new Error(`golden input "${key}" must be a boolean`);
@@ -46,6 +55,24 @@ function taxPolicy(input: Input, key: string): TaxPolicy {
 
 export function loadFixtureFile(path: string): GoldenFile {
   return JSON.parse(readFileSync(path, "utf8")) as GoldenFile;
+}
+
+function balanceCase(input: Input): unknown {
+  const balance = balanceFor({
+    approvedUnpaidCashbackVnd: numArray(input, "approved_unpaid_cashback"),
+    awaitingEstimatedCommissionVnd: numArray(input, "awaiting_estimated_commission"),
+    paidCashbackVnd: numArray(input, "paid_cashback"),
+    confirmedBonusVnd: num(input, "confirmed_bonus"),
+    awaitingBonusVnd: num(input, "awaiting_bonus"),
+    paidBonusVnd: num(input, "paid_bonus"),
+    cashbackRate: num(input, "cashback_rate"),
+    isHouse: bool(input, "is_house"),
+  });
+  return {
+    approved_waiting: balance.approvedWaitingVnd,
+    still_with_shop: balance.stillWithShopVnd,
+    already_paid: balance.alreadyPaidVnd,
+  };
 }
 
 /** Dispatch one case to the function named by rule, returning a JSON-comparable value. */
@@ -94,6 +121,8 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
           num(input, "expected_monthly_commission"),
         ).length,
       };
+    case "balance":
+      return balanceCase(input);
     default:
       throw new Error(`no golden handler for rule "${file.rule}"`);
   }

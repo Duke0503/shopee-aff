@@ -268,3 +268,74 @@ export function standingForOrder(db: Db, orderId: string): Standing | null {
     status: award.status,
   };
 }
+
+/** A neutral shape for one award, so Ledger need not know Orders' types. */
+export interface OrderAward {
+  awardId: number;
+  status: string;
+  bonusVnd: number;
+}
+
+/** Every award on the given orders, whatever its status. */
+export function awardsForOrders(db: Db, orderIds: string[]): OrderAward[] {
+  if (orderIds.length === 0) return [];
+  return db
+    .select({
+      awardId: campaignAwards.id,
+      status: campaignAwards.status,
+      bonusVnd: campaignAwards.amount,
+    })
+    .from(campaignAwards)
+    .where(inArray(campaignAwards.orderId, orderIds))
+    .all();
+}
+
+/** CONFIRMED bonuses per customer: exactly what is payable, right now. */
+export function confirmedBonusesByCustomer(db: Db): Map<string, number> {
+  const rows = db
+    .select({
+      customerId: campaignAwards.customerId,
+      total: sql<number>`COALESCE(SUM(${campaignAwards.amount}), 0)`,
+    })
+    .from(campaignAwards)
+    .where(eq(campaignAwards.status, AWARD_CONFIRMED))
+    .groupBy(campaignAwards.customerId)
+    .all();
+  return new Map(rows.map((row) => [row.customerId, Number(row.total)]));
+}
+
+/** One customer's bonuses split by where they are in their life. */
+export function bonusTotalsForCustomer(
+  db: Db,
+  customerId: string,
+): { confirmed: number; awaiting: number; paid: number } {
+  const rows = db
+    .select({
+      status: campaignAwards.status,
+      total: sql<number>`COALESCE(SUM(${campaignAwards.amount}), 0)`,
+    })
+    .from(campaignAwards)
+    .where(eq(campaignAwards.customerId, customerId))
+    .groupBy(campaignAwards.status)
+    .all();
+  const byStatus = new Map(rows.map((row) => [row.status, Number(row.total)]));
+  return {
+    confirmed: byStatus.get(AWARD_CONFIRMED) ?? 0,
+    awaiting: byStatus.get(AWARD_HELD) ?? 0,
+    paid: byStatus.get(AWARD_PAID) ?? 0,
+  };
+}
+
+/** Marks the confirmed bonuses on paid orders paid, so they are never sent twice. */
+export function settleCampaignBonusesForOrders(
+  db: Db,
+  orderIds: string[],
+  nowIso: string,
+): number {
+  if (orderIds.length === 0) return 0;
+  return db
+    .update(campaignAwards)
+    .set({ status: AWARD_PAID, paidAt: nowIso })
+    .where(and(inArray(campaignAwards.orderId, orderIds), eq(campaignAwards.status, AWARD_CONFIRMED)))
+    .run().changes;
+}

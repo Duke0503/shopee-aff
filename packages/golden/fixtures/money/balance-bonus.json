@@ -1,0 +1,48 @@
+{
+  "rule": "balance",
+  "source": "ledger/payouts.py::balance_for (cashback + campaign bonuses)",
+  "cases": [
+    {
+      "name": "approved cashback and a confirmed bonus; awaiting estimate and a held bonus; paid cashback and its bonus",
+      "input": {
+        "approved_unpaid_cashback": [9506, 5000],
+        "awaiting_estimated_commission": [10000],
+        "paid_cashback": [6000],
+        "confirmed_bonus": 20000,
+        "awaiting_bonus": 20000,
+        "paid_bonus": 20000,
+        "cashback_rate": 0.8,
+        "is_house": false
+      },
+      "expected": { "approved_waiting": 34506, "still_with_shop": 27122, "already_paid": 26000 }
+    },
+    {
+      "name": "nothing owed yet, no orders and no bonuses",
+      "input": {
+        "approved_unpaid_cashback": [],
+        "awaiting_estimated_commission": [],
+        "paid_cashback": [],
+        "confirmed_bonus": 0,
+        "awaiting_bonus": 0,
+        "paid_bonus": 0,
+        "cashback_rate": 0.8,
+        "is_house": false
+      },
+      "expected": { "approved_waiting": 0, "still_with_shop": 0, "already_paid": 0 }
+    },
+    {
+      "name": "the guest account is owed nothing",
+      "input": {
+        "approved_unpaid_cashback": [9506],
+        "awaiting_estimated_commission": [10000],
+        "paid_cashback": [6000],
+        "confirmed_bonus": 20000,
+        "awaiting_bonus": 20000,
+        "paid_bonus": 20000,
+        "cashback_rate": 0.8,
+        "is_house": true
+      },
+      "expected": { "approved_waiting": 0, "still_with_shop": 0, "already_paid": 0 }
+    }
+  ]
+}

@@ -1,18 +1,24 @@
 import type { Db } from "../../../shared/database/connection";
-import { findOrder, markPaid } from "../../orders";
-import { planPayout, type PayoutOrder } from "../domain/payout-plan";
+import {
+  awardsForOrders,
+  findOrder,
+  markPaid,
+  settleCampaignBonusesForOrders,
+} from "../../orders";
+import { planPayout, type AwardStatus, type PayoutOrder } from "../domain/payout-plan";
 import { recordTransfer } from "../infrastructure/payment-transfer.repository";
 
 /**
- * Record a payout and mark its orders paid. The amount is COMPUTED here, not
- * taken from the caller, so a wrong figure cannot reach the bank. Ledger never
- * writes `orders` directly — it asks Orders' `markPaid`, which re-checks that
- * the order is approved and unpaid (never pay twice).
+ * Record a payout and mark its orders paid. The amount is COMPUTED here from
+ * the saved cashback plus the orders' CONFIRMED campaign bonuses, never taken
+ * from the caller, so a wrong figure cannot reach the bank. Ledger never writes
+ * `orders` or `campaign_awards` directly — it asks Orders' `markPaid` (which
+ * re-checks approved and unpaid) and `settleCampaignBonusesForOrders`, so a
+ * bonus is never sent twice.
  */
 export interface ConfirmPayoutInput {
   customerId: string;
   orderIds: string[];
-  confirmedBonusVnd?: number;
   note: string;
   transferCode: string;
   nowIso: string;
@@ -38,19 +44,25 @@ export function confirmPayout(db: Db, input: ConfirmPayoutInput): ConfirmPayoutR
     });
   }
 
-  const plan = planPayout(orders, []);
+  const awards = awardsForOrders(db, input.orderIds).map((award) => ({
+    awardId: String(award.awardId),
+    status: award.status as AwardStatus,
+    bonusVnd: award.bonusVnd,
+  }));
+
+  const plan = planPayout(orders, awards);
   if (!plan.ok) return { ok: false, reason: plan.reason, transferId: null, amountVnd: 0 };
 
-  const amountVnd = plan.totalVnd + (input.confirmedBonusVnd ?? 0);
   const transferId = recordTransfer(db, {
     customerId: input.customerId,
-    amountVnd,
+    amountVnd: plan.totalVnd,
     orderIds: input.orderIds,
     note: input.note,
     transferCode: input.transferCode,
     createdAt: input.nowIso,
   });
   for (const orderId of input.orderIds) markPaid(db, orderId, input.nowIso);
+  settleCampaignBonusesForOrders(db, input.orderIds, input.nowIso);
 
-  return { ok: true, reason: null, transferId, amountVnd };
+  return { ok: true, reason: null, transferId, amountVnd: plan.totalVnd };
 }

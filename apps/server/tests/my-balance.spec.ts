@@ -30,6 +30,9 @@ const DDL = [
      approved_at TEXT, paid_at TEXT, updated_at TEXT NOT NULL, notified_status TEXT,
      platform TEXT NOT NULL DEFAULT 'shopee', settlement_status TEXT NOT NULL DEFAULT 'unsettled',
      payout_batch_id TEXT, settled_at TEXT)`,
+  `CREATE TABLE campaign_awards (id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id TEXT NOT NULL,
+     customer_id TEXT NOT NULL, order_id TEXT NOT NULL, amount INTEGER NOT NULL, status TEXT NOT NULL,
+     created_at TEXT NOT NULL, confirmed_at TEXT, paid_at TEXT, voided_at TEXT, notified_status TEXT)`,
 ];
 
 const dbPath = join(tmpdir(), `cashback-balance-${randomBytes(6).toString("hex")}.db`);

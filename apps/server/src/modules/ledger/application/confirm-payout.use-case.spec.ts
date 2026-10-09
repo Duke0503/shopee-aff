@@ -1,7 +1,8 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { openDatabase, type Db } from "../../../shared/database/connection";
+import { campaignAwards } from "../../../shared/database/schema";
 import { findOrder, markApproved, recordOrder } from "../../orders";
 import { findTransfer } from "../infrastructure/payment-transfer.repository";
 import { confirmPayout } from "./confirm-payout.use-case";
@@ -18,6 +19,9 @@ const DDL = [
   `CREATE TABLE payment_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL,
      amount INTEGER NOT NULL, transfer_code TEXT, note TEXT, proof_image TEXT, order_ids TEXT,
      created_at TEXT NOT NULL, created_by TEXT, notify_mode TEXT, notified_at TEXT, target_group TEXT)`,
+  `CREATE TABLE campaign_awards (id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id TEXT NOT NULL,
+     customer_id TEXT NOT NULL, order_id TEXT NOT NULL, amount INTEGER NOT NULL, status TEXT NOT NULL,
+     created_at TEXT NOT NULL, confirmed_at TEXT, paid_at TEXT, voided_at TEXT, notified_status TEXT)`,
 ];
 
 const NOW = "2026-10-07T12:00:00";
@@ -64,17 +68,35 @@ describe("confirmPayout", () => {
     expect(findTransfer(db, result.transferId ?? 0)?.amount).toBe(25_200);
   });
 
-  it("adds a confirmed campaign bonus to the amount", () => {
+  it("adds a confirmed campaign bonus to the amount and settles it", () => {
     seedApproved(db, "O1", 6000);
+    db.run(sql`INSERT INTO campaign_awards (campaign_id, customer_id, order_id, amount, status, created_at)
+      VALUES ('K1', 'C1', 'O1', 20000, 'confirmed', ${NOW})`);
     const result = confirmPayout(db, {
       customerId: "C1",
       orderIds: ["O1"],
-      confirmedBonusVnd: 20_000,
       note: "",
       transferCode: "TX1",
       nowIso: NOW,
     });
     expect(result.amountVnd).toBe(26_000);
+    const award = db.select().from(campaignAwards).where(eq(campaignAwards.orderId, "O1")).get();
+    expect(award?.status).toBe("paid");
+    expect(award?.paidAt).toBe(NOW);
+  });
+
+  it("does not pay a bonus that is still held", () => {
+    seedApproved(db, "O1", 6000);
+    db.run(sql`INSERT INTO campaign_awards (campaign_id, customer_id, order_id, amount, status, created_at)
+      VALUES ('K1', 'C1', 'O1', 20000, 'held', ${NOW})`);
+    const result = confirmPayout(db, {
+      customerId: "C1",
+      orderIds: ["O1"],
+      note: "",
+      transferCode: "TX1",
+      nowIso: NOW,
+    });
+    expect(result.amountVnd).toBe(6000);
   });
 
   it("refuses a second payout of the same order (never pay twice)", () => {
