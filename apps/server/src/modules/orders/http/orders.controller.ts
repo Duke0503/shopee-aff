@@ -1,10 +1,15 @@
-import { Controller, Get, Inject, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UseGuards } from "@nestjs/common";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
-import { AdminGuard } from "../../identity";
+import { AdminGuard, nowLocalIso } from "../../identity";
 import type { OrderStatus } from "../domain/order";
-import { listOrders } from "../infrastructure/order.repository";
+import { findOrder, listOrders, markPaid } from "../infrastructure/order.repository";
+
+interface MarkPaidBody {
+  customer_id?: string;
+  order_ids?: string[];
+}
 
 @Controller("api/admin/orders")
 @UseGuards(AdminGuard)
@@ -23,5 +28,32 @@ export class OrdersController {
       recordedAt: order.recordedAt,
       paidAt: order.paidAt,
     }));
+  }
+
+  /**
+   * Records a transfer that already happened in the banking app. Every order of
+   * the lot is marked together, and only orders of the given customer that are
+   * approved and unpaid are touched — so a double click can never pay twice.
+   */
+  @Post("mark-paid")
+  markPaid(@Body() body: MarkPaidBody) {
+    const orderIds = Array.isArray(body?.order_ids) ? body.order_ids : null;
+    if (!orderIds) throw new BadRequestException("order_ids must be a list");
+
+    let paid = 0;
+    const skipped: string[] = [];
+    for (const rawId of orderIds) {
+      const orderId = String(rawId);
+      const order = findOrder(this.db, orderId);
+      if (!order || order.customerId !== body.customer_id || order.status !== "approved" || order.paidAt !== null) {
+        skipped.push(orderId);
+        continue;
+      }
+      markPaid(this.db, orderId, nowLocalIso());
+      paid += 1;
+    }
+
+    if (paid === 0) return { ok: false, message: "nothing to mark", paid, skipped };
+    return { ok: true, paid, skipped };
   }
 }

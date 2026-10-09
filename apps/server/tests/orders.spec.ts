@@ -30,6 +30,8 @@ const DDL = [
      approved_at TEXT, paid_at TEXT, updated_at TEXT NOT NULL, notified_status TEXT,
      platform TEXT NOT NULL DEFAULT 'shopee', settlement_status TEXT NOT NULL DEFAULT 'unsettled',
      payout_batch_id TEXT, settled_at TEXT)`,
+  `CREATE TABLE state_history (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL,
+     from_status TEXT, to_status TEXT NOT NULL, changed_at TEXT NOT NULL, note TEXT)`,
 ];
 
 const dbPath = join(tmpdir(), `cashback-orders-${randomBytes(6).toString("hex")}.db`);
@@ -92,5 +94,51 @@ describe("GET /api/admin/orders", () => {
       headers: { cookie },
     });
     expect(res.json().map((o: { orderId: string }) => o.orderId)).toEqual(["O1"]);
+  });
+});
+
+describe("POST /api/admin/orders/mark-paid", () => {
+  it("requires an admin", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/mark-paid",
+      payload: { customer_id: "C1", order_ids: ["O1"] },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("marks the approved orders and skips the rest", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/mark-paid",
+      headers: { cookie },
+      payload: { customer_id: "C1", order_ids: ["O1", "O2", "MISSING"] },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ ok: true, paid: 1 });
+    expect(res.json().skipped).toEqual(["O2", "MISSING"]);
+  });
+
+  it("never pays the same order twice", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/mark-paid",
+      headers: { cookie },
+      payload: { customer_id: "C1", order_ids: ["O1"] },
+    });
+
+    expect(res.json()).toMatchObject({ ok: false, paid: 0 });
+  });
+
+  it("refuses an order that belongs to another customer", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/mark-paid",
+      headers: { cookie },
+      payload: { customer_id: "C2", order_ids: ["O1"] },
+    });
+
+    expect(res.json()).toMatchObject({ ok: false, paid: 0 });
   });
 });
