@@ -7,12 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import { JobRunner, type ScheduledJob } from "../src/jobs/job-runner";
 import { runSteps } from "../src/jobs/notify.job";
+import { notifyFailedLinks } from "../src/modules/affiliate/application/notify-failed-links.use-case";
 import { notifyPayouts } from "../src/modules/ledger/application/notify-payouts.use-case";
 import { notifyOrderChanges } from "../src/modules/orders/application/notify-order-changes.use-case";
 import { HttpDelivery, type DeliveryPort } from "../src/notifications/delivery";
 import { loadMessages } from "../src/notifications/messages";
 import type { Db } from "../src/shared/database/connection";
-import { customers, orders, paymentTransfers } from "../src/shared/database/schema";
+import { customers, linkRequests, orders, paymentTransfers } from "../src/shared/database/schema";
 import * as schema from "../src/shared/database/schema";
 
 const messages = loadMessages(
@@ -58,6 +59,11 @@ function makeDb(): Db {
       amount INTEGER NOT NULL, transfer_code TEXT, note TEXT, proof_image TEXT, order_ids TEXT,
       created_at TEXT NOT NULL, created_by TEXT, notify_mode TEXT, notified_at TEXT,
       target_group TEXT);
+    CREATE TABLE link_requests (request_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL,
+      created_at TEXT NOT NULL, source_url TEXT NOT NULL, affiliate_url TEXT, estimated_commission INTEGER,
+      channel TEXT, status TEXT NOT NULL DEFAULT 'pending', notified_at TEXT, estimate_source TEXT,
+      estimate_detail TEXT, attempts INTEGER NOT NULL DEFAULT 0, platform TEXT NOT NULL DEFAULT 'shopee',
+      share_code TEXT);
   `);
   return drizzle(sqlite, { schema });
 }
@@ -189,6 +195,104 @@ describe("notifyPayouts", () => {
     expect(delivery.sent[0]?.text).toContain("18.000");
     expect(delivery.sent[0]?.text).toContain("2 đơn");
     expect(notifiedAtOf(db)).toBe("2026-10-07T01:00:00");
+  });
+});
+
+function requestNotifiedAt(db: Db, requestId: string): string | null {
+  return (
+    db
+      .select({ notifiedAt: linkRequests.notifiedAt })
+      .from(linkRequests)
+      .where(eq(linkRequests.requestId, requestId))
+      .get()?.notifiedAt ?? null
+  );
+}
+
+function seedFailedLink(db: Db, over: Partial<typeof linkRequests.$inferInsert> = {}): void {
+  db.insert(linkRequests)
+    .values({
+      requestId: "R1",
+      customerId: "C1",
+      sourceUrl: "https://shopee.vn/x",
+      platform: "shopee",
+      status: "failed",
+      createdAt: "2026-10-07T00:30:00",
+      ...over,
+    })
+    .run();
+}
+
+describe("notifyFailedLinks", () => {
+  it("apologises for a fresh failure and marks it notified", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedFailedLink(db);
+    const delivery = new FakeDelivery();
+
+    const result = await notifyFailedLinks({
+      db,
+      delivery,
+      messages,
+      now: () => "2026-10-07T01:00:00",
+    });
+
+    expect(result).toEqual({ sent: 1, failed: 0 });
+    expect(delivery.sent[0]?.to).toBe("U1");
+    expect(delivery.sent[0]?.text).toContain("link");
+    expect(requestNotifiedAt(db, "R1")).toBe("2026-10-07T01:00:00");
+  });
+
+  it("drops a stale failure without sending, so an outage is not spam", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedFailedLink(db, { createdAt: "2026-10-06T20:00:00" });
+    const delivery = new FakeDelivery();
+
+    const result = await notifyFailedLinks({
+      db,
+      delivery,
+      messages,
+      now: () => "2026-10-07T01:00:00",
+    });
+
+    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(delivery.sent).toHaveLength(0);
+    expect(requestNotifiedAt(db, "R1")).toBe("2026-10-07T01:00:00");
+  });
+
+  it("leaves the row unmarked when delivery fails, so it is retried", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedFailedLink(db);
+    const delivery = new FakeDelivery(false);
+
+    expect(
+      await notifyFailedLinks({ db, delivery, messages, now: () => "2026-10-07T01:00:00" }),
+    ).toEqual({ sent: 0, failed: 1 });
+    expect(requestNotifiedAt(db, "R1")).toBeNull();
+  });
+
+  it("ignores a pending request", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedFailedLink(db, { status: "pending" });
+    const delivery = new FakeDelivery();
+
+    expect(
+      await notifyFailedLinks({ db, delivery, messages, now: () => "2026-10-07T01:00:00" }),
+    ).toEqual({ sent: 0, failed: 0 });
+  });
+
+  it("ignores a customer without a Zalo id", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    db.update(customers).set({ zaloUserId: null }).run();
+    seedFailedLink(db);
+    const delivery = new FakeDelivery();
+
+    expect(
+      await notifyFailedLinks({ db, delivery, messages, now: () => "2026-10-07T01:00:00" }),
+    ).toEqual({ sent: 0, failed: 0 });
   });
 });
 
