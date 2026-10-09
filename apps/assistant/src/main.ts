@@ -51,6 +51,11 @@ export function createServerApi(config: AssistantConfig): HandlerDeps {
     saveBank: async (customerId, details) => {
       await internal.saveBank(customerId, details);
     },
+    eraseBank: async (customerId) => {
+      await internal.eraseBank(customerId);
+    },
+    balance: (customerId) => internal.balance(customerId),
+    deals: () => api.deals(),
   };
 }
 

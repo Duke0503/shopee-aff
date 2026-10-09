@@ -20,6 +20,9 @@ const deps = (over: Partial<HandlerDeps> = {}): HandlerDeps => ({
     accountHolder: null,
   }),
   saveBank: async () => undefined,
+  eraseBank: async () => undefined,
+  balance: async () => ({ approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 }),
+  deals: async () => [],
   ...over,
 });
 

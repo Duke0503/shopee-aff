@@ -33,6 +33,9 @@ function build(over: Partial<Omit<WorkerDeps, "client">> = {}) {
         accountHolder: null,
       }),
       saveBank: async () => undefined,
+      eraseBank: async () => undefined,
+      balance: async () => ({ approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 }),
+      deals: async () => [],
     },
     now: () => 0,
     sleep: async () => undefined,
@@ -111,6 +114,9 @@ describe("the assistant worker", () => {
           accountHolder: "LAN",
         }),
         saveBank: async () => undefined,
+        eraseBank: async () => undefined,
+        balance: async () => ({ approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 }),
+        deals: async () => [],
       },
     });
     await worker.onMessage(incoming({ text: "/bank" }));

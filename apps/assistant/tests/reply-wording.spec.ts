@@ -20,6 +20,15 @@ const messages: Messages = {
   password_failed: "no password",
   unknown_command: "unknown {command} :: {commands}",
   command_list: "list",
+  balance_empty: "empty balance",
+  balance_summary: "bal {approved} {awaiting} {paid} {status_line}",
+  balance_ready: "ready",
+  balance_need_bank: "need bank",
+  tax_clause_full: "",
+  ping: "pong",
+  topdeal_header: "top {deals}",
+  topdeal_item: "{index} {name} {cashback}",
+  topdeal_empty: "no deals",
 };
 
 const ctx: WordingContext = { customerId: "DP00012", ratePercent: "80", attributionDays: 7 };
@@ -101,6 +110,31 @@ describe("wordingFor", () => {
     );
     expect(none).toEqual({ key: "need_bank", values: {} });
   });
+
+  it("says the balance is empty only when there is nothing at all", () => {
+    const empty = wordingFor(
+      messages,
+      { kind: "balance", balance: { approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 }, hasBank: false },
+      ctx,
+    );
+    expect(empty).toEqual({ key: "balance_empty", values: {} });
+
+    const some = wordingFor(
+      messages,
+      { kind: "balance", balance: { approvedWaitingVnd: 9506, stillWithShopVnd: 0, alreadyPaidVnd: 0 }, hasBank: true },
+      ctx,
+    );
+    expect(some?.key).toBe("balance_summary");
+    expect(some?.values.status_line).toBe("ready");
+  });
+
+  it("passes the policy rate into a fixed-key sentence", () => {
+    const worded = wordingFor(messages, { kind: "static", key: "ping" }, ctx);
+    expect(worded).toEqual({
+      key: "ping",
+      values: { rate: "80", days: 7, tax_clause: "", tax_clause_full: "" },
+    });
+  });
 });
 
 describe("the real message file", () => {
@@ -124,6 +158,20 @@ describe("the real message file", () => {
       "password_failed",
       "unknown_command",
       "command_list",
+      "balance_summary",
+      "balance_empty",
+      "balance_ready",
+      "balance_need_bank",
+      "topdeal_header",
+      "topdeal_item",
+      "topdeal_empty",
+      "tax_clause_full",
+      "ping",
+      "website",
+      "rules",
+      "policy",
+      "terms",
+      "bank_deleted",
     ];
     for (const key of used) {
       expect(real[key], `missing message key: ${key}`).toBeTypeOf("string");

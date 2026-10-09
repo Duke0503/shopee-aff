@@ -1,4 +1,4 @@
-import type { ApiConvertResult, ApiOrder } from "@mmo/contracts";
+import type { ApiBalance, ApiConvertResult, ApiDeal, ApiOrder } from "@mmo/contracts";
 
 import type { BankDetails } from "./bank-details";
 import { handleCommand, type BankRead, type CommandDeps } from "./commands";
@@ -32,6 +32,10 @@ export type Reply =
   | { kind: "bank_saved"; details: BankDetails }
   | { kind: "bank_current"; bank: BankRead }
   | { kind: "bank_needs_details" }
+  | { kind: "bank_erased" }
+  | { kind: "balance"; balance: ApiBalance; hasBank: boolean }
+  | { kind: "topdeals"; deals: ApiDeal[] }
+  | { kind: "static"; key: string }
   | { kind: "unknown_command"; command: string };
 
 export async function handleIncoming(
@@ -81,6 +85,14 @@ export async function handleIncoming(
       return { kind: "bank_current", bank: outcome.bank };
     case "bank_needs_details":
       return { kind: "bank_needs_details" };
+    case "bank_erased":
+      return { kind: "bank_erased" };
+    case "balance":
+      return { kind: "balance", balance: outcome.balance, hasBank: outcome.hasBank };
+    case "topdeals":
+      return { kind: "topdeals", deals: outcome.deals };
+    case "static":
+      return { kind: "static", key: outcome.key };
     default:
       return { kind: "unknown_command", command: outcome.command };
   }

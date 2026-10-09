@@ -1,4 +1,4 @@
-import type { ApiOrder } from "@mmo/contracts";
+import type { ApiBalance, ApiDeal, ApiOrder } from "@mmo/contracts";
 
 import type { BankRead } from "./commands";
 import type { Reply } from "./handler";
@@ -17,6 +17,7 @@ export interface WordedReply {
 }
 
 const RECENT_ORDER_LIMIT = 10;
+const TOPDEAL_LIMIT = 10;
 
 function orderLines(messages: Messages, orders: ApiOrder[]): string {
   return orders
@@ -51,6 +52,61 @@ function bankLine(bank: Pick<BankRead, "bankName" | "bankAccount" | "accountHold
     .join(" - ");
 }
 
+/** The balance totals, plus the one line that tells them what happens next. */
+function balanceWorded(messages: Messages, balance: ApiBalance, hasBank: boolean): WordedReply {
+  if (balance.approvedWaitingVnd === 0 && balance.stillWithShopVnd === 0 && balance.alreadyPaidVnd === 0) {
+    return { key: "balance_empty", values: {} };
+  }
+  return {
+    key: "balance_summary",
+    values: {
+      approved: formatVnd(messages, balance.approvedWaitingVnd),
+      awaiting: formatVnd(messages, balance.stillWithShopVnd),
+      paid: formatVnd(messages, balance.alreadyPaidVnd),
+      status_line: render(messages, hasBank ? "balance_ready" : "balance_need_bank"),
+    },
+  };
+}
+
+/** The "hoàn tiền cao" list. It shows a name and a cashback, never a link. */
+function topDealsWorded(messages: Messages, deals: ApiDeal[]): WordedReply {
+  if (deals.length === 0) return { key: "topdeal_empty", values: {} };
+  return {
+    key: "topdeal_header",
+    values: {
+      deals: deals
+        .slice(0, TOPDEAL_LIMIT)
+        .map((deal, index) =>
+          render(messages, "topdeal_item", {
+            index: index + 1,
+            name: deal.name,
+            cashback: formatVnd(messages, deal.cashbackVnd),
+          }),
+        )
+        .join("\n"),
+    },
+  };
+}
+
+/** Replies whose answer is one fixed message key and no values. */
+const FIXED_KEYS: Record<string, string> = {
+  link_pending: "received",
+  unsupported_link: "link_failed",
+  password_failed: "password_failed",
+  bank_needs_details: "need_bank",
+  bank_erased: "bank_deleted",
+};
+
+/** The policy numbers a fixed-key sentence may need. */
+function staticValues(messages: Messages, ctx: WordingContext): Record<string, string | number> {
+  return {
+    rate: ctx.ratePercent,
+    days: ctx.attributionDays,
+    tax_clause: "",
+    tax_clause_full: render(messages, "tax_clause_full", { rate: ctx.ratePercent }),
+  };
+}
+
 /** Which message-file key answers a reply, and with what values. */
 export function wordingFor(
   messages: Messages,
@@ -60,6 +116,8 @@ export function wordingFor(
   switch (reply.kind) {
     case "silent":
       return null;
+    case "static":
+      return { key: reply.key, values: staticValues(messages, ctx) };
     case "link":
       return {
         key: "link_ready_no_estimate",
@@ -70,10 +128,6 @@ export function wordingFor(
           tax_clause: "",
         },
       };
-    case "link_pending":
-      return { key: "received", values: {} };
-    case "unsupported_link":
-      return { key: "link_failed", values: {} };
     case "orders":
       return ordersWorded(messages, reply.orders, ctx);
     case "account":
@@ -84,26 +138,25 @@ export function wordingFor(
     case "password":
       return {
         key: "password_issued",
-        values: {
-          customer_id: reply.customerCode ?? reply.customerId,
-          password: reply.password,
-        },
+        values: { customer_id: reply.customerCode ?? reply.customerId, password: reply.password },
       };
-    case "password_failed":
-      return { key: "password_failed", values: {} };
     case "bank_saved":
       return { key: "bank_saved", values: { name: bankLine(reply.details) } };
     case "bank_current":
       return reply.bank.hasBank
         ? { key: "bank_current", values: { name: bankLine(reply.bank) } }
         : { key: "need_bank", values: {} };
-    case "bank_needs_details":
-      return { key: "need_bank", values: {} };
+    case "balance":
+      return balanceWorded(messages, reply.balance, reply.hasBank);
+    case "topdeals":
+      return topDealsWorded(messages, reply.deals);
     case "unknown_command":
       return {
         key: "unknown_command",
         values: { command: reply.command, commands: render(messages, "command_list") },
       };
+    default:
+      return { key: FIXED_KEYS[reply.kind] ?? reply.kind, values: {} };
   }
 }
 

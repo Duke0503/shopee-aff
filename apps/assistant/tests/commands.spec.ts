@@ -12,6 +12,9 @@ const deps = (over: Partial<CommandDeps> = {}): CommandDeps => ({
     accountHolder: null,
   }),
   saveBank: async () => undefined,
+  eraseBank: async () => undefined,
+  balance: async () => ({ approvedWaitingVnd: 0, stillWithShopVnd: 0, alreadyPaidVnd: 0 }),
+  deals: async () => [],
   ...over,
 });
 
@@ -99,6 +102,64 @@ describe("handleCommand", () => {
 
   it("reports an unknown command instead of staying silent", async () => {
     expect(await handleCommand("/xyz", "C1", deps())).toEqual({ kind: "unknown", command: "xyz" });
+  });
+
+  it("answers /sodu with the balance and whether a payout account exists", async () => {
+    const d = deps({
+      balance: async () => ({ approvedWaitingVnd: 9506, stillWithShopVnd: 1000, alreadyPaidVnd: 0 }),
+      bankDetails: async () => ({
+        hasBank: true,
+        bankName: "VCB",
+        bankAccount: "123",
+        accountHolder: "LAN",
+      }),
+    });
+    expect(await handleCommand("/sodu", "C1", d)).toEqual({
+      kind: "balance",
+      balance: { approvedWaitingVnd: 9506, stillWithShopVnd: 1000, alreadyPaidVnd: 0 },
+      hasBank: true,
+    });
+  });
+
+  it("answers wording-only commands with a fixed message key", async () => {
+    expect(await handleCommand("/ping", "C1", deps())).toEqual({ kind: "static", key: "ping" });
+    expect(await handleCommand("/web", "C1", deps())).toEqual({ kind: "static", key: "website" });
+    expect(await handleCommand("/help", "C1", deps())).toEqual({ kind: "static", key: "rules" });
+    expect(await handleCommand("/huongdan", "C1", deps())).toEqual({ kind: "static", key: "rules" });
+    expect(await handleCommand("/chinhsach", "C1", deps())).toEqual({ kind: "static", key: "policy" });
+    expect(await handleCommand("/dieukien", "C1", deps())).toEqual({ kind: "static", key: "terms" });
+    expect(await handleCommand("/nganhang", "C1", deps())).toEqual({
+      kind: "static",
+      key: "need_bank",
+    });
+  });
+
+  it("erases the saved account on /xoathongtin", async () => {
+    const erased: string[] = [];
+    const d = deps({
+      eraseBank: async (customerId) => {
+        erased.push(customerId);
+      },
+    });
+    expect(await handleCommand("/xoathongtin", "DP00012", d)).toEqual({ kind: "bank_erased" });
+    expect(erased).toEqual(["DP00012"]);
+  });
+
+  it("still confirms erasure when the server is unreachable", async () => {
+    const d = deps({
+      eraseBank: async () => {
+        throw new Error("offline");
+      },
+    });
+    expect(await handleCommand("/xoathongtin", "C1", d)).toEqual({ kind: "bank_erased" });
+  });
+
+  it("answers /topdeal with the featured deals", async () => {
+    const d = deps({ deals: async () => [{ id: "D1" } as never] });
+    expect(await handleCommand("/topdeal", "C1", d)).toEqual({
+      kind: "topdeals",
+      deals: [{ id: "D1" }],
+    });
   });
 
   it("still replies when the server is unreachable", async () => {

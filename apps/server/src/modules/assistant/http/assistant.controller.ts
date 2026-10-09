@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Inject,
@@ -23,6 +24,7 @@ import {
   nowLocalIso,
   registerFromZalo,
   saveBankDetails,
+  eraseBankDetails,
   type CustomerRole,
 } from "../../identity";
 import { computeBalanceFor } from "../../ledger";
@@ -121,6 +123,21 @@ export class AssistantController {
       nowLocalIso(),
     );
     this.db.update(customers).set(details).where(eq(customers.customerId, row.customerId)).run();
+    return { ok: true };
+  }
+
+  /** `/xoathongtin`: erase the saved account so payouts stop going to it. */
+  @Delete(":key/bank")
+  eraseBank(@Param("key") key: string) {
+    const row = this.customer(key);
+    if (isHouse({ role: row.role as CustomerRole })) {
+      throw new ForbiddenException("the guest account has no bank details");
+    }
+    this.db
+      .update(customers)
+      .set(eraseBankDetails())
+      .where(eq(customers.customerId, row.customerId))
+      .run();
     return { ok: true };
   }
 

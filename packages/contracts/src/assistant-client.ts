@@ -30,6 +30,7 @@ export interface AssistantClient {
   bank(key: string): Promise<AssistantBank>;
   issuePassword(key: string): Promise<AssistantCustomer & { password: string }>;
   saveBank(key: string, details: ApiBankDetails): Promise<{ ok: boolean }>;
+  eraseBank(key: string): Promise<{ ok: boolean }>;
 }
 
 const encode = (value: string): string => encodeURIComponent(value);
@@ -74,5 +75,7 @@ export function createAssistantClient(
         method: "POST",
         body: JSON.stringify(details),
       }),
+    eraseBank: (key) =>
+      request<{ ok: boolean }>(`/internal/customers/${encode(key)}/bank`, { method: "DELETE" }),
   };
 }

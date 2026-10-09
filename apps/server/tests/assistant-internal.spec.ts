@@ -223,4 +223,26 @@ describe("the internal assistant listener", () => {
     });
     expect(res.json()).toMatchObject({ hasBank: false, bankAccount: null });
   });
+
+  it("erases the saved account on /xoathongtin", async () => {
+    const res = await server.inject({
+      method: "DELETE",
+      url: "/internal/customers/DP00012/bank",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    const raw = new Database(dbPath, { readonly: true });
+    const saved = raw
+      .prepare(
+        "SELECT bank_account, bank_name, account_holder, consent_at FROM customers WHERE customer_id = 'C1'",
+      )
+      .get();
+    raw.close();
+    expect(saved).toMatchObject({
+      bank_account: null,
+      bank_name: null,
+      account_holder: null,
+      consent_at: null,
+    });
+  });
 });
