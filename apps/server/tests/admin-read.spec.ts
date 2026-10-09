@@ -29,6 +29,9 @@ const DDL = [
      created_at TEXT NOT NULL, source_url TEXT NOT NULL, affiliate_url TEXT)`,
   `CREATE TABLE activity_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, action TEXT NOT NULL,
      path TEXT, ip_address TEXT, user_agent TEXT, detail TEXT, created_at TEXT NOT NULL)`,
+  `CREATE TABLE payout_batches (batch_id TEXT PRIMARY KEY, platform TEXT NOT NULL DEFAULT 'shopee',
+     status TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0, eligible_amount INTEGER NOT NULL DEFAULT 0,
+     created_time TEXT, paid_time TEXT, raw_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 ];
 
 const dbPath = join(tmpdir(), `cashback-admin-read-${randomBytes(6).toString("hex")}.db`);
@@ -77,6 +80,13 @@ beforeAll(async () => {
   );
   addLog.run("C1", "login", "/api/auth/login", "2026-10-06T08:30:00");
   addLog.run("C2", "view", "/api/me", "2026-10-06T08:31:00");
+
+  raw
+    .prepare(
+      "INSERT INTO payout_batches (batch_id, platform, status, amount, eligible_amount, created_at, updated_at)" +
+        " VALUES (?,?,?,?,?,?,?)",
+    )
+    .run("B1", "shopee", "paid", 12345, 10000, "2026-10-06T00:00:00", "2026-10-06T00:00:00");
   raw.close();
 
   process.env.DB_PATH = dbPath;
@@ -215,5 +225,23 @@ describe("GET /api/admin/logs", () => {
       headers: { cookie: adminCookie },
     });
     expect(res.json().logs.map((l: { customerId: string }) => l.customerId)).toEqual(["C2"]);
+  });
+});
+
+describe("GET /api/admin/payout-batches", () => {
+  it("lists imported platform batches", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/api/admin/payout-batches",
+      headers: { cookie: adminCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().batches[0]).toMatchObject({
+      batchId: "B1",
+      platform: "shopee",
+      status: "paid",
+      amountVnd: 12345,
+      eligibleAmountVnd: 10000,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "../../../shared/database/connection";
 import { orders, stateHistory } from "../../../shared/database/schema";
@@ -130,4 +130,44 @@ export function listOrders(
   const base = db.select().from(orders);
   const rows = conditions.length > 0 ? base.where(and(...conditions)).all() : base.all();
   return rows.sort((a, b) => (b.recordedAt ?? "").localeCompare(a.recordedAt ?? ""));
+}
+
+export interface SettleBatchInput {
+  platform: string;
+  batchId: string;
+  settledAt: string;
+  nowIso: string;
+  /** When given, only these orders are considered; otherwise the whole platform. */
+  orderIds?: string[];
+  /** Only settle orders approved/recorded on or before this date. */
+  upToDate?: string;
+}
+
+/**
+ * Marks approved orders as settled by a platform payout batch. Ports
+ * `ledger/repository.py::settle_orders_for_batch`. An order already settled is
+ * never touched again, so re-syncing the same batch cannot rewrite history.
+ */
+export function settleOrdersForBatch(db: Db, input: SettleBatchInput): number {
+  const values = {
+    settlementStatus: "settled",
+    payoutBatchId: input.batchId,
+    settledAt: input.settledAt,
+    updatedAt: input.nowIso,
+  };
+  const notSettled = sql`${orders.settlementStatus} != 'settled'`;
+
+  if (input.orderIds && input.orderIds.length > 0) {
+    return db
+      .update(orders)
+      .set(values)
+      .where(and(inArray(orders.orderId, input.orderIds), notSettled))
+      .run().changes;
+  }
+
+  const conditions = [eq(orders.platform, input.platform), eq(orders.status, APPROVED), notSettled];
+  if (input.upToDate) {
+    conditions.push(sql`coalesce(${orders.approvedAt}, ${orders.recordedAt}) <= ${input.upToDate}`);
+  }
+  return db.update(orders).set(values).where(and(...conditions)).run().changes;
 }

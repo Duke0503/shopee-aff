@@ -5,6 +5,7 @@ import { DB } from "../../../shared/database/database.module";
 import { AdminGuard, StaffGuard } from "../../identity";
 import { listEmployees } from "../application/list-employees.use-case";
 import { listLogs } from "../application/list-logs.use-case";
+import { listPayoutBatches } from "../application/list-payout-batches.use-case";
 import { listUsers } from "../application/list-users.use-case";
 import { computeMetrics } from "../application/metrics.use-case";
 import { parsePage } from "../application/pagination";
@@ -73,6 +74,16 @@ export class AdminReadController {
         sortBy: lower(query.sort_by),
         sortOrder: direction(query.sort_order),
       }),
+    };
+  }
+
+  @Get("payout-batches")
+  @UseGuards(StaffGuard)
+  payoutBatches(@Query() query: QueryParams) {
+    const page = parsePage(query, 20);
+    return {
+      ok: true,
+      ...listPayoutBatches(this.db, { ...page, platform: query.platform ?? "all" }),
     };
   }
 }

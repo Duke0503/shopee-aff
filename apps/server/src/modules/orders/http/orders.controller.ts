@@ -4,11 +4,18 @@ import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
 import { AdminGuard, nowLocalIso } from "../../identity";
 import type { OrderStatus } from "../domain/order";
-import { findOrder, listOrders, markPaid } from "../infrastructure/order.repository";
+import { findOrder, listOrders, markPaid, settleOrdersForBatch } from "../infrastructure/order.repository";
 
 interface MarkPaidBody {
   customer_id?: string;
   order_ids?: string[];
+}
+
+interface SettleBody {
+  batch_id?: string;
+  platform?: string;
+  order_ids?: string[];
+  settled_at?: string;
 }
 
 @Controller("api/admin/orders")
@@ -55,5 +62,21 @@ export class OrdersController {
 
     if (paid === 0) return { ok: false, message: "nothing to mark", paid, skipped };
     return { ok: true, paid, skipped };
+  }
+
+  /**
+   * Marks orders settled by a platform payout batch (the money the platform
+   * sent us). Re-running is safe: an order already settled is never touched.
+   */
+  @Post("settle")
+  settle(@Body() body: SettleBody) {
+    const settledCount = settleOrdersForBatch(this.db, {
+      platform: (body?.platform ?? "shopee").trim() || "shopee",
+      batchId: (body?.batch_id ?? "MANUAL").trim() || "MANUAL",
+      settledAt: body?.settled_at ?? nowLocalIso(),
+      nowIso: nowLocalIso(),
+      orderIds: Array.isArray(body?.order_ids) ? body.order_ids.map(String) : undefined,
+    });
+    return { ok: true, settledCount };
   }
 }

@@ -142,3 +142,34 @@ describe("POST /api/admin/orders/mark-paid", () => {
     expect(res.json()).toMatchObject({ ok: false, paid: 0 });
   });
 });
+
+describe("POST /api/admin/orders/settle", () => {
+  it("requires an admin", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/settle",
+      payload: { batch_id: "B1", order_ids: ["O1"] },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("settles the given orders and never re-settles them", async () => {
+    const payload = { batch_id: "B1", platform: "shopee", order_ids: ["O1"] };
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/settle",
+      headers: { cookie },
+      payload,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ ok: true, settledCount: 1 });
+
+    const again = await server.inject({
+      method: "POST",
+      url: "/api/admin/orders/settle",
+      headers: { cookie },
+      payload,
+    });
+    expect(again.json().settledCount).toBe(0);
+  });
+});
