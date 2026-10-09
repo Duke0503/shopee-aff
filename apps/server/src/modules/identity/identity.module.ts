@@ -6,10 +6,11 @@ import { AuthController } from "./http/auth.controller";
 import { CustomersController } from "./http/customers.controller";
 import { MeController } from "./http/me.controller";
 import { SessionGuard } from "./http/session.guard";
+import { StaffGuard } from "./http/staff.guard";
 
 @Module({
   imports: [DatabaseModule],
   controllers: [AuthController, MeController, CustomersController],
-  providers: [SessionGuard, AdminGuard],
+  providers: [SessionGuard, AdminGuard, StaffGuard],
 })
 export class IdentityModule {}

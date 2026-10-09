@@ -17,3 +17,4 @@ export * from "./infrastructure/customer.repository";
 export * from "./infrastructure/session.repository";
 export * from "./http/session.guard";
 export * from "./http/admin.guard";
+export * from "./http/staff.guard";
