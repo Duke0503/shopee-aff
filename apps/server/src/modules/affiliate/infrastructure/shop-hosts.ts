@@ -4,10 +4,12 @@
  * plain chat for an afternoon.
  */
 export const SHOP_HOSTS: Record<string, string[]> = {
+  // ShopeeFood first: `food.shopee.vn` is a subdomain of `shopee.vn`, so
+  // Shopee's check would claim it if it came first.
+  shopeefood: ["shopeefood.vn", "food.shopee.vn"],
   shopee: ["shopee.vn", "shp.ee"],
   tiktok: ["tiktok.com"],
   lazada: ["lazada.vn", "lazada.sg", "lazada.com.my"],
-  shopeefood: ["shopeefood.vn"],
 };
 
 /** True when the hostname is the domain itself or a subdomain of it. */

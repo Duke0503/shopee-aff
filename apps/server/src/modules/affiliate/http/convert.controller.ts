@@ -8,8 +8,9 @@ import { findCustomerIdByAnyId, nowLocalIso } from "../../identity";
 import { decideRequestLink, type ExistingRequest } from "../application/request-link.use-case";
 import { DEFAULT_ATTRIBUTION_DAYS } from "../domain/reuse-policy";
 import { newRequestId } from "../domain/request-id";
+import { attachAffiliateUrl, recordLinkRequest } from "../infrastructure/link-request.repository";
 import { platformForUrl } from "../infrastructure/shop-hosts";
-import { recordLinkRequest } from "../infrastructure/link-request.repository";
+import { PROVIDER_REGISTRY, type ProviderRegistry } from "../providers/provider.registry";
 
 /** The guest account: a web visitor we don't know. Its commission is ours. */
 export const HOUSE_CUSTOMER_ID = "HOUSE";
@@ -21,11 +22,14 @@ interface ConvertBody {
 
 @Controller("api/shopee")
 export class ConvertController {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(PROVIDER_REGISTRY) private readonly providers: ProviderRegistry,
+  ) {}
 
   /** Paste a product link, get a link back (or a request to poll for). */
   @Post("convert")
-  convert(@Body() body: ConvertBody) {
+  async convert(@Body() body: ConvertBody) {
     const url = (body?.url ?? "").trim();
     if (url === "") throw new BadRequestException("url is required");
 
@@ -70,9 +74,27 @@ export class ConvertController {
         platform: decision.platform,
         createdAt: nowLocalIso(),
       });
-      return { ready: false, affiliate_url: null, request_id: requestId, house: isHouse };
+      const affiliateUrl = await this.makeLink(url, customerId, requestId);
+      return { ready: affiliateUrl !== null, affiliate_url: affiliateUrl, request_id: requestId, house: isHouse };
     }
     throw new BadRequestException("unsupported link");
+  }
+
+  /**
+   * Ask the platform's provider for a link. No provider means the shop's link
+   * is made asynchronously (Shopee via the extension queue); a failure leaves
+   * the request pending for the notify loop to retry.
+   */
+  private async makeLink(url: string, customerId: string, requestId: string): Promise<string | null> {
+    const provider = this.providers.forUrl(url);
+    if (!provider) return null;
+    try {
+      const link = await provider.createAffiliateLink(url, customerId, requestId);
+      attachAffiliateUrl(this.db, requestId, link.url);
+      return link.url;
+    } catch {
+      return null;
+    }
   }
 
   /** Poll for a link that was still being made. */
