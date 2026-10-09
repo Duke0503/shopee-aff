@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { JobRunner, type ScheduledJob } from "../src/jobs/job-runner";
 import { runSteps } from "../src/jobs/notify.job";
 import { notifyFailedLinks } from "../src/modules/affiliate/application/notify-failed-links.use-case";
+import { notifyLateLinks } from "../src/modules/affiliate/application/notify-late-links.use-case";
 import { notifyPayouts } from "../src/modules/ledger/application/notify-payouts.use-case";
 import { notifyOrderChanges } from "../src/modules/orders/application/notify-order-changes.use-case";
 import { HttpDelivery, type DeliveryPort } from "../src/notifications/delivery";
@@ -222,6 +223,21 @@ function seedFailedLink(db: Db, over: Partial<typeof linkRequests.$inferInsert> 
     .run();
 }
 
+function seedLink(db: Db, over: Partial<typeof linkRequests.$inferInsert> = {}): void {
+  db.insert(linkRequests)
+    .values({
+      requestId: "R1",
+      customerId: "C1",
+      sourceUrl: "https://shopee.vn/x",
+      affiliateUrl: "https://shope.ee/abc",
+      platform: "shopee",
+      status: "ready",
+      createdAt: "2026-10-07T00:00:00",
+      ...over,
+    })
+    .run();
+}
+
 describe("notifyFailedLinks", () => {
   it("apologises for a fresh failure and marks it notified", async () => {
     const db = makeDb();
@@ -293,6 +309,59 @@ describe("notifyFailedLinks", () => {
     expect(
       await notifyFailedLinks({ db, delivery, messages, now: () => "2026-10-07T01:00:00" }),
     ).toEqual({ sent: 0, failed: 0 });
+  });
+});
+
+describe("notifyLateLinks", () => {
+  const deps = (db: Db, delivery: DeliveryPort) => ({
+    db,
+    delivery,
+    messages,
+    now: () => "2026-10-07T01:00:00",
+    cashbackRate: 0.8,
+  });
+
+  it("sends a link the chat never collected and marks it", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedLink(db);
+    const delivery = new FakeDelivery();
+
+    expect(await notifyLateLinks(deps(db, delivery))).toEqual({ sent: 1, failed: 0 });
+    expect(delivery.sent[0]?.to).toBe("U1");
+    expect(delivery.sent[0]?.text).toContain("https://shope.ee/abc");
+    expect(delivery.sent[0]?.text).toContain("80%");
+    expect(requestNotifiedAt(db, "R1")).toBe("2026-10-07T01:00:00");
+  });
+
+  it("leaves a fresh link to the chat (within the assistant wait)", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedLink(db, { createdAt: "2026-10-07T00:59:30" });
+    const delivery = new FakeDelivery();
+
+    expect(await notifyLateLinks(deps(db, delivery))).toEqual({ sent: 0, failed: 0 });
+    expect(requestNotifiedAt(db, "R1")).toBeNull();
+  });
+
+  it("drops a stale link without sending", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedLink(db, { createdAt: "2026-10-06T20:00:00" });
+    const delivery = new FakeDelivery();
+
+    expect(await notifyLateLinks(deps(db, delivery))).toEqual({ sent: 0, failed: 0 });
+    expect(delivery.sent).toHaveLength(0);
+    expect(requestNotifiedAt(db, "R1")).toBe("2026-10-07T01:00:00");
+  });
+
+  it("ignores a request that has no link yet", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedLink(db, { affiliateUrl: null });
+    const delivery = new FakeDelivery();
+
+    expect(await notifyLateLinks(deps(db, delivery))).toEqual({ sent: 0, failed: 0 });
   });
 });
 

@@ -30,6 +30,7 @@ function jobsEnabled(): boolean {
               messages,
               now: () => new Date().toISOString(),
               intervalMs: Number(process.env.NOTIFY_INTERVAL_MS ?? 10_000),
+              cashbackRate: Number(process.env.CASHBACK_RATE ?? 0.8),
             }),
           ],
           {
