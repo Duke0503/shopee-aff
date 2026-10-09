@@ -14,4 +14,5 @@ export * from "./fake-zalo-client";
 export * from "./worker";
 export * from "./config";
 export * from "./zca-adapter";
+export * from "./notification-server";
 export * from "./main";

@@ -3,6 +3,7 @@ import { createApiClient, createAssistantClient } from "@mmo/contracts";
 import { readConfig, type AssistantConfig } from "./config";
 import type { HandlerDeps } from "./handler";
 import { loadMessages } from "./messages";
+import { startNotificationServer } from "./notification-server";
 import { createWorker, type Worker } from "./worker";
 import { createZcaClient } from "./zca-adapter";
 import type { ZaloClient } from "./zalo-client";
@@ -73,5 +74,13 @@ export function run(env: NodeJS.ProcessEnv = process.env): Worker {
   });
   const worker = buildWorker(client, config, createServerApi(config));
   client.onMessage((message) => worker.onMessage(message));
+  void startNotificationServer(client, {
+    port: config.notificationPort,
+    host: config.notificationHost,
+    token: config.assistantToken,
+    mainGroupId: config.mainGroupId,
+  }).catch((error: unknown) => {
+    console.error(`assistant notification server failed to start: ${String(error)}`);
+  });
   return worker;
 }

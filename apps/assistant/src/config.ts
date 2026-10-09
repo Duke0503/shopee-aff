@@ -18,6 +18,8 @@ export interface AssistantConfig {
   ratePercent: string;
   attributionDays: number;
   messagesPath: string;
+  notificationPort: number;
+  notificationHost: string;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -58,5 +60,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AssistantConfi
     ratePercent: env.CASHBACK_RATE_PERCENT ?? "80",
     attributionDays: asInt(env, "LINK_ATTRIBUTION_DAYS", 7),
     messagesPath: env.MESSAGES_PATH ?? "resources/messages.vi.json",
+    notificationPort: asInt(env, "NOTIFICATION_PORT", 8891),
+    notificationHost: env.NOTIFICATION_HOST ?? "127.0.0.1",
   };
 }
