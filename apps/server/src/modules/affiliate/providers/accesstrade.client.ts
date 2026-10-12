@@ -25,6 +25,26 @@ export interface AccessTradeOrdersPort {
   fetchTransactions(sinceDays?: number): Promise<AccessTradeTransaction[]>;
 }
 
+/** A product from the TikTok Shop feed, already parsed out of AccessTrade's shape. */
+export interface TopDealProduct {
+  productId: string;
+  title: string;
+  detailLink: string;
+  priceVnd: number;
+  commissionVnd: number;
+  /** A fraction: `0.12` is twelve percent. */
+  commissionRate: number;
+  imageUrl: string;
+  unitsSold: number;
+  shopName: string;
+}
+
+/** The catalogue side: what is selling well right now. */
+export interface AccessTradeFeedPort {
+  readonly configured: boolean;
+  searchTikTokProducts(keyword: string, limit: number): Promise<TopDealProduct[]>;
+}
+
 export interface AccessTradeConfig {
   apiKey: string;
   baseUrl: string;
@@ -35,6 +55,9 @@ export interface AccessTradeConfig {
 
 export const DEFAULT_ACCESSTRADE_BASE_URL = "https://api.accesstrade.vn";
 export const DEFAULT_LAZADA_CAMPAIGN_ID = "5087153089503673507";
+
+/** The Nest injection token for the client itself, shared with the registry. */
+export const ACCESSTRADE_CLIENT = Symbol("ACCESSTRADE_CLIENT");
 
 export function accessTradeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): AccessTradeConfig {
   const timeout = Number(env.ACCESSTRADE_TIMEOUT_MS ?? 10_000);
@@ -63,8 +86,13 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-export class HttpAccessTrade implements AccessTradePort, AccessTradeOrdersPort {
+export class HttpAccessTrade implements AccessTradePort, AccessTradeOrdersPort, AccessTradeFeedPort {
   constructor(private readonly config: AccessTradeConfig) {}
+
+  /** Without a key there is no API to ask, and the callers fall back. */
+  get configured(): boolean {
+    return this.config.apiKey !== "";
+  }
 
   private get token(): string {
     return this.config.apiKey.startsWith("Token ") ? this.config.apiKey : `Token ${this.config.apiKey}`;
@@ -131,6 +159,47 @@ export class HttpAccessTrade implements AccessTradePort, AccessTradeOrdersPort {
       priceVnd: parseVndAmount(first.product_price ?? res.product_price),
       commissionVnd: parseVndAmount(first.product_commission ?? res.product_commission),
       commissionRate: parseCommissionRate(first.commission ?? res.commission),
+    };
+  }
+
+  /**
+   * The TikTok Shop feed, best-selling first. Ports
+   * `tiktok_provider.search_products`: rates arrive in hundredths of a percent
+   * (1200 is 12%), prices as a `{ minimum_amount }` object.
+   */
+  async searchTikTokProducts(keyword: string, limit: number): Promise<TopDealProduct[]> {
+    if (!this.configured) throw new Error("ACCESSTRADE_API_KEY is not configured");
+    const url = new URL(`${this.config.baseUrl}/v1/tiktokshop_product_feeds`);
+    url.searchParams.set("sort_field", "units_sold");
+    url.searchParams.set("limit", String(limit));
+    if (keyword !== "") url.searchParams.set("title_keywords", keyword);
+    const response = await fetch(url, {
+      headers: { Authorization: this.token, "User-Agent": "CashbackBot/1.0" },
+      signal: AbortSignal.timeout(this.config.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`AccessTrade /v1/tiktokshop_product_feeds failed: HTTP ${response.status}`);
+    }
+    const payload = asRecord(await response.json());
+    const data = payload.data;
+    const products = Array.isArray(data) ? data : asArray(asRecord(data).products);
+    return products.map((product) => this.toTopDeal(product));
+  }
+
+  private toTopDeal(raw: unknown): TopDealProduct {
+    const product = asRecord(raw);
+    const commission = asRecord(product.commission);
+    const unitsSold = Number(product.units_sold ?? 0);
+    return {
+      productId: firstString(product.id),
+      title: firstString(product.title),
+      detailLink: firstString(product.detail_link),
+      priceVnd: parseVndAmount(product.original_price),
+      commissionVnd: parseVndAmount(commission.amount),
+      commissionRate: parseCommissionRate(commission.rate),
+      imageUrl: firstString(product.main_image_url),
+      unitsSold: Number.isFinite(unitsSold) ? unitsSold : 0,
+      shopName: firstString(asRecord(product.shop).name),
     };
   }
 
