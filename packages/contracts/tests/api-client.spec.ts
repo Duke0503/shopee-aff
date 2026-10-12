@@ -55,12 +55,46 @@ describe("createApiClient", () => {
     expect(JSON.parse(String(init.body))).toEqual({ url: "https://shopee.vn/x", customerId: "C1" });
   });
 
-  it("searches admin customers", async () => {
-    const fetchImpl = fakeFetch([]);
-    await createApiClient(fetchImpl, "").adminCustomers("dp00012");
+  it("searches admin customers, sending only the chosen filters", async () => {
+    const fetchImpl = fakeFetch({ ok: true, users: [], pagination: {} });
+    await createApiClient(fetchImpl, "").adminUsers({ search: "dp00012", bank: "no_bank", page: 3 });
     expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
-      "/api/admin/customers?q=dp00012",
+      "/api/admin/users?search=dp00012&bank=no_bank&page=3",
     );
+  });
+
+  it("asks for one customer's page", async () => {
+    const fetchImpl = fakeFetch({ ok: true, orders: [] });
+    await createApiClient(fetchImpl, "").adminUserDetail("DP00012");
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/users/DP00012",
+    );
+  });
+
+  it("records a transfer with the fields the server names", async () => {
+    const fetchImpl = fakeFetch({ ok: true, transferId: 7, amountVnd: 20000 });
+    await createApiClient(fetchImpl, "").recordTransfer({
+      customerId: "C1",
+      orderIds: ["O1"],
+      amountVnd: 20_000,
+      note: "DP00012",
+      transferCode: "TX1",
+    });
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      customer_id: "C1",
+      order_ids: ["O1"],
+      amount: 20_000,
+      note: "DP00012",
+      transfer_code: "TX1",
+    });
+  });
+
+  it("reads the web labels", async () => {
+    const fetchImpl = fakeFetch({ title: "Bảng chuyển tiền" });
+    expect(await createApiClient(fetchImpl, "").labels()).toEqual({ title: "Bảng chuyển tiền" });
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe("/api/labels");
   });
 
   it("lists admin campaigns", async () => {
