@@ -84,5 +84,7 @@
   "balance_summary": "💰 SỐ DƯ CỦA BẠN\n\n✅ Đã duyệt, chờ chuyển: {approved}\n⏳ Đang chờ sàn duyệt & đối soát: {awaiting}\n🏦 Đã chuyển cho bạn: {paid}\n\n{status_line}\n\nℹ️ Số đang chờ là ước tính — sàn chốt xong mới ra số cuối.",
   "topdeal_header": "🔥 SẢN PHẨM HOÀN TIỀN CAO NHẤT\n\n{deals}\n\n👉 Dán link mua để nhận hoàn tiền nhé!",
   "topdeal_item": "{index}. {name} — hoàn {cashback}",
-  "topdeal_empty": "🔥 Hiện chưa có đủ dữ liệu sản phẩm hoàn tiền cao.\n\nBạn gửi link sản phẩm bất kỳ cho mình, mình tạo link hoàn tiền ngay nhé!"
+  "topdeal_empty": "🔥 Hiện chưa có đủ dữ liệu sản phẩm hoàn tiền cao.\n\nBạn gửi link sản phẩm bất kỳ cho mình, mình tạo link hoàn tiền ngay nhé!",
+  "group_default_name": "Hoàn Tiền Shopee",
+  "group_member_default_name": "Thành viên {suffix}"
 }

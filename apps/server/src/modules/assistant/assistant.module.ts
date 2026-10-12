@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 
+import { NotificationsModule } from "../../notifications";
 import { DatabaseModule } from "../../shared/database/database.module";
 import { HealthController } from "../../shared/health.controller";
+import { AssistantActivityController } from "./http/activity.controller";
 import { AssistantCampaignsController } from "./http/campaigns.controller";
 import { AssistantController } from "./http/assistant.controller";
 
@@ -11,7 +13,12 @@ import { AssistantController } from "./http/assistant.controller";
  * these routes cannot be reached from outside (ADR-16).
  */
 @Module({
-  imports: [DatabaseModule],
-  controllers: [AssistantController, AssistantCampaignsController, HealthController],
+  imports: [DatabaseModule, NotificationsModule],
+  controllers: [
+    AssistantController,
+    AssistantCampaignsController,
+    AssistantActivityController,
+    HealthController,
+  ],
 })
 export class AssistantModule {}
