@@ -4,6 +4,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
 import { nowLocalIso } from "../../identity";
+import { estimateProductName } from "../domain/estimate-detail";
 import { findByShareCode } from "../infrastructure/link-request.repository";
 import { recordClick } from "../infrastructure/link-click.repository";
 import { renderSharePage } from "../template/share-page.template";
@@ -35,7 +36,7 @@ export class ShareController {
       .type("text/html; charset=utf-8")
       .send(
         renderSharePage({
-          productName: found.estimateDetail ? productName(found.estimateDetail) : "",
+          productName: estimateProductName(found.estimateDetail),
           cashbackFormatted: "",
           buyHref: `/s/${code}/go`,
         }),
@@ -52,14 +53,5 @@ export class ShareController {
     }
     recordClick(this.db, found.requestId, "buy", nowLocalIso());
     reply.code(302).header("Location", found.affiliateUrl ?? "/").send();
-  }
-}
-
-function productName(estimateDetail: string): string {
-  try {
-    const parsed = JSON.parse(estimateDetail) as { name?: string };
-    return parsed.name ?? "";
-  } catch {
-    return "";
   }
 }

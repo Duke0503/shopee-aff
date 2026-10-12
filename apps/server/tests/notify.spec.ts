@@ -59,7 +59,7 @@ function makeDb(): Db {
     CREATE TABLE payment_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL,
       amount INTEGER NOT NULL, transfer_code TEXT, note TEXT, proof_image TEXT, order_ids TEXT,
       created_at TEXT NOT NULL, created_by TEXT, notify_mode TEXT, notified_at TEXT,
-      target_group TEXT);
+      target_group TEXT, bill_token TEXT);
     CREATE TABLE link_requests (request_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL,
       created_at TEXT NOT NULL, source_url TEXT NOT NULL, affiliate_url TEXT, estimated_commission INTEGER,
       channel TEXT, status TEXT NOT NULL DEFAULT 'pending', notified_at TEXT, estimate_source TEXT,

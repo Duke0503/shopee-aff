@@ -189,15 +189,14 @@ def test_admin_upload_proof_base64(mock_handler, monkeypatch):
 def test_serve_bill_html(conn, cfg, mock_handler):
     ledger.add_customer(conn, "C005", display_name="Pham Thi E")
     conn.execute("UPDATE customers SET customer_code = 'DP00005' WHERE customer_id = 'C005'")
-    cur = conn.execute("""
-        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, created_at)
-        VALUES ('C005', 67164, 'DP00005TX', 'Hoan tien', 'https://example.com/proof.png', '2026-10-03 10:16:00')
+    conn.execute("""
+        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, bill_token, created_at)
+        VALUES ('C005', 67164, 'DP00005TX', 'Hoan tien', 'https://example.com/proof.png', 'bill-token-abc', '2026-10-03 10:16:00')
     """)
-    tx_id = cur.lastrowid
     conn.commit()
 
     mock_handler._send = lambda status, body, ct: (status, body.decode("utf-8"), ct)
-    status, html_content, content_type = mock_handler._serve_bill(str(tx_id))
+    status, html_content, content_type = mock_handler._serve_bill("bill-token-abc")
     assert status == 200
     assert "text/html" in content_type
     assert "67.164" in html_content
@@ -205,10 +204,21 @@ def test_serve_bill_html(conn, cfg, mock_handler):
     assert "Xác nhận thanh toán thành công" in html_content
     assert "https://example.com/proof.png" in html_content
 
-    # Non-existent bill returns 404
-    status_404, html_404, _ = mock_handler._serve_bill("999999")
+    # The row number is guessable, so an old /b/<number> link shows how to
+    # sign in instead of the receipt.
+    status_num, html_num, _ = mock_handler._serve_bill("999999")
+    assert status_num == 200
+    assert "Vui lòng đăng nhập" in html_num
+    assert "Pham Thi E" not in html_num
+
+    # An unknown token, and even the transfer code, are simply not found: the
+    # token is the only key.
+    status_404, html_404, _ = mock_handler._serve_bill("no-such-token")
     assert status_404 == 404
     assert "Không tìm thấy biên lai" in html_404
+    status_code, html_code, _ = mock_handler._serve_bill("DP00005TX")
+    assert status_code == 404
+    assert "Không tìm thấy biên lai" in html_code
 
 
 def test_resolve_proof_urls():
@@ -238,15 +248,14 @@ def test_resolve_proof_urls():
 def test_serve_bill_html_gdrive(conn, cfg, mock_handler):
     ledger.add_customer(conn, "C006", display_name="Nguyen Van F")
     conn.execute("UPDATE customers SET customer_code = 'DP00006' WHERE customer_id = 'C006'")
-    cur = conn.execute("""
-        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, created_at)
-        VALUES ('C006', 50000, 'DP00006TX', 'Hoan tien', 'https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view?usp=drivesdk', '2026-10-04 15:32:00')
+    conn.execute("""
+        INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, bill_token, created_at)
+        VALUES ('C006', 50000, 'DP00006TX', 'Hoan tien', 'https://drive.google.com/file/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_/view?usp=drivesdk', 'bill-token-gdrive', '2026-10-04 15:32:00')
     """)
-    tx_id = cur.lastrowid
     conn.commit()
 
     mock_handler._send = lambda status, body, ct: (status, body.decode("utf-8"), ct)
-    status, html_content, content_type = mock_handler._serve_bill(str(tx_id))
+    status, html_content, content_type = mock_handler._serve_bill("bill-token-gdrive")
     assert status == 200
     assert "https://lh3.googleusercontent.com/d/1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content
     assert "https://drive.google.com/thumbnail?sz=w1200&amp;id=1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content or "https://drive.google.com/thumbnail?sz=w1200&id=1C2-4qDrJlcw_9IqoeLXt0ELm3W6vlxK_" in html_content

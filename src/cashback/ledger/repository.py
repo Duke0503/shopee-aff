@@ -6,6 +6,7 @@ All money is stored as whole VND integers. Never floats.
 from __future__ import annotations
 
 import re
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -377,8 +378,35 @@ _LATER_COLUMNS = {
         "notify_mode": "TEXT",
         "notified_at": "TEXT",
         "target_group": "TEXT",
+        # The bill link is /b/<bill_token>. A row number is guessable and the
+        # bill shows a name, an account number and a proof image, so the
+        # token is the only way in. See new_bill_token / _ensure_bill_tokens.
+        "bill_token": "TEXT",
     },
 }
+
+
+def new_bill_token() -> str:
+    """An unguessable bill reference: 24 random bytes, URL safe (192 bits)."""
+    return secrets.token_urlsafe(24)
+
+
+def _ensure_bill_tokens(conn: sqlite3.Connection) -> None:
+    """Give every payout a bill token, once.
+
+    Tokens are added the usual way (see _LATER_COLUMNS); this fills in the
+    ones that predate the column and leaves the rest alone, so an old bill
+    link never changes under a customer.
+    """
+    rows = conn.execute(
+        "SELECT id FROM payment_transfers"
+        " WHERE bill_token IS NULL OR bill_token = ''"
+    ).fetchall()
+    for row in rows:
+        conn.execute(
+            "UPDATE payment_transfers SET bill_token = ? WHERE id = ?",
+            (new_bill_token(), row[0]),
+        )
 
 
 # Promotions such as "20,000 VND extra for the first 20 customers". A bonus
@@ -501,6 +529,7 @@ def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) ->
 
     _ensure_customer_aliases(conn)
     _ensure_house(conn)
+    _ensure_bill_tokens(conn)
     if assign_codes:
         _ensure_customer_codes(conn)
 
@@ -512,6 +541,8 @@ def _add_missing_columns(conn: sqlite3.Connection, assign_codes: bool = True) ->
                  " ON link_requests(share_code) WHERE share_code IS NOT NULL")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_batch ON orders(payout_batch_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_settlement ON orders(settlement_status)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transfer_bill_token"
+                 " ON payment_transfers(bill_token) WHERE bill_token IS NOT NULL")
 
 
 # The name a customer signs in with and reads back to us. customer_id is

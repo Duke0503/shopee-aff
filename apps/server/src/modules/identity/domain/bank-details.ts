@@ -34,3 +34,16 @@ export function saveBankDetails(
 export function eraseBankDetails(): BankDetails {
   return { ...EMPTY_BANK_DETAILS };
 }
+
+/**
+ * A bank account as it may be shown to anyone: never the whole number.
+ * `0123456789` becomes `01****6789`, and a short number is hidden completely —
+ * a receipt with a partly hidden account is still a receipt worth having the
+ * customer check, but the full number is not something to hand out.
+ */
+export function maskBankAccount(account: string | null): string {
+  const value = (account ?? "").trim();
+  if (value === "") return "";
+  if (value.length <= 4) return "*".repeat(value.length);
+  return `${value.slice(0, 2)}****${value.slice(-4)}`;
+}

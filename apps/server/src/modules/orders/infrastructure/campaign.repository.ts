@@ -279,6 +279,33 @@ export function awardsForOrders(db: Db, orderIds: string[]): OrderAward[] {
     .all();
 }
 
+/** A bonus as a receipt shows it: what it was, and which event paid it. */
+export interface OrderBonus {
+  orderId: string;
+  bonusVnd: number;
+  campaignName: string;
+}
+
+/**
+ * The bonuses attached to these orders, for showing (never for paying: the
+ * payable ones are CONFIRMED and go through `confirmedBonusesByCustomer`).
+ * A void award is not a bonus, so it is left out.
+ */
+export function bonusesForOrders(db: Db, orderIds: string[]): OrderBonus[] {
+  if (orderIds.length === 0) return [];
+  return db
+    .select({
+      orderId: campaignAwards.orderId,
+      bonusVnd: campaignAwards.amount,
+      campaignName: campaigns.name,
+    })
+    .from(campaignAwards)
+    .leftJoin(campaigns, eq(campaigns.campaignId, campaignAwards.campaignId))
+    .where(and(inArray(campaignAwards.orderId, orderIds), ne(campaignAwards.status, AWARD_VOID)))
+    .all()
+    .map((row) => ({ ...row, campaignName: row.campaignName ?? "" }));
+}
+
 /** CONFIRMED bonuses per customer: exactly what is payable, right now. */
 export function confirmedBonusesByCustomer(db: Db): Map<string, number> {
   const rows = db

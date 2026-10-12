@@ -644,6 +644,32 @@ _MISSING_BUILD = (
 )
 
 
+# An old /b/<number> link, or a bill id with no token. A bill is now found by
+# its unguessable token only, so say how to see it instead of pretending the
+# receipt is gone.
+_BILL_SIGN_IN_PAGE = (
+    "<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+    "<title>Đăng nhập để xem biên lai - Hoàn Tiền DP</title>"
+    "<style>"
+    "body{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,sans-serif;"
+    "background:#090d16;color:#f1f5f9;display:flex;align-items:center;justify-content:center;"
+    "min-height:100vh;margin:0;padding:16px;}"
+    ".card{background:#131b2e;border:1px solid #1e293b;border-radius:18px;padding:36px 24px;"
+    "max-width:420px;width:100%;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.5);}"
+    "h2{color:#38bdf8;font-size:19px;margin-bottom:8px;}"
+    "p{color:#94a3b8;font-size:14px;margin-bottom:20px;line-height:1.6;}"
+    "a{display:inline-block;padding:11px 24px;background:#10b981;color:#fff;text-decoration:none;"
+    "border-radius:10px;font-weight:700;font-size:14px;}"
+    "</style></head><body><div class=\"card\">"
+    "<h2>Vui lòng đăng nhập</h2>"
+    "<p>Biên lai này chỉ xem được khi bạn đăng nhập vào hoantiendp.com. "
+    "Các link biên lai cũ không còn dùng được nữa.</p>"
+    "<a href=\"/\">Đăng nhập xem biên lai</a>"
+    "</div></body></html>"
+)
+
+
 # Requests from the internet, per client, per window. The customer codes are
 # sequential and therefore guessable, so password guessing is bounded per
 # address here and per account in accounts.login. Link endpoints are bounded
@@ -2536,9 +2562,10 @@ class _Handler(BaseHTTPRequestHandler):
 
         with ledger.connect(self.cfg.db_path) as conn:
             cur = conn.execute("""
-                INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, order_ids, created_at, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)
-            """, (customer_id, amount, transfer_code, note, proof_image, order_ids_str, cust_id))
+                INSERT INTO payment_transfers (customer_id, amount, transfer_code, note, proof_image, order_ids, bill_token, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+            """, (customer_id, amount, transfer_code, note, proof_image, order_ids_str,
+                  ledger.new_bill_token(), cust_id))
             transfer_id = cur.lastrowid
 
             if mark_as_paid:
@@ -2846,13 +2873,14 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "message": "Không tìm thấy khách hàng"}, 404)
             c_dict = dict(c_row)
 
+            bill_token = ledger.new_bill_token()
             cur = conn.execute("""
                 INSERT INTO payment_transfers (
                     customer_id, amount, transfer_code, note, proof_image,
-                    order_ids, notify_mode, notified_at, target_group, created_at, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), ?)
+                    order_ids, notify_mode, notified_at, target_group, bill_token, created_at, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), ?)
             """, (customer_id, amount, transfer_code, note, proof_image,
-                  order_ids_str, notify_mode, target_group, cust_id))
+                  order_ids_str, notify_mode, target_group, bill_token, cust_id))
             transfer_id = cur.lastrowid
 
             bonus_total = 0
@@ -2986,7 +3014,7 @@ class _Handler(BaseHTTPRequestHandler):
         now_vn = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y %H:%M")
 
         base = str(getattr(self.cfg, "public_base_url", "") or "").rstrip("/")
-        bill_url = f"{base}/b/{transfer_id}" if base else f"/b/{transfer_id}"
+        bill_url = f"{base}/b/{bill_token}" if base else f"/b/{bill_token}"
         bill_line = f"\n🔗 Bill: {bill_url}"
         tag_user = f"@{display_name}"
 
@@ -4432,19 +4460,28 @@ class _Handler(BaseHTTPRequestHandler):
         return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
 
     def _serve_bill(self, bill_id: str):
-        """Public bill verification receipt: /b/<code>."""
+        """Public bill verification receipt: /b/<bill_token>.
+
+        Found by the random token and nothing else. The row number is
+        guessable and this page shows a name, an account number and a proof
+        image, so an old /b/<number> link is told to sign in instead.
+        """
         from datetime import datetime, timezone, timedelta
         import html
         vn_tz = timezone(timedelta(hours=7))
+
+        if not bill_id or bill_id.isdigit():
+            return self._send(200, _BILL_SIGN_IN_PAGE.encode("utf-8"),
+                              "text/html; charset=utf-8")
 
         with ledger.connect(self.cfg.db_path) as conn:
             row = conn.execute("""
                 SELECT pt.*, c.display_name, c.customer_code, c.bank_name, c.bank_account, c.account_holder
                   FROM payment_transfers pt
                   JOIN customers c ON c.customer_id = pt.customer_id
-                 WHERE pt.id = ? OR pt.transfer_code = ?
-                 ORDER BY pt.id DESC LIMIT 1
-            """, (bill_id, bill_id)).fetchone()
+                 WHERE pt.bill_token = ?
+                 LIMIT 1
+            """, (bill_id,)).fetchone()
 
             if not row:
                 err_html = """<!DOCTYPE html>

@@ -39,6 +39,12 @@ export function attachAffiliateUrl(db: Db, requestId: string, affiliateUrl: stri
     .run();
 }
 
+/** One link request by its id — a receipt names the product a payout came from. */
+export function findLinkRequestById(db: Db, requestId: string) {
+  if (!requestId) return null;
+  return db.select().from(linkRequests).where(eq(linkRequests.requestId, requestId)).get() ?? null;
+}
+
 /** The customer a link request was made for, or null. Evidence for attribution. */
 export function findLinkRequestOwner(db: Db, requestId: string): string | null {
   const row = db

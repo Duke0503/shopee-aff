@@ -26,7 +26,7 @@ const DDL = [
      created_at TEXT NOT NULL, note TEXT)`,
   `CREATE TABLE payment_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL,
      amount INTEGER NOT NULL, transfer_code TEXT, note TEXT, proof_image TEXT, order_ids TEXT,
-     created_at TEXT NOT NULL, created_by TEXT, notify_mode TEXT, notified_at TEXT, target_group TEXT)`,
+     created_at TEXT NOT NULL, created_by TEXT, notify_mode TEXT, notified_at TEXT, target_group TEXT, bill_token TEXT)`,
 ];
 
 const dbPath = join(tmpdir(), `cashback-transfers-${randomBytes(6).toString("hex")}.db`);

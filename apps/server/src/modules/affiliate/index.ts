@@ -2,6 +2,7 @@ export * from "./domain/sub-id";
 export * from "./domain/share-code";
 export * from "./domain/reuse-policy";
 export * from "./domain/request-id";
+export * from "./domain/estimate-detail";
 export * from "./domain/accesstrade";
 export * from "./domain/accesstrade-order";
 export * from "./application/request-link.use-case";

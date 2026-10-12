@@ -146,6 +146,40 @@ class TestMigrations:
         assert {"notified_at", "estimate_source", "estimate_detail",
                 "attempts"} <= requests
 
+    def test_bills_get_a_token_and_keep_it(self, db: Path):
+        """A bill is looked up by an unguessable token, never by row number."""
+        with ledger.connect(db) as conn:
+            conn.execute(
+                "INSERT INTO payment_transfers (customer_id, amount, created_at)"
+                " VALUES ('C0001', 1000, datetime('now'))"
+            )
+            conn.commit()
+        ledger.initialise(db)
+        with ledger.connect(db) as conn:
+            token = conn.execute("SELECT bill_token FROM payment_transfers").fetchone()[0]
+        assert token and len(token) >= 22 and " " not in token
+
+        # Re-opening the ledger must not change a link a customer already has.
+        ledger.initialise(db)
+        with ledger.connect(db) as conn:
+            assert conn.execute(
+                "SELECT bill_token FROM payment_transfers"
+            ).fetchone()[0] == token
+
+    def test_two_bills_get_different_tokens(self, db: Path):
+        with ledger.connect(db) as conn:
+            for _ in range(2):
+                conn.execute(
+                    "INSERT INTO payment_transfers (customer_id, amount, created_at)"
+                    " VALUES ('C0001', 1000, datetime('now'))"
+                )
+            conn.commit()
+        ledger.initialise(db)
+        with ledger.connect(db) as conn:
+            tokens = [r[0] for r in conn.execute(
+                "SELECT bill_token FROM payment_transfers ORDER BY id")]
+        assert len(set(tokens)) == 2
+
 
 class TestSubIdSafety:
     """A sub_id with a dash breaks attribution two months later, silently."""

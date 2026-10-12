@@ -4,6 +4,7 @@ import type { Db } from "../../../shared/database/connection";
 import { customers, paymentTransfers } from "../../../shared/database/schema";
 import type { DeliveryPort, NotifyResult } from "../../../notifications/delivery";
 import { formatVnd, render, type Messages } from "../../../notifications/messages";
+import { decodeOrderIds } from "../infrastructure/payment-transfer.repository";
 
 /**
  * Telling a customer their money was sent. Ports the payout step: a transfer
@@ -15,16 +16,6 @@ export interface NotifyPayoutsDeps {
   delivery: DeliveryPort;
   messages: Messages;
   now: () => string;
-}
-
-function orderCount(orderIds: string | null): number {
-  if (!orderIds) return 0;
-  try {
-    const parsed = JSON.parse(orderIds) as unknown;
-    return Array.isArray(parsed) ? parsed.length : 0;
-  } catch {
-    return 0;
-  }
 }
 
 function bankLine(row: {
@@ -61,7 +52,7 @@ export async function notifyPayouts(deps: NotifyPayoutsDeps): Promise<NotifyResu
     const bank = bankLine(row);
     const text = render(deps.messages, bank ? "order_paid" : "order_paid_no_bank", {
       amount: formatVnd(deps.messages, row.amount),
-      count: orderCount(row.orderIds),
+      count: decodeOrderIds(row.orderIds).length,
       bank,
       reference: row.transferCode ?? row.note ?? "",
     });

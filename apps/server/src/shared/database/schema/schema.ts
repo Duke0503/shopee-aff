@@ -213,11 +213,16 @@ export const paymentTransfers = sqliteTable("payment_transfers", {
 	notifyMode: text("notify_mode"),
 	notifiedAt: text("notified_at"),
 	targetGroup: text("target_group"),
+	// The bill link is /b/<bill_token>. A row number is guessable and the bill
+	// shows a name, an account number and a proof image. Added by Python
+	// (_LATER_COLUMNS), read and filled in here.
+	billToken: text("bill_token"),
 },
 (table) => {
 	return {
 		idxTransferTime: index("idx_transfer_time").on(table.createdAt),
 		idxTransferCustomer: index("idx_transfer_customer").on(table.customerId),
+		idxTransferBillToken: uniqueIndex("idx_transfer_bill_token").on(table.billToken).where(sql`bill_token IS NOT NULL`),
 		customerCodeCounterCheck1: check("customer_code_counter_check_1", sql`id = 1`),
 	}
 });

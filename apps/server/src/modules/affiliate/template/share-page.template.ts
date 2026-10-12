@@ -1,20 +1,11 @@
+import { escapeHtml } from "../../../shared/html";
+
 export interface SharePageInput {
   productName: string;
   cashbackFormatted: string;
   buyHref: string;
   zaloUrl?: string;
 }
-
-const ENTITIES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-export const escapeHtml = (text: string): string =>
-  text.replace(/[&<>"']/g, (char) => ENTITIES[char] ?? char);
 
 /** A minimal, phone-first product page: everyone sees it before Shopee. */
 export function renderSharePage(input: SharePageInput): string {
