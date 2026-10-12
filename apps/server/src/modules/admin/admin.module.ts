@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../../shared/database/database.module";
 import { AdminGuard, StaffGuard } from "../identity";
+import { AdminEmployeeController } from "./http/admin-employee.controller";
 import { AdminReadController } from "./http/admin-read.controller";
 
 /**
@@ -10,7 +11,7 @@ import { AdminReadController } from "./http/admin-read.controller";
  */
 @Module({
   imports: [DatabaseModule],
-  controllers: [AdminReadController],
+  controllers: [AdminReadController, AdminEmployeeController],
   providers: [AdminGuard, StaffGuard],
 })
 export class AdminModule {}

@@ -1,6 +1,7 @@
 export * from "./domain/customer";
 export * from "./domain/customer-code";
 export * from "./domain/password-policy";
+export * from "./domain/employee-account";
 export * from "./domain/password-hash";
 export * from "./domain/login-decision";
 export * from "./domain/merge-customers";
@@ -13,6 +14,8 @@ export * from "./application/sign-in.use-case";
 export * from "./application/register-from-zalo.use-case";
 export * from "./application/issue-password.use-case";
 export * from "./application/change-password.use-case";
+export * from "./application/create-employee.use-case";
+export * from "./application/update-employee.use-case";
 export * from "./infrastructure/customer.repository";
 export * from "./infrastructure/session.repository";
 export * from "./http/session.guard";
