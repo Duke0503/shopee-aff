@@ -95,6 +95,19 @@ function seedOrder(db: Db, over: Partial<typeof orders.$inferInsert> = {}): void
     .run();
 }
 
+function seedTransfer(db: Db, over: Partial<typeof paymentTransfers.$inferInsert> = {}): void {
+  db.insert(paymentTransfers)
+    .values({
+      customerId: "C1",
+      amount: 18_000,
+      transferCode: "FT1",
+      orderIds: "O1",
+      createdAt: "2026-10-07T00:00:00",
+      ...over,
+    })
+    .run();
+}
+
 function notifiedStatusOf(db: Db): string | null {
   return (
     db
@@ -196,6 +209,32 @@ describe("notifyPayouts", () => {
     expect(delivery.sent[0]?.text).toContain("18.000");
     expect(delivery.sent[0]?.text).toContain("2 đơn");
     expect(notifiedAtOf(db)).toBe("2026-10-07T01:00:00");
+  });
+
+  it("ends the notice with an absolute link to that transfer's bill", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedTransfer(db, { billToken: "tok-abc" });
+    const delivery = new FakeDelivery();
+    process.env.PUBLIC_BASE_URL = "https://example.test/";
+    try {
+      await notifyPayouts({ db, delivery, messages, now: () => "2026-10-07T01:00:00" });
+    } finally {
+      delete process.env.PUBLIC_BASE_URL;
+    }
+
+    expect(delivery.sent[0]?.text).toContain("https://example.test/b/tok-abc");
+  });
+
+  it("leaves the link out when a transfer has no token", async () => {
+    const db = makeDb();
+    seedCustomer(db);
+    seedTransfer(db, { billToken: null });
+    const delivery = new FakeDelivery();
+
+    await notifyPayouts({ db, delivery, messages, now: () => "2026-10-07T01:00:00" });
+
+    expect(delivery.sent[0]?.text).not.toContain("/b/");
   });
 });
 

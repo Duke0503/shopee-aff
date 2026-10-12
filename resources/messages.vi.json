@@ -145,5 +145,6 @@
   "bill_not_found_link": "Về trang chủ Hoàn Tiền DP",
   "bill_sign_in_title": "Vui lòng đăng nhập",
   "bill_sign_in_body": "Link biên lai cũ không còn dùng được. Hãy đăng nhập để xem biên lai của bạn.",
-  "bill_sign_in_link": "Đăng nhập xem biên lai"
+  "bill_sign_in_link": "Đăng nhập xem biên lai",
+  "order_paid_bill_line": "🔗 Biên lai: {url}"
 }

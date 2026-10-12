@@ -1,15 +1,21 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
-import type { Db } from "../../../shared/database/connection";
-import { customers, paymentTransfers } from "../../../shared/database/schema";
 import type { DeliveryPort, NotifyResult } from "../../../notifications/delivery";
 import { formatVnd, render, type Messages } from "../../../notifications/messages";
+import { publicUrl } from "../../../shared/config/public-base-url";
+import type { Db } from "../../../shared/database/connection";
+import { customers, paymentTransfers } from "../../../shared/database/schema";
 import { decodeOrderIds } from "../infrastructure/payment-transfer.repository";
 
 /**
  * Telling a customer their money was sent. Ports the payout step: a transfer
  * row is marked notified only after the assistant confirms delivery, and a
  * second pass never sends the same transfer twice.
+ *
+ * The message ends with the bill link — the receipt for exactly this transfer —
+ * built from the row's own `bill_token`. A transfer with no token (one recorded
+ * before tokens existed) simply gets no link: a bill is never addressed by its
+ * row number.
  */
 export interface NotifyPayoutsDeps {
   db: Db;
@@ -36,6 +42,7 @@ export async function notifyPayouts(deps: NotifyPayoutsDeps): Promise<NotifyResu
       transferCode: paymentTransfers.transferCode,
       note: paymentTransfers.note,
       orderIds: paymentTransfers.orderIds,
+      billToken: paymentTransfers.billToken,
       zaloUserId: customers.zaloUserId,
       bankName: customers.bankName,
       bankAccount: customers.bankAccount,
@@ -50,12 +57,20 @@ export async function notifyPayouts(deps: NotifyPayoutsDeps): Promise<NotifyResu
   for (const row of rows) {
     if (!row.zaloUserId) continue;
     const bank = bankLine(row);
-    const text = render(deps.messages, bank ? "order_paid" : "order_paid_no_bank", {
-      amount: formatVnd(deps.messages, row.amount),
-      count: decodeOrderIds(row.orderIds).length,
-      bank,
-      reference: row.transferCode ?? row.note ?? "",
-    });
+    const lines = [
+      render(deps.messages, bank ? "order_paid" : "order_paid_no_bank", {
+        amount: formatVnd(deps.messages, row.amount),
+        count: decodeOrderIds(row.orderIds).length,
+        bank,
+        reference: row.transferCode ?? row.note ?? "",
+      }),
+    ];
+    if (row.billToken) {
+      lines.push(
+        render(deps.messages, "order_paid_bill_line", { url: publicUrl(`/b/${row.billToken}`) }),
+      );
+    }
+    const text = lines.join("\n");
     if (!(await deps.delivery.sendPrivate(row.zaloUserId, text))) continue;
     deps.db
       .update(paymentTransfers)
