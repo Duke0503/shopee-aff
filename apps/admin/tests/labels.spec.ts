@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import bundled from "../../../resources/dashboard.vi.json";
 import { label, type Labels } from "../src/shared/lib/labels";
-import { statusText } from "../src/shared/lib/status";
+import { platformText, roleText, settlementText, statusText } from "../src/shared/lib/status";
 
 const labels = bundled as Labels;
 
@@ -28,5 +28,24 @@ describe("statusText", () => {
 
   it("shows an unknown state as the server sent it", () => {
     expect(statusText(labels, "brand_new_state")).toBe("brand_new_state");
+  });
+});
+
+describe("the other words the order list needs", () => {
+  it("names the marketplace an order came from", () => {
+    expect(platformText(labels, "shopee")).toBe("Shopee");
+    expect(platformText(labels, "tiktok")).toBe("TikTok");
+    expect(platformText(labels, "lazada")).toBe("lazada");
+  });
+
+  it("says whether the marketplace has paid us yet", () => {
+    expect(settlementText(labels, "unsettled")).toBe("Chưa đối soát");
+    expect(settlementText(labels, "settled")).toBe("Đã đối soát");
+    expect(settlementText(labels, "who_knows")).toBe("who_knows");
+  });
+
+  it("names who a row is", () => {
+    expect(roleText(labels, "admin")).toBe("Chủ");
+    expect(roleText(labels, "employee")).toBe("Nhân viên");
   });
 });

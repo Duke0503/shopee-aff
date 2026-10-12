@@ -83,6 +83,47 @@ export interface ApiUsersPage {
   pagination: ApiPagination;
 }
 
+/** One order in the staff list: the customer page's row, plus whose it is. */
+export interface ApiAdminOrder extends ApiUserOrder {
+  customerId: string | null;
+  customerCode: string | null;
+  customerName: string | null;
+}
+
+export interface ApiAdminOrdersQuery {
+  search?: string;
+  status?: string;
+  settlementStatus?: string;
+  platform?: string;
+  customerId?: string;
+  /** A day (`2026-10-05`) or a full stamp; the server widens a day to 00:00–23:59. */
+  fromDate?: string;
+  toDate?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}
+
+export interface ApiAdminOrdersPage {
+  orders: ApiAdminOrder[];
+  pagination: ApiPagination;
+}
+
+/** Marking orders paid happens only after the money really left. */
+export interface ApiMarkPaidInput {
+  customerId: string;
+  orderIds: string[];
+}
+
+export interface ApiMarkPaidResult {
+  ok: boolean;
+  paid: number;
+  /** The orders that were left alone: unknown, another customer's, or already paid. */
+  skipped: string[];
+  message?: string;
+}
+
 export interface ApiUsersQuery {
   search?: string;
   bank?: "all" | "has_bank" | "no_bank";
@@ -272,13 +313,34 @@ function usersQuery(query: ApiUsersQuery = {}): string {
   return text === "" ? "" : `?${text}`;
 }
 
+/** The order list's filters, same rule: an unchosen filter is not sent. */
+function ordersQuery(query: ApiAdminOrdersQuery = {}): string {
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.status && query.status !== "all") params.set("status", query.status);
+  if (query.settlementStatus && query.settlementStatus !== "all") {
+    params.set("settlement_status", query.settlementStatus);
+  }
+  if (query.platform && query.platform !== "all") params.set("platform", query.platform);
+  if (query.customerId) params.set("customer_id", query.customerId);
+  if (query.fromDate) params.set("from_date", query.fromDate);
+  if (query.toDate) params.set("to_date", query.toDate);
+  if (query.page !== undefined && query.page > 1) params.set("page", String(query.page));
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.sortBy) params.set("sort_by", query.sortBy);
+  if (query.sortOrder) params.set("sort_order", query.sortOrder);
+  const text = params.toString();
+  return text === "" ? "" : `?${text}`;
+}
+
 export interface ApiClient {
   me(): Promise<ApiCustomer>;
   login(name: string, password: string): Promise<{ customerId: string }>;
   logout(): Promise<{ ok: boolean }>;
   myOrders(): Promise<ApiOrder[]>;
   balance(): Promise<ApiBalance>;
-  adminOrders(status?: string): Promise<ApiOrder[]>;
+  adminOrders(query?: ApiAdminOrdersQuery): Promise<ApiAdminOrdersPage>;
+  markOrdersPaid(input: ApiMarkPaidInput): Promise<ApiMarkPaidResult>;
   payouts(): Promise<ApiPayables>;
   convert(url: string, customerId?: string): Promise<ApiConvertResult>;
   linkStatus(requestId: string): Promise<ApiLinkStatus>;
@@ -323,10 +385,12 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
     logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: "{}" }),
     myOrders: () => request<ApiOrder[]>("/api/me/orders"),
     balance: () => request<ApiBalance>("/api/me/balance"),
-    adminOrders: (status) =>
-      request<ApiOrder[]>(
-        status ? `/api/admin/orders?status=${encodeURIComponent(status)}` : "/api/admin/orders",
-      ),
+    adminOrders: (query) => request<ApiAdminOrdersPage>(`/api/admin/orders${ordersQuery(query)}`),
+    markOrdersPaid: (input) =>
+      request<ApiMarkPaidResult>("/api/admin/orders/mark-paid", {
+        method: "POST",
+        body: JSON.stringify({ customer_id: input.customerId, order_ids: input.orderIds }),
+      }),
     payouts: () => request<ApiPayables>("/api/payouts"),
     convert: (url, customerId) =>
       request<ApiConvertResult>("/api/shopee/convert", {

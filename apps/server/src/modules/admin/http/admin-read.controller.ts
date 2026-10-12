@@ -15,6 +15,7 @@ import { AdminGuard, StaffGuard } from "../../identity";
 import { getUserDetail } from "../application/get-user-detail.use-case";
 import { listEmployees } from "../application/list-employees.use-case";
 import { listLogs } from "../application/list-logs.use-case";
+import { listOrders } from "../application/list-orders.use-case";
 import { listPayoutBatches } from "../application/list-payout-batches.use-case";
 import { listProducts } from "../application/list-products.use-case";
 import { listUsers } from "../application/list-users.use-case";
@@ -25,6 +26,21 @@ type QueryParams = Record<string, string | undefined>;
 
 const direction = (value?: string): "asc" | "desc" => (value === "asc" ? "asc" : "desc");
 const lower = (value?: string): string => (value ?? "").trim().toLowerCase();
+
+/**
+ * A day the screen sent (`2026-10-05`) becomes the whole day it names. Stamps
+ * are stored as local ISO with a `T` (`2026-10-05T09:12:00`), so the bounds use
+ * one too; a value that is already a full stamp is passed through untouched.
+ */
+const dayStart = (value?: string): string => {
+  const raw = (value ?? "").trim();
+  return raw.length === 10 ? `${raw}T00:00:00` : raw;
+};
+
+const dayEnd = (value?: string): string => {
+  const raw = (value ?? "").trim();
+  return raw.length === 10 ? `${raw}T23:59:59` : raw;
+};
 
 /**
  * The staff read surface: numbers, activity, customers and staff accounts.
@@ -51,6 +67,27 @@ export class AdminReadController {
         ...page,
         search: lower(query.search),
         action: query.action ?? "all",
+        sortOrder: direction(query.sort_order),
+      }),
+    };
+  }
+
+  @Get("orders")
+  @UseGuards(StaffGuard)
+  orders(@Query() query: QueryParams) {
+    const page = parsePage(query, 20);
+    return {
+      ok: true,
+      ...listOrders(this.db, {
+        ...page,
+        search: lower(query.search),
+        status: query.status ?? "all",
+        settlementStatus: query.settlement_status ?? "all",
+        platform: lower(query.platform ?? "all"),
+        customerId: (query.customer_id ?? "").trim(),
+        fromDate: dayStart(query.from_date ?? query.date_from),
+        toDate: dayEnd(query.to_date ?? query.date_to),
+        sortBy: lower(query.sort_by),
         sortOrder: direction(query.sort_order),
       }),
     };

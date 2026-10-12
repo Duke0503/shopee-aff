@@ -21,12 +21,12 @@ const NAV: Record<AdminRoute, LabelKey> = {
   transfers: "admin_nav_transfers",
 };
 
-function screen(route: AdminRoute, canRecordTransfer: boolean): ReactElement {
+function screen(route: AdminRoute, isAdmin: boolean): ReactElement {
   switch (route) {
     case "orders":
-      return <OrdersPage />;
+      return <OrdersPage canMarkPaid={isAdmin} />;
     case "customers":
-      return <CustomersPage canRecordTransfer={canRecordTransfer} />;
+      return <CustomersPage canRecordTransfer={isAdmin} />;
     case "campaigns":
       return <CampaignsPage />;
     case "transfers":

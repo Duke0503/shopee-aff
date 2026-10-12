@@ -3,8 +3,8 @@ import type { ReactElement } from "react";
 import type { ApiOrderBreakdown } from "@mmo/contracts";
 import { colors, spacing } from "@mmo/ui";
 
-import { label, useLabels, type LabelKey } from "../../shared/lib/labels";
-import { vnd } from "../../shared/lib/money";
+import { label, useLabels, type LabelKey } from "../lib/labels";
+import { vnd } from "../lib/money";
 
 /** The wording that explains what the figures rest on. */
 const BASIS = {

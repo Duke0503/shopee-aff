@@ -40,12 +40,28 @@ describe("createApiClient", () => {
     expect(await client.myOrders()).toEqual([{ orderId: "O1" }]);
   });
 
-  it("filters admin orders by status", async () => {
-    const fetchImpl = fakeFetch([]);
-    await createApiClient(fetchImpl, "").adminOrders("approved");
+  it("sends the order filters that were chosen, and no others", async () => {
+    const fetchImpl = fakeFetch({ ok: true, orders: [], pagination: {} });
+    await createApiClient(fetchImpl, "").adminOrders({
+      search: "ao thun",
+      status: "approved",
+      platform: "shopee",
+      fromDate: "2026-10-01",
+      toDate: "2026-10-05",
+      page: 2,
+    });
     expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
-      "/api/admin/orders?status=approved",
+      "/api/admin/orders?search=ao+thun&status=approved&platform=shopee" +
+        "&from_date=2026-10-01&to_date=2026-10-05&page=2",
     );
+  });
+
+  it("marks orders paid with the customer the server must check", async () => {
+    const fetchImpl = fakeFetch({ ok: true, paid: 1, skipped: [] });
+    await createApiClient(fetchImpl, "").markOrdersPaid({ customerId: "C1", orderIds: ["O1"] });
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ customer_id: "C1", order_ids: ["O1"] });
   });
 
   it("posts a link to convert", async () => {

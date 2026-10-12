@@ -7,7 +7,7 @@ import { shortDate, shortDateTime } from "../../shared/lib/dates";
 import { label, type Labels } from "../../shared/lib/labels";
 import { vnd, vndOrDash } from "../../shared/lib/money";
 import { statusText } from "../../shared/lib/status";
-import { OrderMoney } from "./order-money";
+import { OrderMoney } from "../../shared/ui/order-money";
 
 const table = { borderCollapse: "collapse", width: "100%" } as const;
 const cell = { borderBottom: `1px solid ${colors.border}`, fontSize: 12, padding: "4px 8px" } as const;

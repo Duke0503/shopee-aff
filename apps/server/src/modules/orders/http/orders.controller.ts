@@ -1,10 +1,9 @@
-import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from "@nestjs/common";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
 import { AdminGuard, nowLocalIso } from "../../identity";
-import type { OrderStatus } from "../domain/order";
-import { findOrder, listOrders, markPaid, settleOrdersForBatch } from "../infrastructure/order.repository";
+import { findOrder, markPaid, settleOrdersForBatch } from "../infrastructure/order.repository";
 
 interface MarkPaidBody {
   customer_id?: string;
@@ -22,20 +21,6 @@ interface SettleBody {
 @UseGuards(AdminGuard)
 export class OrdersController {
   constructor(@Inject(DB) private readonly db: Db) {}
-
-  @Get()
-  list(@Query("status") status?: OrderStatus) {
-    return listOrders(this.db, status ? { status } : {}).map((order) => ({
-      orderId: order.orderId,
-      customerId: order.customerId,
-      status: order.status,
-      orderValueVnd: order.orderValue,
-      approvedCommissionVnd: order.approvedCommission,
-      cashbackVnd: order.cashbackAmount,
-      recordedAt: order.recordedAt,
-      paidAt: order.paidAt,
-    }));
-  }
 
   /**
    * Records a transfer that already happened in the banking app. Every order of

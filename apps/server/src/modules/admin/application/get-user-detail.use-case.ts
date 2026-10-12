@@ -1,5 +1,5 @@
 import type { Balance } from "@mmo/money";
-import { desc, eq, inArray, or, sql } from "drizzle-orm";
+import { desc, eq, or, sql } from "drizzle-orm";
 
 import { estimateProductName } from "../../affiliate";
 import { computeBalanceFor, decodeOrderIds, listTransfersForCustomer } from "../../ledger";
@@ -8,11 +8,7 @@ import { cashbackRate } from "../../../shared/config/cashback-rate";
 import { periodIsWithheld } from "../../../shared/config/period-is-withheld";
 import type { Db } from "../../../shared/database/connection";
 import { activityLogs, customers, linkRequests } from "../../../shared/database/schema";
-import {
-  orderBreakdown,
-  type BreakdownStatus,
-  type OrderBreakdown,
-} from "../domain/order-breakdown";
+import { orderView, requestsForOrders, type OrderView } from "./order-view";
 
 /**
  * One customer's page: who they are, what they bought, what we sent them and
@@ -40,25 +36,6 @@ export interface UserDetailUser {
   lastLoginAt: string | null;
   loginCount: number;
   lastBotActivity: string | null;
-}
-
-export interface UserDetailOrder {
-  orderId: string;
-  status: string;
-  platform: string;
-  settlementStatus: string;
-  orderValueVnd: number | null;
-  estimatedCommissionVnd: number | null;
-  approvedCommissionVnd: number | null;
-  /** The saved cashback, or — before approval — the estimate the customer sees. */
-  cashbackVnd: number;
-  rejectionReason: string | null;
-  recordedAt: string | null;
-  approvedAt: string | null;
-  paidAt: string | null;
-  productName: string;
-  sourceUrl: string | null;
-  breakdown: OrderBreakdown;
 }
 
 export interface UserDetailRequest {
@@ -103,34 +80,13 @@ export interface UserDetailStats {
 
 export interface UserDetail {
   user: UserDetailUser;
-  orders: UserDetailOrder[];
+  orders: OrderView[];
   linkRequests: UserDetailRequest[];
   transfers: UserDetailTransfer[];
   stats: UserDetailStats;
 }
 
-type OrderRow = ReturnType<typeof listOrders>[number];
 type TransferRow = ReturnType<typeof listTransfersForCustomer>[number];
-
-interface OrderRequest {
-  estimateDetail: string | null;
-  sourceUrl: string;
-}
-
-/** The link requests behind these orders, in one read instead of one each. */
-function requestsForOrders(db: Db, requestIds: string[]): Map<string, OrderRequest> {
-  if (requestIds.length === 0) return new Map();
-  const rows = db
-    .select({
-      requestId: linkRequests.requestId,
-      estimateDetail: linkRequests.estimateDetail,
-      sourceUrl: linkRequests.sourceUrl,
-    })
-    .from(linkRequests)
-    .where(inArray(linkRequests.requestId, requestIds))
-    .all();
-  return new Map(rows.map((row) => [row.requestId, row]));
-}
 
 /** The last bot contact: a link request or a logged command, whichever is later. */
 function lastBotActivity(db: Db, customerId: string, zaloUserId: string | null): string | null {
@@ -160,40 +116,6 @@ function lastBotActivity(db: Db, customerId: string, zaloUserId: string | null):
       .sort()
       .at(-1) ?? null
   );
-}
-
-function orderView(
-  order: OrderRow,
-  request: OrderRequest | undefined,
-  rate: number,
-  withheld: boolean,
-): UserDetailOrder {
-  const breakdown = orderBreakdown({
-    status: order.status as BreakdownStatus,
-    approvedCommissionVnd: order.approvedCommission,
-    estimatedCommissionVnd: order.estimatedCommission,
-    savedCashbackVnd: order.cashbackAmount,
-    cashbackRate: rate,
-    periodIsWithheld: withheld,
-  });
-
-  return {
-    orderId: order.orderId,
-    status: order.status,
-    platform: order.platform,
-    settlementStatus: order.settlementStatus,
-    orderValueVnd: order.orderValue,
-    estimatedCommissionVnd: order.estimatedCommission,
-    approvedCommissionVnd: order.approvedCommission,
-    cashbackVnd: order.cashbackAmount ?? breakdown.cashbackVnd,
-    rejectionReason: order.rejectionReason,
-    recordedAt: order.recordedAt,
-    approvedAt: order.approvedAt,
-    paidAt: order.paidAt,
-    productName: estimateProductName(request?.estimateDetail ?? null),
-    sourceUrl: request?.sourceUrl ?? null,
-    breakdown,
-  };
 }
 
 function transferView(transfer: TransferRow): UserDetailTransfer {
@@ -269,7 +191,7 @@ function userView(row: CustomerRow, lastActivity: string | null): UserDetailUser
 /** The totals under the customer's name. The three balance figures come from
  * `computeBalanceFor`, so staff and customer are told the same numbers. */
 function statsView(
-  orderViews: UserDetailOrder[],
+  orderViews: OrderView[],
   transfers: TransferRow[],
   balance: Balance,
   totalRequests: number,
