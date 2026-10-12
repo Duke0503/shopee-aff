@@ -42,6 +42,23 @@ export interface Award {
   status: AwardStatus;
 }
 
+/** `startsAt <= moment < endsAt`, compared as times so formats do not matter. */
+export function windowOpen(startsAt: string, endsAt: string, moment: string | null): boolean {
+  if (!moment) return false;
+  const at = Date.parse(moment);
+  const start = Date.parse(startsAt);
+  const end = Date.parse(endsAt);
+  if (Number.isNaN(at) || Number.isNaN(start) || Number.isNaN(end)) return false;
+  return at >= start && at < end;
+}
+
+export function isCampaignRunning(
+  campaign: { startsAt: string; endsAt: string },
+  nowIso: string,
+): boolean {
+  return windowOpen(campaign.startsAt, campaign.endsAt, nowIso);
+}
+
 function isEligible(campaign: Campaign, order: CandidateOrder): boolean {
   if ((order.role ?? "user") !== "user") return false;
   if (campaign.excludedCustomerIds.includes(order.customerId)) return false;

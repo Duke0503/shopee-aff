@@ -80,3 +80,51 @@ describe("GET /api/admin/campaigns", () => {
     expect(res.json()[0]).toMatchObject({ campaignId: "CMP1", name: "Trung Thu", slots: 20, bonusVnd: 20000 });
   });
 });
+
+describe("POST /api/admin/campaigns", () => {
+  const payload = {
+    campaign_id: "CMP2",
+    name: "Black Friday",
+    starts_at: "2026-11-01T00:00:00",
+    ends_at: "2026-11-30T23:59:59",
+  };
+
+  it("requires an admin", async () => {
+    const res = await server.inject({ method: "POST", url: "/api/admin/campaigns", payload });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("creates a campaign with the old defaults", async () => {
+    const res = await server.inject({ method: "POST", url: "/api/admin/campaigns", headers: { cookie }, payload });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ ok: true, campaignId: "CMP2" });
+
+    const list = await server.inject({ method: "GET", url: "/api/admin/campaigns", headers: { cookie } });
+    const created = list.json().find((row: { campaignId: string }) => row.campaignId === "CMP2");
+    expect(created).toMatchObject({
+      name: "Black Friday",
+      slots: 20,
+      bonusVnd: 20000,
+      perCustomer: 0,
+      status: "active",
+    });
+  });
+
+  it("refuses a missing field and a duplicate id", async () => {
+    const missing = await server.inject({
+      method: "POST",
+      url: "/api/admin/campaigns",
+      headers: { cookie },
+      payload: { campaign_id: "CMP3", starts_at: "2026-11-01T00:00:00", ends_at: "2026-11-02T00:00:00" },
+    });
+    expect(missing.statusCode).toBe(400);
+
+    const duplicate = await server.inject({
+      method: "POST",
+      url: "/api/admin/campaigns",
+      headers: { cookie },
+      payload: { ...payload, name: "Again" },
+    });
+    expect(duplicate.statusCode).toBe(400);
+  });
+});

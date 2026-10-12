@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../../shared/database/database.module";
 import { HealthController } from "../../shared/health.controller";
+import { AssistantCampaignsController } from "./http/campaigns.controller";
 import { AssistantController } from "./http/assistant.controller";
 
 /**
@@ -11,6 +12,6 @@ import { AssistantController } from "./http/assistant.controller";
  */
 @Module({
   imports: [DatabaseModule],
-  controllers: [AssistantController, HealthController],
+  controllers: [AssistantController, AssistantCampaignsController, HealthController],
 })
 export class AssistantModule {}

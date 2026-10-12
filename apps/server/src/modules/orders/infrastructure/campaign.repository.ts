@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import type { Db } from "../../../shared/database/connection";
 import { campaignAwards, campaigns, customers, orders } from "../../../shared/database/schema";
+import { isCampaignRunning, windowOpen } from "../domain/campaign";
 
 /** Campaigns are rows of data, not code. Newest event first. */
 export function listCampaigns(db: Db) {
@@ -31,28 +32,15 @@ export function activeCampaigns(db: Db): CampaignRow[] {
     .all();
 }
 
-function splitList(value: string): string[] {
+export function splitList(value: string): string[] {
   return value
     .split(",")
     .map((part) => part.trim())
     .filter((part) => part !== "");
 }
 
-/** `startsAt <= moment < endsAt`, compared as times so formats do not matter. */
-export function windowOpen(startsAt: string, endsAt: string, moment: string | null): boolean {
-  if (!moment) return false;
-  const at = Date.parse(moment);
-  const start = Date.parse(startsAt);
-  const end = Date.parse(endsAt);
-  if (Number.isNaN(at) || Number.isNaN(start) || Number.isNaN(end)) return false;
-  return at >= start && at < end;
-}
-
-export function isCampaignRunning(campaign: CampaignRow, nowIso: string): boolean {
-  return windowOpen(campaign.startsAt, campaign.endsAt, nowIso);
-}
-
-function liveCounts(db: Db, campaignId: string): Map<string, number> {
+/** Live slots per customer in one campaign. */
+export function liveCounts(db: Db, campaignId: string): Map<string, number> {
   const rows = db
     .select({ customerId: campaignAwards.customerId, n: sql<number>`count(*)` })
     .from(campaignAwards)
@@ -62,7 +50,8 @@ function liveCounts(db: Db, campaignId: string): Map<string, number> {
   return new Map(rows.map((row) => [row.customerId, row.n]));
 }
 
-function liveTotal(db: Db, campaignId: string): number {
+/** Live (non-void) slots used in one campaign. */
+export function liveTotal(db: Db, campaignId: string): number {
   return (
     db
       .select({ n: sql<number>`count(*)` })
@@ -338,4 +327,34 @@ export function settleCampaignBonusesForOrders(
     .set({ status: AWARD_PAID, paidAt: nowIso })
     .where(and(inArray(campaignAwards.orderId, orderIds), eq(campaignAwards.status, AWARD_CONFIRMED)))
     .run().changes;
+}
+
+export interface NewCampaign {
+  campaignId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  slots: number;
+  bonusVnd: number;
+  minOrderValue: number;
+  platforms: string;
+  perCustomer: number;
+  createdAt: string;
+}
+
+export function campaignExists(db: Db, campaignId: string): boolean {
+  return (
+    db
+      .select({ campaignId: campaigns.campaignId })
+      .from(campaigns)
+      .where(eq(campaigns.campaignId, campaignId))
+      .get() !== undefined
+  );
+}
+
+/** A new event is a row of data, not code: one honest INSERT. */
+export function insertCampaign(db: Db, campaign: NewCampaign): void {
+  db.insert(campaigns)
+    .values({ ...campaign, status: "active" })
+    .run();
 }

@@ -6,6 +6,7 @@ import { AffiliateModule } from "./modules/affiliate/affiliate.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { OrdersModule } from "./modules/orders/orders.module";
+import { SiteModule } from "./modules/site/site.module";
 import { HealthController } from "./shared/health.controller";
 
 /**
@@ -14,7 +15,7 @@ import { HealthController } from "./shared/health.controller";
  * Admin reads across them.
  */
 @Module({
-  imports: [IdentityModule, AffiliateModule, OrdersModule, LedgerModule, AdminModule, JobsModule],
+  imports: [IdentityModule, AffiliateModule, OrdersModule, LedgerModule, AdminModule, SiteModule, JobsModule],
   controllers: [HealthController],
 })
 export class AppModule {}

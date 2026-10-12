@@ -4,7 +4,8 @@ import type { DeliveryPort, NotifyResult } from "../../../notifications/delivery
 import { formatVnd, render, type Messages } from "../../../notifications/messages";
 import type { Db } from "../../../shared/database/connection";
 import { campaignAwards, campaigns, customers, linkRequests, orders } from "../../../shared/database/schema";
-import { evaluateCampaigns, standingForOrder, AWARD_VOID, windowOpen } from "../infrastructure/campaign.repository";
+import { windowOpen } from "../domain/campaign";
+import { evaluateCampaigns, standingForOrder, AWARD_VOID } from "../infrastructure/campaign.repository";
 
 /**
  * Telling a customer the moment they win a campaign slot, and when they lose
