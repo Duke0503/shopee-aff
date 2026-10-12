@@ -75,12 +75,25 @@ beforeAll(async () => {
   const raw = new Database(dbPath);
   for (const statement of DDL) raw.exec(statement);
   const addCustomer = raw.prepare(
-    "INSERT INTO customers (customer_id, zalo_user_id, bank_account, role, status, created_at, password_hash)" +
-      " VALUES (?,?,?,?,?,?,?)",
+    "INSERT INTO customers (customer_id, customer_code, display_name, zalo_user_id, bank_name," +
+      " bank_account, account_holder, role, status, created_at, password_hash)" +
+      " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
   );
-  addCustomer.run("ADMIN", null, null, "admin", "active", "2026-01-01T00:00:00", hashPassword("ADMINPASS", "s1"));
-  addCustomer.run("C1", "Z1", "123", "user", "active", "2026-01-02T00:00:00", null);
-  addCustomer.run("C2", null, null, "user", "active", "2026-01-03T00:00:00", null);
+  addCustomer.run(
+    "ADMIN",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "admin",
+    "active",
+    "2026-01-01T00:00:00",
+    hashPassword("ADMINPASS", "s1"),
+  );
+  addCustomer.run("C1", "DP1", "An", "Z1", "Vietcombank", "123", "AN", "user", "active", "2026-01-02T00:00:00", null);
+  addCustomer.run("C2", null, null, null, null, null, null, "user", "active", "2026-01-03T00:00:00", null);
 
   const addOrder = raw.prepare(
     "INSERT INTO orders (order_id, customer_id, cashback_amount, status, updated_at) VALUES (?,?,?,?,?)",
@@ -114,10 +127,87 @@ describe("GET /api/admin/payments", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
+    // The row carries the identity the owner must check before sending money.
     expect(res.json().payables.ready).toEqual([
-      { customerId: "C1", amountVnd: 14506, blockedReason: null, bankChangedRecently: false },
+      {
+        customerId: "C1",
+        customerCode: "DP1",
+        displayName: "An",
+        bankName: "Vietcombank",
+        bankAccount: "123",
+        accountHolder: "AN",
+        amountVnd: 14506,
+        blockedReason: null,
+        bankChangedRecently: false,
+      },
     ]);
     expect(res.json().payables.blocked.map((p: { customerId: string }) => p.customerId)).toEqual(["C2"]);
+    expect(res.json().transfers).toEqual([]);
+  });
+});
+
+describe("GET /api/admin/payments/plan", () => {
+  interface PlanOrder {
+    orderId: string;
+  }
+
+  interface PlanBody {
+    customerId: string;
+    customerCode: string | null;
+    displayName: string | null;
+    orders: PlanOrder[];
+    ordersVnd: number;
+    bonusVnd: number;
+    totalVnd: number;
+    memo: string;
+    qr: { bankBin: string; accountNumber: string; amountVnd: number; note: string } | null;
+  }
+
+  const plan = async (customerId: string): Promise<PlanBody> => {
+    const res = await server.inject({
+      method: "GET",
+      url: `/api/admin/payments/plan?customer_id=${customerId}`,
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json() as PlanBody;
+  };
+
+  it("requires staff", async () => {
+    const res = await server.inject({ method: "GET", url: "/api/admin/payments/plan?customer_id=C1" });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("404s an unknown customer, and 400s without one", async () => {
+    const missing = await server.inject({ method: "GET", url: "/api/admin/payments/plan", headers: { cookie } });
+    expect(missing.statusCode).toBe(400);
+    const unknown = await server.inject({
+      method: "GET",
+      url: "/api/admin/payments/plan?customer_id=NOPE",
+      headers: { cookie },
+    });
+    expect(unknown.statusCode).toBe(404);
+  });
+
+  it("works out what a payout covers, and the memo to write", async () => {
+    const body = await plan("C1");
+    expect(body).toMatchObject({
+      customerId: "C1",
+      customerCode: "DP1",
+      displayName: "An",
+      ordersVnd: 14506,
+      bonusVnd: 0,
+      totalVnd: 14506,
+      memo: "DP1",
+    });
+    expect(body.orders.map((o: { orderId: string }) => o.orderId)).toEqual(["O1", "O2"]);
+    // The bank matches for certain, so the owner can scan instead of typing.
+    expect(body.qr).toEqual({ bankBin: "970436", accountNumber: "123", amountVnd: 14506, note: "DP1" });
+  });
+
+  it("offers no QR when there is no account to pay into", async () => {
+    const body = await plan("C2");
+    expect(body).toMatchObject({ totalVnd: 4000, qr: null });
   });
 });
 

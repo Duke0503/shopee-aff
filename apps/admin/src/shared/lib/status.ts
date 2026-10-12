@@ -28,6 +28,11 @@ const SETTLEMENT: Record<string, LabelKey> = {
   processing: "admin_settlement_processing",
 };
 
+/** Why a payout is on hold. Unknown reasons are shown as the server sent them. */
+const BLOCKED: Record<string, LabelKey> = {
+  "no bank account on file": "profile_bank_not_set",
+};
+
 /** The state in the owner's words; an unknown one is shown as the server sent it. */
 export function statusText(labels: Labels, status: string): string {
   const key = STATUS[status];
@@ -47,6 +52,13 @@ export function platformText(labels: Labels, platform: string): string {
 export function settlementText(labels: Labels, settlement: string): string {
   const key = SETTLEMENT[settlement];
   return key === undefined ? settlement : label(labels, key);
+}
+
+/** Why a customer cannot be paid yet, in the owner's words. */
+export function blockedText(labels: Labels, reason: string | null): string {
+  if (reason === null) return "";
+  const key = BLOCKED[reason];
+  return key === undefined ? reason : label(labels, key);
 }
 
 

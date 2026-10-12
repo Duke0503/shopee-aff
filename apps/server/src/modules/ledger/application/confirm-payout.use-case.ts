@@ -53,7 +53,17 @@ export function planPayoutFromDb(db: Db, orderIds: string[]): PayoutPlan {
   const orders: PayoutOrder[] = [];
   for (const orderId of orderIds) {
     const row = findOrder(db, orderId);
-    if (!row) return { ok: false, reason: `unknown order ${orderId}`, orderIds: [], awardIds: [], totalVnd: 0 };
+    if (!row) {
+      return {
+        ok: false,
+        reason: `unknown order ${orderId}`,
+        orderIds: [],
+        awardIds: [],
+        ordersVnd: 0,
+        bonusVnd: 0,
+        totalVnd: 0,
+      };
+    }
     orders.push({
       orderId: row.orderId,
       status: row.status as PayoutOrder["status"],

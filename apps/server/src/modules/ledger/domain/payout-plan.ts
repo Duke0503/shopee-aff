@@ -30,6 +30,11 @@ export interface PayoutPlan {
   reason: string | null;
   orderIds: string[];
   awardIds: string[];
+  /** The orders' own saved cashback. */
+  ordersVnd: number;
+  /** The CONFIRMED campaign bonuses riding with those orders. */
+  bonusVnd: number;
+  /** `ordersVnd + bonusVnd`: the whole figure the owner pays. */
   totalVnd: number;
 }
 
@@ -43,16 +48,22 @@ export function planPayout(orders: PayoutOrder[], awards: PayoutAward[]): Payout
       reason: `order ${refused.orderId} is not payable (${refused.status})`,
       orderIds: [],
       awardIds: [],
+      ordersVnd: 0,
+      bonusVnd: 0,
       totalVnd: 0,
     };
   }
 
   const confirmed = awards.filter((award) => award.status === "confirmed");
+  const ordersVnd = sum(orders.map((order) => order.cashbackVnd));
+  const bonusVnd = sum(confirmed.map((award) => award.bonusVnd));
   return {
     ok: true,
     reason: null,
     orderIds: orders.map((order) => order.orderId),
     awardIds: confirmed.map((award) => award.awardId),
-    totalVnd: sum(orders.map((order) => order.cashbackVnd)) + sum(confirmed.map((a) => a.bonusVnd)),
+    ordersVnd,
+    bonusVnd,
+    totalVnd: ordersVnd + bonusVnd,
   };
 }

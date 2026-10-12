@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, createApiClient, type ApiPayables } from "../src/api-client";
+import { ApiError, createApiClient, type ApiPaymentsPage } from "../src/api-client";
 
 function fakeFetch(payload: unknown, ok = true, status = 200): typeof fetch {
   return vi.fn(async () => ({
@@ -135,9 +135,41 @@ describe("createApiClient", () => {
     expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe("/api/me/balance");
   });
 
-  it("returns payables", async () => {
-    const payables: ApiPayables = { ready: [], blocked: [] };
-    const client = createApiClient(fakeFetch(payables));
-    expect(await client.payouts()).toEqual(payables);
+  it("reads the money-out list from the staff route", async () => {
+    const page: ApiPaymentsPage = {
+      ok: true,
+      payables: { ready: [], blocked: [] },
+      totals: { readyCount: 0, readyVnd: 0, blockedCount: 0, blockedVnd: 0, allCount: 0, allVnd: 0 },
+      transfers: [],
+    };
+    const fetchImpl = fakeFetch(page);
+    const client = createApiClient(fetchImpl, "");
+    expect(await client.payouts()).toEqual(page);
+    expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/payments",
+    );
+  });
+
+  it("asks for one customer's payout plan, and confirms it in the server's words", async () => {
+    const plan = fakeFetch({ ok: true, totalVnd: 0, orders: [], qr: null });
+    const client = createApiClient(plan, "");
+    await client.paymentPlan("C1");
+    expect((plan as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "/api/admin/payments/plan?customer_id=C1",
+    );
+
+    const confirm = fakeFetch({ ok: true, transferId: 1, amountVnd: 14506, billPath: "/b/T" });
+    await createApiClient(confirm, "").confirmPayout({
+      customerId: "C1",
+      orderIds: ["O1", "O2"],
+      transferCode: "FT1",
+    });
+    const init = (confirm as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toEqual({
+      customer_id: "C1",
+      order_ids: ["O1", "O2"],
+      note: "",
+      transfer_code: "FT1",
+    });
   });
 });

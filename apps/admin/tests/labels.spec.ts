@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import bundled from "../../../resources/dashboard.vi.json";
 import { label, type Labels } from "../src/shared/lib/labels";
-import { platformText, roleText, settlementText, statusText } from "../src/shared/lib/status";
+import {
+  blockedText,
+  platformText,
+  roleText,
+  settlementText,
+  statusText,
+} from "../src/shared/lib/status";
 
 const labels = bundled as Labels;
 
@@ -47,5 +53,11 @@ describe("the other words the order list needs", () => {
   it("names who a row is", () => {
     expect(roleText(labels, "admin")).toBe("Chủ");
     expect(roleText(labels, "employee")).toBe("Nhân viên");
+  });
+
+  it("says why a payout is on hold, and passes on a reason it does not know", () => {
+    expect(blockedText(labels, "no bank account on file")).toBe("Chưa cài đặt số tài khoản");
+    expect(blockedText(labels, "something new")).toBe("something new");
+    expect(blockedText(labels, null)).toBe("");
   });
 });

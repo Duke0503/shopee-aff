@@ -6,6 +6,7 @@ import {
   Inject,
   NotFoundException,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { eq } from "drizzle-orm";
@@ -17,8 +18,8 @@ import { customers } from "../../../shared/database/schema";
 import { StaffGuard, nowLocalIso } from "../../identity";
 import { findOrder } from "../../orders";
 import { confirmPayout } from "../application/confirm-payout.use-case";
-import { collectPayablesFromDb } from "../infrastructure/payables.repository";
-import { decodeOrderIds, listTransfers } from "../infrastructure/payment-transfer.repository";
+import { listPayments } from "../application/list-payments.use-case";
+import { planPaymentFor } from "../application/plan-payment.use-case";
 
 interface ConfirmBody {
   customer_id?: string;
@@ -47,23 +48,24 @@ export class PaymentsController {
     @Inject(MESSAGES) private readonly messages: Messages,
   ) {}
 
-  /** Everyone who can be paid now, plus the transfers already recorded. */
+  /** Everyone who can be paid now, who they are, plus the transfers recorded. */
   @Get()
   list() {
-    return {
-      ok: true,
-      payables: collectPayablesFromDb(this.db, nowLocalIso()),
-      transfers: listTransfers(this.db).map((transfer) => ({
-        id: transfer.id,
-        customerId: transfer.customerId,
-        amountVnd: transfer.amount,
-        transferCode: transfer.transferCode,
-        note: transfer.note,
-        orderIds: decodeOrderIds(transfer.orderIds),
-        createdAt: transfer.createdAt,
-        notifiedAt: transfer.notifiedAt,
-      })),
-    };
+    return { ok: true, ...listPayments(this.db, nowLocalIso()) };
+  }
+
+  /**
+   * What paying one customer right now would cover: their payable orders, the
+   * confirmed bonuses riding with them, the server's total, the memo, and a
+   * VietQR when the bank matches for certain. Nothing is recorded.
+   */
+  @Get("plan")
+  plan(@Query("customer_id") customerId?: string) {
+    const id = (customerId ?? "").trim();
+    if (!id) throw new BadRequestException("customer_id is required");
+    const plan = planPaymentFor(this.db, id);
+    if (plan === null) throw new NotFoundException("unknown customer");
+    return { ok: true, ...plan };
   }
 
   @Post("confirm")

@@ -1,294 +1,35 @@
+import type { ApiAdminOrdersQuery, ApiConfirmPayoutInput, ApiMarkPaidInput, ApiRecordTransferInput, ApiUsersQuery } from "./api-admin-types";
+import type {
+  ApiAdminOrdersPage,
+  ApiCampaign,
+  ApiConfirmPayoutResult,
+  ApiMarkPaidResult,
+  ApiPaymentPlan,
+  ApiPaymentsPage,
+  ApiRecordTransferResult,
+  ApiTransfer,
+  ApiUserDetail,
+  ApiUsersPage,
+} from "./api-admin-types";
+import type {
+  ApiBalance,
+  ApiBankDetails,
+  ApiConvertResult,
+  ApiCustomer,
+  ApiDeal,
+  ApiLabels,
+  ApiLinkStatus,
+  ApiOrder,
+} from "./api-types";
+
 /**
  * A small typed helper for calling the server, shared by both frontends
- * (ADR-13). The shapes here match the routes the server exposes.
+ * (ADR-13). The shapes it moves live in `./api-types` (the customer surface)
+ * and `./api-admin-types` (the staff console); both are re-exported here, so
+ * everything is imported from `@mmo/contracts`.
  */
-export interface ApiCustomer {
-  customerId: string;
-  customerCode: string | null;
-  displayName: string | null;
-  role: string;
-  hasBankDetails: boolean;
-}
-
-export interface ApiPayable {
-  customerId: string;
-  amountVnd: number;
-  blockedReason: string | null;
-  bankChangedRecently: boolean;
-}
-
-export interface ApiPayables {
-  ready: ApiPayable[];
-  blocked: ApiPayable[];
-}
-
-export interface ApiOrder {
-  orderId: string;
-  status: string;
-  orderValueVnd: number | null;
-  cashbackVnd: number | null;
-  recordedAt: string | null;
-  paidAt: string | null;
-}
-
-export interface ApiConvertResult {
-  ready: boolean;
-  affiliate_url: string | null;
-  request_id: string;
-  house: boolean;
-}
-
-export interface ApiLinkStatus {
-  ready: boolean;
-  affiliate_url: string | null;
-  status: string;
-  notified_at: string | null;
-}
-
-/** Web labels, read live from `resources/dashboard.vi.json` by the server. */
-export type ApiLabels = Record<string, string>;
-
-export interface ApiPagination {
-  page: number;
-  limit: number;
-  total: number;
-  total_pages: number;
-}
-
-/** One row of the admin customer list. Aggregates are stored columns only. */
-export interface ApiUserRow {
-  customerId: string;
-  customerCode: string | null;
-  displayName: string | null;
-  zaloUserId: string | null;
-  bankName: string | null;
-  bankAccount: string | null;
-  accountHolder: string | null;
-  createdAt: string;
-  lastLoginAt: string | null;
-  loginCount: number;
-  status: string;
-  orderCount: number;
-  totalCashback: number;
-  awaitingAmount: number;
-  readyAmount: number;
-  paidAmount: number;
-  lastBotActivity: string | null;
-  recentRequests: Array<{ name: string; createdAt: string; affiliateUrl: string | null }>;
-}
-
-export interface ApiUsersPage {
-  ok: boolean;
-  users: ApiUserRow[];
-  pagination: ApiPagination;
-}
-
-/** One order in the staff list: the customer page's row, plus whose it is. */
-export interface ApiAdminOrder extends ApiUserOrder {
-  customerId: string | null;
-  customerCode: string | null;
-  customerName: string | null;
-}
-
-export interface ApiAdminOrdersQuery {
-  search?: string;
-  status?: string;
-  settlementStatus?: string;
-  platform?: string;
-  customerId?: string;
-  /** A day (`2026-10-05`) or a full stamp; the server widens a day to 00:00–23:59. */
-  fromDate?: string;
-  toDate?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-  page?: number;
-  limit?: number;
-}
-
-export interface ApiAdminOrdersPage {
-  orders: ApiAdminOrder[];
-  pagination: ApiPagination;
-}
-
-/** Marking orders paid happens only after the money really left. */
-export interface ApiMarkPaidInput {
-  customerId: string;
-  orderIds: string[];
-}
-
-export interface ApiMarkPaidResult {
-  ok: boolean;
-  paid: number;
-  /** The orders that were left alone: unknown, another customer's, or already paid. */
-  skipped: string[];
-  message?: string;
-}
-
-export interface ApiUsersQuery {
-  search?: string;
-  bank?: "all" | "has_bank" | "no_bank";
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}
-
-/** What an order earned, and on what basis. Mirrors the server's breakdown. */
-export interface ApiOrderBreakdown {
-  basis: "approved" | "estimate" | "none";
-  commissionVnd: number;
-  serviceFeeVnd: number;
-  withheldTaxVnd: number;
-  netVnd: number;
-  cashbackVnd: number;
-  operatorKeepsVnd: number;
-  operatorMarginPercent: number;
-}
-
-export interface ApiUserOrder {
-  orderId: string;
-  status: string;
-  platform: string;
-  settlementStatus: string;
-  orderValueVnd: number | null;
-  estimatedCommissionVnd: number | null;
-  approvedCommissionVnd: number | null;
-  cashbackVnd: number;
-  rejectionReason: string | null;
-  recordedAt: string | null;
-  approvedAt: string | null;
-  paidAt: string | null;
-  productName: string;
-  sourceUrl: string | null;
-  breakdown: ApiOrderBreakdown;
-}
-
-export interface ApiUserRequest {
-  requestId: string;
-  createdAt: string;
-  sourceUrl: string;
-  affiliateUrl: string | null;
-  platform: string;
-  channel: string | null;
-  status: string;
-  estimatedCommissionVnd: number | null;
-  productName: string;
-}
-
-export interface ApiUserTransfer {
-  id: number;
-  amountVnd: number;
-  transferCode: string | null;
-  note: string | null;
-  createdAt: string;
-  createdBy: string | null;
-  orderIds: string[];
-  /** The bill sent to the customer; empty when the row has no token. */
-  billPath: string;
-  /** The bank screenshot; served only to the customer or to staff. */
-  proofPath: string;
-}
-
-export interface ApiUserStats {
-  totalCashbackVnd: number;
-  readyVnd: number;
-  awaitingVnd: number;
-  paidVnd: number;
-  totalOrders: number;
-  totalRequests: number;
-  totalTransferredVnd: number;
-  totalAdminProfitVnd: number;
-  periodIsWithheld: boolean;
-}
-
-/** One customer's page. Amounts all come from the server. */
-export interface ApiUserDetail {
-  ok: boolean;
-  user: {
-    customerId: string;
-    customerCode: string | null;
-    displayName: string | null;
-    zaloUserId: string | null;
-    privateChatId: string | null;
-    bankName: string | null;
-    bankAccount: string | null;
-    accountHolder: string | null;
-    consentAt: string | null;
-    status: string;
-    role: string;
-    createdAt: string;
-    lastLoginAt: string | null;
-    loginCount: number;
-    lastBotActivity: string | null;
-  };
-  orders: ApiUserOrder[];
-  linkRequests: ApiUserRequest[];
-  transfers: ApiUserTransfer[];
-  stats: ApiUserStats;
-}
-
-export interface ApiRecordTransferInput {
-  customerId: string;
-  /** Empty means every order of that customer that is approved and unpaid. */
-  orderIds?: string[];
-  /** What the screen showed; the server refuses a mismatch instead of paying it. */
-  amountVnd?: number;
-  note?: string;
-  transferCode?: string;
-  proofImage?: string;
-}
-
-export interface ApiRecordTransferResult {
-  ok: boolean;
-  transferId: number;
-  amountVnd: number;
-  billToken: string;
-  billPath: string;
-}
-
-export interface ApiCampaign {
-  campaignId: string;
-  name: string;
-  startsAt: string;
-  endsAt: string;
-  slots: number;
-  bonusVnd: number;
-  perCustomer: number;
-  status: string;
-}
-
-export interface ApiTransfer {
-  id: number;
-  customerId: string;
-  amountVnd: number;
-  note: string | null;
-  orderIds: string[];
-  createdAt: string;
-}
-
-export interface ApiBalance {
-  approvedWaitingVnd: number;
-  stillWithShopVnd: number;
-  alreadyPaidVnd: number;
-}
-
-export interface ApiDeal {
-  id: string;
-  name: string;
-  platform: string;
-  category: string;
-  originalPriceVnd: number;
-  salePriceVnd: number;
-  cashbackVnd: number;
-  imageUrl: string;
-  url: string;
-}
-
-export interface ApiBankDetails {
-  bankName: string;
-  bankAccount: string;
-  accountHolder: string;
-}
+export * from "./api-types";
+export * from "./api-admin-types";
 
 export class ApiError extends Error {
   constructor(
@@ -341,7 +82,10 @@ export interface ApiClient {
   balance(): Promise<ApiBalance>;
   adminOrders(query?: ApiAdminOrdersQuery): Promise<ApiAdminOrdersPage>;
   markOrdersPaid(input: ApiMarkPaidInput): Promise<ApiMarkPaidResult>;
-  payouts(): Promise<ApiPayables>;
+  payouts(): Promise<ApiPaymentsPage>;
+  paymentPlan(customerId: string): Promise<ApiPaymentPlan>;
+  confirmPayout(input: ApiConfirmPayoutInput): Promise<ApiConfirmPayoutResult>;
+  askForBank(customerId: string): Promise<{ ok: boolean }>;
   convert(url: string, customerId?: string): Promise<ApiConvertResult>;
   linkStatus(requestId: string): Promise<ApiLinkStatus>;
   adminUsers(query?: ApiUsersQuery): Promise<ApiUsersPage>;
@@ -354,6 +98,8 @@ export interface ApiClient {
   saveBank(details: ApiBankDetails): Promise<{ ok: boolean }>;
 }
 
+type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
+
 /** The server's own words when it explains a refusal, the raw body otherwise. */
 async function errorMessage(response: Response): Promise<string> {
   const text = await response.text();
@@ -365,16 +111,11 @@ async function errorMessage(response: Response): Promise<string> {
   }
 }
 
-export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetchImpl(`${baseUrl}${path}`, {
-      headers: { "content-type": "application/json" },
-      ...init,
-    });
-    if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
-    return (await response.json()) as T;
-  }
-
+/** What a signed-in customer's own pages need. */
+function customerClient(request: Request): Pick<
+  ApiClient,
+  "me" | "login" | "logout" | "myOrders" | "balance" | "convert" | "linkStatus" | "deals" | "saveBank"
+> {
   return {
     me: () => request<ApiCustomer>("/api/me"),
     login: (name, password) =>
@@ -385,13 +126,6 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
     logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: "{}" }),
     myOrders: () => request<ApiOrder[]>("/api/me/orders"),
     balance: () => request<ApiBalance>("/api/me/balance"),
-    adminOrders: (query) => request<ApiAdminOrdersPage>(`/api/admin/orders${ordersQuery(query)}`),
-    markOrdersPaid: (input) =>
-      request<ApiMarkPaidResult>("/api/admin/orders/mark-paid", {
-        method: "POST",
-        body: JSON.stringify({ customer_id: input.customerId, order_ids: input.orderIds }),
-      }),
-    payouts: () => request<ApiPayables>("/api/payouts"),
     convert: (url, customerId) =>
       request<ApiConvertResult>("/api/shopee/convert", {
         method: "POST",
@@ -399,10 +133,69 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
       }),
     linkStatus: (requestId) =>
       request<ApiLinkStatus>(`/api/shopee/link-status?request_id=${encodeURIComponent(requestId)}`),
-    adminUsers: (query) =>
-      request<ApiUsersPage>(`/api/admin/users${usersQuery(query)}`),
+    deals: () => request<ApiDeal[]>("/api/deals"),
+    saveBank: (details) =>
+      request<{ ok: boolean }>("/api/me/bank", {
+        method: "POST",
+        body: JSON.stringify(details),
+      }),
+  };
+}
+
+/** What the staff console reads. */
+function staffReadClient(request: Request): Pick<
+  ApiClient,
+  | "labels"
+  | "adminOrders"
+  | "payouts"
+  | "paymentPlan"
+  | "adminUsers"
+  | "adminUserDetail"
+  | "adminCampaigns"
+  | "adminTransfers"
+> {
+  return {
+    labels: () => request<ApiLabels>("/api/labels"),
+    adminOrders: (query) => request<ApiAdminOrdersPage>(`/api/admin/orders${ordersQuery(query)}`),
+    payouts: () => request<ApiPaymentsPage>("/api/admin/payments"),
+    paymentPlan: (customerId) =>
+      request<ApiPaymentPlan>(
+        `/api/admin/payments/plan?customer_id=${encodeURIComponent(customerId)}`,
+      ),
+    adminUsers: (query) => request<ApiUsersPage>(`/api/admin/users${usersQuery(query)}`),
     adminUserDetail: (customerId) =>
       request<ApiUserDetail>(`/api/admin/users/${encodeURIComponent(customerId)}`),
+    adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
+    adminTransfers: () => request<ApiTransfer[]>("/api/admin/transfers"),
+  };
+}
+
+/** The staff writes: each one records something that already happened. */
+function staffWriteClient(request: Request): Pick<
+  ApiClient,
+  "markOrdersPaid" | "confirmPayout" | "askForBank" | "recordTransfer"
+> {
+  return {
+    markOrdersPaid: (input) =>
+      request<ApiMarkPaidResult>("/api/admin/orders/mark-paid", {
+        method: "POST",
+        body: JSON.stringify({ customer_id: input.customerId, order_ids: input.orderIds }),
+      }),
+    confirmPayout: (input) =>
+      request<ApiConfirmPayoutResult>("/api/admin/payments/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          customer_id: input.customerId,
+          order_ids: input.orderIds,
+          note: input.note ?? "",
+          transfer_code: input.transferCode ?? "",
+        }),
+      }),
+    askForBank: (customerId) =>
+      request<{ ok: boolean }>("/api/admin/payments/ask-bank", {
+        method: "POST",
+        body: JSON.stringify({ customer_id: customerId }),
+      }),
     recordTransfer: (input) =>
       request<ApiRecordTransferResult>("/api/admin/transfers", {
         method: "POST",
@@ -415,14 +208,22 @@ export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): 
           proof_image: input.proofImage,
         }),
       }),
-    labels: () => request<ApiLabels>("/api/labels"),
-    adminCampaigns: () => request<ApiCampaign[]>("/api/admin/campaigns"),
-    adminTransfers: () => request<ApiTransfer[]>("/api/admin/transfers"),
-    deals: () => request<ApiDeal[]>("/api/deals"),
-    saveBank: (details) =>
-      request<{ ok: boolean }>("/api/me/bank", {
-        method: "POST",
-        body: JSON.stringify(details),
-      }),
+  };
+}
+
+export function createApiClient(fetchImpl: typeof fetch = fetch, baseUrl = ""): ApiClient {
+  const request: Request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+    const response = await fetchImpl(`${baseUrl}${path}`, {
+      headers: { "content-type": "application/json" },
+      ...init,
+    });
+    if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
+    return (await response.json()) as T;
+  };
+
+  return {
+    ...customerClient(request),
+    ...staffReadClient(request),
+    ...staffWriteClient(request),
   };
 }

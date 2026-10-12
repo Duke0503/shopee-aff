@@ -40,6 +40,16 @@ describe("planPayout", () => {
     expect(plan.totalVnd).toBe(29_506);
   });
 
+  it("shows what the orders earned and what the campaign added, adding up", () => {
+    const plan = planPayout(
+      [order({ orderId: "A", cashbackVnd: 9506 }), order({ orderId: "B", cashbackVnd: 5000 })],
+      [award({ awardId: "W1", status: "confirmed", bonusVnd: 20_000 })],
+    );
+    expect(plan.ordersVnd).toBe(14_506);
+    expect(plan.bonusVnd).toBe(20_000);
+    expect(plan.ordersVnd + plan.bonusVnd).toBe(plan.totalVnd);
+  });
+
   it("reports every order it covers", () => {
     const plan = planPayout(
       [order({ orderId: "A", cashbackVnd: 1 }), order({ orderId: "B", cashbackVnd: 2 })],

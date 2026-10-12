@@ -430,5 +430,20 @@
   "admin_settlement_unsettled": "Chưa đối soát",
   "admin_settlement_settled": "Đã đối soát",
   "admin_settlement_processing": "Đang đối soát",
-  "admin_search_orders": "Tìm mã đơn, khách, sản phẩm"
+  "admin_search_orders": "Tìm mã đơn, khách, sản phẩm",
+  "admin_payouts_total": "Tổng phải trả",
+  "admin_payouts_pay": "Chuyển tiền",
+  "admin_payouts_ask_bank": "Hỏi số tài khoản",
+  "admin_payouts_ask_sent": "Đã nhờ bot hỏi khách.",
+  "admin_payouts_ask_failed": "Không gửi được: {reason}",
+  "admin_payouts_warning": "Vừa đổi số tài khoản — kiểm tra lại trước khi chuyển.",
+  "admin_payouts_reason": "Lý do",
+  "admin_payouts_orders_total": "Tiền từ đơn",
+  "admin_payouts_bonus": "Thưởng chiến dịch",
+  "admin_payouts_qr": "Quét mã để chuyển",
+  "admin_payouts_qr_alt": "Mã VietQR",
+  "admin_payouts_qr_none": "Không tạo được mã QR — chuyển tay theo số tài khoản trên.",
+  "admin_payouts_memo_hint": "Ghi đúng nội dung này khi chuyển.",
+  "admin_payouts_copy": "Sao chép số tài khoản",
+  "admin_payouts_copied": "Đã sao chép"
 }
