@@ -7,5 +7,6 @@ export * from "./application/bill.use-case";
 export * from "./application/confirm-payout.use-case";
 export * from "./application/notify-payouts.use-case";
 export * from "./application/proof.use-case";
+export * from "./application/record-transfer.use-case";
 export * from "./infrastructure/payment-transfer.repository";
 export * from "./infrastructure/balance.repository";

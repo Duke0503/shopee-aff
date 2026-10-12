@@ -15,6 +15,8 @@ export interface NewTransfer {
   note: string;
   transferCode: string;
   createdAt: string;
+  /** The bank screenshot the owner uploaded, as a URL; empty until one exists. */
+  proofImage?: string | null;
   /** Defaults to a fresh unguessable one: the bill link is `/b/<bill_token>`. */
   billToken?: string;
 }
@@ -33,6 +35,7 @@ export function recordTransfer(db: Db, transfer: NewTransfer): number {
       orderIds: encodeOrderIds(transfer.orderIds),
       note: transfer.note,
       transferCode: transfer.transferCode,
+      proofImage: transfer.proofImage ?? null,
       billToken: transfer.billToken ?? createBillToken(),
       createdAt: transfer.createdAt,
     })

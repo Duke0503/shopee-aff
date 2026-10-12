@@ -41,3 +41,17 @@ export function collectPayablesFromDb(db: Db, nowIso: string): Payables {
 
   return collectPayables(inputs, nowIso);
 }
+
+/**
+ * The orders one payout covers right now, most recently earned first: approved
+ * and not yet paid. An empty list means there is nothing to pay.
+ */
+export function payableOrderIdsForCustomer(db: Db, customerId: string): string[] {
+  return db
+    .select({ orderId: orders.orderId })
+    .from(orders)
+    .where(and(eq(orders.customerId, customerId), eq(orders.status, "approved"), isNull(orders.paidAt)))
+    .orderBy(sql`COALESCE(${orders.approvedAt}, ${orders.recordedAt}) DESC`)
+    .all()
+    .map((row) => row.orderId);
+}

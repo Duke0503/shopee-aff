@@ -89,7 +89,13 @@ export class PaymentsController {
       nowIso: nowLocalIso(),
     });
     if (!result.ok) throw new BadRequestException(result.reason ?? "payout failed");
-    return { ok: true, transferId: result.transferId, amountVnd: result.amountVnd };
+    return {
+      ok: true,
+      transferId: result.transferId,
+      amountVnd: result.amountVnd,
+      billToken: result.billToken,
+      billPath: `/b/${result.billToken}`,
+    };
   }
 
   /** Have the bot ask one customer for a bank account, privately. */
