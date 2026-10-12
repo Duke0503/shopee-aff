@@ -2,10 +2,12 @@ import { Controller, Get, Inject, Query, UseGuards } from "@nestjs/common";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
+import { cashbackRate } from "../../../shared/config/cashback-rate";
 import { AdminGuard, StaffGuard } from "../../identity";
 import { listEmployees } from "../application/list-employees.use-case";
 import { listLogs } from "../application/list-logs.use-case";
 import { listPayoutBatches } from "../application/list-payout-batches.use-case";
+import { listProducts } from "../application/list-products.use-case";
 import { listUsers } from "../application/list-users.use-case";
 import { computeMetrics } from "../application/metrics.use-case";
 import { parsePage } from "../application/pagination";
@@ -84,6 +86,25 @@ export class AdminReadController {
     return {
       ok: true,
       ...listPayoutBatches(this.db, { ...page, platform: query.platform ?? "all" }),
+    };
+  }
+
+  @Get("products")
+  @UseGuards(StaffGuard)
+  products(@Query() query: QueryParams) {
+    const page = parsePage(query, 20);
+    return {
+      ok: true,
+      ...listProducts(
+        this.db,
+        {
+          ...page,
+          search: lower(query.search),
+          sortBy: lower(query.sort_by),
+          sortOrder: direction(query.sort_order),
+        },
+        cashbackRate(),
+      ),
     };
   }
 }

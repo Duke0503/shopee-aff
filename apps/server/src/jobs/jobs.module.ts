@@ -7,6 +7,7 @@ import type { Messages } from "../notifications/messages";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { DB, DatabaseModule } from "../shared/database/database.module";
 import type { Db } from "../shared/database/connection";
+import { cashbackRate } from "../shared/config/cashback-rate";
 import { JobRunner, type ScheduledJob } from "./job-runner";
 import { createNotifyJob } from "./notify.job";
 import { createAccessTradeReconcileJob } from "./reconcile-accesstrade.job";
@@ -17,8 +18,6 @@ function jobsEnabled(): boolean {
   if (flag !== undefined) return flag === "true";
   return process.env.NODE_ENV === "production";
 }
-
-const cashbackRate = (): number => Number(process.env.CASHBACK_RATE ?? 0.8);
 
 /**
  * The notify loop always runs; AccessTrade reconciliation only runs when its
