@@ -4,6 +4,7 @@ import { NotificationsModule } from "../../notifications";
 import { DatabaseModule } from "../../shared/database/database.module";
 import { HealthController } from "../../shared/health.controller";
 import { AssistantActivityController } from "./http/activity.controller";
+import { AssistantAlertsController } from "./http/alerts.controller";
 import { AssistantCampaignsController } from "./http/campaigns.controller";
 import { AssistantController } from "./http/assistant.controller";
 
@@ -18,6 +19,7 @@ import { AssistantController } from "./http/assistant.controller";
     AssistantController,
     AssistantCampaignsController,
     AssistantActivityController,
+    AssistantAlertsController,
     HealthController,
   ],
 })

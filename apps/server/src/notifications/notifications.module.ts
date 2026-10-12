@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { Module } from "@nestjs/common";
 
+import { ALERT_COOLDOWN, AlertCooldown } from "./alert-cooldown";
 import { DELIVERY_PORT, HttpDelivery, MESSAGES } from "./delivery";
 import { loadMessages, type Messages } from "./messages";
 
@@ -34,7 +35,11 @@ const DEFAULT_MESSAGES_PATH = fileURLToPath(
           telegramChatId: process.env.TELEGRAM_CHAT_ID,
         }),
     },
+    {
+      provide: ALERT_COOLDOWN,
+      useFactory: (): AlertCooldown => new AlertCooldown(),
+    },
   ],
-  exports: [MESSAGES, DELIVERY_PORT],
+  exports: [MESSAGES, DELIVERY_PORT, ALERT_COOLDOWN],
 })
 export class NotificationsModule {}

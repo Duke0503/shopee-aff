@@ -1,7 +1,12 @@
-import { eq, inArray, or } from "drizzle-orm";
+import { eq, inArray, or, sql } from "drizzle-orm";
 
 import type { Db } from "../../../shared/database/connection";
 import { customerAliases, customers } from "../../../shared/database/schema";
+
+/** How many customer rows exist: the "total khách" figure in the owner alert. */
+export function countCustomers(db: Db): number {
+  return db.select({ n: sql<number>`count(*)` }).from(customers).get()?.n ?? 0;
+}
 
 /** Strip every whitespace character, as the Python does before any lookup. */
 export function normaliseKey(key: string): string {
