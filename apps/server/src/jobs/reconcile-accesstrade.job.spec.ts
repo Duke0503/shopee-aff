@@ -98,4 +98,20 @@ describe("createAccessTradeReconcileJob", () => {
     await makeJob(db, new FakeOrders([])).run();
     expect(lastRun(db)).toBeNull();
   });
+
+  it("withholds the 10% when the payout period is withheld", async () => {
+    const original = process.env.PAYOUT_PERIOD_WITHHELD;
+    process.env.PAYOUT_PERIOD_WITHHELD = "true";
+    try {
+      const job = makeJob(db, new FakeOrders([confirmed("T1")]));
+      await job.run();
+      await job.run();
+    } finally {
+      if (original === undefined) delete process.env.PAYOUT_PERIOD_WITHHELD;
+      else process.env.PAYOUT_PERIOD_WITHHELD = original;
+    }
+
+    // 31,500 commission: fee 309, tax 3,150 -> net 28,041 -> 80% = 22,432.8 (half up).
+    expect(findOrder(db, "T1")).toMatchObject({ status: "approved", cashbackAmount: 22_433 });
+  });
 });

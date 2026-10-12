@@ -1,5 +1,6 @@
 import { splitCommission } from "@mmo/money";
 
+import { periodIsWithheld } from "../../../shared/config/period-is-withheld";
 import type { Db } from "../../../shared/database/connection";
 import {
   buyersFor,
@@ -48,7 +49,7 @@ function buyerView(buyer: BuyerRow, cashbackRate: number) {
     approvedCommission: buyer.approvedCommission,
     estimatedCommission: buyer.estimatedCommission,
     cashbackAmount:
-      buyer.cashbackAmount ?? splitCommission(commission, cashbackRate, false).customerReceives,
+      buyer.cashbackAmount ?? splitCommission(commission, cashbackRate, periodIsWithheld()).customerReceives,
     status: buyer.status,
     orderDate: buyer.orderDate,
   };

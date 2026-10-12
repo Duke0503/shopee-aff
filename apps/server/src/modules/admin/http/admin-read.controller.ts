@@ -1,9 +1,18 @@
-import { Controller, Get, Inject, Query, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Param,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 
 import type { Db } from "../../../shared/database/connection";
 import { DB } from "../../../shared/database/database.module";
 import { cashbackRate } from "../../../shared/config/cashback-rate";
 import { AdminGuard, StaffGuard } from "../../identity";
+import { getUserDetail } from "../application/get-user-detail.use-case";
 import { listEmployees } from "../application/list-employees.use-case";
 import { listLogs } from "../application/list-logs.use-case";
 import { listPayoutBatches } from "../application/list-payout-batches.use-case";
@@ -61,6 +70,14 @@ export class AdminReadController {
         sortOrder: direction(query.sort_order),
       }),
     };
+  }
+
+  @Get("users/:id")
+  @UseGuards(StaffGuard)
+  userDetail(@Param("id") id: string) {
+    const detail = getUserDetail(this.db, id);
+    if (!detail) throw new NotFoundException("unknown customer");
+    return { ok: true, ...detail };
   }
 
   @Get("employees")

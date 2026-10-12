@@ -158,6 +158,21 @@ describe("GET /api/admin/products", () => {
     expect(buyers[1]).toMatchObject({ orderId: "O1", cashbackAmount: 8_000 });
   });
 
+  it("computes a fallback cashback with the period's withholding flag", async () => {
+    const original = process.env.PAYOUT_PERIOD_WITHHELD;
+    process.env.PAYOUT_PERIOD_WITHHELD = "true";
+    try {
+      const body = (await products()).json() as { products: Array<Record<string, unknown>> };
+      const product = body.products.find((row) => row.itemId === "111") as Record<string, unknown>;
+      const buyers = product.buyers as Array<Record<string, unknown>>;
+      // 10,000 commission: fee 98, tax 1,000 -> net 8,902 -> 80% = 7,122.
+      expect(buyers[0]).toMatchObject({ orderId: "O2", cashbackAmount: 7_122 });
+    } finally {
+      if (original === undefined) delete process.env.PAYOUT_PERIOD_WITHHELD;
+      else process.env.PAYOUT_PERIOD_WITHHELD = original;
+    }
+  });
+
   it("reports zeros for a product nobody has asked for", async () => {
     const body = (await products()).json() as { products: Array<Record<string, unknown>> };
     const product = body.products.find((row) => row.itemId === "222") as Record<string, unknown>;
