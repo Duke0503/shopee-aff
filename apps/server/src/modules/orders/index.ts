@@ -1,4 +1,5 @@
 export * from "./domain/order";
+export * from "./domain/order-time";
 export * from "./domain/order-response";
 export * from "./domain/attribution";
 export * from "./domain/reconcile";

@@ -1,4 +1,5 @@
 import { parseCommissionRate, parseVndAmount } from "../domain/accesstrade";
+import type { AccessTradeTransaction } from "../domain/accesstrade-order";
 
 /**
  * Talks to the AccessTrade Publisher API, which makes TikTok Shop and Lazada
@@ -19,11 +20,17 @@ export interface AccessTradePort {
   createLazadaLink(productUrl: string, subId1: string, subId2: string): Promise<AccessTradeLink>;
 }
 
+/** The order side of the API: the commission lines reconciliation reads. */
+export interface AccessTradeOrdersPort {
+  fetchTransactions(sinceDays?: number): Promise<AccessTradeTransaction[]>;
+}
+
 export interface AccessTradeConfig {
   apiKey: string;
   baseUrl: string;
   lazadaCampaignId: string;
   timeoutMs: number;
+  maxPages: number;
 }
 
 export const DEFAULT_ACCESSTRADE_BASE_URL = "https://api.accesstrade.vn";
@@ -31,11 +38,13 @@ export const DEFAULT_LAZADA_CAMPAIGN_ID = "5087153089503673507";
 
 export function accessTradeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): AccessTradeConfig {
   const timeout = Number(env.ACCESSTRADE_TIMEOUT_MS ?? 10_000);
+  const maxPages = Number(env.ACCESSTRADE_MAX_PAGES ?? 10);
   return {
     apiKey: (env.ACCESSTRADE_API_KEY ?? "").trim(),
     baseUrl: (env.ACCESSTRADE_BASE_URL ?? DEFAULT_ACCESSTRADE_BASE_URL).trim().replace(/\/+$/, ""),
     lazadaCampaignId: (env.ACCESSTRADE_LAZADA_CAMPAIGN_ID ?? DEFAULT_LAZADA_CAMPAIGN_ID).trim(),
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 10_000,
+    maxPages: Number.isFinite(maxPages) && maxPages > 0 ? maxPages : 10,
   };
 }
 
@@ -50,18 +59,25 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
-export class HttpAccessTrade implements AccessTradePort {
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+export class HttpAccessTrade implements AccessTradePort, AccessTradeOrdersPort {
   constructor(private readonly config: AccessTradeConfig) {}
+
+  private get token(): string {
+    return this.config.apiKey.startsWith("Token ") ? this.config.apiKey : `Token ${this.config.apiKey}`;
+  }
 
   private async post(path: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (this.config.apiKey === "") {
       throw new Error("ACCESSTRADE_API_KEY is not configured");
     }
-    const token = this.config.apiKey.startsWith("Token ") ? this.config.apiKey : `Token ${this.config.apiKey}`;
     const response = await fetch(`${this.config.baseUrl}${path}`, {
       method: "POST",
       headers: {
-        Authorization: token,
+        Authorization: this.token,
         "Content-Type": "application/json",
         "User-Agent": "CashbackBot/1.0",
       },
@@ -116,5 +132,37 @@ export class HttpAccessTrade implements AccessTradePort {
       commissionVnd: parseVndAmount(first.product_commission ?? res.product_commission),
       commissionRate: parseCommissionRate(first.commission ?? res.commission),
     };
+  }
+
+  /**
+   * The commission lines AccessTrade uses to report orders. `/v1/orders`
+   * lacks the sub-id labels an order needs, so only `/v1/transactions` is
+   * read. The window stays within 30 days: a 60-day window answered 500.
+   */
+  async fetchTransactions(sinceDays = 30): Promise<AccessTradeTransaction[]> {
+    if (this.config.apiKey === "") {
+      throw new Error("ACCESSTRADE_API_KEY is not configured");
+    }
+    const now = new Date();
+    const since = new Date(now.getTime() - Math.min(sinceDays, 30) * 86_400_000);
+    const rows: AccessTradeTransaction[] = [];
+    for (let page = 1; page <= this.config.maxPages; page += 1) {
+      const url = new URL(`${this.config.baseUrl}/v1/transactions`);
+      url.searchParams.set("since", `${since.toISOString().slice(0, 10)}T00:00:00Z`);
+      url.searchParams.set("until", `${now.toISOString().slice(0, 10)}T23:59:59Z`);
+      url.searchParams.set("limit", "100");
+      url.searchParams.set("page", String(page));
+      const response = await fetch(url, {
+        headers: { Authorization: this.token, "User-Agent": "CashbackBot/1.0" },
+        signal: AbortSignal.timeout(this.config.timeoutMs),
+      });
+      if (!response.ok) throw new Error(`AccessTrade /v1/transactions failed: HTTP ${response.status}`);
+      const data = (await response.json()) as unknown;
+      const batch = Array.isArray(data) ? data : asArray(asRecord(data).data);
+      rows.push(...(batch as AccessTradeTransaction[]));
+      const total = Array.isArray(data) ? rows.length : Number(asRecord(data).total ?? 0);
+      if (batch.length === 0 || rows.length >= total) break;
+    }
+    return rows;
   }
 }

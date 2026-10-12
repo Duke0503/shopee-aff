@@ -14,6 +14,8 @@ import { logRun } from "../infrastructure/reconciliation-run.repository";
 export interface ReportRowInput extends ReportRow {
   orderId: string;
   orderValueVnd: number;
+  /** The estimate to store on a freshly recorded order (defaults to the approved figure). */
+  estimatedCommissionVnd?: number | null;
   recordedAt: string | null;
   platform: string;
 }
@@ -69,7 +71,7 @@ export function reconcileReport(db: Db, input: ReconcileInput): ReconcileSummary
           customerId: decision.customerId,
           requestId: row.subId2,
           orderValue: row.orderValueVnd,
-          estimatedCommission: row.approvedCommission,
+          estimatedCommission: row.estimatedCommissionVnd ?? row.approvedCommission,
           recordedAt: row.recordedAt ?? input.nowIso,
           platform: row.platform,
           nowIso: input.nowIso,

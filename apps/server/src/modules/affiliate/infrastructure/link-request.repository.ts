@@ -39,6 +39,16 @@ export function attachAffiliateUrl(db: Db, requestId: string, affiliateUrl: stri
     .run();
 }
 
+/** The customer a link request was made for, or null. Evidence for attribution. */
+export function findLinkRequestOwner(db: Db, requestId: string): string | null {
+  const row = db
+    .select({ customerId: linkRequests.customerId })
+    .from(linkRequests)
+    .where(eq(linkRequests.requestId, requestId))
+    .get();
+  return row?.customerId ?? null;
+}
+
 /** This customer's own request for one of these spellings, within the window. */
 export function findOwnRequest(
   db: Db,
