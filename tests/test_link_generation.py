@@ -171,3 +171,13 @@ class TestOneFailureDoesNotContaminateTheOthers:
         gen.generate(FakeBridge(), _jobs("C0001", 3))
         assert flaky_browser[0]["previous"] == ""          # nothing yet
         assert flaky_browser[1]["previous"] == "https://s.shopee.vn/real1"
+
+
+class TestTheButtonIsFoundInEitherLanguage:
+    """The page follows the profile's language cookie, not ours."""
+
+    @pytest.mark.parametrize("label", ["L\u1ea5y link", "Get Link"])
+    def test_the_submit_label_matches(self, label):
+        import re
+        from cashback.shopee.page_selectors import SUBMIT_BUTTON_TEXT
+        assert re.search(SUBMIT_BUTTON_TEXT, label, re.IGNORECASE)
