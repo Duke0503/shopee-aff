@@ -141,3 +141,73 @@ class TestEstimateRoundTrip:
     def test_keyword_trims_a_stuffed_product_name(self):
         stuffed = "Chuot May Tinh Logitech G102 Lightsync game co day cau hinh RGB"
         assert keyword_from_name(stuffed) == "Chuot May Tinh Logitech G102 Lightsync"
+
+
+class TestWhichSourceIsAskedFirst:
+    """The third party first, Shopee's own search only when it has nothing.
+
+    A product Shopee's search never lists comes back with a price and no
+    rates. Taking that as "0%" once kept every such link from ever reaching
+    the third party, which knew the real rate (item 43733512926: 4% + 10%).
+    """
+
+    @pytest.fixture
+    def sources(self, monkeypatch):
+        from types import SimpleNamespace
+        from cashback.shopee import dashboard_lookup, third_party_lookup
+        calls = []
+        state = SimpleNamespace(other=None, found=None, calls=calls)
+
+        def other(url, api_key=None):
+            calls.append("third_party")
+            return state.other
+
+        def found(bridge, url):
+            calls.append("shopee")
+            return state.found
+
+        monkeypatch.setattr(third_party_lookup, "lookup", other)
+        monkeypatch.setattr(dashboard_lookup, "lookup", found)
+        return state
+
+    @staticmethod
+    def _other(price=242_250, shopee=4.0, seller=10.0):
+        from cashback.shopee.third_party_lookup import ProductInfo
+        return ProductInfo(item_id="1", name="x", shop_name="", price=price,
+                           total_commission=0, total_rate=shopee + seller,
+                           seller_rate=seller, shopee_rate=shopee,
+                           cap=None, is_capped=False, has_xtra=False,
+                           last_update="")
+
+    @staticmethod
+    def _found(total=0.0, seller=0.0):
+        from cashback.shopee.dashboard_lookup import Commission
+        return Commission(item_id="1", name="x", price=242_250,
+                          total_rate=total, seller_rate=seller, long_link="")
+
+    def test_the_third_party_answers_first_and_shopee_is_not_asked(self, sources):
+        from cashback.shopee.commission import lookup
+        sources.other = self._other()
+        estimate = lookup("u", bridge=object(), third_party=True)
+        assert estimate.source == SOURCE_THIRD_PARTY
+        assert sources.calls == ["third_party"]
+
+    def test_shopee_is_asked_when_the_third_party_has_nothing(self, sources):
+        from cashback.shopee.commission import lookup
+        sources.found = self._found(total=8.5, seller=3.0)
+        estimate = lookup("u", bridge=object(), third_party=True)
+        assert estimate.source == SOURCE_SHOPEE
+        assert sources.calls == ["third_party", "shopee"]
+
+    def test_a_product_shopee_never_listed_does_not_hide_the_third_party(self, sources):
+        from cashback.shopee.commission import lookup
+        sources.other = self._other()
+        sources.found = self._found()          # price only, no rates
+        estimate = lookup("u", bridge=object(), third_party=True)
+        assert estimate.source == SOURCE_THIRD_PARTY
+
+    def test_with_the_third_party_off_only_shopee_is_asked(self, sources):
+        from cashback.shopee.commission import lookup
+        sources.found = self._found(total=8.5, seller=3.0)
+        lookup("u", bridge=object(), third_party=False)
+        assert sources.calls == ["shopee"]

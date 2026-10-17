@@ -7,13 +7,14 @@ commissions. It takes no credentials and accepts an item id or a URL.
 
 WHY IT IS HERE AT ALL
 ---------------------
-Shopee's own dashboard is the first source (see shopee_lookup), but its
-product search does not index the whole catalogue: a product can carry a
-real commission and still be absent from every keyword search. Measured
-example, item 19090086744, "Combo 2 Banh mi sandwich Staff": 8.5% real
-commission, invisible to four different searches including its exact full
-name. Neither remaining Shopee route is open to this account -- Open API
-access was refused in writing, and Product Feed reports no data.
+Since 17 Oct 2026 this is the first source (see commission.py). Shopee's own
+dashboard comes second. Its product search does not index the whole
+catalogue: a product can carry a real commission and still be absent
+from every keyword search. Measured example, item 19090086744,
+"Combo 2 Banh mi sandwich Staff": 8.5% real commission, invisible to
+four different searches including its exact full name. Neither
+remaining Shopee route is open to this account -- Open API access was
+refused in writing, and Product Feed reports no data.
 
 HOW GOOD IT IS
 --------------
@@ -42,7 +43,7 @@ Every response carries a `legalNotice` block declaring
 A cashback operation is commercial. The operator was shown this and chose
 to use it as a fallback regardless; that decision is recorded here rather
 than hidden. It stays behind THIRD_PARTY_FALLBACK so it can be switched
-off in one line, and it is never the first source.
+off in one line. With it off, only Shopee's own data is asked.
 """
 
 from __future__ import annotations
