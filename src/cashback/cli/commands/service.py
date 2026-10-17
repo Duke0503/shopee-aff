@@ -168,10 +168,18 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
 
     def link_loop() -> None:
         totals = worker.Totals()
+        # The canary runs in this thread, between passes, so it can never
+        # drive the tab while a customer's pass is using it.
+        canary_every = cfg.link_canary_minutes * 60
+        last_used = time.monotonic()
         while not stop.is_set():
             if bridge.connected():
                 try:
-                    worker.run_one_pass(cfg.db_path, bridge, settings, totals)
+                    if worker.run_one_pass(cfg.db_path, bridge, settings, totals):
+                        last_used = time.monotonic()
+                    elif canary_every and time.monotonic() - last_used >= canary_every:
+                        last_used = time.monotonic()
+                        worker.run_canary(cfg.db_path, bridge, totals)
                 except Exception as exc:
                     print(f"[links] pass error: {exc}")
             time.sleep(5)

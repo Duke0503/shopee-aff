@@ -691,6 +691,20 @@ class _RateLimiter:
 _limiter = _RateLimiter()
 
 
+def _has_commission(row) -> bool:
+    """A cached product worth quoting without asking again.
+
+    A row with a price but no rates usually means "not found" (Shopee's
+    search never listed it), not "0%". Trusting it kept item 43733512926
+    at no estimate although the third party knew 4% + 10%. Such rows are
+    looked up again, third party first, every time a customer sends them.
+    """
+    if not row or not row["name"] or not (row["price"] or 0) > 0:
+        return False
+    return ((row["shopee_rate"] or 0) > 0 or (row["seller_rate"] or 0) > 0
+            or (row["total_commission"] or 0) > 0)
+
+
 def _cache_payload(product, own, rate: float, source: str,
                    age_hours: float) -> dict:
     """Smart-resolve answer: shared product facts, the customer's own link."""
@@ -4204,7 +4218,7 @@ class _Handler(BaseHTTPRequestHandler):
             # If products_cache already has this item, attach estimate_detail immediately
             if item_id:
                 cached = ledger.get_product_cache(conn, item_id)
-                if cached and cached["name"]:
+                if _has_commission(cached):
                     detail_json = json.dumps({
                         "name": cached["name"],
                         "price": cached["price"] or 0,
@@ -4280,7 +4294,7 @@ class _Handler(BaseHTTPRequestHandler):
                     if parsed:
                         cached_row = ledger.get_product_cache(conn, parsed[2])
                         cached = dict(cached_row) if cached_row else None
-                        if not cached or not cached.get("name") or not cached.get("price"):
+                        if not _has_commission(cached):
                             try:
                                 from ..shopee.commission import lookup
                                 est = lookup(
@@ -4965,7 +4979,7 @@ class _Handler(BaseHTTPRequestHandler):
                 except Exception:
                     age_hours = 999.0
 
-                if age_hours < max_age_hours and cached_row["price"] and cached_row["price"] > 0:
+                if age_hours < max_age_hours and _has_commission(cached_row):
                     conn.execute(
                         "UPDATE products_cache SET request_count = request_count + 1 WHERE item_id = ?",
                         (item_id,),

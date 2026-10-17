@@ -95,6 +95,10 @@ class Config:
     backup_dir: Path = Path("./backups")
     backup_keep: int = 30
     backup_interval_hours: int = 24
+    # After this long with no link made, the worker makes one test link
+    # nobody receives, so a broken Chrome tab is found before a customer
+    # finds it. 0 turns it off.
+    link_canary_minutes: int = 60
     # Ports and the assistant's address are per environment: a dev copy on
     # the same machine must not take production's ports or its Zalo account.
     dashboard_port: int = 8899
@@ -225,6 +229,7 @@ def load() -> Config:
         backup_dir=Path(os.getenv("BACKUP_DIR", "./backups")),
         backup_keep=int(os.getenv("BACKUP_KEEP", "30")),
         backup_interval_hours=int(os.getenv("BACKUP_INTERVAL_HOURS", "24")),
+        link_canary_minutes=int(os.getenv("LINK_CANARY_MINUTES", "60")),
         dashboard_port=int(os.getenv("DASHBOARD_PORT", "8899")),
         public_port=int(os.getenv("PUBLIC_PORT", "80")),
         assistant_url=os.getenv("ASSISTANT_URL", "http://127.0.0.1:8891").strip(),
