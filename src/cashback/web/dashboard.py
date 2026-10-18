@@ -1997,14 +1997,25 @@ class _Handler(BaseHTTPRequestHandler):
             params.append(customer_id)
         from_date = (qs.get("from_date", [""])[0] or qs.get("date_from", [""])[0] or "").strip()
         to_date = (qs.get("to_date", [""])[0] or qs.get("date_to", [""])[0] or "").strip()
+        # Order times are stored ISO-style ("2026-09-25T10:00:00+07:00").
+        # Comparing them with "2026-09-25 23:59:59" put 'T' after ' ' and
+        # dropped every order on the "to" day: 25/09 -> 25/09 showed none.
+        # A plain date is compared on the date part alone.
+        order_time = "COALESCE(o.recorded_at, o.approved_at)"
         if from_date:
-            from_ts = f"{from_date} 00:00:00" if len(from_date) == 10 else from_date
-            where_clauses.append("COALESCE(o.recorded_at, o.approved_at) >= ?")
-            params.append(from_ts)
+            if len(from_date) == 10:
+                where_clauses.append(f"substr({order_time}, 1, 10) >= ?")
+            else:
+                where_clauses.append(f"{order_time} >= ?")
+                from_date = from_date.replace(" ", "T")
+            params.append(from_date)
         if to_date:
-            to_ts = f"{to_date} 23:59:59" if len(to_date) == 10 else to_date
-            where_clauses.append("COALESCE(o.recorded_at, o.approved_at) <= ?")
-            params.append(to_ts)
+            if len(to_date) == 10:
+                where_clauses.append(f"substr({order_time}, 1, 10) <= ?")
+            else:
+                where_clauses.append(f"{order_time} <= ?")
+                to_date = to_date.replace(" ", "T")
+            params.append(to_date)
 
         where_sql = " AND ".join(where_clauses)
         offset = (page - 1) * limit
