@@ -35,6 +35,15 @@ export function shortDate(value: string | null | undefined): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/** dd/MM/yyyy HH:mm, for tables where the year matters (orders span months). */
+export function fullDate(value: string | null | undefined): string {
+  if (!value) return unknown
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 /** Format raw number or string to comma-separated thousands string, e.g. 1111 -> "1,111" */
 export function formatVndNumber(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return ""

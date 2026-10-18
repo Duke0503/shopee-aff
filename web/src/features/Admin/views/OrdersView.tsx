@@ -17,7 +17,7 @@ import {
   markAdminOrderPaid,
   type AdminOrder,
 } from "@/lib/api"
-import { shortDate, vnd } from "@/lib/format"
+import { fullDate, vnd } from "@/lib/format"
 import {
   Search,
   ExternalLink,
@@ -513,6 +513,15 @@ export function OrdersView() {
                 onSort={handleSort}
               />
             </TableHead>
+            <TableHead className="whitespace-nowrap">
+              <SortableHeader
+                title="Ngày Mua"
+                column="date"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSort={handleSort}
+              />
+            </TableHead>
             <TableHead className="min-w-[150px]">
               <SortableHeader
                 title="Khách Hàng"
@@ -572,15 +581,6 @@ export function OrdersView() {
                 onSort={handleSort}
               />
             </TableHead>
-            <TableHead className="whitespace-nowrap">
-              <SortableHeader
-                title="Ngày Đặt"
-                column="date"
-                currentSortBy={sortBy}
-                currentSortOrder={sortOrder}
-                onSort={handleSort}
-              />
-            </TableHead>
             <TableHead className="text-right whitespace-nowrap">Hành Động</TableHead>
           </TableRow>
         </TableHeader>
@@ -597,6 +597,11 @@ export function OrdersView() {
                 {/* Mã Đơn Hàng */}
                 <TableCell className="whitespace-nowrap">
                   <CodeBadge code={o.order_id} label="Đơn:" variant="purple" />
+                </TableCell>
+
+                {/* Ngày Mua: purchase time from the platform report */}
+                <TableCell className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
+                  {fullDate(o.recorded_at || o.approved_at)}
                 </TableCell>
 
                 {/* Khách Hàng */}
@@ -706,10 +711,6 @@ export function OrdersView() {
 
                 <TableCell className="whitespace-nowrap">
                   {renderStatus(o.status, o.platform, o.settlement_status, o.payout_batch_id)}
-                </TableCell>
-
-                <TableCell className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
-                  {shortDate(o.recorded_at || o.approved_at)}
                 </TableCell>
 
                 <TableCell className="text-right whitespace-nowrap">
