@@ -250,6 +250,18 @@ def _fail(bridge: Bridge, step: int, why: str) -> LinkStepError:
     href = str(state.get("href") or "")
     low = why.lower()
 
+    # A tab that answers no script cannot say what it is showing, so a
+    # captcha behind it was reported as "extension lost" or not at all
+    # (19 Oct 2026). Open a fresh tab, read where it lands, close the
+    # frozen one, and alert on what the fresh tab shows.
+    frozen = "unavailable" in state or looks_frozen(low)
+    if frozen:
+        fresh = replace_frozen_tab(bridge)
+        if fresh.get("href"):
+            href = fresh["href"]
+            hint = _hint(step, why, {"href": href})
+            state = {**state, "href": href, "replaced_frozen_tab": fresh.get("closed", 0)}
+
     # Trigger urgent alerts to Telegram Dev Group
     try:
         from ..core import telegram_alerts
@@ -257,12 +269,107 @@ def _fail(bridge: Bridge, step: int, why: str) -> LinkStepError:
             telegram_alerts.notify_shopee_captcha(hint=hint, current_url=href)
         elif state.get("password_box") or any(m in href for m in ("/login", "/signin", "passport", "/account")):
             telegram_alerts.notify_shopee_session_expired(hint=hint, current_url=href)
-        elif "unavailable" in state or "no result for" in low or "job_timeout" in low:
+        elif frozen and not state.get("replaced_frozen_tab"):
             telegram_alerts.notify_shopee_bridge_disconnected()
     except Exception:
         pass
 
     return LinkStepError(step, why, _describe(state), hint)
+
+
+# A frozen tab is replaced at most this often, so a page that freezes again
+# straight away cannot make the bot open and close tabs in a loop.
+REPLACE_TAB_EVERY_SECONDS = 300
+FRESH_TAB_SCOPE = "fresh"
+AFFILIATE_HOST = "affiliate.shopee.vn"
+_last_replaced = [0.0]
+
+
+def _tabs(bridge: Bridge) -> list[dict]:
+    value = bridge.submit(Job(connector=CONNECTOR, action="get_tabs", params={}), timeout=20)
+    if isinstance(value, dict):
+        value = value.get("result", value.get("value"))
+    return value if isinstance(value, list) else []
+
+
+def looks_frozen(error: str) -> bool:
+    """An error that means the page stopped answering, not that it refused."""
+    low = (error or "").lower()
+    return any(m in low for m in ("no result for", "job_timeout", "execute_script_timeout",
+                                  "cdp_page_enable_timeout", "cdp_attach_timeout",
+                                  "tab_update_timeout"))
+
+
+def recover_frozen_page(bridge: Bridge, error: str) -> str:
+    """For the other jobs on the same tab (order report, payout sync): when
+    their page stops answering, replace the tab and alert on what the fresh
+    one shows. Returns what was found: 'captcha', 'login', 'replaced',
+    'lost' or '' when the error was not a frozen page."""
+    if not looks_frozen(error):
+        return ""
+    fresh = replace_frozen_tab(bridge)
+    href = str(fresh.get("href") or "")
+    try:
+        from ..core import telegram_alerts
+        if any(m in href for m in VERIFICATION_MARKERS):
+            telegram_alerts.notify_shopee_captcha(
+                hint="Shopee wants a verification check: drag the slider in the browser",
+                current_url=href)
+            return "captcha"
+        if any(m in href for m in ("/login", "/signin", "passport", "/account")):
+            telegram_alerts.notify_shopee_session_expired(
+                hint="log in to affiliate.shopee.vn in the browser", current_url=href)
+            return "login"
+        if fresh:
+            return "replaced"
+        telegram_alerts.notify_shopee_bridge_disconnected()
+    except Exception:
+        pass
+    return "lost" if not fresh else "replaced"
+
+
+def replace_frozen_tab(bridge: Bridge) -> dict:
+    """Open the Custom Link page in a brand new tab and close the frozen one.
+
+    Only tab-level calls are used (get_tabs, navigate, close_tab), never a
+    script inside the old page, because that page is the thing that stopped
+    answering. The fresh tab's address is read from the tab list, so a
+    captcha or a login page is seen even when no script could run. The next
+    job adopts the fresh tab by itself: once the frozen tab is gone, the
+    extension looks for any open affiliate tab.
+
+    Returns {"href": <where the fresh tab landed>, "closed": <tabs closed>},
+    or {} when it was done too recently or the extension did not answer.
+    """
+    now = time.monotonic()
+    if now - _last_replaced[0] < REPLACE_TAB_EVERY_SECONDS:
+        return {}
+    _last_replaced[0] = now
+    try:
+        before = {t.get("id") for t in _tabs(bridge) if AFFILIATE_HOST in str(t.get("url") or "")}
+        bridge.submit(
+            Job(connector=CONNECTOR, action="navigate",
+                params={"url": CUSTOM_LINK_URL, "_tab_scope": FRESH_TAB_SCOPE}),
+            timeout=90,
+        )
+        after = [t for t in _tabs(bridge) if AFFILIATE_HOST in str(t.get("url") or "")
+                 or "/verify/" in str(t.get("url") or "")]
+        fresh = next((t for t in after if t.get("id") not in before), None)
+        if fresh is None:
+            return {}
+        closed = 0
+        for tab_id in before:
+            if tab_id is None or tab_id == fresh.get("id"):
+                continue
+            try:
+                bridge.submit(Job(connector=CONNECTOR, action="close_tab",
+                                  params={"tabid": tab_id}), timeout=20)
+                closed += 1
+            except RuntimeError:
+                pass
+        return {"href": str(fresh.get("url") or ""), "closed": closed}
+    except RuntimeError:
+        return {}
 
 
 def _js(bridge: Bridge, code: str, timeout: float = 60) -> dict:
