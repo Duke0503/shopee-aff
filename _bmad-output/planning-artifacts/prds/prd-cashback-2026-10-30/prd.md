@@ -403,9 +403,17 @@ Anyone with the link can open the receipt page of one payout: customer code, las
 amount, date. The token is random and unguessable. The proof image is never on the public page; it
 is shown only to staff and to the signed-in customer (D49).
 
-#### FR-19: Network settlement
-Staff can see what each network has paid the operator and which approved orders those payments
-settle. Settlement never changes what the customer is owed.
+#### FR-19: Network settlement matched to exact orders
+Staff can see each payment a network made to the operator and exactly which orders it settles
+(D59). Settlement never changes what the customer is owed.
+
+**Consequences (testable):**
+- A payout whose orders the network lists is settled by order id.
+- Otherwise the orders validated in the payout's billing period are settled only when their approved
+  commission minus fee and tax equals the payout amount to the dong; any difference is shown with
+  the candidate orders and opens a review case.
+- Each payout opens a list of its orders with product thumbnails, and each order shows the payout
+  that settled it; the payout panel shows per covered order whether the network has paid.
 
 ### 4.6 Customer conversation and notifications
 

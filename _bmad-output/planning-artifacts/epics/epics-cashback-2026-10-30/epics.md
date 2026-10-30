@@ -234,7 +234,23 @@ The reconciliation run keeps every order's state, cashback and review cases corr
 The operator can see who is owed, pay each customer once with a QR and a receipt, void a mistake, clear review cases and find any customer or order, on lists that follow the List Contract on phone, tablet and desktop.
 **FRs covered:** FR-11 (command), FR-14 (screen), FR-15 (balance), FR-16, FR-17, FR-18, FR-23 and FR-24 (commands, seeded staff), FR-25, FR-26, FR-31 (shared bank flag), FR-34, FR-35, FR-37, FR-38.
 
-### Epic 5: Link issuing, browser bridge and share page
+#### Story 4.21: Network payouts matched to exact orders
+
+As the operator, I want every Shopee and AccessTrade payout matched to the exact orders it pays, so that I never add up orders by hand against the network again.
+
+**Context:** D59 replaces the live date cut-off (`settle_orders_for_batch`) with exact matching. Realises FR-19 (moved into v1 by D59). Follows AD-4, AD-6, AD-22. Decisions: D27, D59.
+**Screens:** Chuyển tiền tab "Sàn thanh toán", payout detail, payout panel (settled marker). **Skills:** cashback-shadcn, cashback-ui-review.
+**Blocked by:** Story 3.7, Story 4.3.
+**Size:** M
+
+**Acceptance criteria**
+1. Given a network payout whose order list is known, when it is recorded, then exactly those orders are marked settled with the payout id, and an order already settled by another payout is refused and opens a review case.
+2. Given a payout with no order list, when the orders validated in its billing period have approved commission minus fee and tax equal to the payout amount to the dong, then all of them are settled with the payout id (golden test).
+3. Given the same payout when the sums differ, then no order is settled, the difference in dong and the candidate orders are shown, and a review case `settlement_mismatch` opens.
+4. Given the "Sàn thanh toán" tab, when staff open a payout, then they see its orders with product thumbnails, the matched total, the payout amount and the difference, from the server.
+5. Given the payout panel for a customer, when it shows the covered orders, then each order says whether the network has paid it and by which payout.
+
+## Epic 5: Link issuing, browser bridge and share page
 A customer's link request becomes an affiliate link that carries only that customer's id, created through the operator's real browser for Shopee or the AccessTrade API for TikTok Shop, and opened through the share page in a real browser.
 **FRs covered:** FR-1, FR-3, FR-5, FR-6, FR-7, FR-12 (Shopee report pages), FR-37 (basic link requests list).
 

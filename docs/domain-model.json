@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -2959,7 +2959,7 @@
     },
     {
       "id": "d53-v1-cutover-scope",
-      "decision": "The v1 cutover scope is what paying, attributing and reconciling depend on. Deferred until after cutover, without deleting the FRs: FR-27 metrics beyond the Overview line, FR-31 flags except the shared bank account, the FR-19 settlement screen, the FR-23 campaign creation UI, the FR-11 merge UI, the FR-24 staff UI, the FR-29 audit screen and the Guide redesign. Merge, campaign and staff work is done by admin command until then. The build follows a walking skeleton starting with money, the cutover import and shadow reconciliation.",
+      "decision": "The v1 cutover scope is what paying, attributing and reconciling depend on. Deferred until after cutover, without deleting the FRs: FR-27 metrics beyond the Overview line, FR-31 flags except the shared bank account, the FR-19 settlement screen, the FR-23 campaign creation UI, the FR-11 merge UI, the FR-24 staff UI, the FR-29 audit screen and the Guide redesign. Merge, campaign and staff work is done by admin command until then. The build follows a walking skeleton starting with money, the cutover import and shadow reconciliation. Amended by D59: FR-19 network settlement matching is in the v1 cutover scope.",
       "rationale": "Cutover is big-bang, so the minimum cutover set bounds v1; none of the deferred items is on the pay, attribute or reconcile path (review section 6). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
       "status": "accepted",
       "sources": [
@@ -3012,6 +3012,15 @@
       "status": "accepted",
       "sources": [
         ".context/decisions/2026-10-30-D58-unresolved-sub-id1-review.md"
+      ]
+    },
+    {
+      "id": "d59-exact-settlement-matching",
+      "decision": "Each network payout is matched to exact orders, never by a date cut-off. When the network lists the orders of a payout (payout detail page read through the browser bridge, or an export), those orders are settled by id. Otherwise the payout is matched to the orders validated in its billing period: if their approved commission minus fee and tax equals the payout amount to the dong, every order is marked settled with the payout id; any difference is shown with the candidate orders and opens a review case, and nothing is guessed. FR-19 moves into the v1 cutover scope.",
+      "rationale": "The live system marks every order approved before a payout's creation time as settled, so the owner re-checks and adds up orders by hand against Shopee after every payout. The owner asked for an exact view (2026-10-30). Matching design is the recommended option.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D59-exact-settlement-matching.md"
       ]
     }
   ],

@@ -66,10 +66,10 @@ development_status:
   3-2-audit-trail-and-owner-alert-ports-written-by-every-command: done
   3-3-apply-one-report-row-to-one-order-idempotently: done
   3-4-cashback-stored-at-approval-with-withheld-settlement-periods: done
-  3-5-review-cases-opened-by-the-reconciliation-rules: backlog
-  3-6-clawback-entries-for-a-cancel-after-payout: backlog
-  3-7-hourly-reconciliation-over-the-last-7-days-with-run-records: backlog
-  3-8-nightly-sweep-reads-every-day-that-still-holds-an-open-order: backlog
+  3-5-review-cases-opened-by-the-reconciliation-rules: review
+  3-6-clawback-entries-for-a-cancel-after-payout: review
+  3-7-hourly-reconciliation-over-the-last-7-days-with-run-records: review
+  3-8-nightly-sweep-reads-every-day-that-still-holds-an-open-order: review
   3-9-review-case-apply-and-dismiss-commands: backlog
   epic-3-retrospective: optional
 
@@ -94,6 +94,7 @@ development_status:
   4-18-settings-mark-a-shopee-settlement-period-withheld-or-not: backlog
   4-19-customer-merge-by-admin-command-with-preview-and-apply: backlog
   4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: backlog
+  4-21-network-payouts-matched-to-exact-orders: backlog
   epic-4-retrospective: optional
 
   epic-5: backlog
