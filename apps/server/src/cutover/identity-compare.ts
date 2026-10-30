@@ -6,15 +6,15 @@
  */
 import type BetterSqlite3 from "better-sqlite3";
 
-import type { ReportNote, TableComparison } from "./import-report";
+import { skippedKeys, type ReportNote, type TableComparison } from "./import-report";
 
-type Row = Record<string, string | null>;
+type Row = Record<string, string | number | null>;
 
-function compare(sourceRows: Row[], targetRows: Row[], key: string, fields: readonly string[], skipped: ReadonlySet<string>): TableComparison {
-  const target = new Map(targetRows.map((row) => [row[key] ?? "", row]));
+export function compareRows(sourceRows: Row[], targetRows: Row[], key: string, fields: readonly string[], skipped: ReadonlySet<string>): TableComparison {
+  const target = new Map(targetRows.map((row) => [String(row[key] ?? ""), row]));
   const mismatches: TableComparison["mismatches"] = [];
   for (const row of sourceRows) {
-    const id = row[key] ?? "";
+    const id = String(row[key] ?? "");
     if (skipped.has(id)) continue;
     const imported = target.get(id);
     if (!imported) {
@@ -30,17 +30,17 @@ function compare(sourceRows: Row[], targetRows: Row[], key: string, fields: read
 }
 
 export function compareIdentity(source: BetterSqlite3.Database, target: BetterSqlite3.Database, notes: readonly ReportNote[]): Record<string, TableComparison> {
-  const skippedAliases = new Set(notes.filter((n) => n.kind === "alias_target_missing").map((n) => n.key));
+  const skippedAliases = skippedKeys(notes, "customer_aliases");
   const all = (db: BetterSqlite3.Database, query: string) => db.prepare(query).all() as Row[];
   return {
-    customers: compare(
+    customers: compareRows(
       all(source, "SELECT customer_id, NULLIF(UPPER(TRIM(customer_code)), '') AS customer_code, NULLIF(TRIM(zalo_user_id), '') AS zalo_user_id FROM customers ORDER BY customer_id"),
       all(target, "SELECT customer_id, customer_code, zalo_user_id FROM customers ORDER BY customer_id"),
       "customer_id",
       ["customer_code", "zalo_user_id"],
       new Set(),
     ),
-    customer_aliases: compare(
+    customer_aliases: compareRows(
       all(source, "SELECT alias, customer_id FROM customer_aliases ORDER BY alias"),
       all(target, "SELECT alias, customer_id FROM customer_aliases ORDER BY alias"),
       "alias",

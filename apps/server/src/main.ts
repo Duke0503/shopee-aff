@@ -1,6 +1,7 @@
 /**
  * Composition root: config, logger, the single-instance lock, the ledger (migrated behind a
- * checked local backup, AD-26), then the two listeners. A config error names the keys and exits before anything else runs; a held
+ * checked local backup, AD-26), then the two listeners, then the job scheduler (AD-13; each
+ * module adds its job with its story, timed by platform/jobs/job-schedules.ts). A config error names the keys and exits before anything else runs; a held
  * lock exits before the ledger is opened, so a second instance never touches the data.
  * Any failure after the lock is taken is logged, and whatever was started is closed and
  * the lock released before the process exits.
@@ -13,6 +14,7 @@ import { LEDGER_FILE, type Ledger } from "./platform/db/ledger";
 import { openMigratedLedger } from "./platform/db/migration-gate";
 import { MIGRATIONS_DIR } from "./platform/db/migrations";
 import { buildServers, close, listen, type Servers } from "./platform/http/servers";
+import { createScheduler, systemTimer, type Job, type Scheduler } from "./platform/jobs/scheduler";
 import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
 import { createLogger, type Logger } from "./platform/log/logger";
@@ -27,10 +29,14 @@ function readConfig(): ServerConfig | null {
   }
 }
 
+/** No module job exists yet; Stories 3.7, 3.8, 5.1, 4.7, 8.2 and 8.3 add theirs here. */
+const JOBS: readonly Job[] = [];
+
 async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Promise<RunningParts | null> {
   let ledger: Ledger | null = null;
   let servers: Servers | null = null;
-  const parts = (): RunningParts => ({ closeServers: async () => (servers ? close(servers) : undefined), ledger, lock, logger });
+  let jobs: Scheduler | null = null;
+  const parts = (): RunningParts => ({ jobs, closeServers: async () => (servers ? close(servers) : undefined), ledger, lock, logger });
   try {
     ledger = await openMigratedLedger({
       ledgerPath: join(config.dataDir, LEDGER_FILE),
@@ -41,6 +47,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Pr
     });
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
+    jobs = createScheduler(JOBS, { clock: systemClock, timer: systemTimer, logger });
+    jobs.start();
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort }, "platform.server.started");
     return parts();
   } catch (error) {

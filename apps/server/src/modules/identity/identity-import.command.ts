@@ -6,8 +6,8 @@
  * key order so two imports of one source give identical ledgers.
  */
 import { searchText, sortKey } from "@cashback/core";
-import { sql } from "drizzle-orm";
 
+import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
 import { bankFingerprint } from "./bank-fingerprint";
 import { counterAbove } from "./domain/customer-code";
@@ -70,25 +70,20 @@ export class IdentityImportError extends Error {
   }
 }
 
-const byKey = <T>(rows: readonly T[], key: (row: T) => string): T[] => [...rows].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
-
 function refuseUnlessEmpty(db: LedgerDb): void {
-  for (const table of ["customers", "customer_aliases", "customer_code_counter", "bank_accounts"]) {
-    const row = db.get<{ n: number }>(sql.raw(`SELECT count(*) AS n FROM ${table}`));
-    if (row.n > 0) throw new IdentityImportError(`identity import needs empty tables; ${table} has ${row.n} rows`);
-  }
+  assertTablesEmpty(db, ["customers", "customer_aliases", "customer_code_counter", "bank_accounts"], (table, n) => new IdentityImportError(`identity import needs empty tables; ${table} has ${n} rows`));
 }
 
 /** Imports identity into empty tables; call inside `tx`. The holder name is stored upper case (FR-10). */
 export function importIdentity(db: LedgerDb, data: IdentityImport, fingerprintKey: string): IdentityImportResult {
   refuseUnlessEmpty(db);
-  for (const c of byKey(data.customers, (r) => r.customerId)) {
+  for (const c of sortByKey(data.customers, (r) => r.customerId)) {
     db.insert(customers)
       .values({ ...c, searchText: searchText(c.displayName, c.customerCode), sortKey: sortKey(c.displayName ?? "") })
       .run();
   }
-  for (const a of byKey(data.aliases, (r) => r.alias)) db.insert(customerAliases).values(a).run();
-  for (const b of byKey(data.bankAccounts, (r) => r.customerId)) {
+  for (const a of sortByKey(data.aliases, (r) => r.alias)) db.insert(customerAliases).values(a).run();
+  for (const b of sortByKey(data.bankAccounts, (r) => r.customerId)) {
     db.insert(bankAccounts)
       .values({ ...b, holderName: b.holderName?.toUpperCase() ?? null, fingerprint: bankFingerprint(fingerprintKey, b.accountNumber), pendingConfirmation: false })
       .run();

@@ -84,3 +84,34 @@ describe("shutdown (review item 7)", () => {
     expect(calls).toEqual(["servers", "ledger", "lock"]);
   });
 });
+
+describe("shutdown with jobs (Story 3.1 AC4)", () => {
+  it("stops the jobs before the servers, the ledger and the lock", async () => {
+    const calls: string[] = [];
+    const logger = createLogger({ destination: { write: () => undefined } });
+    const p = {
+      jobs: { stop: async () => (calls.push("jobs"), { finished: true, stillRunning: [] }) },
+      closeServers: async () => void calls.push("servers"),
+      ledger: { close: () => void calls.push("ledger") },
+      lock: { release: () => void calls.push("lock") },
+      logger,
+    };
+    expect(await stopServer(p, "SIGTERM")).toBe(0);
+    expect(calls).toEqual(["jobs", "servers", "ledger", "lock"]);
+  });
+
+  it("returns 1 and names the job when a run outlived the timeout, and still closes everything", async () => {
+    const calls: string[] = [];
+    const lines: string[] = [];
+    const p = {
+      jobs: { stop: async () => ({ finished: false, stillRunning: ["reconcile"] }) },
+      closeServers: async () => void calls.push("servers"),
+      ledger: { close: () => void calls.push("ledger") },
+      lock: { release: () => void calls.push("lock") },
+      logger: createLogger({ destination: { write: (line: string) => void lines.push(line) } }),
+    };
+    expect(await stopServer(p, "SIGTERM")).toBe(1);
+    expect(calls).toEqual(["servers", "ledger", "lock"]);
+    expect(lines.join("")).toContain('"stillRunning":["reconcile"]');
+  });
+});

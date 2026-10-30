@@ -167,7 +167,7 @@ describe("Story 2.2: the rest of each customer row", () => {
     expect(byId.get("1000000000000000002")?.["created_at"]).toBe("2026-09-24T08:15:00.000Z");
     expect(byId.get("1000000000000000004")?.["created_at"]).toBeNull();
     expect(byId.get("1000000000000000009")?.["last_sign_in_at"]).toBeNull();
-    expect(run.report.timeProblems).toEqual([
+    expect(run.report.timeProblems.filter((p) => p.table === "customers")).toEqual([
       { table: "customers", key: "1000000000000000004", column: "created_at" },
       { table: "customers", key: "1000000000000000009", column: "last_login_at" },
     ]);

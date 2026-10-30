@@ -6,6 +6,7 @@ import {
   fixedClock,
   formatVnDate,
   formatVnDateTime,
+  nextVnTimeOfDay,
   parseInstant,
   parseStaffVnTime,
   vnDateRange,
@@ -65,5 +66,25 @@ describe("display formats", () => {
     expect(() => parseInstant("2026-10-30T24:00:00.000Z")).toThrow(RangeError);
     expect(() => parseInstant("2026-09-16 16:27:51")).toThrow(RangeError);
     expect(() => parseInstant("2026-09-16T16:27:51+07:00")).toThrow(RangeError);
+  });
+});
+
+describe("daily Vietnam times for jobs (AD-13, Story 3.1 AC3)", () => {
+  it("02:00 Vietnam time is 19:00 UTC of the previous day", () => {
+    expect(nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 2, minute: 0 })).toBe("2026-10-30T19:00:00.000Z");
+    expect(nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 3, minute: 0 })).toBe("2026-10-30T20:00:00.000Z");
+  });
+
+  it("is strictly after the given instant and rolls to the next Vietnam day", () => {
+    expect(nextVnTimeOfDay(parseInstant("2026-10-30T19:00:00.000Z"), { hour: 2, minute: 0 })).toBe("2026-10-31T19:00:00.000Z");
+    expect(nextVnTimeOfDay(parseInstant("2026-10-30T18:59:59.999Z"), { hour: 2, minute: 0 })).toBe("2026-10-30T19:00:00.000Z");
+    // 01:00 Vietnam time on 31 Oct is still before that day's 02:00.
+    expect(nextVnTimeOfDay(parseInstant("2026-10-30T18:00:00.000Z"), { hour: 2, minute: 0 })).toBe("2026-10-30T19:00:00.000Z");
+    expect(nextVnTimeOfDay(parseInstant("2026-12-31T20:30:00.000Z"), { hour: 3, minute: 15 })).toBe("2027-01-01T20:15:00.000Z");
+  });
+
+  it("refuses a time of day that does not exist", () => {
+    expect(() => nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 24, minute: 0 })).toThrow(RangeError);
+    expect(() => nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 2, minute: 1.5 })).toThrow(RangeError);
   });
 });

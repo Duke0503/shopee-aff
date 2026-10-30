@@ -11,21 +11,21 @@
  * The new ledger is built in `<target>.partial` and renamed into place only when everything
  * succeeded; on any failure the partial files are deleted, so a retry starts clean. From the
  * moment the source is opened, `<target>.import-report.json` is written whatever the outcome,
- * with the reason on failure. This slice imports identity (Story 2.2); later stories add orders,
- * payouts, campaigns and links to the same run.
+ * with the reason on failure. The run imports identity (Story 2.2), orders (Story 2.3), and link
+ * requests, share codes and products with the keys of notifications the live system already
+ * sent (Story 2.5), all in one transaction; Story 2.4 adds payouts and campaigns to it.
  */
 import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Clock } from "@cashback/core";
 import type BetterSqlite3 from "better-sqlite3";
 
-import { customerCodeNumber, formatCustomerCode, importIdentity, lastFour, type IdentityImport } from "../modules/identity/index";
+import { lastFour } from "../modules/identity/index";
 import { openLedger } from "../platform/db/ledger";
 import { MIGRATIONS_DIR, readMigrations, runMigrations } from "../platform/db/migrations";
 import type { Logger } from "../platform/log/logger";
-import { compareIdentity } from "./identity-compare";
-import { readLiveIdentity } from "./identity-source";
 import { emptyReport, type ImportReport } from "./import-report";
+import { fillReport, finishedLine, readLive, writeLive, type LiveData } from "./import-steps";
 import { openLiveCopy, samePath, type SourceOpener } from "./live-source";
 import { assertEveryTimeColumnHasRule, CutoverRefusedError } from "./live-time";
 
@@ -65,27 +65,15 @@ function removePartial(path: string): void {
   for (const file of [path, `${path}-wal`, `${path}-shm`, `${path}-journal`]) rmSync(file, { force: true });
 }
 
-function highestAliasCode(identity: IdentityImport): string | null {
-  const top = Math.max(0, ...identity.retiredAliases.map((a) => customerCodeNumber(a) ?? 0));
-  return top > 0 ? formatCustomerCode(top) : null;
-}
-
-/** Migrates the partial ledger, imports identity in one `tx`, fills the report, leaves one closed file. */
-function writeLedger(partial: string, identity: IdentityImport, source: BetterSqlite3.Database, checked: Checked, options: CutoverImportOptions, report: ImportReport): void {
+/** Migrates the partial ledger, imports everything in one `tx`, fills the report, leaves one closed file. */
+function writeLedger(partial: string, live: LiveData, source: BetterSqlite3.Database, checked: Checked, options: CutoverImportOptions, report: ImportReport): void {
   const ledger = openLedger(partial);
   try {
     runMigrations(ledger, readMigrations(options.migrationsDir ?? MIGRATIONS_DIR), options.clock);
-    const result = ledger.tx((db) => importIdentity(db, identity, checked.fingerprintKey));
-    report.comparison = compareIdentity(source, ledger.sqlite, report.notes);
-    report.counter = {
-      liveCounterLast: identity.counterLast,
-      highestAliasCode: highestAliasCode(identity),
-      importedCounterLast: result.counterLast,
-      nextCode: formatCustomerCode(result.counterLast + 1),
-    };
-    report.bankAccounts = { imported: result.bankAccounts, lastFour: identity.bankAccounts.map((b) => lastFour(b.accountNumber)) };
-    for (const b of identity.bankAccounts) options.logger.info({ lastFour: lastFour(b.accountNumber), consent: b.consentAt !== null }, "cutover.bank_account.imported");
-    options.logger.info({ customers: result.customers, aliases: result.aliases, bankAccounts: result.bankAccounts, timeProblems: report.timeProblems.length, notes: report.notes.length }, "cutover.import.finished");
+    const written = writeLive(ledger, live, checked.fingerprintKey, options.clock);
+    fillReport(report, live, written, source, ledger.sqlite);
+    for (const b of live.identity.bankAccounts) options.logger.info({ lastFour: lastFour(b.accountNumber), consent: b.consentAt !== null }, "cutover.bank_account.imported");
+    options.logger.info(finishedLine(report, written), "cutover.import.finished");
     // One self-contained file to rename: no -wal or -shm left beside it.
     ledger.sqlite.pragma("journal_mode = DELETE");
   } finally {
@@ -97,12 +85,8 @@ function importInto(partial: string, checked: Checked, options: CutoverImportOpt
   const source = openLiveCopy(options.sourcePath, { liveLedgerPath: checked.liveLedgerPath, open: options.openSource });
   try {
     assertEveryTimeColumnHasRule(source);
-    options.logger.info({ step: "identity" }, "cutover.import.started");
-    const identity = readLiveIdentity(source, report);
-    if (report.duplicates.length > 0) {
-      throw new CutoverRefusedError("duplicate_identity", `live rows share a Zalo id or a customer code: ${report.duplicates.map((d) => `${d.column} [${d.keys.join(", ")}]`).join("; ")}`);
-    }
-    writeLedger(partial, identity, source, checked, options, report);
+    options.logger.info({ step: "read" }, "cutover.import.started");
+    writeLedger(partial, readLive(source, report), source, checked, options, report);
   } finally {
     source.close();
   }
