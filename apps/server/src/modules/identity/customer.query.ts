@@ -104,3 +104,16 @@ export function customerKeys(db: LedgerDb, key: string): CustomerKeys | null {
 export function customerCardOf(db: LedgerDb, customerId: string): { customerCode: string | null; displayName: string | null } | null {
   return db.select({ customerCode: customers.customerCode, displayName: customers.displayName }).from(customers).where(eq(customers.customerId, customerId)).get() ?? null;
 }
+
+/** The cards of every customer id named, in one read, by customer id; an unknown id is absent. */
+export function customerCardsOf(db: LedgerDb, customerIds: readonly string[]): Map<string, { customerCode: string | null; displayName: string | null }> {
+  const ids = [...new Set(customerIds)];
+  if (ids.length === 0) return new Map();
+  const rows = db.select({ customerId: customers.customerId, customerCode: customers.customerCode, displayName: customers.displayName }).from(customers).where(inArray(customers.customerId, ids)).all();
+  return new Map(rows.map(({ customerId, ...card }) => [customerId, card]));
+}
+
+/** The ids of the guest accounts (role HOUSE, D5): their orders earn no cashback. */
+export function guestCustomerIds(db: LedgerDb): string[] {
+  return db.select({ customerId: customers.customerId }).from(customers).where(eq(customers.role, "HOUSE")).all().map((r) => r.customerId);
+}

@@ -1,43 +1,34 @@
 /**
- * The admin Orders list (FR-26, FR-37) on the list contract. The server side,
- * `GET /api/admin/orders` from `orders.list.ts`, is Story 4.13; this file is the client half:
- * the URL search generated from the same field names, the row shape and the one list query.
- * Until the endpoint exists the screen shows the list error state, never an empty list.
+ * The admin Orders list (FR-26, FR-37, Story 4.13) on the list contract: the URL search generated
+ * from the same field names as the server's `orders.list.ts` (sortable fields, the status, the one
+ * network filter and one date filter per date kind), the row shape from @cashback/contracts and
+ * the one list query. The rows are read only: no order is changed from this screen.
  */
-import { listResponseSchema, listSearch, type ListResponse, type ListSearchState } from "@cashback/contracts";
+import { adminOrdersResponseSchema, listSearch, ORDER_DATE_FIELDS, ORDER_NETWORKS, type AdminOrderRow, type ListResponse, type ListSearchState, type OrderDateField } from "@cashback/contracts";
 import { storedValues } from "@cashback/core";
 import { useListQuery } from "@cashback/ui";
-import { z } from "zod";
 
 import { apiRequest } from "../api/api.queries";
 
 export const ORDERS_KEY = ["admin", "orders"] as const;
 
+export type OrderRow = AdminOrderRow;
+
 export const ORDERS_SEARCH = listSearch({
-  sortable: ["customerName", "status", "cashback", "recordedAt"],
-  filters: [{ field: "status", values: storedValues("order") }],
+  sortable: ["orderId", "customerCode", "customerName", "network", "status", "orderValue", "approvedCommission", "cashback", ...ORDER_DATE_FIELDS],
+  filters: [{ field: "status", values: storedValues("order") }, { field: "network", values: ORDER_NETWORKS }, ...ORDER_DATE_FIELDS.map((field) => ({ field }))],
   defaultSort: { field: "recordedAt", direction: "desc" },
 });
 
-const orderRowSchema = z.object({
-  orderId: z.string(),
-  customerCode: z.string().nullable(),
-  customerName: z.string().nullable(),
-  productName: z.string().nullable(),
-  /** The product snapshot's image (D56), https only; null when the snapshot has none. */
-  productImageUrl: z.url({ protocol: /^https$/ }).nullable(),
-  network: z.string(),
-  status: z.string(),
-  /** Stored whole dong; null while the order has no approved cashback yet. */
-  cashback: z.number().int().nullable(),
-  recordedAt: z.string(),
-});
-export type OrderRow = z.infer<typeof orderRowSchema>;
-
-const ordersResponseSchema = listResponseSchema(orderRowSchema);
+/** The date kind the screen shows: the one filtered on, else the one sorted by, else the recorded date. */
+export function dateFieldOf(state: ListSearchState): OrderDateField {
+  const filtered = ORDER_DATE_FIELDS.find((f) => (state.filters[f]?.length ?? 0) > 0);
+  if (filtered !== undefined) return filtered;
+  return ORDER_DATE_FIELDS.find((f) => f === state.sort.field) ?? "recordedAt";
+}
 
 export async function fetchOrders(query: string, signal: AbortSignal): Promise<ListResponse<OrderRow>> {
-  return ordersResponseSchema.parse(await apiRequest(`/api/admin/orders?${query}`, { signal }));
+  return adminOrdersResponseSchema.parse(await apiRequest(`/api/admin/orders?${query}`, { signal }));
 }
 
 export function useOrdersList(state: ListSearchState) {

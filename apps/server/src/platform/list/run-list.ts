@@ -8,7 +8,10 @@
  * registry lifecycle order, names by their stored sort key, everything else by the stored column;
  * missing values sort last either way and the spec's key breaks ties, so pages never overlap.
  *
- * The four statements run back to back on the one synchronous connection of the one writer
+ * A spec may also ask for `overall`, the unfiltered count, which a screen shows labelled as the
+ * overall total, never as the filtered one.
+ *
+ * The statements run back to back on the one synchronous connection of the one writer
  * process (AD-2), so no write can land between them.
  */
 import type { ListResponse } from "@cashback/contracts";
@@ -110,5 +113,7 @@ export function runList<F extends FieldSpecs, R = Record<keyof F, unknown>>(db: 
   const total = db.get<{ total: number }>(sql`SELECT COUNT(*) AS total FROM ${from} WHERE ${where}`)?.total ?? 0;
   const page = clampPage(query.page, query.pageSize, total);
   const rows = db.all<R>(sql`SELECT ${selectList(list.fields)} FROM ${from} WHERE ${where} ORDER BY ${orderSql(list, query)} LIMIT ${query.pageSize} OFFSET ${(page - 1) * query.pageSize}`);
-  return { rows, total, page, pageSize: query.pageSize, facets: facetsOf(db, list, from, where), summary: summaryOf(db, list, from, where), asOf: clock.now() };
+  const response: ListResponse<R> = { rows, total, page, pageSize: query.pageSize, facets: facetsOf(db, list, from, where), summary: summaryOf(db, list, from, where), asOf: clock.now() };
+  if (list.overallTotal === true) response.overall = db.get<{ total: number }>(sql`SELECT COUNT(*) AS total FROM ${from}`)?.total ?? 0;
+  return response;
 }

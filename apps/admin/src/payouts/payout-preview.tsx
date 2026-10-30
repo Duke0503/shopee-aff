@@ -118,7 +118,7 @@ function CoveredLines({ preview }: { readonly preview: Preview }) {
       <h3 className="text-sm font-semibold">{adminText("panel_covered", { count })}</h3>
       <ul className="divide-y divide-border">
         {preview.orders.map((o) => (
-          <Line key={o.orderId} title={o.productName ?? adminText("panel_product_missing", { order: o.orderId })} image={o.productImageUrl} note={o.settled ? adminText("panel_settled") : undefined} amount={<MoneyFigure amount={o.cashback} />} />
+          <Line key={o.orderId} title={o.productName ?? adminText("panel_product_missing", { order: o.orderId })} image={o.productImageUrl} note={settledNote(o)} amount={<MoneyFigure amount={o.cashback} />} />
         ))}
         {preview.bonuses.map((b) => (
           <Line key={`award-${b.awardId}`} title={adminText("panel_bonus", { campaign: b.campaignName })} amount={<MoneyFigure amount={b.amount} />} />
@@ -141,6 +141,12 @@ export interface PayoutPreviewProps {
   readonly notice?: ReactNode;
   /** Shown last: the confirm step. */
   readonly footer?: ReactNode;
+}
+
+/** Whether the network has paid the operator for the order, and by which payout (D59, Story 4.21 AC5). */
+function settledNote(o: { readonly settled: boolean; readonly settledBy: string | null }): string {
+  if (!o.settled) return adminText("panel_unsettled");
+  return o.settledBy === null ? adminText("panel_settled") : adminText("panel_settled_by", { payout: o.settledBy });
 }
 
 export function PayoutPreview({ preview, onStale, notice, footer }: PayoutPreviewProps) {

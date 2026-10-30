@@ -1,6 +1,6 @@
 /**
  * The payouts module (AD-1): payout claims, payouts, ledger entries, getBalances and network
- * settlements (AD-6, AD-9). It may import identity, orders and campaigns. Other modules reach it
+ * settlements matched to exact orders (AD-6, AD-9, D59). It may import identity, orders and campaigns. Other modules reach it
  * only through this file (code.md §1).
  */
 export {
@@ -32,3 +32,8 @@ export { PAYOUT_VOIDED_MESSAGE, PayoutVoidError, VOID_REASON_MAX, voidPayout, ty
 export { planVoid, recordedKey, voidPreview, type VoidPlan, type VoidPreview } from "./payout-void.query";
 export { payoutRecordRoutes, type PayoutRecordRouteDeps } from "./http/payout-record.routes";
 export { customerProofRoutes, type CustomerProofRouteDeps } from "./http/customer-proof.routes";
+export { answerPayoutHistory, PAYOUT_HISTORY_LIST } from "./payout-history.list";
+export { matchDue, NetworkSettlementError, recordNetworkPayout, withholdingOf, type NetworkSettlementDeps, type StoredSettlement } from "./network-settlement.command";
+export { answerNetworkSettlements, NETWORK_SETTLEMENT_LIST, networkSettlementDetail } from "./network-settlement.list";
+export { NETWORK_SYNC_ACTOR, networkPayoutInternalRoutes, networkSettlementRoutes, type NetworkPayoutRouteDeps } from "./http/network-payout.routes";
+export { importNetworkSettlements, type ImportedNetworkSettlement, type NetworkSettlementsImportResult } from "./network-settlement-import.command";

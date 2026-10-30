@@ -45,6 +45,8 @@ export const linkRequests = sqliteTable("link_requests", {
   createdAt: text("created_at"),
   deliveredAt: text("delivered_at"),
   origin: text("origin", { enum: ["CUTOVER", "REQUEST"] }).notNull(),
+  // The folded product name of the snapshot (migration 0019), for the Orders list's search.
+  searchText: text("search_text").notNull().default(""),
 });
 
 export const shareCodes = sqliteTable("share_codes", {

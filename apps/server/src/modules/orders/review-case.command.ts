@@ -21,9 +21,14 @@ import { reviewCases } from "./schema";
  * Every reason a case opens with: the transition's (D31 freeze reasons, D55 drops, cancels after
  * approval or payout), attribution's (D58), a row whose order id belongs to another network, and
  * an awaiting order the report has not shown for 14 days (R5, D43), and a wrong rejection staff
- * reported (D38, Story 3.9).
+ * reported (D38, Story 3.9), and a network payout that did not match its orders to the dong or
+ * listed an order another payout already settled (D59, Story 4.21).
  */
-export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report" | "wrong_rejection";
+export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report" | "wrong_rejection" | SettlementCaseReason;
+
+export type SettlementCaseReason = "settlement_mismatch" | "settlement_conflict" | "settlement_not_approved" | "settlement_facts_changed";
+/** The reasons of network payout cases: they change no order, so they are only ever dismissed. */
+export const SETTLEMENT_CASE_REASONS: readonly string[] = ["settlement_mismatch", "settlement_conflict", "settlement_not_approved", "settlement_facts_changed"] satisfies readonly SettlementCaseReason[];
 
 export interface CaseEvidence {
   readonly network: AffiliateNetwork;
@@ -124,4 +129,18 @@ export function resolveOpenCase(db: LedgerDb, orderId: string, reason: CaseReaso
   db.update(reviewCases).set({ status: "RESOLVED", resolution: "DISMISSED", resolvedAt: w.at, resolvedBy: w.by.actor.id, resolutionReason: outcome }).where(eq(reviewCases.caseId, open.caseId)).run();
   w.by.audit.record({ actor: w.by.actor, event: "orders.review_case.resolved", entityId: String(open.caseId), payload: { caseId: open.caseId, network: open.network, reason, orderId, outcome } });
   return open.caseId;
+}
+
+/**
+ * Whether staff already resolved a case of this network, subject and reason opened from exactly
+ * these facts (`fingerprint`): a source that repeats the same facts every run must not reopen a
+ * case staff dismissed; new facts open a new one (Story 4.21).
+ */
+export function caseResolvedWith(db: LedgerDb, e: Pick<CaseEvidence, "network" | "subject" | "reason"> & { readonly fingerprint: string }): boolean {
+  const found = db
+    .select({ caseId: reviewCases.caseId })
+    .from(reviewCases)
+    .where(and(eq(reviewCases.network, e.network), eq(reviewCases.subject, e.subject), eq(reviewCases.reason, e.reason), eq(reviewCases.status, "RESOLVED"), eq(reviewCases.fingerprint, e.fingerprint)))
+    .get();
+  return found !== undefined;
 }

@@ -1,0 +1,99 @@
+{
+  "rule": "batchWithholding",
+  "source": "D59 and the production backup (11 Shopee payout_batches, 2026-09-24 to 2026-10-29; eligibleTotalAmount and totalPaymentAmount of raw_json divided by 100,000): received = eligible minus the 0.98% fee and, in a withheld batch, 10% tax, both on the gross (FR-13); tolerance 1% of the gross, at least 2 dong, for Shopee's per-order rounding; fee shown is what the network kept (eligible - tax - received)",
+  "cases": [
+    {
+      "name": "real batch 24/9: 168,347 gross paid 166,698 is not withheld (the split gives 166,697, 1 dong of per-order rounding)",
+      "input": {
+        "network": "shopee",
+        "eligible": 168347,
+        "received": 166698
+      },
+      "expected": {
+        "withheld": false,
+        "fee": 1649,
+        "tax": 0,
+        "expected": 166697,
+        "deviation": 1
+      }
+    },
+    {
+      "name": "real batch: 434,665 gross paid 386,938 is withheld, exactly the split (fee 4,260, tax 43,467)",
+      "input": {
+        "network": "shopee",
+        "eligible": 434665,
+        "received": 386938
+      },
+      "expected": {
+        "withheld": true,
+        "fee": 4260,
+        "tax": 43467,
+        "expected": 386938,
+        "deviation": 0
+      }
+    },
+    {
+      "name": "real batch: 60,743 gross (eligibleTotalAmount 6074300000) paid 54,073 is withheld, 1 dong under the split",
+      "input": {
+        "network": "shopee",
+        "eligible": 60743,
+        "received": 54073
+      },
+      "expected": {
+        "withheld": true,
+        "fee": 596,
+        "tax": 6074,
+        "expected": 54074,
+        "deviation": -1
+      }
+    },
+    {
+      "name": "the FR-13 example: 100,000 gross paid 89,020 is withheld",
+      "input": {
+        "network": "shopee",
+        "eligible": 100000,
+        "received": 89020
+      },
+      "expected": {
+        "withheld": true,
+        "fee": 980,
+        "tax": 10000,
+        "expected": 89020,
+        "deviation": 0
+      }
+    },
+    {
+      "name": "a batch that fits neither split (100,000 paid 95,000) is not guessed at",
+      "input": {
+        "network": "shopee",
+        "eligible": 100000,
+        "received": 95000
+      },
+      "expected": null
+    },
+    {
+      "name": "an AccessTrade batch is always withheld: 15,000 paid 13,500",
+      "input": {
+        "network": "accesstrade",
+        "eligible": 15000,
+        "received": 13500
+      },
+      "expected": {
+        "withheld": true,
+        "fee": 0,
+        "tax": 1500,
+        "expected": 13500,
+        "deviation": 0
+      }
+    },
+    {
+      "name": "an AccessTrade batch paid as if not withheld fits nothing",
+      "input": {
+        "network": "accesstrade",
+        "eligible": 15000,
+        "received": 15000
+      },
+      "expected": null
+    }
+  ]
+}

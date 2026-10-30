@@ -18,7 +18,7 @@ export function sumDong(values: readonly number[], label = "amount"): number {
   return total;
 }
 
-/** `a - b` for two whole-dong amounts, either sign; for reports of a difference, never stored. */
+/** `a - b` for two whole-dong amounts, either sign; a reported difference (a mismatch shown to staff), never an amount anyone is paid. */
 export function differenceDong(a: number, b: number): number {
   return assertDong(assertDong(a, "a") - assertDong(b, "b"), "difference");
 }

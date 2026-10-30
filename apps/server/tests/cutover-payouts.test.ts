@@ -294,6 +294,7 @@ describe("Story 2.4: the import as one command", () => {
       { actor_kind: "system", actor_id: "cutover", event: "orders.orders.imported", payload: '{"orders":10,"items":10,"history":10,"settlementPeriods":2}' },
       { actor_kind: "system", actor_id: "cutover", event: "campaigns.campaigns.imported", payload: '{"campaigns":2,"awards":4}' },
       { actor_kind: "system", actor_id: "cutover", event: "payouts.payouts.imported", payload: '{"payouts":3,"items":3}' },
+      { actor_kind: "system", actor_id: "cutover", event: "payouts.network_settlements.imported", payload: '{"settlements":0}' },
       { actor_kind: "system", actor_id: "cutover", event: "messaging.outbox.seeded", payload: '{"seeded":16}' },
     ]);
   });

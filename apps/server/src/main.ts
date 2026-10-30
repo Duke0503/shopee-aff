@@ -15,7 +15,7 @@ import { systemClock } from "@cashback/core";
 import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { adminDesk } from "./admin/admin-desk";
 import { commandAudit } from "./modules/operations/index";
-import { customerProofRoutes, fileProofStore, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
+import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { receiptPageRoutes } from "./pages/receipt.page";
 import { ConfigError, loadConfig, type ServerConfig } from "./platform/config/env.config";
 import { LEDGER_FILE, type Ledger } from "./platform/db/ledger";
@@ -61,7 +61,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Pr
     const proofs = fileProofStore(proofFilesDir(config.dataDir));
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    const internal = [adminCommandRoutes({ ledger, clock: systemClock })];
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) })];
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), customerProofRoutes({ ledger, clock: systemClock, proofs })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });

@@ -1,12 +1,11 @@
 /**
- * Stories 4.9 and 4.10 on the admin desk: the payout panel takes an optional proof image (JPEG or
- * PNG) and uploads its bytes once the payout is recorded; an admin can void a payout recorded by
- * mistake from a dialog that lists the server's own figures, with a required reason, and every
- * list refreshes after it (LC-10). An employee never sees the void action.
+ * Story 4.9 on the admin desk: the payout panel takes an optional proof image (JPEG or PNG) and
+ * uploads its bytes once the payout is recorded. Voiding a payout (Story 4.10) is done from the
+ * payout history since Story 4.12: payout-history.test.tsx; the panel offers no void.
  */
 import type { PayoutVoidPreview } from "@cashback/contracts";
-import { formatMoney, statusLabel } from "@cashback/ui";
-import { screen, waitFor, within } from "@testing-library/react";
+import { formatMoney } from "@cashback/ui";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +13,6 @@ import { adminText, errorText } from "../src/labels";
 import { PAYOUTS_KEY } from "../src/payouts/payouts.queries";
 import { ADMIN, EMPLOYEE, envelope, fakeServer, json, renderDesk, settle, type Answer, type Route } from "./app-harness";
 import { PAYOUT_FIXTURES, payoutRow, payoutServer, payoutsAnswer } from "./payout-fixtures";
-import { setViewportWidth } from "./viewport";
 
 const ROWS = [payoutRow(0, { payable: 135216 })];
 
@@ -129,55 +127,13 @@ describe("Story 4.9 on the desk: the proof image", () => {
   });
 });
 
-describe("Story 4.10 on the desk: void", () => {
-  it("AC4 (desk): an employee sees no void action after recording; an admin does", async () => {
+describe("Story 4.12: void moved from the panel to the payout history", () => {
+  it("after recording, the panel offers no void, even to an admin", async () => {
     const user = userEvent.setup();
-    await desk(EMPLOYEE);
+    await desk(ADMIN);
     const dialog = await openFirst(user);
     await recordIt(user, dialog);
     expect(within(dialog).queryByRole("button", { name: adminText("void_open") })).toBeNull();
-  });
-
-  it("AC5: the dialog lists each order with the state the server says it returns to; void needs a reason, sends only it, and refreshes every list (LC-10)", async () => {
-    const user = userEvent.setup();
-    const { record: server, payouts } = await desk(ADMIN);
-    const panel = await openFirst(user);
-    await recordIt(user, panel);
-    await user.click(within(panel).getByRole("button", { name: adminText("void_open") }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByRole("heading", { name: adminText("void_title", { amount: formatMoney(135216) ?? "" }) })).toBeInTheDocument();
-    const lines = await waitFor(() => dialog.querySelector("[data-void-lines]") as HTMLElement);
-    const rows = within(lines).getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent("261001A0001");
-    expect(rows[0]).toHaveTextContent(statusLabel("status_reversed"));
-    expect(rows[1]).toHaveTextContent(statusLabel("status_approved"));
-    expect(rows[2]).toHaveTextContent(statusLabel("status_campaign_award_void"));
-    expect(within(dialog).getByText(adminText("void_clawback")).closest("div")).toHaveTextContent(formatMoney(99216) ?? "");
-    expect(within(dialog).getByText(adminText("void_told"))).toBeInTheDocument();
-    const go = within(dialog).getByRole("button", { name: adminText("void_confirm") });
-    expect(go).toBeDisabled();
-    await user.type(within(dialog).getByLabelText(adminText("void_reason")), "   ");
-    expect(go).toBeDisabled();
-    await user.type(within(dialog).getByLabelText(adminText("void_reason")), "Ghi nham khach");
-    const listsBefore = payouts.calls.filter((c) => c.method === "GET" && c.path === "/api/admin/payouts").length;
-    await user.click(go);
-    expect(await within(panel).findByText(adminText("void_done"))).toBeInTheDocument();
-    expect(server.calls.filter((c) => c.method === "POST")).toEqual([{ method: "POST", path: "/api/admin/payouts/41/void", body: { reason: "Ghi nham khach" }, type: "application/json" }]);
-    await waitFor(() => expect(payouts.calls.filter((c) => c.method === "GET" && c.path === "/api/admin/payouts").length).toBeGreaterThan(listsBefore));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-  });
-
-  it("on a phone the void dialog fits the width and stacks its buttons", async () => {
-    setViewportWidth(390);
-    const user = userEvent.setup();
-    await desk(ADMIN);
-    const panel = await openFirst(user);
-    await recordIt(user, panel);
-    await user.click(within(panel).getByRole("button", { name: adminText("void_open") }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(dialog.className).toContain("w-[calc(100%-2rem)]");
-    expect(dialog.className).toContain("max-w-[480px]");
   });
 });
 
@@ -204,19 +160,5 @@ describe("Sprint 16 code review on the desk", () => {
     expect(within(dialog).queryByText("lai.jpg")).toBeNull();
     await user.upload(fileInput(dialog), jpeg);
     expect(within(dialog).getByText("lai.jpg")).toBeInTheDocument();
-  });
-
-  it("review 1 (desk): the void dialog shows what is credited back to the customer for netting already taken", async () => {
-    const user = userEvent.setup();
-    const record = recordServer();
-    const route: Route = (url, init) => (url.pathname.endsWith("/void") && (init?.method ?? "GET") === "GET" ? json(200, voidPreview({ refunded: 14243 })) : record.route(url, init));
-    fakeServer({ session: ADMIN, routes: [route, payoutServer(() => payoutsAnswer(ROWS, 135216)).route] });
-    const view = renderDesk("/admin/payouts");
-    await settle(view.queryClient, PAYOUTS_KEY);
-    const panel = await openFirst(user);
-    await recordIt(user, panel);
-    await user.click(within(panel).getByRole("button", { name: adminText("void_open") }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect((await within(dialog).findByText(adminText("void_refund"))).closest("div")).toHaveTextContent(formatMoney(14243) ?? "");
   });
 });

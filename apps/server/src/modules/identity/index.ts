@@ -7,7 +7,7 @@ export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-finger
 export { accountNumberOf, bankAccountsOf, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
 export { distinctiveBankText, findVietQrBank, plainBankText, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
-export { customerCardOf, customerCodeOf, customerKeys, resolveCustomer, type CustomerKeys, type ResolvedCustomer } from "./customer.query";
+export { customerCardOf, customerCardsOf, customerCodeOf, guestCustomerIds, customerKeys, resolveCustomer, type CustomerKeys, type ResolvedCustomer } from "./customer.query";
 export { counterAbove, customerCodeNumber, CUSTOMER_CODE_PREFIX, formatCustomerCode } from "./domain/customer-code";
 export {
   IdentityImportError,

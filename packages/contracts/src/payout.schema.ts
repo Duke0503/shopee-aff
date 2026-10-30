@@ -70,7 +70,8 @@ export const payoutClaimParamsSchema = z.strictObject({ claimId: z.string().rege
 /** Opening a payout takes nothing from the browser (INV-4). */
 export const payoutClaimRequestSchema = z.strictObject({});
 
-const previewOrderSchema = z.object({ orderId: z.string(), productName: z.string().nullable(), productImageUrl: z.url({ protocol: /^https$/ }).nullable(), cashback: dong, settled: z.boolean() });
+/** `settledBy` is the network payout that paid the operator for the order (D59), null while unpaid. */
+const previewOrderSchema = z.object({ orderId: z.string(), productName: z.string().nullable(), productImageUrl: z.url({ protocol: /^https$/ }).nullable(), cashback: dong, settled: z.boolean(), settledBy: z.string().nullable() });
 const previewBonusSchema = z.object({ awardId: z.number().int(), orderId: z.string(), campaignName: z.string(), amount: dong });
 const previewClawbackSchema = z.object({ clawbackId: z.string(), orderId: z.string().nullable(), open: z.number().int().min(1) });
 /** Money a voided payout's clawback had already netted, credited back and paid with this payout (Story 4.10). */

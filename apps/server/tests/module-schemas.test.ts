@@ -62,6 +62,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       order_status_history: "orders",
       order_observations: "orders",
       settlement_periods: "orders",
+      network_withholding: "orders",
       review_cases: "orders",
       reconciliation_runs: "orders",
       product_offers: "linking",
@@ -77,6 +78,8 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       ledger_entries: "payouts",
       payout_claims: "payouts",
       payout_proofs: "payouts",
+      network_settlements: "payouts",
+      network_settlement_orders: "payouts",
     });
   });
 });

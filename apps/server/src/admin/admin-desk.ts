@@ -9,8 +9,8 @@ import type { Clock } from "@cashback/core";
 import { staffSessionRoutes, staffSessionsFor } from "../modules/identity/index";
 import { outboxFor, wasTold } from "../modules/messaging/index";
 import { auditFor, commandAudit } from "../modules/operations/index";
-import { reviewCaseRoutes } from "../modules/orders/index";
-import { payoutRecordRoutes, payoutRoutes, type ProofStore } from "../modules/payouts/index";
+import { orderDeskRoutes, reviewCaseRoutes } from "../modules/orders/index";
+import { networkSettlementRoutes, payoutRecordRoutes, payoutRoutes, type ProofStore } from "../modules/payouts/index";
 import type { StaffAccessConfig } from "../platform/config/env.config";
 import type { Ledger } from "../platform/db/ledger";
 import type { Logger } from "../platform/log/logger";
@@ -53,6 +53,8 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     }),
     payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), ...(deps.logger ? { logger: deps.logger } : {}) }),
     payoutRecordRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), lookup: (db) => ({ told: (key) => wasTold(db, key) }), proofs: deps.proofs }),
+    orderDeskRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
+    networkSettlementRoutes({ ledger, clock }),
   ];
   return { gate, routes };
 }

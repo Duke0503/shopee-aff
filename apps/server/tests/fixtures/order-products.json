@@ -1,0 +1,5 @@
+{
+  "$comment": "Fake product names for the Orders list search tests (Story 4.13); the folded query matches the first without diacritics.",
+  "products": ["Nồi cơm điện tử 1.8L", "Tai nghe bluetooth chống ồn"],
+  "foldedProduct": "noi com dien"
+}

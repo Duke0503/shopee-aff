@@ -12,6 +12,7 @@ import {
   nextVnTimeOfDay,
   parseInstant,
   parseStaffVnTime,
+  vnDatePreset,
   vnDateRange,
   vnToday,
 } from "../src/index";
@@ -101,5 +102,22 @@ describe("daily Vietnam times for jobs (AD-13, Story 3.1 AC3)", () => {
   it("refuses a time of day that does not exist", () => {
     expect(() => nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 24, minute: 0 })).toThrow(RangeError);
     expect(() => nextVnTimeOfDay(parseInstant("2026-10-30T07:00:00.000Z"), { hour: 2, minute: 1.5 })).toThrow(RangeError);
+  });
+});
+
+describe("list date presets in Vietnam days (Stories 4.12 AC4 and 4.13 AC1)", () => {
+  it("'today' at 06:30 Vietnam time is the Vietnam day, not the UTC one", () => {
+    expect(vnDatePreset("today", fixedClock("2026-10-29T23:30:00.000Z"))).toEqual({ from: "2026-10-30", to: "2026-10-30" });
+  });
+
+  it("'this month' runs from the 1st to the last day, which a range includes whole", () => {
+    expect(vnDatePreset("thisMonth", fixedClock("2026-10-30T12:00:00.000Z"))).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(vnDatePreset("thisMonth", fixedClock("2028-02-10T12:00:00.000Z"))).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+    expect(vnDateRange("2026-10-01", "2026-10-31")).toEqual({ from: "2026-09-30T17:00:00.000Z", to: "2026-10-31T17:00:00.000Z" });
+  });
+
+  it("'last 7 days' ends today and 'last month' is the whole previous month, across a year", () => {
+    expect(vnDatePreset("last7", fixedClock("2026-10-30T12:00:00.000Z"))).toEqual({ from: "2026-10-24", to: "2026-10-30" });
+    expect(vnDatePreset("lastMonth", fixedClock("2027-01-05T12:00:00.000Z"))).toEqual({ from: "2026-12-01", to: "2026-12-31" });
   });
 });

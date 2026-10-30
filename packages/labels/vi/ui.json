@@ -35,5 +35,14 @@
   "list_page_size": "Số dòng mỗi trang",
   "list_page_size_option": "{count} dòng",
   "list_pagination": "Phân trang",
-  "list_total_overall": "Toàn bộ: {total}"
+  "list_total_overall": "Toàn bộ: {total}",
+  "list_all_overall": "Tất cả, toàn bộ {total}",
+  "list_date_kind": "Loại ngày",
+  "list_date_days": "Thời gian",
+  "list_date_any": "Mọi ngày",
+  "list_date_today": "Hôm nay",
+  "list_date_last7": "7 ngày qua",
+  "list_date_this_month": "Tháng này",
+  "list_date_last_month": "Tháng trước",
+  "list_date_range": "{from} – {to}"
 }

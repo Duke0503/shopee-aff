@@ -31,5 +31,10 @@ export interface ListSpec<F extends FieldSpecs> {
   /** Stored `search_text` columns; any other column is refused. */
   readonly search: readonly string[];
   readonly defaultSort: { readonly field: keyof F & string; readonly direction: "asc" | "desc" };
+  /**
+   * Also answer `overall`, the count of every record with no filter and no search, for a screen
+   * that labels it as the overall total (LC-6) beside the filtered figures.
+   */
+  readonly overallTotal?: boolean;
 }
 

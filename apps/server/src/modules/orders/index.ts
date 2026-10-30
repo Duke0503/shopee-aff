@@ -46,7 +46,7 @@ export { stepEvent } from "./order-steps.command";
 export { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
 export { applyReportRow, ReportApplyError, type ApplyDeps, type ApplyOutcome, type ContextDeps, type ApplyReport } from "./report-apply.command";
 export { periodIsWithheld, settlementPeriodOf, splitWithheld, type SplitHolder } from "./domain/settlement";
-export { markSettlementPeriod, periodWithheld, SettlementPeriodError, type SettlementPeriodErrorCode, type SettlementPeriodMark } from "./settlement-period.command";
+export { markSettlementPeriod, periodWithheld, periodWithholding, type PeriodWithholding, type WithholdingSource, SettlementPeriodError, type SettlementPeriodErrorCode, type SettlementPeriodMark } from "./settlement-period.command";
 export {
   CUTOVER_ACTOR,
   importOrders,
@@ -55,10 +55,15 @@ export {
   type OrdersImport,
   type OrdersImportResult,
 } from "./order-import.command";
-export { openOrRefreshCase, resolveOpenCase, type CaseEvidence, type CaseReason, type CaseWrite } from "./review-case.command";
+export { caseResolvedWith, openOrRefreshCase, resolveOpenCase, SETTLEMENT_CASE_REASONS, type CaseEvidence, type CaseReason, type CaseWrite, type SettlementCaseReason } from "./review-case.command";
+export { latestWithholding, observeWithholding, settleOrders, settlementCandidates, settlementOrdersOf, type SettleInput, type SettlementOrder, type SettlementWindow, type WithholdingObservation } from "./order-settlement.command";
+export { answerOrdersList, ORDERS_LIST } from "./orders.list";
+export { openSettlementCaseIds, orderCardsOf, type OrderCard } from "./order-cards.query";
 export { orderBalanceRows, payableOrderLines, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows, type PayableOrderLine } from "./order-balance.query";
 export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
 export { reviewCaseRoutes, type ReviewCaseRouteDeps } from "./http/review-case.routes";
+export { orderDeskRoutes, type OrderDeskRouteDeps } from "./http/order-desk.routes";
+export { settlementPeriodImpact, settlementPeriodRows, type PeriodRow } from "./settlement-period.query";
 export { previewReviewApply, ReviewCaseError, type ReviewReadDeps, type ReviewApplyInput, type ReviewCaseErrorCode, type ReviewPreview } from "./review-plan.query";
 export { openOrderDays, type OpenOrderDay, type OpenOrderDays } from "./open-order-days.query";
 export { AGED_AFTER_DAYS, FLAG_AFTER_DAYS, flagUnseenOrders, orderAging, resolveSeenAgain, type AgingCounts } from "./order-aging.command";

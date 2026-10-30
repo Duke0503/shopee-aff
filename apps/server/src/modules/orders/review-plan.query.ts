@@ -26,6 +26,7 @@ import { transition, TransitionError, type ReviewContext, type TransitionResult 
 import { ledgerDirectory } from "./ledger-directory.query";
 import { findOrder, frozenFrom, latestObservation, transitionOrderOf, type StoredOrder } from "./order-ledger.repository";
 import { contextFor, type ContextDeps } from "./report-apply.command";
+import { SETTLEMENT_CASE_REASONS } from "./review-case.command";
 import { reviewCases } from "./schema";
 
 export type ReviewCaseErrorCode =
@@ -195,6 +196,8 @@ function planReview(db: LedgerDb, c: ReviewCaseRow, stored: StoredOrder, input: 
 export function planReviewApply(db: LedgerDb, input: ReviewApplyInput, deps: ReviewReadDeps): ReviewPlan {
   requireStaff(deps.actor, input.reason);
   const c = openCaseOf(db, input.caseId);
+  // A network payout case (D59) changes no order: staff check it against the network and dismiss it.
+  if (SETTLEMENT_CASE_REASONS.includes(c.reason)) refuse("review_not_applicable", `a ${c.reason} case is checked against the network and dismissed`);
   const stored = findOrder(db, c.orderId ?? c.subject);
   return stored === null ? planAttribution(db, c, input, deps) : planReview(db, c, stored, input, deps);
 }

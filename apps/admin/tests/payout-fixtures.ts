@@ -56,8 +56,8 @@ export function preview(overrides: Partial<PayoutPreview> = {}): PayoutPreview {
     qrMissing: null,
     flags: [],
     orders: [
-      { orderId: "261001A0001", productName: fixtures.products[0] ?? null, productImageUrl: null, cashback: 79216, settled: true },
-      { orderId: "261001A0002", productName: null, productImageUrl: null, cashback: 36000, settled: false },
+      { orderId: "261001A0001", productName: fixtures.products[0] ?? null, productImageUrl: null, cashback: 79216, settled: true, settledBy: "1034567" },
+      { orderId: "261001A0002", productName: null, productImageUrl: null, cashback: 36000, settled: false, settledBy: null },
     ],
     bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: fixtures.campaign, amount: 20000 }],
     clawbacks: [],
@@ -84,7 +84,7 @@ export function nettingPreview(): PayoutPreview {
     qrPayload: null,
     qrMissing: "netting_only",
     flags: ["NETTING_ONLY"],
-    orders: [{ orderId: "261002N0001", productName: fixtures.products[1] ?? null, productImageUrl: null, cashback: 30000, settled: false }],
+    orders: [{ orderId: "261002N0001", productName: fixtures.products[1] ?? null, productImageUrl: null, cashback: 30000, settled: false, settledBy: null }],
     bonuses: [{ awardId: 2, orderId: "261002N0001", campaignName: fixtures.campaign, amount: 20000 }],
     clawbacks: [{ clawbackId: "260901PAID07-1", orderId: "260901PAID07", open: 80000 }],
   });

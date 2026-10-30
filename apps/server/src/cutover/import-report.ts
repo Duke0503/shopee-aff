@@ -56,6 +56,9 @@ export interface ReportNote {
     | "bill_token_missing"
     | "bill_token_duplicate"
     | "bill_token_malformed"
+    | "network_payout_unknown_platform"
+    | "network_payout_unknown_status"
+    | "network_payout_amount_not_whole_dong"
     | "duplicate_live_award"
     | "campaign_amount_not_whole_dong"
     | "campaign_window_invalid"
@@ -230,6 +233,14 @@ export interface ImportReport {
   notifications: NotificationsSection | null;
   payouts: PayoutsSection | null;
   campaigns: CampaignsSection | null;
+  /** Live payout_batches imported as HISTORIC network settlements, never matched to orders (D59). */
+  networkPayouts: NetworkPayoutsSection | null;
+}
+
+export interface NetworkPayoutsSection {
+  imported: number;
+  /** Each batch, HISTORIC: its creation time, gross, received and the withholding read from them (null: fits no split). */
+  batches: { networkPayoutId: string; createdAt: string | null; eligible: number | null; received: number; withheld: boolean | null; match: string }[];
 }
 
 export function emptyReport(): ImportReport {
@@ -249,5 +260,6 @@ export function emptyReport(): ImportReport {
     notifications: null,
     payouts: null,
     campaigns: null,
+    networkPayouts: null,
   };
 }

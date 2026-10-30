@@ -1,6 +1,7 @@
 /**
- * Routes on a recorded payout (FR-17, FR-18, FR-34, D41, D49; Stories 4.9 and 4.10).
+ * Routes on a recorded payout (FR-17, FR-18, FR-34, D41, D49; Stories 4.9, 4.10 and 4.12).
  *
+ *   GET  /api/admin/payout-history            any staff: every payout, voided included, on the list contract
  *   POST /api/admin/payouts/:payoutId/proof   any staff: the proof image as a JPEG or PNG body, up to 8 MB
  *   GET  /api/admin/payouts/:payoutId/proof   any staff: the stored image, nosniff and the strict CSP
  *   GET  /api/admin/payouts/:payoutId/void    admin only: what a void would do, from the server
@@ -14,7 +15,7 @@
  * removed. A body over 8 MB is refused by the body limit as `error.proof.too_large`.
  */
 import { createHash } from "node:crypto";
-import { payoutIdParamsSchema, payoutProofResponseSchema, payoutVoidPreviewSchema, payoutVoidRequestSchema, payoutVoidResponseSchema, type ErrorCode } from "@cashback/contracts";
+import { payoutHistoryResponseSchema, payoutIdParamsSchema, payoutProofResponseSchema, payoutVoidPreviewSchema, payoutVoidRequestSchema, payoutVoidResponseSchema, type ErrorCode } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 import type { z } from "zod";
 
@@ -30,6 +31,7 @@ import { PROOF_MAX_BYTES, sanitizeProofImage } from "../proof-image";
 import { PayoutProofError, proofOf, proofRefusal, recordPayoutProof, type PayoutProofErrorCode, type ProofStore } from "../payout-proof.command";
 import { PayoutVoidError, voidPayout, type PayoutVoidErrorCode } from "../payout-void.command";
 import { voidPreview } from "../payout-void.query";
+import { answerPayoutHistory } from "../payout-history.list";
 
 export interface PayoutRecordRouteDeps {
   readonly ledger: Ledger;
@@ -84,6 +86,7 @@ async function uploadProof(deps: PayoutRecordRouteDeps, staff: StaffPrincipal | 
 export function payoutRecordRoutes(deps: PayoutRecordRouteDeps): StaffRoutes {
   const { clock } = deps;
   return (add) => {
+    add({ method: "GET", url: "/api/admin/payout-history", handler: async (request) => payoutHistoryResponseSchema.parse(answerPayoutHistory(deps.ledger.db, request.query, clock)) });
     add({
       method: "POST",
       url: "/api/admin/payouts/:payoutId/proof",

@@ -182,8 +182,8 @@ describe("Story 2.2: the rest of each customer row", () => {
     expect(byId.get("1000000000000000004")).toMatchObject({ display_name: null, zalo_user_id: null, status: "DISABLED", search_text: "dp00007", customer_code: "DP00007" });
   });
 
-  it("builds search_text and sort_key from the name", () => {
-    expect(byId.get("1000000000000000001")).toMatchObject({ search_text: "nguyenvanan|dp00001" });
+  it("builds search_text from the name, the code and the Zalo id (Story 4.13 review), and sort_key from the name", () => {
+    expect(byId.get("1000000000000000001")).toMatchObject({ search_text: "nguyenvanan|dp00001|1000000000000000001" });
     expect(byId.get("1000000000000000005")?.["sort_key"]).toBe(sortKey(liveField("1000000000000000005", "display_name")));
   });
 

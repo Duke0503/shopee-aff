@@ -94,6 +94,15 @@ export const settlementPeriods = sqliteTable(
   (t) => [primaryKey({ columns: [t.network, t.periodMonth] })],
 );
 
+/** The latest network payout batch's withholding per network (migration 0018, D59): the estimate approvals take. */
+export const networkWithholding = sqliteTable("network_withholding", {
+  network: text("network", { enum: ORDER_NETWORKS }).primaryKey().notNull(),
+  withheld: integer("withheld", { mode: "boolean" }).notNull(),
+  networkPayoutId: text("network_payout_id").notNull(),
+  observedAt: text("observed_at").notNull(),
+  recordedAt: text("recorded_at").notNull(),
+});
+
 export const REVIEW_CASE_STATUSES = ["OPEN", "RESOLVED"] as const satisfies readonly ReviewCaseStatus[];
 
 export const reviewCases = sqliteTable("review_cases", {

@@ -81,7 +81,7 @@ export function importIdentity(db: LedgerDb, data: IdentityImport, fingerprintKe
   refuseUnlessEmpty(db);
   for (const c of sortByKey(data.customers, (r) => r.customerId)) {
     db.insert(customers)
-      .values({ ...c, searchText: searchText(c.displayName, c.customerCode), sortKey: sortKey(c.displayName ?? "") })
+      .values({ ...c, searchText: searchText(c.displayName, c.customerCode, c.zaloUserId), sortKey: sortKey(c.displayName ?? "") })
       .run();
   }
   for (const a of sortByKey(data.aliases, (r) => r.alias)) db.insert(customerAliases).values(a).run();

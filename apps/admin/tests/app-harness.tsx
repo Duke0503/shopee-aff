@@ -30,17 +30,22 @@ export function orderRow(n: number, overrides: Partial<OrderRow> = {}): OrderRow
     customerName: fixtures.customerNames[n % fixtures.customerNames.length] ?? null,
     productName: fixtures.products[n % fixtures.products.length] ?? null,
     productImageUrl: n % 2 === 0 ? `https://cf.example.test/file/p${n}.jpg` : null,
-    network: "Shopee",
+    network: "shopee",
     status: "APPROVED",
+    orderValue: 450000,
+    approvedCommission: 11693,
     cashback: 9263,
     recordedAt: "2026-10-30T05:00:00.000Z",
+    approvedAt: "2026-10-30T06:00:00.000Z",
+    paidAt: null,
+    settledBy: null,
     ...overrides,
   };
 }
 
 export function ordersAnswer(rows: readonly OrderRow[], extra: Partial<ListResponse<OrderRow>> = {}): Answer {
   const facets = { status: ["AWAITING_APPROVAL", "FROZEN", "APPROVED", "REVERSED", "PAID", "REJECTED"].map((value) => ({ value, count: rows.filter((r) => r.status === value).length })) };
-  return json(200, { rows, total: rows.length, page: 1, pageSize: 25, facets, summary: { cashback: 0 }, asOf: "2026-10-30T12:42:00.000Z", ...extra });
+  return json(200, { rows, total: rows.length, page: 1, pageSize: 25, facets, summary: { approvedCommission: 0, cashback: 0 }, asOf: "2026-10-30T12:42:00.000Z", ...extra });
 }
 
 export interface ServerOptions {

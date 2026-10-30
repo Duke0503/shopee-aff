@@ -1,5 +1,6 @@
 // Screenshots of the admin desk shell, the Orders DataList, the Payouts list and the payout panel (with its confirm step,
-// the amount-changed and recorded states, and the netting-only variant) at phone, tablet and desktop
+// the amount-changed and recorded states, and the netting-only variant), the payout history with its void dialog,
+// the network payouts tab with one payout's orders, and Settings with the withheld periods, at phone, tablet and desktop
 // widths, for the design review. Starts the Vite dev server, answers /api/admin from fixtures
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
 // sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too.
@@ -35,15 +36,20 @@ function orders(url) {
     customerName: fixtures.customerNames[i % fixtures.customerNames.length],
     productName: fixtures.products[i % fixtures.products.length],
     productImageUrl: i % 5 === 4 ? null : `https://cf.example.test/file/${PHOTOS[i % PHOTOS.length]}`,
-    network: i % 4 === 3 ? "TikTok Shop" : "Shopee",
+    network: i % 4 === 3 ? "accesstrade" : "shopee",
     status: STATUSES[i % STATUSES.length],
+    orderValue: 159000 + i * 21000,
+    approvedCommission: AMOUNTS[i % AMOUNTS.length] === null ? null : Math.floor((AMOUNTS[i % AMOUNTS.length] * 5) / 4),
     cashback: AMOUNTS[i % AMOUNTS.length],
-    recordedAt: `2026-10-${String(30 - (i % 9)).padStart(2, "0")}T0${i % 9}:15:00.000Z`,
+    recordedAt: i === 22 ? "2025-12-28T03:15:00.000Z" : `2026-10-${String(30 - (i % 9)).padStart(2, "0")}T0${i % 9}:15:00.000Z`,
+    approvedAt: AMOUNTS[i % AMOUNTS.length] === null ? null : "2026-10-29T03:00:00.000Z",
+    paidAt: STATUSES[i % STATUSES.length] === "PAID" ? "2026-10-30T05:00:00.000Z" : null,
+    settledBy: i % 3 === 0 ? "1034567" : null,
   }));
   const rows = status.length === 0 ? all : all.filter((r) => status.includes(r.status));
   const facets = { status: ["AWAITING_APPROVAL", "FROZEN", "APPROVED", "REVERSED", "PAID", "REJECTED"].map((value) => ({ value, count: rows.filter((r) => r.status === value).length })) };
-  const summary = { cashback: rows.reduce((sum, r) => sum + (r.cashback ?? 0), 0) };
-  return { rows: rows.slice(0, 25), total: rows.length + 1261, page: 1, pageSize: 25, facets, summary, asOf: "2026-10-30T12:42:00.000Z" };
+  const summary = { approvedCommission: rows.reduce((sum, r) => sum + (r.approvedCommission ?? 0), 0), cashback: rows.reduce((sum, r) => sum + (r.cashback ?? 0), 0) };
+  return { rows: rows.slice(0, 25), total: rows.length + 1261, page: 1, pageSize: 25, facets, summary, asOf: "2026-10-30T12:42:00.000Z", overall: 4912 };
 }
 
 const payoutFixtures = JSON.parse(readFileSync(join(root, "tests/fixtures/payouts.json"), "utf8"));
@@ -73,8 +79,8 @@ const PREVIEW = {
   bankName: "Vietcombank", holderName: payoutFixtures.holder, accountLastFour: "3456", qrPayload: payoutFixtures.qrPayload, qrMissing: null,
   flags: ["BANK_CHANGED"],
   orders: [
-    { orderId: "261001A0001", productName: payoutFixtures.products[0], productImageUrl: "https://cf.example.test/file/deal_home_1.jpg", cashback: 79216, settled: true },
-    { orderId: "261001A0002", productName: payoutFixtures.products[2], productImageUrl: "https://cf.example.test/file/deal_home_4.jpg", cashback: 36000, settled: false },
+    { orderId: "261001A0001", productName: payoutFixtures.products[0], productImageUrl: "https://cf.example.test/file/deal_home_1.jpg", cashback: 79216, settled: true, settledBy: "1034567" },
+    { orderId: "261001A0002", productName: payoutFixtures.products[2], productImageUrl: "https://cf.example.test/file/deal_home_4.jpg", cashback: 36000, settled: false, settledBy: null },
   ],
   bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
   clawbacks: [], refunds: [],
@@ -82,10 +88,10 @@ const PREVIEW = {
   snapshotHash: "a".repeat(64), netted: 0, carriedForward: 0,
 };
 const CHANGED = { ...PREVIEW, claimId: "N3WCLA1M", snapshotHash: "c".repeat(64), amount: 144479, gross: 144479, warning: null,
-  orders: [...PREVIEW.orders, { orderId: "261001A0003", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 9263, settled: false }] };
+  orders: [...PREVIEW.orders, { orderId: "261001A0003", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 9263, settled: false, settledBy: null }] };
 const NETTING = { ...PREVIEW, claimId: "N3TT1NG0", snapshotHash: "b".repeat(64), transferReference: "DP00088 N3TT1NG0", customerId: "P4", customerCode: "DP00088", customerName: payoutFixtures.names[4],
   amount: 0, gross: 50000, deductedNext: 80000, netted: 50000, carriedForward: 30000, qrPayload: null, qrMissing: "netting_only", flags: ["NETTING_ONLY"], warning: null,
-  orders: [{ orderId: "261002N0001", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 30000, settled: false }],
+  orders: [{ orderId: "261002N0001", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 30000, settled: false, settledBy: null }],
   bonuses: [{ awardId: 2, orderId: "261002N0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
   clawbacks: [{ clawbackId: "260901PAID07-1", orderId: "260901PAID07", open: 80000 }] };
 const RECORDED = { outcome: "recorded", payoutId: 41, claimId: "K7Q2M9XA", customerId: "P0", amount: 135216, netted: 0, nettingOnly: false, orderCount: 2, awardCount: 1, receiptToken: "rcpt_test_token_0001", recordedAt: "2026-10-30T12:45:00.000Z", replay: false };
@@ -98,6 +104,39 @@ const VOID_PREVIEW = {
   awards: [{ awardId: 1, orderId: "261001A0001", amount: 20000, to: "VOID" }], nettingReversed: 0, clawbacksClosed: 99216, refunded: 0, told: true,
 };
 const VOIDED = { payoutId: 41, customerId: "P0", amount: 135216, voidedAt: "2026-10-30T12:50:00.000Z", orders: [{ orderId: "261001A0001", to: "REVERSED" }, { orderId: "261001A0002", to: "APPROVED" }], offsets: 1, corrected: true, replay: false };
+
+const HISTORY_AMOUNTS = [135216, 24860, 9263, 0, 58400, 31008];
+function historyRows() {
+  const rows = payoutFixtures.names.map((name, i) => ({
+    payoutId: 41 + i, customerId: `P${i}`, customerCode: `DP${String(12 + i * 19).padStart(5, "0")}`, customerName: name,
+    amount: HISTORY_AMOUNTS[i], paidAmount: i === 1 ? 0 : HISTORY_AMOUNTS[i], status: i === 1 ? "VOIDED" : "RECORDED",
+    recordedAt: i === 5 ? "2025-12-30T04:10:00.000Z" : `2026-10-${String(30 - i * 3).padStart(2, "0")}T05:45:00.000Z`, recordedBy: i % 2 === 0 ? "minh" : "tuan",
+    voidedAt: i === 1 ? "2026-10-28T09:00:00.000Z" : null, receiptToken: HISTORY_AMOUNTS[i] === 0 ? null : `rcpt_${i}`,
+  }));
+  return { rows, total: 150, page: 1, pageSize: 25, facets: { status: [{ value: "RECORDED", count: 149 }, { value: "VOIDED", count: 1 }] }, summary: { paidAmount: 12345678 }, asOf: "2026-10-30T12:42:00.000Z" };
+}
+const NETWORK_ROWS = [
+  { settlementId: 11, network: "shopee", networkPayoutId: "1034567", status: "PROCESSING", match: "PENDING", amount: 54073, eligibleAmount: 60743, withheld: true, fee: 596, tax: 6074, matchedGross: null, unattributed: null, orderCount: 0, createdAt: "2026-10-29T03:00:00.000Z", paidAt: null },
+  { settlementId: 10, network: "shopee", networkPayoutId: "1033120", status: "PAID", match: "MISMATCH", amount: 89020, eligibleAmount: 100000, withheld: true, fee: 980, tax: 10000, matchedGross: 106000, unattributed: -6000, orderCount: 4, createdAt: "2026-10-26T03:00:00.000Z", paidAt: "2026-10-28T03:00:00.000Z" },
+  { settlementId: 9, network: "shopee", networkPayoutId: "1031877", status: "PAID", match: "MATCHED", amount: 386938, eligibleAmount: 434665, withheld: true, fee: 4260, tax: 43467, matchedGross: 411665, unattributed: 23000, orderCount: 12, createdAt: "2026-10-22T03:00:00.000Z", paidAt: "2026-10-24T03:00:00.000Z" },
+  { settlementId: 1, network: "shopee", networkPayoutId: "1020455", status: "PAID", match: "HISTORIC", amount: 166698, eligibleAmount: 168347, withheld: false, fee: 1649, tax: 0, matchedGross: null, unattributed: null, orderCount: 0, createdAt: "2026-09-24T03:00:00.000Z", paidAt: "2026-09-26T03:00:00.000Z" },
+];
+const networkRows = () => ({ rows: NETWORK_ROWS, total: NETWORK_ROWS.length, page: 1, pageSize: 25, facets: {}, summary: { amount: 696729, eligibleAmount: 763755, matchedGross: 669012, fee: 7485, tax: 59541 }, asOf: "2026-10-30T12:42:00.000Z" });
+const NETWORK_DETAIL = {
+  ...NETWORK_ROWS[2], listed: false, windowFrom: "2026-10-19T03:00:00.000Z", openCaseIds: [],
+  orders: [
+    { orderId: "251019ZT45LB", outcome: "SETTLED", gross: 371665, net: 330856, customerCode: "DP00012", customerName: payoutFixtures.names[0], productName: payoutFixtures.products[0], productImageUrl: "https://cf.example.test/file/deal_home_1.jpg", status: "PAID", settledBy: "1031877" },
+    { orderId: "251020M8RR0Q", outcome: "SETTLED", gross: 25000, net: 22255, customerCode: "DP00031", customerName: payoutFixtures.names[1], productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", status: "APPROVED", settledBy: "1031877" },
+    { orderId: "251021C4DD9E", outcome: "SETTLED", gross: 15000, net: 13353, customerCode: "DP00050", customerName: payoutFixtures.names[2], productName: null, productImageUrl: null, status: "APPROVED", settledBy: "1031877" },
+  ],
+};
+const PERIODS = { currentMonth: "2026-10", periods: [
+  { network: "shopee", periodMonth: "2026-10", withheld: true, editable: true, origin: "NETWORK", basedOn: "1034567" },
+  { network: "shopee", periodMonth: "2026-09", withheld: false, editable: true, origin: "STAFF", basedOn: null },
+  { network: "shopee", periodMonth: "2026-08", withheld: true, editable: true, origin: "CUTOVER", basedOn: null },
+  { network: "accesstrade", periodMonth: "2026-10", withheld: true, editable: false, origin: "DEFAULT", basedOn: null },
+  { network: "accesstrade", periodMonth: "2026-09", withheld: true, editable: false, origin: "CUTOVER", basedOn: null },
+] };
 
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5174, strictPort: true }, logLevel: "error" });
 await server.listen();
@@ -114,6 +153,11 @@ async function shoot(name, width, height, path, after, answers = {}) {
     if (url.pathname === "/api/admin/session") return route.fulfill({ json: { staffId: "stf_1", username: "minh", role: "ADMIN" } });
     if (url.pathname === "/api/admin/orders") return route.fulfill({ json: orders(url) });
     if (url.pathname === "/api/admin/payouts") return route.fulfill({ json: payoutRows(url) });
+    if (url.pathname === "/api/admin/payout-history") return route.fulfill({ json: historyRows() });
+    if (url.pathname === "/api/admin/network-settlements") return route.fulfill({ json: networkRows() });
+    if (url.pathname.startsWith("/api/admin/network-settlements/")) return route.fulfill({ json: NETWORK_DETAIL });
+    if (url.pathname.endsWith("/impact")) return route.fulfill({ json: { network: "shopee", periodMonth: "2026-10", withheld: false, affected: 7 } });
+    if (url.pathname === "/api/admin/settlement-periods") return route.fulfill({ json: PERIODS });
     if (url.pathname.endsWith("/claim")) return route.fulfill({ json: (answers.claim ?? (() => PREVIEW))(++claims) });
     if (url.pathname.endsWith("/confirm")) {
       const answer = (answers.confirm ?? (() => ({ json: RECORDED })))();
@@ -177,15 +221,19 @@ for (const [label, width, height] of WIDTHS) {
     { claim: () => NETTING, confirm: () => ({ json: NETTING_RECORDED }) });
 }
 const chooseProof = (page) => page.locator("[data-proof] input[type=file]").setInputFiles(PROOF_PHOTO).then(() => page.locator("[data-proof] img").waitFor({ timeout: 10_000 }));
-const openVoid = (page) => page.getByRole("button", { name: /^Hu/ }).click().then(() => page.locator("[data-void-lines]").waitFor({ timeout: 10_000 }));
 for (const [label, width, height] of WIDTHS) {
   await shoot(`payout-proof-${label}-sheet`, width, height, "/admin/payouts", (page) => openPanel(page).then(() => chooseProof(page)).then(() => toConfirm(page)));
   await shoot(`payout-proof-saved-${label}-sheet`, width, height, "/admin/payouts", (page) =>
     openPanel(page).then(() => chooseProof(page)).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-proof-state=saved] img").waitFor({ timeout: 10_000 })));
-  await shoot(`payout-void-${label}-sheet`, width, height, "/admin/payouts", (page) =>
-    openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => openVoid(page)).then(() => page.getByRole("alertdialog").locator("textarea").fill("Ghi nh\u1ea7m kh\u00e1ch, ch\u01b0a chuy\u1ec3n kho\u1ea3n")));
-  await shoot(`payout-voided-${label}-sheet`, width, height, "/admin/payouts", (page) =>
-    openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => openVoid(page)).then(() => page.getByRole("alertdialog").locator("textarea").fill("Ghi nh\u1ea7m kh\u00e1ch")).then(() => page.getByRole("alertdialog").getByRole("button", { name: /^Hu/ }).click()).then(() => page.locator("[data-voided]").waitFor({ timeout: 10_000 })));
+}
+const openHistoryVoid = (page) => page.locator("[data-card=payout-history] button, tbody button").filter({ hasText: /^Hu/ }).first().click().then(() => page.locator("[data-void-lines]").waitFor({ timeout: 10_000 }));
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`payout-history-${label}`, width, height, "/admin/payouts/history");
+  await shoot(`payout-void-${label}-sheet`, width, height, "/admin/payouts/history", (page) => openHistoryVoid(page).then(() => page.getByRole("alertdialog").locator("textarea").fill("Ghi nh\u1ea7m kh\u00e1ch, ch\u01b0a chuy\u1ec3n kho\u1ea3n")));
+  await shoot(`network-payouts-${label}`, width, height, "/admin/payouts/network");
+  await shoot(`network-payout-${label}-sheet`, width, height, "/admin/payouts/network", (page) => page.getByRole("button", { name: /^Xem/ }).nth(2).click().then(() => page.locator("[data-settlement-order]").first().waitFor({ timeout: 10_000 })));
+  await shoot(`settings-${label}`, width, height, "/admin/settings");
+  await shoot(`settings-confirm-${label}-sheet`, width, height, "/admin/settings", (page) => page.getByRole("switch").first().click().then(() => page.locator("[data-affected]").waitFor({ timeout: 10_000 })));
 }
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));

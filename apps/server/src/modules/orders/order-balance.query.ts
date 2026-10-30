@@ -62,6 +62,8 @@ export interface PayableOrderLine {
   readonly cashback: number;
   /** The network paid the batch covering the order (D27: information only, never a status). */
   readonly settled: boolean;
+  /** The network payout that settled it (D59), or null while the network has not paid it. */
+  readonly settledBy: string | null;
   readonly productName: string | null;
   readonly productImageUrl: string | null;
 }
@@ -74,7 +76,7 @@ export function payableOrderLines(db: LedgerDb, customerIds: readonly string[] |
   if (customerIds !== null && customerIds.length === 0) return [];
   const mine: SQL = customerIds === null ? isNotNull(orders.customerId) : inArray(orders.customerId, [...customerIds]);
   const rows = db
-    .select({ orderId: orders.orderId, customerId: sql<string>`${orders.customerId}`, cashback: sql<number>`coalesce(${orders.cashback}, 0)`, settledAt: orders.settledAt, requestId: orders.requestId })
+    .select({ orderId: orders.orderId, customerId: sql<string>`${orders.customerId}`, cashback: sql<number>`coalesce(${orders.cashback}, 0)`, settledAt: orders.settledAt, networkBatchId: orders.networkBatchId, requestId: orders.requestId })
     .from(orders)
     .where(and(mine, payable))
     .orderBy(orders.approvedAt, orders.orderId)
@@ -82,6 +84,6 @@ export function payableOrderLines(db: LedgerDb, customerIds: readonly string[] |
   const snapshots = products ? productSnapshotsOf(db, rows.flatMap((r) => (r.requestId === null ? [] : [r.requestId]))) : new Map();
   return rows.map((r) => {
     const product = r.requestId === null ? undefined : snapshots.get(r.requestId);
-    return { orderId: r.orderId, customerId: r.customerId, cashback: r.cashback, settled: r.settledAt !== null, productName: product?.productName ?? null, productImageUrl: product?.productImageUrl ?? null };
+    return { orderId: r.orderId, customerId: r.customerId, cashback: r.cashback, settled: r.settledAt !== null, settledBy: r.settledAt === null ? null : r.networkBatchId, productName: product?.productName ?? null, productImageUrl: product?.productImageUrl ?? null };
   });
 }

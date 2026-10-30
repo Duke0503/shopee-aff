@@ -1,11 +1,13 @@
 /**
  * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql,
- * 0013_payout_claims.sql, 0014_payout_confirm.sql and 0015_payout_proofs_and_void.sql. Only this module
+ * 0013_payout_claims.sql, 0014_payout_confirm.sql, 0015_payout_proofs_and_void.sql and
+ * 0017_network_settlements.sql (whose generated payouts.paid_amount is read by the history list only,
+ * so it is not declared here). Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
 import { PROOF_TYPES, type ProofType } from "@cashback/contracts";
-import type { PayoutClaimStatus, PayoutStatus } from "@cashback/core";
+import type { NetworkSettlementStatus, PayoutClaimStatus, PayoutStatus } from "@cashback/core";
 import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const PAYOUT_STATUSES = ["RECORDED", "VOIDED"] as const satisfies readonly PayoutStatus[];
@@ -105,6 +107,51 @@ export const payoutClaims = sqliteTable("payout_claims", {
   abandonedAt: text("abandoned_at"),
   confirmedAt: text("confirmed_at"),
 });
+
+export const NETWORK_SETTLEMENT_STATUSES = ["PROCESSING", "PAID", "FAILED"] as const satisfies readonly NetworkSettlementStatus[];
+export const SETTLEMENT_MATCHES = ["PENDING", "MATCHED", "MISMATCH", "HISTORIC"] as const;
+export type SettlementMatch = (typeof SETTLEMENT_MATCHES)[number];
+export const SETTLEMENT_ORDER_OUTCOMES = ["SETTLED", "CANDIDATE", "CONFLICT", "NOT_APPROVED", "UNKNOWN"] as const;
+export type SettlementOrderOutcome = (typeof SETTLEMENT_ORDER_OUTCOMES)[number];
+
+/** One payout batch a network made to the operator, matched to exact orders (D59). */
+export const networkSettlements = sqliteTable("network_settlements", {
+  settlementId: integer("settlement_id").primaryKey({ autoIncrement: true }),
+  network: text("network", { enum: ["shopee", "accesstrade"] }).notNull(),
+  networkPayoutId: text("network_payout_id").notNull(),
+  status: text("status", { enum: NETWORK_SETTLEMENT_STATUSES }).notNull(),
+  amount: integer("amount").notNull(),
+  eligibleAmount: integer("eligible_amount"),
+  withheld: integer("withheld", { mode: "boolean" }),
+  fee: integer("fee"),
+  tax: integer("tax"),
+  createdAt: text("created_at"),
+  paidAt: text("paid_at"),
+  windowFrom: text("window_from"),
+  orderIds: text("order_ids"),
+  match: text("match", { enum: SETTLEMENT_MATCHES }).notNull(),
+  matchedGross: integer("matched_gross"),
+  unattributed: integer("unattributed"),
+  matchFingerprint: text("match_fingerprint"),
+  origin: text("origin", { enum: ["CUTOVER", "NETWORK"] }).notNull(),
+  recordedAt: text("recorded_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** The orders of one network settlement and what the match did with each. */
+export const networkSettlementOrders = sqliteTable(
+  "network_settlement_orders",
+  {
+    settlementId: integer("settlement_id")
+      .notNull()
+      .references(() => networkSettlements.settlementId),
+    orderId: text("order_id").notNull(),
+    outcome: text("outcome", { enum: SETTLEMENT_ORDER_OUTCOMES }).notNull(),
+    gross: integer("gross"),
+    net: integer("net"),
+  },
+  (t) => [primaryKey({ columns: [t.settlementId, t.orderId] })],
+);
 
 export type PayoutRow = typeof payouts.$inferInsert;
 export type PayoutClaimRow = typeof payoutClaims.$inferSelect;

@@ -1,7 +1,8 @@
 /**
- * Settlement periods (D54, FR-13, AD-5; Story 3.4, the admin screen is Story 4.18). An order's
- * period is its network and the Vietnam month of its approval. A Shopee period counts as withheld
- * until staff unmark it; an AccessTrade period is always withheld (`@cashback/money`'s network
+ * Settlement periods (D54, D59, FR-13, AD-5; Story 3.4, the admin screen is Story 4.18). An order's
+ * period is its network and the Vietnam month of its approval. A Shopee approval takes the
+ * withholding of the network's latest payout batch unless staff marked the period (the override),
+ * withheld when neither is known; an AccessTrade period is always withheld (`@cashback/money`'s network
  * rules, through domain/settlement.ts). A mark changes only what later approvals read: cashback already stored is never
  * recomputed, so an order approved before the mark keeps its amount.
  */
@@ -11,19 +12,42 @@ import { and, eq } from "drizzle-orm";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import { periodIsWithheld } from "./domain/settlement";
+import { latestWithholding } from "./order-settlement.command";
 import { settlementPeriods } from "./schema";
 
 const PERIOD_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** Whether an approval in this period withholds the 10% tax now. */
-export function periodWithheld(db: LedgerDb, network: AffiliateNetwork, periodMonth: string): boolean {
-  if (NETWORK_MONEY_RULES[network].alwaysWithheld) return true;
-  const row = db
+export type WithholdingSource = "ALWAYS" | "STAFF" | "NETWORK" | "DEFAULT";
+
+export interface PeriodWithholding {
+  readonly withheld: boolean;
+  readonly source: WithholdingSource;
+  /** The batch the estimate comes from, for source NETWORK. */
+  readonly networkPayoutId: string | null;
+}
+
+/**
+ * The withholding an approval in this period takes now (D54, D59): AccessTrade always; else a
+ * staff mark on the period (the owner's override); else the network's latest payout batch, read
+ * from what it paid (the estimate until the batch that settles the order says); else withheld.
+ * A cutover row is no staff mark: the live system withheld every period by rule, not by reading.
+ */
+export function periodWithholding(db: LedgerDb, network: AffiliateNetwork, periodMonth: string): PeriodWithholding {
+  if (NETWORK_MONEY_RULES[network].alwaysWithheld) return { withheld: true, source: "ALWAYS", networkPayoutId: null };
+  const mark = db
     .select({ withheld: settlementPeriods.withheld })
     .from(settlementPeriods)
-    .where(and(eq(settlementPeriods.network, network), eq(settlementPeriods.periodMonth, periodMonth)))
+    .where(and(eq(settlementPeriods.network, network), eq(settlementPeriods.periodMonth, periodMonth), eq(settlementPeriods.origin, "STAFF")))
     .get();
-  return periodIsWithheld(network, row?.withheld ?? null);
+  if (mark !== undefined) return { withheld: periodIsWithheld(network, mark.withheld), source: "STAFF", networkPayoutId: null };
+  const latest = latestWithholding(db, network);
+  if (latest !== null) return { withheld: latest.withheld, source: "NETWORK", networkPayoutId: latest.networkPayoutId };
+  return { withheld: periodIsWithheld(network, null), source: "DEFAULT", networkPayoutId: null };
+}
+
+/** Whether an approval in this period withholds the 10% tax now. */
+export function periodWithheld(db: LedgerDb, network: AffiliateNetwork, periodMonth: string): boolean {
+  return periodWithholding(db, network, periodMonth).withheld;
 }
 
 export type SettlementPeriodErrorCode = "invalid_period" | "always_withheld";

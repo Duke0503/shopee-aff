@@ -5,7 +5,7 @@
  * so the whole end day is included. Campaign windows typed by staff are Vietnam
  * time and their end is exclusive.
  */
-import { addVnDays, parseVnDate, toMs, vnDayStart, VN_OFFSET_MINUTES, instantFromMs, type Instant } from "./instant";
+import { addVnDays, parseVnDate, toMs, vnDayStart, vnToday, VN_OFFSET_MINUTES, instantFromMs, type Clock, type Instant, type VnDate } from "./instant";
 
 export interface InstantRange {
   from: Instant;
@@ -18,6 +18,28 @@ export function vnDateRange(fromDate: string, toDate: string): InstantRange {
   const to = parseVnDate(toDate);
   if (from > to) throw new RangeError(`range starts after it ends: ${fromDate} > ${toDate}`);
   return { from: vnDayStart(from), to: vnDayStart(addVnDays(to, 1)) };
+}
+
+/** The quick date choices of a list (EXPERIENCE.md date rules): Vietnam days, the end day included. */
+export const VN_DATE_PRESETS = ["today", "last7", "thisMonth", "lastMonth"] as const;
+export type VnDatePreset = (typeof VN_DATE_PRESETS)[number];
+
+/** The Vietnam calendar days of a preset, first and last (both included), on the clock's day. */
+export function vnDatePreset(preset: VnDatePreset, clock: Clock): { from: VnDate; to: VnDate } {
+  const today = vnToday(clock);
+  const firstOfMonth = parseVnDate(`${today.slice(0, 7)}-01`);
+  switch (preset) {
+    case "today":
+      return { from: today, to: today };
+    case "last7":
+      return { from: addVnDays(today, -6), to: today };
+    case "thisMonth":
+      return { from: firstOfMonth, to: addVnDays(parseVnDate(`${addVnDays(firstOfMonth, 31).slice(0, 7)}-01`), -1) };
+    case "lastMonth": {
+      const lastDay = addVnDays(firstOfMonth, -1);
+      return { from: parseVnDate(`${lastDay.slice(0, 7)}-01`), to: lastDay };
+    }
+  }
 }
 
 export function contains(range: InstantRange, at: Instant): boolean {

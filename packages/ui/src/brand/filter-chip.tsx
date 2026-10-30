@@ -12,14 +12,17 @@ export interface FilterChipProps {
   readonly count?: number | undefined;
   readonly pressed: boolean;
   readonly onToggle: () => void;
+  /** The accessible name when the count needs its own words (the overall total); label and count otherwise. */
+  readonly ariaLabel?: string | undefined;
 }
 
-export function FilterChip({ label, count, pressed, onToggle }: FilterChipProps) {
+export function FilterChip({ label, count, pressed, onToggle, ariaLabel }: FilterChipProps) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
-      aria-label={count === undefined ? label : `${label} ${formatCount(count)}`}
+      aria-label={ariaLabel ?? (count === undefined ? label : `${label} ${formatCount(count)}`)}
+      title={ariaLabel}
       onClick={onToggle}
       className={cn(
         "inline-flex h-8 max-w-full shrink-0 items-center gap-1.5 rounded-full border px-3 text-meta font-medium outline-none coarse:h-11",

@@ -38,5 +38,9 @@
   "error.proof.payout_not_found": "Không tìm thấy lần chuyển này.",
   "error.proof.payout_voided": "Lần chuyển này đã huỷ ghi nhận nên không thêm ảnh.",
   "error.proof.proof_not_needed": "Lần này chỉ trừ nợ, không chuyển tiền nên không cần ảnh.",
-  "error.proof.staff_only": "Chỉ nhân viên làm được việc này."
+  "error.proof.staff_only": "Chỉ nhân viên làm được việc này.",
+  "error.settlement_period.always_withheld": "Sàn này luôn khấu trừ thuế, không đổi được.",
+  "error.settlement_period.invalid_period": "Kỳ không hợp lệ. Chọn lại tháng.",
+  "error.network_payout.not_found": "Không tìm thấy lần sàn thanh toán này.",
+  "error.network_payout.status_not_allowed": "Trạng thái thanh toán của sàn không được lùi lại."
 }

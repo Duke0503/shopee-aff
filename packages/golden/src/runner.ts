@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { clawbackAmount, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { classifyWithholding, clawbackAmount, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan" | "batchWithholding";
   source?: string;
   cases: GoldenCase[];
 }
@@ -80,5 +80,7 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
       const plan = nettingPlan(gross, clawbacks);
       return { gross, netting: plan.entries.map((e) => e.amount), carried: plan.entries.map((e) => e.carried), transfer: plan.transfer, carriedForward: plan.carriedForward };
     }
+    case "batchWithholding":
+      return classifyWithholding(network(input), num(input, "eligible"), num(input, "received"));
   }
 }

@@ -13,12 +13,13 @@ export interface ProductSnapshot {
   readonly productImageUrl: string | null;
 }
 
-const httpsOnly = (url: string | null): string | null => (url !== null && url.startsWith("https://") ? url : null);
+/** The URL when it is https, else null: the desk never loads an image over plain http. */
+export const httpsImageUrl = (url: string | null): string | null => (url !== null && url.startsWith("https://") ? url : null);
 
 /** The snapshot of each request named, by request id; an unknown request is absent. */
 export function productSnapshotsOf(db: LedgerDb, requestIds: readonly string[]): Map<string, ProductSnapshot> {
   const ids = [...new Set(requestIds)];
   if (ids.length === 0) return new Map();
   const rows = db.select({ requestId: linkRequests.requestId, productName: linkRequests.productName, productImageUrl: linkRequests.productImageUrl }).from(linkRequests).where(inArray(linkRequests.requestId, ids)).all();
-  return new Map(rows.map((r) => [r.requestId, { productName: r.productName, productImageUrl: httpsOnly(r.productImageUrl) }]));
+  return new Map(rows.map((r) => [r.requestId, { productName: r.productName, productImageUrl: httpsImageUrl(r.productImageUrl) }]));
 }

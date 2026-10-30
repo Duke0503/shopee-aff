@@ -113,8 +113,21 @@ owner, merge survivor); staff cannot choose another customer.
 
 ## 7. Network settlement
 
-Per network batch: `PROCESSING → PAID` or `FAILED`. Settlement marks orders settled; it never
-changes an order's customer status (D27).
+Per network payout batch: `PROCESSING → PAID` or `FAILED`. Shopee makes a batch every three or
+four days with its gross commission and what the operator received; their difference is the 0.98%
+fee and, in a withheld batch, 10% tax on the gross, so each batch's withholding is read from the two
+amounts, and the latest batch's is the estimate later approvals take (the Settings period mark
+overrides it). Settlement marks orders settled; it never changes an order's customer status (D27).
+A paid batch is matched to exact orders (D59): the orders the network lists (APPROVED or PAID only),
+or else the network's approved, unsettled orders approved in the batch's window (from the previous
+batch's creation to this one's) when their gross fits inside the batch's; the rest of the gross is
+recorded as unattributed (guest or unknown orders). Orders above the batch, a withholding that fits
+no split, or a listed order that cannot be settled settles nothing for it and opens a review case
+(`settlement_mismatch`, `settlement_conflict`, `settlement_not_approved`); a later record that
+states other facts opens `settlement_facts_changed`. These cases change no order and are only
+dismissed; a dismissed case is not reopened for the same facts. Batches imported at cutover are
+`HISTORIC`: facts and totals only, never matched to orders, no case; window matching uses only
+orders this system approved and starts at the go-live for the first new batch.
 
 ## 8. Customer
 

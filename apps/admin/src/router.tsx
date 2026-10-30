@@ -15,8 +15,13 @@ import { AdminOnly } from "./pages/admin-only";
 import { DeskLayout } from "./pages/desk-layout";
 import { NotFoundPage } from "./pages/not-found.page";
 import { PendingPage } from "./pages/pending.page";
+import { NetworkSettlementsPage } from "./payouts/network-settlements.page";
+import { NETWORK_SETTLEMENTS_SEARCH } from "./payouts/network-settlements.queries";
+import { PayoutHistoryPage } from "./payouts/payout-history.page";
+import { PAYOUT_HISTORY_SEARCH } from "./payouts/payout-history.queries";
 import { PayoutsPage } from "./payouts/payouts.page";
 import { PAYOUTS_SEARCH } from "./payouts/payouts.queries";
+import { SettingsPage } from "./settings/settings.page";
 import { SignInRoute } from "./pages/sign-in-route";
 import { parseSearch, stringifySearch } from "./search-params";
 
@@ -71,11 +76,39 @@ export const payoutsRoute = createRoute({
   },
 });
 
+export const payoutHistoryRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "payouts/history",
+  validateSearch: (raw: Record<string, unknown>) => PAYOUT_HISTORY_SEARCH.validate(raw),
+  component: function PayoutHistoryScreen() {
+    const search = payoutHistoryRoute.useSearch();
+    const navigate = useNavigate({ from: payoutHistoryRoute.fullPath });
+    const state = useMemo(() => PAYOUT_HISTORY_SEARCH.parse(search), [search]);
+    return <PayoutHistoryPage state={state} onStateChange={(next, options) => void navigate({ search: PAYOUT_HISTORY_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
+export const networkSettlementsRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "payouts/network",
+  validateSearch: (raw: Record<string, unknown>) => NETWORK_SETTLEMENTS_SEARCH.validate(raw),
+  component: function NetworkSettlementsScreen() {
+    const search = networkSettlementsRoute.useSearch();
+    const navigate = useNavigate({ from: networkSettlementsRoute.fullPath });
+    const state = useMemo(() => NETWORK_SETTLEMENTS_SEARCH.parse(search), [search]);
+    return <NetworkSettlementsPage state={state} onStateChange={(next, options) => void navigate({ search: NETWORK_SETTLEMENTS_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
+const settingsRoute = createRoute({ getParentRoute: () => deskRoute, path: "settings", component: SettingsPage });
+
 const routeTree = rootRoute.addChildren([
   signInRoute,
   deskRoute.addChildren([
     pendingRoute("/", "nav_overview"),
     payoutsRoute,
+    payoutHistoryRoute,
+    networkSettlementsRoute,
     pendingRoute("review", "nav_review"),
     ordersRoute,
     pendingRoute("customers", "nav_customers"),
@@ -83,7 +116,7 @@ const routeTree = rootRoute.addChildren([
     pendingRoute("campaigns", "nav_campaigns", true),
     pendingRoute("staff", "nav_staff", true),
     pendingRoute("audit", "nav_audit"),
-    pendingRoute("settings", "nav_settings"),
+    settingsRoute,
   ]),
 ]);
 

@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { useState } from "react";
 
-import { DataList, useListQuery, type ListColumn } from "../src/index";
+import { DataList, useListQuery, type DataListProps, type ListColumn } from "../src/index";
 
 export interface OrderRow {
   readonly orderId: string;
@@ -25,7 +25,7 @@ export interface OrderRow {
 
 export const ORDER_SEARCH = listSearch({
   sortable: ["customerName", "status", "cashback", "recordedAt"],
-  filters: [{ field: "status", values: storedValues("order") }],
+  filters: [{ field: "status", values: storedValues("order") }, { field: "network", values: ["shopee", "accesstrade"] }, { field: "recordedAt" }, { field: "approvedAt" }],
   defaultSort: { field: "recordedAt", direction: "desc" },
 });
 
@@ -76,7 +76,7 @@ export interface Harness {
   readonly replaced: boolean[];
 }
 
-export function renderList(respond: Responder, initial: Partial<ListSearchState> = {}) {
+export function renderList(respond: Responder, initial: Partial<ListSearchState> = {}, filters?: DataListProps<OrderRow>["filters"]) {
   const harness: Harness = { requests: [], states: [], replaced: [] };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   function Screen() {
@@ -107,6 +107,7 @@ export function renderList(respond: Responder, initial: Partial<ListSearchState>
         emptyText="No orders yet."
         statusFilter={{ field: "status", entity: "order" }}
         summary={[{ key: "cashback", label: "Cashback" }]}
+        {...(filters === undefined ? {} : { filters })}
       />
     );
   }

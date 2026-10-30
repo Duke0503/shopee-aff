@@ -14,7 +14,7 @@ import { importLinks, type LinksImportResult } from "../modules/linking/index";
 import { seedSentNotifications } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { importOrders, type ImportedOrder, type OrdersImportResult } from "../modules/orders/index";
-import { importPayouts, type PayoutsImportResult } from "../modules/payouts/index";
+import { importNetworkSettlements, importPayouts, type ImportedNetworkSettlement, type NetworkSettlementsImportResult, type PayoutsImportResult } from "../modules/payouts/index";
 import type { Ledger } from "../platform/db/ledger";
 import { CUTOVER_SYSTEM_ACTOR } from "../platform/ports/audit.port";
 import { readLiveCampaigns, type LiveCampaigns } from "./campaign-source";
@@ -29,6 +29,7 @@ import { readLiveNotifications, withMoreNotifications, type LiveNotifications } 
 import { cashbackDifferences, countBy, paidParity, paidStatusConflicts } from "./order-checks";
 import { readLiveOrderRows, readLiveOrders } from "./order-source";
 import { fullPaidParity } from "./paid-parity";
+import { readLiveNetworkPayouts } from "./network-payout-source";
 import { readLivePayouts, type LivePayouts } from "./payout-source";
 
 /** Everything read from the live copy, ready to write. */
@@ -39,6 +40,7 @@ export interface LiveData {
   links: LiveLinks;
   campaigns: LiveCampaigns;
   payouts: LivePayouts;
+  networkPayouts: ImportedNetworkSettlement[];
   notifications: LiveNotifications;
 }
 
@@ -48,6 +50,7 @@ export interface Written {
   orders: OrdersImportResult;
   campaigns: CampaignsImportResult;
   payouts: PayoutsImportResult;
+  networkPayouts: NetworkSettlementsImportResult;
   seeded: number;
 }
 
@@ -72,7 +75,8 @@ export function readLive(source: BetterSqlite3.Database, report: ImportReport): 
   const bankAccounts = new Map(identity.bankAccounts.map((b) => [b.customerId, b.accountNumber]));
   const payouts = readLivePayouts(source, { context, orders, awards: campaigns.awards, bankAccounts }, report);
   const base = readLiveNotifications({ orders: liveOrders, linkRequests: liveLinks }, imported, report);
-  return { identity, context, orders, links, campaigns, payouts, notifications: withMoreNotifications(base, [payouts, campaigns]) };
+  const networkPayouts = readLiveNetworkPayouts(source, report);
+  return { identity, context, orders, links, campaigns, payouts, networkPayouts, notifications: withMoreNotifications(base, [payouts, campaigns]) };
 }
 
 /** Writes every imported row in one `tx`: one import is one command. */
@@ -86,6 +90,7 @@ export function writeLive(ledger: Ledger, live: LiveData, fingerprintKey: string
       orders: importOrders(db, { orders: live.orders, importedAt }, by),
       campaigns: importCampaigns(db, { campaigns: live.campaigns.campaigns, awards: live.campaigns.awards }, by),
       payouts: importPayouts(db, { payouts: live.payouts.payouts, items: live.payouts.items }, by),
+      networkPayouts: importNetworkSettlements(db, live.networkPayouts, importedAt, by),
       seeded: seedSentNotifications(db, live.notifications.seeds, importedAt, by),
     };
   });
@@ -132,6 +137,8 @@ export function fillReport(report: ImportReport, live: LiveData, written: Writte
   };
   report.notifications = live.notifications.section;
   report.payouts = live.payouts.section;
+  const batches = (target.prepare("SELECT network_payout_id AS networkPayoutId, created_at AS createdAt, eligible_amount AS eligible, amount AS received, withheld, match FROM network_settlements ORDER BY created_at, network_payout_id").all() as { networkPayoutId: string; createdAt: string | null; eligible: number | null; received: number; withheld: number | null; match: string }[]).map((b) => ({ ...b, withheld: b.withheld === null ? null : b.withheld === 1 }));
+  report.networkPayouts = { imported: written.networkPayouts.settlements, batches };
   const frozen = new Set(live.orders.filter((o) => o.status === "FROZEN").map((o) => o.orderId));
   report.campaigns = {
     imported: written.campaigns.campaigns,

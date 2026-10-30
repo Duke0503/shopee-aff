@@ -14,3 +14,4 @@ export { fromNetworkUnits, fromNetworkUnitsTimes } from "./network-units";
 export { clawbackAmount, clawbackOpenAmount, creditOpenAmount, differenceDong, partialClawbackAmount, sumDong, type ClawbackInput, type PartialClawbackInput } from "./clawback";
 export { estimatedCashback, openClawbackTotal, payableBalance, type PayableInput } from "./balance";
 export { nettingPlan, type NettingEntry, type NettingPlan, type OpenClawback } from "./netting";
+export { batchCoverage, classifyWithholding, settlementNet, settlementTolerance, type BatchCoverage, type BatchWithholding } from "./settlement";

@@ -45,7 +45,7 @@ function metaText<R>(columns: readonly ListColumn<R>[], row: R): string {
     .map((column) => {
       const value: unknown = row[column.key];
       if (column.kind === "instant") return `${column.cardLabel ?? column.header} ${formatVnDateOf(value, systemClock) ?? "–"}`;
-      return textOf(value);
+      return column.cardText === undefined ? textOf(value) : column.cardText(row);
     })
     .filter((part): part is string => part !== null)
     .join(" · ");

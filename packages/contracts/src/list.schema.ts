@@ -54,6 +54,8 @@ export function listResponseSchema<R extends z.ZodType>(row: R) {
     /** Sums of stored whole-dong columns over the filtered set. */
     summary: z.record(z.string(), z.number().int()),
     asOf: z.string().regex(INSTANT_PATTERN),
+    /** Every record with no filter and no search; sent only by a list that shows it, labelled as the overall total. */
+    overall: z.number().int().min(0).optional(),
   });
 }
 
@@ -65,4 +67,5 @@ export interface ListResponse<R> {
   facets: Record<string, FacetCount[]>;
   summary: Record<string, number>;
   asOf: string;
+  overall?: number;
 }

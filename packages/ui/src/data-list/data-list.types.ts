@@ -8,6 +8,8 @@ import type { ListResponse, ListSearch, ListSearchState } from "@cashback/contra
 import type { EntityName } from "@cashback/core";
 import type { ReactNode } from "react";
 
+import type { FilterApi } from "./list-filters";
+
 export type ColumnKind = "text" | "code" | "name" | "money" | "instant" | "status" | "integer" | "product";
 
 /**
@@ -40,6 +42,8 @@ export interface ListColumn<R> {
    * the field `key` names and nothing else, so a column still holds one value (LC-2).
    */
   readonly render?: (row: R) => ReactNode;
+  /** The words of this field on the phone card's meta line, when the stored value is a key (a network's name). */
+  readonly cardText?: (row: R) => string | null;
 }
 
 /** The part of a TanStack Query result DataList reads; `useListQuery` returns a superset. */
@@ -88,6 +92,11 @@ export interface DataListProps<R> {
    * card (the payout card). It is built from the same row the table shows, so the figures match.
    */
   readonly card?: (row: R) => ReactNode;
+  /**
+   * Filters beside the status chips (a network choice, a date kind with its days), drawn from the
+   * same URL state; on phone they sit in the filter sheet with the chips.
+   */
+  readonly filters?: (api: FilterApi) => ReactNode;
 }
 
 /** A list fetch that failed with an HTTP status, or null status for no answer at all. */

@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { MoneyFigure } from "../brand/money-figure";
 import { useLayout, type Layout } from "../hooks/use-media-query";
+import { uiText } from "../labels";
 import { cn } from "../lib/utils";
 import type { DataListProps, ListColumn } from "./data-list.types";
 import { FilterSheet } from "./filter-sheet";
@@ -31,8 +32,16 @@ export function nextSort<R>(current: ListSort, column: ListColumn<R>): ListSort 
 }
 
 function withFilter(state: ListSearchState, field: string, values: readonly string[]): ListSearchState["filters"] {
-  const { [field]: _dropped, ...rest } = state.filters;
-  return values.length === 0 ? rest : { ...rest, [field]: values };
+  return withFilters(state, { [field]: values });
+}
+
+function withFilters(state: ListSearchState, patch: Readonly<Record<string, readonly string[]>>): ListSearchState["filters"] {
+  const next: Record<string, readonly string[]> = { ...state.filters };
+  for (const [field, values] of Object.entries(patch)) {
+    if (values.length === 0) delete next[field];
+    else next[field] = values;
+  }
+  return next;
 }
 
 function useShownData<R>(data: ListResponse<R> | undefined): ListResponse<R> | undefined {
@@ -87,8 +96,8 @@ function ListBody<R extends RowData>(props: ListBodyProps<R>) {
   );
 }
 
-/** "1.284 orders · cashback 12.345.678" for the filtered set the rows come from (LC-6). */
-function SummaryLine<R>({ shown, text, fields }: { shown: ListResponse<R>; text: string; fields: DataListProps<R>["summary"] }) {
+/** "1.284 orders · cashback 12.345.678" for the filtered set the rows come from (LC-6), then the overall total, labelled so, when the list sends one. */
+function SummaryLine<R>({ shown, text, fields, overallText }: { shown: ListResponse<R>; text: string; fields: DataListProps<R>["summary"]; overallText: string | null }) {
   return (
     <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-meta">
       <span className="font-medium tabular-nums">{text}</span>
@@ -98,7 +107,33 @@ function SummaryLine<R>({ shown, text, fields }: { shown: ListResponse<R>; text:
           <MoneyFigure amount={shown.summary[field.key]} />
         </span>
       ))}
+      {overallText !== null && <span className="text-muted-foreground">· {overallText}</span>}
     </p>
+  );
+}
+
+interface FilterControls<R> {
+  readonly statusFilter: DataListProps<R>["statusFilter"];
+  readonly filters: DataListProps<R>["filters"];
+  readonly state: ListSearchState;
+  readonly shown: ListResponse<R> | undefined;
+  readonly change: (patch: Partial<ListSearchState>) => void;
+}
+
+/** The list's own filters (beside the chips) and the status chips, or null when it has neither. */
+function filterControls<R>({ statusFilter, filters, state, shown, change }: FilterControls<R>): ReactNode {
+  const selected = statusFilter === undefined ? [] : (state.filters[statusFilter.field] ?? []);
+  const statusChips =
+    statusFilter === undefined ? null : (
+      <StatusChips entity={statusFilter.entity} facets={shown?.facets[statusFilter.field]} total={shown?.total} overall={shown?.overall} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
+    );
+  const extra = filters?.({ state, setFilters: (patch) => change({ filters: withFilters(state, patch) }) });
+  if (statusChips === null && extra === undefined) return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {extra !== undefined && <div className="flex min-w-0 flex-wrap items-end gap-2">{extra}</div>}
+      {statusChips}
+    </div>
   );
 }
 
@@ -117,14 +152,11 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
   }, [settled]);
 
   const change = (patch: Partial<ListSearchState>): void => onStateChange({ ...state, page: 1, ...patch });
-  const selected = statusFilter === undefined ? [] : (state.filters[statusFilter.field] ?? []);
   const activeFilters = Object.values(state.filters).reduce((n, values) => n + values.length, 0);
   const filtered = state.q.trim() !== "" || activeFilters > 0;
-  const chips =
-    statusFilter === undefined ? null : (
-      <StatusChips entity={statusFilter.entity} facets={shown?.facets[statusFilter.field]} total={shown?.total} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
-    );
+  const chips = filterControls({ statusFilter, filters: props.filters, state, shown, change });
   const summaryText = shown === undefined ? "" : countLabel(shown.total);
+  const overallText = shown?.overall === undefined ? null : uiText("list_total_overall", { total: countLabel(shown.overall) });
 
   return (
     <section className="flex min-w-0 flex-col gap-3">
@@ -144,7 +176,7 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
       ) : (
         chips
       )}
-      {shown !== undefined && <SummaryLine shown={shown} text={summaryText} fields={props.summary} />}
+      {shown !== undefined && <SummaryLine shown={shown} text={summaryText} fields={props.summary} overallText={overallText} />}
       <div role="status" aria-live="polite" className="sr-only">
         {announcement}
       </div>
