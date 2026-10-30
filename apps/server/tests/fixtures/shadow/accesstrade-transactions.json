@@ -1,0 +1,53 @@
+{
+  "data": [
+    {
+      "id": "L171",
+      "transaction_id": "TT0000000000000017",
+      "status": 2,
+      "is_confirmed": 0,
+      "commission": 10000,
+      "product_price": 200000,
+      "product_quantity": 1,
+      "merchant": "tiktokshop",
+      "transaction_time": "2026-10-08T10:00:00",
+      "_extra": {
+        "sub_params": {
+          "sub1": "1000000000000000001"
+        }
+      }
+    },
+    {
+      "id": "L172",
+      "transaction_id": "TT0000000000000017",
+      "status": 2,
+      "is_confirmed": 0,
+      "commission": 5000,
+      "product_price": 100000,
+      "product_quantity": 1,
+      "merchant": "tiktokshop",
+      "transaction_time": "2026-10-08T10:00:00",
+      "_extra": {
+        "sub_params": {
+          "sub1": "1000000000000000001"
+        }
+      }
+    },
+    {
+      "id": "L201",
+      "transaction_id": "TT0000000000000020",
+      "status": 1,
+      "is_confirmed": 1,
+      "commission": 12000,
+      "product_price": 150000,
+      "product_quantity": 1,
+      "merchant": "tiktokshop",
+      "transaction_time": "2026-10-09T10:00:00",
+      "_extra": {
+        "sub_params": {
+          "sub1": "1000000000000000005"
+        }
+      }
+    }
+  ],
+  "total": 3
+}

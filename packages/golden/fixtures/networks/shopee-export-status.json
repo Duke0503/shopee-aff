@@ -1,0 +1,430 @@
+{
+  "rule": "shopeeExportStatus",
+  "network": "shopee",
+  "source": "src/cashback/shopee/report_importer.py APPROVED_VALUES, REJECTED_VALUES, AWAITING_VALUES and classify_status, read through the Story 1.11 meanings",
+  "cases": [
+    {
+      "name": "\"completed\" is AWAITING (Story 1.11: an order finished is not a validated commission (live classify said approved))",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "completed"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"approved\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "approved"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"valid\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "valid"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"settled\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "settled"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"Đã duyệt\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Đã duyệt"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"da duyet\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "da duyet"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"Hoàn thành\" is AWAITING (the Vietnamese 'completed': AWAITING as Story 1.11 reads completed)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Hoàn thành"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"hoan thanh\" is AWAITING (as completed)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "hoan thanh"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Đã thanh toán\" is AWAITING (the Vietnamese 'paid': AWAITING as Story 1.11 reads paid)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Đã thanh toán"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"da thanh toan\" is AWAITING (as paid)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "da thanh toan"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Hợp lệ\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Hợp lệ"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"hop le\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "hop le"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"cancelled\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "cancelled"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"canceled\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "canceled"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"rejected\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "rejected"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"invalid\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "invalid"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"returned\" is CANCELLED (a returned item is an item cancel signal (D31))",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "returned"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"refunded\" is CANCELLED (a refunded item is an item cancel signal (D31))",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "refunded"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Đã hủy\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Đã hủy"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"da huy\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "da huy"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Không hợp lệ\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Không hợp lệ"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"khong hop le\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "khong hop le"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Trả hàng\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Trả hàng"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"tra hang\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "tra hang"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Hoàn tiền\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Hoàn tiền"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"hoan tien\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "hoan tien"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Bị từ chối\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Bị từ chối"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"bi tu choi\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "bi tu choi"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"pending\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "pending"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"processing\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "processing"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"awaiting\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "awaiting"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Chờ duyệt\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Chờ duyệt"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"cho duyet\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "cho duyet"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Đang xử lý\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Đang xử lý"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"dang xu ly\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "dang xu ly"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Chưa đối soát\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Chưa đối soát"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"chua doi soat\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "chua doi soat"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Validated\" is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Validated"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "\"To Ship\" is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "To Ship"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"UNPAID\" is AWAITING (never a cancel (D38))",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "UNPAID"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"Closed\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Closed"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"Fraud\" is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Fraud"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"  PENDING  \" is AWAITING (case and spaces carry no meaning)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "  PENDING  "
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "\"ĐÃ HỦY\" is CANCELLED (upper-case stroked D)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "ĐÃ HỦY"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "\"on hold\" is UNKNOWN (not listed: frozen, never guessed)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "on hold"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "\"Đã giao\" is UNKNOWN (not listed: frozen)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": "Đã giao"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "\"\" is UNKNOWN (empty: frozen)",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "raw": ""
+      },
+      "expected": "UNKNOWN"
+    }
+  ]
+}

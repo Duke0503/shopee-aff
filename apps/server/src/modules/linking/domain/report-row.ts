@@ -4,6 +4,7 @@
  * through `fromNetworkUnits`, and the sub_ids the link carried. Nothing downstream reads a
  * raw status or a raw amount. The raw values stay beside the mapped ones for review cases.
  */
+import { instantFromMs, parseLegacyTime, type Instant } from "@cashback/core";
 import { fromNetworkUnits, type AffiliateNetwork } from "@cashback/money";
 
 import type { NetworkStatus } from "./network-status";
@@ -85,6 +86,18 @@ export function readAmount(value: unknown, scale: number, problems: RowProblem[]
     problems.push("invalid_amount");
     return null;
   }
+}
+
+/**
+ * When the buyer purchased, as a report gives it: Unix seconds (Shopee's `purchase_time`) or
+ * a time text, naive text read as Vietnam time (the networks' dashboards are in Vietnam
+ * time). Null when absent or unreadable; it only places the row in a report window.
+ */
+export function readPurchaseTime(value: unknown): Instant | null {
+  const seconds = typeof value === "number" ? value : typeof value === "string" && /^\s*\d{9,11}\s*$/.test(value) ? Number(value) : null;
+  if (seconds !== null) return Number.isSafeInteger(seconds) && seconds > 0 ? instantFromMs(seconds * 1000) : null;
+  if (typeof value !== "string") return null;
+  return parseLegacyTime(value, "VN")?.instant ?? null;
 }
 
 /** Each problem once, in the order first seen. */

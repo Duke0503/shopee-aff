@@ -1,0 +1,259 @@
+{
+  "rule": "shopeeExportAmount",
+  "network": "shopee",
+  "source": "src/cashback/shopee/report_importer.py parse_money, restricted to plain amounts (one separator style, a fraction of 1 or 2 digits)",
+  "cases": [
+    {
+      "name": "\"27000\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27000"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27.000\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27.000"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27,000\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27,000"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27 000\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27 000"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"1.234.567\" reads as 1234567",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1.234.567"
+      },
+      "expected": 1234567
+    },
+    {
+      "name": "\"1,234,567\" reads as 1234567",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1,234,567"
+      },
+      "expected": 1234567
+    },
+    {
+      "name": "\"27000.00\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27000.00"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27000,5\" reads as 27001",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27000,5"
+      },
+      "expected": 27001
+    },
+    {
+      "name": "\"27.000,50\" reads as 27001",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27.000,50"
+      },
+      "expected": 27001
+    },
+    {
+      "name": "\"27,000.49\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27,000.49"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27 000 ₫\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27 000 ₫"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27.000 đ\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27.000 đ"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27.000 VND\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27.000 VND"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"27000d\" reads as 27000",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27000d"
+      },
+      "expected": 27000
+    },
+    {
+      "name": "\"\" reads as None",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": ""
+      },
+      "expected": null
+    },
+    {
+      "name": "\"   \" reads as None",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "   "
+      },
+      "expected": null
+    },
+    {
+      "name": "\"-\" reads as None",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "-"
+      },
+      "expected": null
+    },
+    {
+      "name": "\"2.7E+04\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "2.7E+04"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"1e5\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1e5"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"abc\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "abc"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"12a\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "12a"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"1.234,567.8\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1.234,567.8"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"1.234,567\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1.234,567"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"1,23,456\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1,23,456"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"12.3456\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "12.3456"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"-5.000\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "-5.000"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"27.000.5\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "27.000.5"
+      },
+      "expected": "invalid_amount"
+    },
+    {
+      "name": "\"1,234.567\" reads as invalid_amount",
+      "provenance": "synthetic-from-code",
+      "story": "2.8 AC2",
+      "input": {
+        "text": "1,234.567"
+      },
+      "expected": "invalid_amount"
+    }
+  ]
+}

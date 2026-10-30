@@ -14,6 +14,8 @@ describe("network fixtures (Story 1.11)", () => {
       "accesstrade:accesstradeLine",
       "accesstrade:accesstradeTransactions",
       "shopee:shopeeConversion",
+      "shopee:shopeeExportAmount",
+      "shopee:shopeeExportStatus",
       "shopee:statusMap",
     ]);
   });

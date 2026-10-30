@@ -1,0 +1,34 @@
+{
+  "$comment": "Status words of Shopee's export as the live classify_status knows them (report_importer.py), with their Story 1.11 meaning; the Story 1.11 map (SHOPEE_STATUS_MAP) is read beside them. 'completed' and its Vietnamese form, and 'paid', are AWAITING (an order finished or paid is not a validated commission). Returned and refunded items are cancelled (D31). Matching is on the normalised word: lower case, accents removed, the stroked d read as d, only a-z0-9.",
+  "AWAITING": [
+    "completed",
+    "hoan thanh",
+    "da thanh toan",
+    "pending",
+    "processing",
+    "awaiting",
+    "cho duyet",
+    "dang xu ly",
+    "chua doi soat"
+  ],
+  "APPROVED": [
+    "approved",
+    "valid",
+    "settled",
+    "da duyet",
+    "hop le"
+  ],
+  "CANCELLED": [
+    "cancelled",
+    "canceled",
+    "rejected",
+    "invalid",
+    "returned",
+    "refunded",
+    "da huy",
+    "khong hop le",
+    "tra hang",
+    "hoan tien",
+    "bi tu choi"
+  ]
+}

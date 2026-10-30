@@ -43,6 +43,8 @@ export interface ServerConfig {
   fingerprintKey: string | null;
   /** The live production ledger; the cutover import refuses to run without it, and refuses to read or write it (AD-24). */
   liveLedgerPath: string | null;
+  /** AccessTrade API key, read only by the shadow run's optional live source (Story 2.8); never logged. */
+  accesstradeApiKey: string | null;
 }
 
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace"] as const;
@@ -72,6 +74,7 @@ function fileSchema(env: Environment) {
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
     FINGERPRINT_KEY: z.string().optional(),
     LIVE_LEDGER_PATH: z.string().optional(),
+    ACCESSTRADE_API_KEY: z.string().optional(),
   });
 }
 
@@ -96,6 +99,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     logLevel: file.LOG_LEVEL,
     fingerprintKey: file.FINGERPRINT_KEY || null,
     liveLedgerPath: file.LIVE_LEDGER_PATH || null,
+    accesstradeApiKey: file.ACCESSTRADE_API_KEY || null,
   };
 }
 

@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 export const PROVENANCES = ["synthetic-from-code", "real-anonymised"] as const;
 export type Provenance = (typeof PROVENANCES)[number];
 
-export const NETWORK_RULES = ["statusMap", "accesstradeLine", "shopeeConversion", "accesstradeTransactions"] as const;
+export const NETWORK_RULES = ["statusMap", "accesstradeLine", "shopeeConversion", "accesstradeTransactions", "shopeeExportStatus", "shopeeExportAmount"] as const;
 export type NetworkRule = (typeof NETWORK_RULES)[number];
 
 export interface NetworkCase {

@@ -9,6 +9,8 @@
     "start": "tsx src/main.ts",
     "rehearse:migration": "tsx src/rehearse-migration.ts",
     "cutover:import": "tsx src/cutover/run-import.ts",
+    "shadow:run": "tsx src/cutover/run-shadow.ts",
+    "shadow:sign-off": "tsx src/cutover/sign-off-shadow.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

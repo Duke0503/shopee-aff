@@ -16,6 +16,46 @@ export type { ReportItem, ReportRow, RowProblem } from "./domain/report-row";
 export { parseShopeeSubIds, readShopeeConversion, SHOPEE_AMOUNT_SCALE, SHOPEE_STATUS_MAP, type ShopeeSubIds } from "./domain/shopee-report";
 export { ACCESSTRADE_AMOUNT_SCALE, ACCESSTRADE_STATUS_MAP, mapAccessTradeLine, pythonInt, readAccessTradeTransactions } from "./domain/accesstrade-report";
 export {
+  detectShopeeExportMapping,
+  mapExportStatus,
+  normaliseExportStatus,
+  normaliseHeader,
+  parseCsv,
+  readExportAmount,
+  readShopeeExport,
+  SHOPEE_EXPORT_FIELDS,
+  SHOPEE_EXPORT_STATUS_MAP,
+  shopeeExportMapping,
+  type ShopeeExport,
+  type ShopeeExportField,
+  type ShopeeExportMapping,
+} from "./domain/shopee-export";
+export {
+  assertComplete,
+  fingerprintRow,
+  readReportFile,
+  ReportSourceError,
+  sourced,
+  type ReportSource,
+  type ReportSourceErrorCode,
+  type SourcedReport,
+  type SourcedRow,
+} from "./report-source.port";
+export { readShopeeFile, readShopeePages, SHOPEE_MAX_PAGES, SHOPEE_PAGE_SIZE, shopeeFileSource, type ShopeeFileOptions } from "./shopee-file.adapter";
+export { accessTradeFileSource, accessTradePages, readAccessTradeFile, readAccessTradePages, type AccessTradePage } from "./accesstrade-file.adapter";
+export {
+  ACCESSTRADE_MAX_PAGES,
+  ACCESSTRADE_MAX_WINDOW_DAYS,
+  ACCESSTRADE_PAGE_LIMIT,
+  ACCESSTRADE_TIMEOUT_MS,
+  accessTradeApiSource,
+  fetchGet,
+  readAccessTradeApi,
+  type AccessTradeApiOptions,
+  type HttpAnswer,
+  type HttpGet,
+} from "./accesstrade-api.adapter";
+export {
   importLinks,
   isShareCode,
   LinksImportError,

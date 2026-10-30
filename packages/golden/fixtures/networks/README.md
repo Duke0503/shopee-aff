@@ -12,6 +12,8 @@ through the linking module's readers and the orders module's `reportSignal`.
 | `shopee-conversions.json` | `shopeeConversion` | one item of `/api/v3/report/list` `data.list` (a conversion with its `orders` and `items`) |
 | `accesstrade-status-map.json` | `accesstradeLine` | one line's `status` and `is_confirmed` and its meaning |
 | `accesstrade-transactions.json` | `accesstradeTransactions` | the `data` lines of `/v1/transactions`, grouped per `transaction_id` |
+| `shopee-export-status.json` | `shopeeExportStatus` | one status word of the conversion report export (CSV), English or Vietnamese, and its meaning |
+| `shopee-export-amount.json` | `shopeeExportAmount` | one amount cell of the export and the dong it reads as, or `invalid_amount` |
 
 ## Provenance
 

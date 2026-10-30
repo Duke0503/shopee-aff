@@ -6,7 +6,17 @@
 import { loadNetworkFixtures, type NetworkCase, type NetworkFixtureFile } from "@cashback/golden/networks";
 import { describe, expect, it } from "vitest";
 
-import { mapAccessTradeLine, mapStatus, readAccessTradeTransactions, readShopeeConversion, SHOPEE_STATUS_MAP, type ReportRow } from "../src/modules/linking/index";
+import {
+  mapAccessTradeLine,
+  mapExportStatus,
+  mapStatus,
+  readAccessTradeTransactions,
+  readExportAmount,
+  readShopeeConversion,
+  SHOPEE_STATUS_MAP,
+  type ReportRow,
+  type RowProblem,
+} from "../src/modules/linking/index";
 import { reportSignal } from "../src/modules/orders/index";
 
 const files = loadNetworkFixtures();
@@ -34,6 +44,13 @@ function run(file: NetworkFixtureFile, c: NetworkCase): unknown {
       return project(readShopeeConversion(input));
     case "accesstradeTransactions":
       return project(readAccessTradeTransactions(input["lines"] as unknown[]));
+    case "shopeeExportStatus":
+      return mapExportStatus(String(input["raw"]));
+    case "shopeeExportAmount": {
+      const problems: RowProblem[] = [];
+      const amount = readExportAmount(String(input["text"]), problems);
+      return problems.length > 0 ? problems[0] : amount;
+    }
   }
 }
 
