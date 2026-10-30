@@ -30,5 +30,4 @@ can answer.
 | Cashback Payouts | `core` | 2 | [contexts/payouts.md](contexts/payouts.md) |
 | Campaigns | `supporting` | 2 | [contexts/campaigns.md](contexts/campaigns.md) |
 | Customer Conversation | `supporting` | 1 | [contexts/messaging.md](contexts/messaging.md) |
-| Deals | `generic` | 2 | [contexts/catalog.md](contexts/catalog.md) |
 | Operations | `generic` | 1 | [contexts/operations.md](contexts/operations.md) |

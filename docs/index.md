@@ -37,7 +37,7 @@ next one reads it. Record every approved decision in `.context/decisions/` and i
 |---|---|---|
 | Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.3.0: 8 contexts, D1 to D28 accepted, OQ1, OQ2, OQ5, OQ8 open |
 | PRD | [prd-cashback-2026-10-30/prd.md](../_bmad-output/planning-artifacts/prds/prd-cashback-2026-10-30/prd.md) | Final: FR-1 to FR-38, UJ-1 to UJ-8; list defects in `list-defects.md` |
-| UX workspace | `_bmad-output/planning-artifacts/ux-designs/` | Not started |
+| UX workspace | [ux-cashback-2026-10-30/](../_bmad-output/planning-artifacts/ux-designs/ux-cashback-2026-10-30/) (`DESIGN.md`, `EXPERIENCE.md`, `.memlog.md`, `mockups/`) | Final: both spines, List Contract for FR-37/FR-38, 3 key-screen mocks |
 | Architecture spine | `_bmad-output/planning-artifacts/architecture/` | Not started |
 
 Update this table when an artifact is created, so every skill can find the current one.

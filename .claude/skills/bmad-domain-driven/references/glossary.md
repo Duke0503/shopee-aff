@@ -54,7 +54,6 @@
 | **Browser bridge** | The Chrome extension that runs short scripts in the operator's signed-in affiliate tab to make links and read rates |
 | **Link queue** | The ordered list of link requests waiting for the browser bridge. Zalo first, then web customers, then guests |
 | **Web quota** | The limit on links made from the website: 60 per hour for the whole site, 20 per day per customer code |
-| **Deal** | A featured product the operator shows on the website |
 | **Customer message** | Any text a customer reads. Lives only in the message files, never in code |
 
 ## Strategic design

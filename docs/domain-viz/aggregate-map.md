@@ -30,10 +30,6 @@ flowchart TB
     subgraph context_messaging["Customer Conversation"]
         messaging_notification["Notification"]
     end
-    subgraph context_catalog["Deals"]
-        catalog_deal["Deal"]
-        catalog_voucher["Voucher"]
-    end
     subgraph context_operations["Operations"]
         operations_audit_entry["AuditEntry"]
     end

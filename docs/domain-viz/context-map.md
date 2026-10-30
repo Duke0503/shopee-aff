@@ -8,7 +8,6 @@ flowchart LR
     payouts["Cashback Payouts<br/>Payout · NetworkSettlement"]
     campaigns["Campaigns<br/>Campaign · CampaignAward"]
     messaging["Customer Conversation<br/>Notification"]
-    catalog["Deals<br/>Deal · Voucher"]
     operations["Operations<br/>AuditEntry"]
     linking -->|port: CustomerDirectory| identity
     orders -->|port: CustomerDirectory| identity

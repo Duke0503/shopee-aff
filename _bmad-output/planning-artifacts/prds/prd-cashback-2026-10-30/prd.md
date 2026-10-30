@@ -125,7 +125,7 @@ account (HOUSE), staff, product lookup, estimated commission, approved commissio
 XTRA commission, commission split, cashback, operator share, order, order approval, order
 cancellation, reconciliation, payout, paid order, bank account, dong, half-up rounding, example
 amount, campaign, campaign slot, held slot, Zalo assistant, notification, browser bridge, link
-queue, web quota, deal, customer message. Terms added by this PRD:
+queue, web quota, customer message. Terms added by this PRD:
 
 - **Customer website** — the public site at hoantiendp.com for customers and guests.
 - **Admin desk** — the staff-only application for the operator and employees.
@@ -277,6 +277,11 @@ through its API, every 60 minutes.
 - Attribution uses sub_id1, then customer aliases, then the owner of the sub_id2 request; anything
   else becomes a review case.
 - Unknown statuses become review cases instead of a guess.
+- Cancel signals follow a fixed precedence (order status, then each item, then a 0 commission); an
+  unknown status, a missing order id or a page-cap read freezes the order out of every total (D31).
+- A cancel after approval reverses the order before payout; a cancel after payout keeps it paid and
+  nets a clawback against the next payout (D30). Every status is defined in
+  `docs/operations/status-flows.md`.
 
 #### FR-13: Cashback from approved commission
 On approval, the platform computes cashback with the one commission split (D3, D20).
@@ -385,7 +390,7 @@ settle. Settlement never changes what the customer is owed.
 its own. Realizes UJ-1, UJ-3, UJ-5, UJ-7.
 
 #### FR-20: Chat commands
-A customer can use /id, /matkhau, /sodu, /donhang, /stk, /topdeal and /help, or paste a link.
+A customer can use /id, /matkhau, /sodu, /donhang, /stk and /help, or paste a link.
 
 **Consequences (testable):**
 - Private data (/matkhau, /donhang, /stk) is answered in a private chat only.
@@ -457,11 +462,9 @@ payouts, bank, flags) and search orders by id, status and network.
 Staff can see approved orders per day, effective commission rate, valid rate, approved average order
 value and orders per active customer per month, marked untrustworthy below 100 approved orders.
 
-### 4.9 Deals
+### 4.9 Deals (withdrawn)
 
-#### FR-28: Featured deals
-Staff can curate featured products by category; customers see active deals on the website and with
-/topdeal. [ASSUMPTION: food-and-drink vouchers stay as a deal category, not a separate feature.]
+FR-28 is withdrawn: the platform has no deals or vouchers (D29).
 
 ### 4.10 Operations
 
@@ -590,6 +593,7 @@ paid time, payout, campaign award or share code.
 - No Lazada in the first release (D17).
 - No raising the customer share above 80% of net.
 - No seller-facing features.
+- No deals, featured products or vouchers (D29).
 
 ## 8. MVP Scope
 
@@ -641,6 +645,5 @@ paid time, payout, campaign award or share code.
 ## 11. Assumptions Index
 
 - §4.3 FR-13: staff mark withheld Shopee settlement periods, because the report does not say it.
-- §4.9 FR-28: food-and-drink vouchers become a deal category.
 - §5 NFR-3: 2-second interactive target on a mid-range phone.
 - §5 NFR-8: 15 minutes of operator work per day at 30 orders a day.

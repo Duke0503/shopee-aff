@@ -1,13 +1,13 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
   "strategicModel": {
     "primaryDomain": "orders",
-    "classificationRationale": "The business is trustworthy attribution and exact payment: a link that belongs to one customer, an order traced to that customer, and a payout made once from the approved commission. Linking, Order Tracking and Cashback Payouts are core. Identity, Campaigns and Customer Conversation support them. Deals and Operations are generic.",
+    "classificationRationale": "The business is trustworthy attribution and exact payment: a link that belongs to one customer, an order traced to that customer, and a payout made once from the approved commission. Linking, Order Tracking and Cashback Payouts are core. Identity, Campaigns and Customer Conversation support them. Operations is generic.",
     "subdomains": [
       {
         "id": "subdomain.attribution",
@@ -35,9 +35,8 @@
         "id": "subdomain.back-office",
         "name": "Back office",
         "domainType": "generic",
-        "description": "Deals, audit, alerts and metrics.",
+        "description": "Audit, alerts and metrics.",
         "contextIds": [
-          "catalog",
           "operations"
         ]
       }
@@ -933,7 +932,9 @@
               "kind": "primitive",
               "enumValues": [
                 "awaiting_approval",
+                "frozen",
                 "approved",
+                "reversed",
                 "paid",
                 "rejected"
               ],
@@ -992,7 +993,14 @@
                 "name": "AWAITING_APPROVAL"
               },
               {
+                "name": "FROZEN"
+              },
+              {
                 "name": "APPROVED"
+              },
+              {
+                "name": "REVERSED",
+                "terminal": true
               },
               {
                 "name": "PAID",
@@ -1043,6 +1051,54 @@
                 "emits": [
                   "orders.order.paid"
                 ]
+              },
+              {
+                "from": "AWAITING_APPROVAL",
+                "action": "freeze",
+                "to": "FROZEN",
+                "description": "The report carries an unknown status, no order id, or the read hit the page cap.",
+                "guards": [
+                  "orders.order.cancel-signal-precedence"
+                ],
+                "emits": [
+                  "orders.order.frozen"
+                ],
+                "sideEffects": [
+                  "A review case opens. The order leaves every total."
+                ]
+              },
+              {
+                "from": "FROZEN",
+                "action": "resolve",
+                "to": "AWAITING_APPROVAL",
+                "description": "Staff resolve the review case and the order returns to its known state.",
+                "reversible": true
+              },
+              {
+                "from": "APPROVED",
+                "action": "reverse",
+                "to": "REVERSED",
+                "description": "A cancel signal arrives after approval and before payout.",
+                "guards": [
+                  "orders.order.cancel-signal-precedence"
+                ],
+                "emits": [
+                  "orders.order.reversed"
+                ],
+                "sideEffects": [
+                  "The order leaves the payable balance.",
+                  "Staff get an alert. The customer is told once."
+                ]
+              },
+              {
+                "from": "PAID",
+                "action": "claw_back",
+                "to": "PAID",
+                "description": "A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout.",
+                "emits": [
+                  "orders.order.clawed-back"
+                ],
+                "compensating": true
               }
             ]
           },
@@ -1088,13 +1144,28 @@
               "description": "AccessTrade lines are grouped per transaction. The order is approved only when every non-rejected line is confirmed, and rejected when every line is rejected.",
               "kind": "specification",
               "status": "observed"
+            },
+            {
+              "id": "orders.order.cancel-signal-precedence",
+              "description": "A cancel signal is read in a fixed order: order status, then each item, then a zero commission. Item status never overrides an order-level cancellation (D31).",
+              "kind": "specification",
+              "status": "target"
+            },
+            {
+              "id": "orders.order.payable-only-approved",
+              "description": "Only an approved order with commission above 0 is payable. Awaiting, frozen, reversed and rejected money is never shown as owed (D32).",
+              "kind": "invariant",
+              "status": "target"
             }
           ],
           "events": [
             "orders.order.recorded",
             "orders.order.approved",
             "orders.order.rejected",
-            "orders.order.paid"
+            "orders.order.paid",
+            "orders.order.frozen",
+            "orders.order.reversed",
+            "orders.order.clawed-back"
           ],
           "useCases": [
             "orders.reconcile",
@@ -1207,6 +1278,40 @@
             "messaging"
           ],
           "status": "observed"
+        },
+        {
+          "id": "orders.order.frozen",
+          "name": "OrderFrozen",
+          "description": "The report said something the system does not understand. The order left every total and a review case opened.",
+          "producer": "orders.order",
+          "consumers": [
+            "operations",
+            "payouts"
+          ],
+          "status": "target"
+        },
+        {
+          "id": "orders.order.reversed",
+          "name": "OrderReversed",
+          "description": "The network cancelled an approved order before payout. It left the payable balance.",
+          "producer": "orders.order",
+          "consumers": [
+            "payouts",
+            "campaigns",
+            "messaging"
+          ],
+          "status": "target"
+        },
+        {
+          "id": "orders.order.clawed-back",
+          "name": "OrderClawedBack",
+          "description": "The network cancelled an order after payout. A clawback entry will reduce the next payout.",
+          "producer": "orders.order",
+          "consumers": [
+            "payouts",
+            "messaging"
+          ],
+          "status": "target"
         }
       ],
       "useCases": [
@@ -1816,87 +1921,6 @@
             "announce"
           ],
           "status": "observed"
-        }
-      ]
-    },
-    {
-      "id": "catalog",
-      "name": "Deals",
-      "status": "observed",
-      "domainType": "generic",
-      "owner": "Operator",
-      "description": "Featured products and food-and-drink vouchers the operator shows to bring customers back.",
-      "businessCapability": "Show curated deals",
-      "strategicImportance": "low",
-      "aggregates": [
-        {
-          "id": "catalog.deal",
-          "name": "Deal",
-          "resource": "featured_deals",
-          "status": "observed",
-          "domainRole": "generic",
-          "description": "One featured product in a category, shown on the website and with /topdeal.",
-          "aggregateRoot": "catalog.deal",
-          "consistencyBoundary": "Must be correct together: product, category and active flag.",
-          "invariants": [
-            "Only active deals are shown."
-          ],
-          "fields": [
-            {
-              "name": "dealId",
-              "type": "DealId",
-              "kind": "primitive",
-              "identity": true,
-              "required": true
-            },
-            {
-              "name": "category",
-              "type": "DealCategory",
-              "kind": "primitive",
-              "enumValues": [
-                "tech",
-                "home",
-                "beauty"
-              ]
-            },
-            {
-              "name": "active",
-              "type": "Boolean",
-              "kind": "primitive"
-            }
-          ]
-        },
-        {
-          "id": "catalog.voucher",
-          "name": "Voucher",
-          "resource": "fnb_vouchers",
-          "status": "observed",
-          "domainRole": "generic",
-          "description": "A counter code for a food-and-drink brand.",
-          "aggregateRoot": "catalog.voucher",
-          "consistencyBoundary": "Must be correct together: brand, code and active flag.",
-          "invariants": [
-            "Only active vouchers are shown."
-          ],
-          "fields": [
-            {
-              "name": "voucherId",
-              "type": "VoucherId",
-              "kind": "primitive",
-              "identity": true,
-              "required": true
-            },
-            {
-              "name": "brand",
-              "type": "Brand",
-              "kind": "primitive"
-            },
-            {
-              "name": "active",
-              "type": "Boolean",
-              "kind": "primitive"
-            }
-          ]
         }
       ]
     },
@@ -2591,6 +2615,45 @@
       "sources": [
         ".context/decisions/2026-10-30-D28-utc-storage-vietnam-days.md"
       ]
+    },
+    {
+      "id": "d29-no-deals",
+      "decision": "The platform has no deals, featured products or food-and-drink vouchers. The Deals context, the /topdeal command and the deals pages are removed.",
+      "rationale": "The project owner removed the requirement on 2026-10-30. Fewer surfaces keep the website simple for customers.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D29-no-deals.md"
+      ]
+    },
+    {
+      "id": "d30-reverse-and-clawback",
+      "decision": "An order cancelled after approval and before payout becomes REVERSED and leaves every payout. An order cancelled after payout stays PAID and gets a clawback entry that is netted against the customer's next payout; an admin may write it off with a reason.",
+      "rationale": "Today a cancel after approval is silently skipped; the customer could be paid for a cancelled order. Asking customers to send money back loses them. Agreed in the status-flows party session; delegated by the project owner (recommended option).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D30-reverse-and-clawback.md",
+        "docs/operations/status-flows.md"
+      ]
+    },
+    {
+      "id": "d31-cancel-signal-precedence",
+      "decision": "A cancel signal is checked in a fixed order: order-level status, then each item, then a commission of 0. An unknown status, a missing order id or a report page cap freezes the order (FROZEN), excludes it from every total and opens a review case.",
+      "rationale": "The live reader uses only the first item's status, so a cancelled order stayed awaiting and was shown as money owed. Agreed in the status-flows party session; delegated by the project owner (recommended option).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D31-cancel-signal-precedence.md",
+        "docs/operations/status-flows.md"
+      ]
+    },
+    {
+      "id": "d32-confirm-rereads-orders",
+      "decision": "Payout confirmation re-reads every covered order inside the transaction and fails if any is not APPROVED, unpaid and owned by that customer. Awaiting money is never shown as owed, in any total, QR or selection.",
+      "rationale": "The live payments screen showed awaiting money by default and the confirm endpoint did not check status. Agreed in the status-flows party session; delegated by the project owner (recommended option).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D32-confirm-rereads-orders.md",
+        "docs/operations/status-flows.md"
+      ]
     }
   ],
   "openQuestions": [
@@ -2660,6 +2723,7 @@
     "docs/04-reference",
     "src/cashback",
     "zalo_assistant",
-    "apps/server/src/modules"
+    "apps/server/src/modules",
+    "docs/operations/status-flows.md"
   ]
 }

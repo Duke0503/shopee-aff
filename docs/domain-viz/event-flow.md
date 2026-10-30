@@ -53,6 +53,19 @@ flowchart LR
     orders_order --> event_orders_order_paid
     event_orders_order_paid -.-> campaigns
     event_orders_order_paid -.-> messaging
+    event_orders_order_frozen{"OrderFrozen"}
+    orders_order --> event_orders_order_frozen
+    event_orders_order_frozen -.-> operations
+    event_orders_order_frozen -.-> payouts
+    event_orders_order_reversed{"OrderReversed"}
+    orders_order --> event_orders_order_reversed
+    event_orders_order_reversed -.-> payouts
+    event_orders_order_reversed -.-> campaigns
+    event_orders_order_reversed -.-> messaging
+    event_orders_order_clawed_back{"OrderClawedBack"}
+    orders_order --> event_orders_order_clawed_back
+    event_orders_order_clawed_back -.-> payouts
+    event_orders_order_clawed_back -.-> messaging
     payouts["Cashback Payouts"]
     event_payouts_payout_recorded{"PayoutRecorded"}
     payouts_payout --> event_payouts_payout_recorded
@@ -70,7 +83,6 @@ flowchart LR
     campaigns_campaign --> event_campaigns_campaign_closed
     event_campaigns_campaign_closed -.-> operations
     messaging["Customer Conversation"]
-    catalog["Deals"]
     operations["Operations"]
     payouts -.->|orders.order.approved| orders
     campaigns -.->|orders.order.*| orders

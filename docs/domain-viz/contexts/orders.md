@@ -127,16 +127,25 @@ stateDiagram-v2
     AWAITING_APPROVAL --> APPROVED: approve [approval-needs-commission]
     AWAITING_APPROVAL --> REJECTED: reject
     APPROVED --> PAID: mark_paid [pay-once]
+    AWAITING_APPROVAL --> FROZEN: freeze [cancel-signal-precedence]
+    FROZEN --> AWAITING_APPROVAL: resolve
+    APPROVED --> REVERSED: reverse [cancel-signal-precedence]
+    PAID --> PAID: claw_back
+    REVERSED --> [*]
     PAID --> [*]
     REJECTED --> [*]
 ```
-**3 transitions**: guard, event emitted, what happens next
+**7 transitions**: guard, event emitted, what happens next
 
 | From | Command | To | Guard | Emits | Then |
 |---|---|---|---|---|---|
 | AWAITING_APPROVAL | approve | APPROVED | approval-needs-commission | orders.order.approved | The customer balance grows. · The customer is told the amount, without a payout date (D11: Every approved, unpaid order is payable, grouped by customer). · Reconciliation sees the network approve the order with a commission figure. The cashback becomes owed. |
 | AWAITING_APPROVAL | reject | REJECTED | — | orders.order.rejected | The customer is told the reason. · Reconciliation sees the network cancel the order. |
 | APPROVED | mark_paid | PAID | pay-once | orders.order.paid | A payout covering this order is recorded. |
+| AWAITING_APPROVAL | freeze | FROZEN | cancel-signal-precedence | orders.order.frozen | A review case opens. The order leaves every total. · The report carries an unknown status, no order id, or the read hit the page cap. |
+| FROZEN | resolve | AWAITING_APPROVAL | — | — | Staff resolve the review case and the order returns to its known state. |
+| APPROVED | reverse | REVERSED | cancel-signal-precedence | orders.order.reversed | The order leaves the payable balance. · Staff get an alert. The customer is told once. · A cancel signal arrives after approval and before payout. |
+| PAID | claw_back | PAID | — | orders.order.clawed-back | A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout. [compensating] |
 
 
 ### ReviewCase
@@ -163,6 +172,10 @@ stateDiagram-v2
 | approve | Order | Reconciliation sees the network approve the order with a commission figure. The cashback becomes owed. |
 | reject | Order | Reconciliation sees the network cancel the order. |
 | mark_paid | Order | A payout covering this order is recorded. |
+| freeze | Order | The report carries an unknown status, no order id, or the read hit the page cap. |
+| resolve | Order | Staff resolve the review case and the order returns to its known state. |
+| reverse | Order | A cancel signal arrives after approval and before payout. |
+| claw_back | Order | A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout. |
 | resolve | ReviewCase | The operator applies or dismisses the row. |
 
 ## Events
@@ -170,6 +183,9 @@ stateDiagram-v2
 - command `approve` → aggregate `Order` → event **orders.order.approved**; then The customer balance grows.; The customer is told the amount, without a payout date (D11: Every approved, unpaid order is payable, grouped by customer).
 - command `reject` → aggregate `Order` → event **orders.order.rejected**; then The customer is told the reason.
 - command `mark_paid` → aggregate `Order` → event **orders.order.paid**
+- command `freeze` → aggregate `Order` → event **orders.order.frozen**; then A review case opens. The order leaves every total.
+- command `reverse` → aggregate `Order` → event **orders.order.reversed**; then The order leaves the payable balance.; Staff get an alert. The customer is told once.
+- command `claw_back` → aggregate `Order` → event **orders.order.clawed-back**
 
 Commands that emit no event (nothing elsewhere can react): `resolve`
 
@@ -179,16 +195,20 @@ Commands that emit no event (nothing elsewhere can react): `resolve`
 | orders.order.approved | The network approved the order. The cashback is now owed to the customer. | payouts, campaigns, messaging |
 | orders.order.rejected | The network cancelled the order. No cashback is owed; a held campaign slot is freed. | campaigns, messaging |
 | orders.order.paid | A payout covered the order. It never changes again. | campaigns, messaging |
+| orders.order.frozen | The report said something the system does not understand. The order left every total and a review case opened. | operations, payouts |
+| orders.order.reversed | The network cancelled an approved order before payout. It left the payable balance. | payouts, campaigns, messaging |
+| orders.order.clawed-back | The network cancelled an order after payout. A clawback entry will reduce the next payout. | payouts, messaging |
 
 ## Rules & policies
 
-**invariant** (9)
+**invariant** (10)
 
 | Rule | Declared on | Status |
 |---|---|---|
 | An order is approved only when the report carries a commission figure; otherwise it goes to manual review. | Order | observed · exists in code |
 | Only an approved order without a paid time can be marked paid (D4: An order with a payout time (paid_at) is never changed or paid again). | Order | observed · exists in code |
 | Running reconciliation again over the same period leaves every order unchanged. | Order | observed · exists in code |
+| Only an approved order with commission above 0 is payable. Awaiting, frozen, reversed and rejected money is never shown as owed (D32: Payout confirmation re-reads every covered order inside the transaction and fails if any is not APPROVED, unpaid and…). | Order | target · agreed goal |
 | Cashback is calculated from the approved commission only (D3: Cashback is calculated from the approved commission only, never from the estimate shown to the customer). | Order |  |
 | An order with a paid time is never changed or paid again (D4: An order with a payout time (paid_at) is never changed or paid again). | Order |  |
 | An approved order is never rejected later. | Order |  |
@@ -204,12 +224,13 @@ Commands that emit no event (nothing elsewhere can react): `resolve`
 | A report status the system does not know goes to manual review instead of a guess. | Order | observed · exists in code |
 
 
-**specification** (2)
+**specification** (3)
 
 | Rule | Declared on | Status |
 |---|---|---|
 | Shopee's completed, delivered and paid statuses mean awaiting approval. Only validated or approved means approved. | Order | observed · exists in code |
 | AccessTrade lines are grouped per transaction. The order is approved only when every non-rejected line is confirmed, and rejected when every line is rejected. | Order | observed · exists in code |
+| A cancel signal is read in a fixed order: order status, then each item, then a zero commission. Item status never overrides an order-level cancellation (D31: A cancel signal is checked in a fixed order: order-level status, then each item, then a commission of 0). | Order | target · agreed goal |
 
 
 **workflow** (1)

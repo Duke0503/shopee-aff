@@ -30,6 +30,8 @@ Git rules are in `docs/rules/git.md`.
   "Current planning artifacts" table up to date.
 - The domain model lives in `docs/domain-model.json` and is managed with the `bmad-domain-driven`
   skill. Generated views in `docs/domain-viz/` are never edited by hand (`make domain-render`).
+- Every status, its trigger and its customer sentence are defined once in
+  `docs/operations/status-flows.md` (Operations Lead, party member `ops-lead`).
 - Approved decisions live in `.context/decisions/` and in the model. A suggestion is not a
   decision until the project owner confirms it.
 
@@ -42,7 +44,12 @@ Applies whenever the conversation is about screens, layout, colours or UX, even 
   design decision there with `bmad-ux`; never decide silently.
 - Two surfaces: the customer website (phone-first, most customers come from a Zalo chat) and the
   admin desk (dense work tool). Every screen covers phone, tablet and desktop.
-- Use `cashback-shadcn` for UI build rules and `cashback-ui-review` to review a screen.
+- Wireframes are in `docs/design/wireframe/cashback.pen`, opened in pen.dev and edited only through
+  the `pencil` MCP tools; sections are listed in `docs/design/wireframe/README.md`.
+- Use `cashback-design-craft` (brand, anti-"AI look", copy, responsive), `ui-ux-pro-max` (style
+  data), `cashback-shadcn` (build rules) and `cashback-ui-review` (review).
+- The customer website must be very easy to use: one main task per screen, the fewest choices,
+  plain words. Every code is a copyable code chip; one value per table column.
 
 ## Rules
 

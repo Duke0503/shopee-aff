@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key screen: Đơn hàng and the List Contract (admin)</title>
+<style>
+/* Governs: EXPERIENCE.md > List Contract (anatomy, LC-1 to LC-16, date rules, status
+   vocabulary, root cause map), State Patterns (first load, reloading, no matches, error,
+   stale), Money Display (M-2 estimate vs approved, LC-15 dash), IA (Orders). DESIGN.md:
+   components.data-table, data-list-card, filter-chip, list-loading-dim, stale-banner,
+   status-badge, money-figure(-estimate). Spines win on conflict. */
+:root{
+  --background:#F8FAFC;--foreground:#0F172A;--card:#FFFFFF;--primary:#1D4E89;--secondary:#E8EFF8;
+  --muted:#F1F5F9;--muted-fg:#5A6475;--border:#E2E8F0;--input:#7B8798;--money:#0A7A4F;
+  --attention:#7C2D12;--attention-soft:#FFF7ED;--destructive:#B91C1C;
+  --waiting:#92400E;--waiting-soft:#FEF3C7;--approved:#1D4E89;--approved-soft:#E8EFF8;
+  --done:#334155;--done-soft:#E2E8F0;--rejected:#9F1239;--rejected-soft:#FFE4E6;
+  --font:'Be Vietnam Pro',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#CBD5E1;font-family:var(--font);color:var(--foreground);padding:24px 16px}
+.caption-out{max-width:1440px;margin:0 auto 12px;font-size:13px;color:#334155}
+.frame{max-width:1440px;margin:0 auto;border-radius:12px;border:1px solid #94A3B8;background:var(--background);overflow-x:auto}
+.chrome{background:#E2E8F0;padding:8px 14px;font-size:12px;color:#334155}
+.url{background:#fff;border-radius:6px;padding:3px 10px;font-family:var(--mono)}
+.main{padding:20px 24px;min-width:1240px}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:20px;font-weight:600;margin:0}
+.upd{font-size:13px;color:var(--muted-fg)}
+.btn{height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:#fff;font:500 14px var(--font);color:var(--foreground);white-space:nowrap}
+.btn.f{border-color:var(--input)}
+.tool{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.search{width:440px;height:36px;border:1px solid var(--primary);box-shadow:0 0 0 2px #3D6FB633;border-radius:8px;padding:0 12px;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+.search .ph{color:var(--muted-fg)}
+.chips{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+.chip{height:32px;padding:0 12px;border-radius:9999px;border:1px solid var(--border);background:#fff;font-size:13px;display:flex;align-items:center;gap:6px}
+.chip .c{font-variant-numeric:tabular-nums;color:var(--muted-fg);font-size:12px}
+.chip.on{background:var(--secondary);border-color:var(--secondary);color:var(--primary);font-weight:500}
+.chip.on .c{color:var(--primary)}
+.sum{font-size:14px;margin:0 0 10px}
+.sum .m{color:var(--money);font-weight:600;font-variant-numeric:tabular-nums}
+.sum .all{color:var(--muted-fg)}
+.tablewrap{position:relative;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff}
+.progress{position:absolute;left:0;top:0;height:2px;width:38%;background:var(--primary)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:var(--muted);text-align:left;font-weight:500;padding:0 12px;height:40px;white-space:nowrap;font-size:13px}
+th.r,td.r{text-align:right}
+th .s{color:var(--muted-fg);font-size:11px}
+th.sorted{color:var(--primary)}
+td{padding:0 12px;height:44px;border-top:1px solid var(--border);white-space:nowrap}
+.code{font-family:var(--mono);font-size:13px;font-weight:500}
+.nm{color:var(--muted-fg);font-size:12px;margin-left:6px}
+.num{font-variant-numeric:tabular-nums}
+.money{color:var(--money);font-weight:600;font-variant-numeric:tabular-nums}
+.est{font-weight:400}
+.tag{background:var(--muted);color:var(--muted-fg);font-size:11px;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:400}
+.dash{color:var(--muted-fg)}
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;font-size:12px;font-weight:500}
+.b-waiting{background:var(--waiting-soft);color:var(--waiting)}
+.b-approved{background:var(--approved-soft);color:var(--approved)}
+.b-done{background:var(--done-soft);color:var(--done)}
+.b-rejected{background:var(--rejected-soft);color:var(--rejected)}
+.pager{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:13px;color:var(--muted-fg);border-top:1px solid var(--border)}
+.pg{display:flex;gap:4px}
+.pg span{min-width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;color:var(--foreground)}
+.pg span.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.dim tbody{opacity:.55}
+.note{max-width:1440px;margin:8px auto 0;font-size:12px;color:#334155}
+.grid{max-width:1440px;margin:20px auto 0;display:grid;grid-template-columns:390px 1fr;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.phone{width:390px;max-width:100%;background:var(--background);border:10px solid #0F172A;border-radius:36px;overflow:hidden}
+.ptop{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.pbody{padding:12px 16px 16px}
+.psearch{height:44px;border:1px solid var(--input);border-radius:8px;padding:0 12px;display:flex;align-items:center;color:var(--muted-fg);font-size:15px;margin-bottom:10px}
+.prow{display:flex;gap:8px;margin-bottom:10px}
+.prow .btn{height:44px;flex:1}
+.pchips{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px}
+.pchips .chip{height:36px;flex:none}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:14px}
+.ct{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cm{font-size:13px;color:var(--muted-fg);margin-top:4px}
+.cb{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.st{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px}
+.st h3{margin:0 0 8px;font-size:13px;color:var(--muted-fg);font-weight:600;text-transform:none}
+.sk{height:12px;border-radius:4px;background:var(--muted);margin:8px 0}
+.stale{background:var(--attention-soft);color:var(--attention);border-radius:6px;padding:9px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.err b{color:var(--destructive)}
+.map{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:13px;margin-top:12px}
+.map table{font-size:13px}
+.map td{height:auto;padding:6px 8px;white-space:normal;vertical-align:top}
+.map th{height:32px;padding:0 8px}
+</style>
+</head>
+<body>
+<p class="caption-out">Key screen 3 of 3. Admin desk, "Đơn hàng" (orders), desktop 1440 px, in the reloading state: the search was just changed, previous rows stay dimmed under the progress line (LC-8). Below: the same list on phone (LC-12), the five named states (LC-9), and which rule each part illustrates.</p>
+<div class="frame">
+  <div class="chrome"><span class="url">hoantiendp.com/admin/orders?q=nguyen&amp;status=AWAITING_APPROVAL,APPROVED&amp;date=recorded:2026-10-24..2026-10-30&amp;sort=-recorded_at</span></div>
+  <div class="main">
+    <div class="head"><h1>Đơn hàng</h1><span class="upd">Cập nhật lúc 19:42 · <button class="btn">Tải lại</button></span></div>
+    <div class="tool">
+      <div class="search"><span>nguyen</span><span class="ph">/</span></div>
+      <button class="btn f">Sàn: Tất cả</button>
+      <button class="btn f">Ngày ghi nhận: 24/10 – 30/10</button>
+      <button class="btn">Xoá bộ lọc</button>
+      <span style="flex:1"></span>
+      <button class="btn">50 / trang</button>
+    </div>
+    <div class="chips" role="group" aria-label="Trạng thái">
+      <span class="chip">Tất cả <span class="c">214</span></span>
+      <span class="chip on" aria-pressed="true">✓ Chờ sàn duyệt <span class="c">61</span></span>
+      <span class="chip on" aria-pressed="true">✓ Đã duyệt <span class="c">18</span></span>
+      <span class="chip">Đã chuyển tiền <span class="c">127</span></span>
+      <span class="chip">Không được duyệt <span class="c">8</span></span>
+    </div>
+    <p class="sum">79 đơn · Khách nhận <span class="money">1.482.906đ</span> (đã duyệt) + <span class="money est">khoảng 905.300đ</span><span class="tag">ước tính</span> · <span class="all">Toàn bộ: 4.912 đơn</span></p>
+    <div class="tablewrap dim" aria-busy="true">
+      <div class="progress" aria-hidden="true"></div>
+      <table>
+        <thead><tr>
+          <th>Mã đơn <span class="s">↕</span></th><th>Khách <span class="s">↕</span></th><th>Sản phẩm</th><th>Sàn <span class="s">↕</span></th><th>Trạng thái <span class="s">↕</span></th>
+          <th class="r">Giá trị đơn <span class="s">↕</span></th><th class="r">Hoa hồng duyệt <span class="s">↕</span></th><th class="r">Khách nhận <span class="s">↕</span></th><th class="sorted" aria-sort="descending">Ngày ghi nhận ↓</th><th>Sàn thanh toán</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="code">250930KQ8M2T</td><td><span class="code">DP00012</span><span class="nm">Nguyễn Thị Lan</span></td><td>Tai nghe Bluetooth Soundcore P20i</td><td>TikTok Shop</td><td><span class="badge b-waiting">Chờ sàn duyệt</span></td><td class="r num">590.000đ</td><td class="r dash">–</td><td class="r money est">khoảng 11.200đ<span class="tag">ước tính</span></td><td class="num">26/10 21:14</td><td class="dash">–</td></tr>
+          <tr><td class="code">251024P1A7XC</td><td><span class="code">DP00088</span><span class="nm">Nguyễn Hoàng Phúc</span></td><td>Kem chống nắng Anessa 60ml</td><td>Shopee</td><td><span class="badge b-waiting">Chờ sàn duyệt</span></td><td class="r num">465.000đ</td><td class="r dash">–</td><td class="r money est">khoảng 15.620đ<span class="tag">ước tính</span></td><td class="num">25/10 09:02</td><td class="dash">–</td></tr>
+          <tr><td class="code">251019ZT45LB</td><td><span class="code">DP00012</span><span class="nm">Nguyễn Thị Lan</span></td><td>Nồi cơm điện tử Sunhouse 1.8L</td><td>Shopee</td><td><span class="badge b-approved">Đã duyệt</span></td><td class="r num">450.000đ</td><td class="r num">11.693đ</td><td class="r money">9.263đ</td><td class="num">24/10 20:47</td><td>Đã thanh toán</td></tr>
+          <tr><td class="code">251020M8RR0Q</td><td><span class="code">DP00105</span><span class="nm">Nguyễn Văn Đạt</span></td><td>Máy hút bụi cầm tay Deerma</td><td>Shopee</td><td><span class="badge b-approved">Đã duyệt</span></td><td class="r num">1.150.000đ</td><td class="r num">40.000đ</td><td class="r money">31.686đ</td><td class="num">24/10 08:31</td><td class="dash">Chưa</td></tr>
+          <tr><td class="code">251024C4DD9E</td><td><span class="code">DP00141</span><span class="nm">Nguyễn Ngọc Trâm</span></td><td>Son kem lì Romand</td><td>TikTok Shop</td><td><span class="badge b-waiting">Chờ sàn duyệt</span></td><td class="r num">219.000đ</td><td class="r dash">–</td><td class="r money est">khoảng 6.300đ<span class="tag">ước tính</span></td><td class="num">24/10 07:55</td><td class="dash">–</td></tr>
+        </tbody>
+      </table>
+      <div class="pager"><span>1–50 / 79 đơn</span><div class="pg"><span>‹</span><span class="on">1</span><span>2</span><span>›</span></div></div>
+    </div>
+  </div>
+</div>
+<p class="note">Notes: chips are toggles in lifecycle order with counts from the same filtered set (LC-6, LC-13); the summary states which part is approved and which is estimate (M-2) and labels the overall total "Toàn bộ"; "Hoa hồng duyệt" shows the approved commission and sorts by it, a dash when not yet approved (LC-2, LC-15); the date column and filter both say "Ngày ghi nhận" (date rules); dates in the current year omit the year; search "nguyen" matches "Nguyễn" (LC-3); the whole view is in the URL (LC-4). Every amount is a server figure: the Sunhouse order's approved commission 11.693đ gives cashback 9.263đ after the fee and one half-up rounding; the Deerma order hits the 40.000đ commission cap.</p>
+
+<div class="grid">
+  <div class="phone" aria-label="Phone layout">
+    <div class="ptop"><span>Đơn hàng</span><span class="upd">19:42</span></div>
+    <div class="pbody">
+      <div class="psearch">Tìm mã đơn, mã khách, tên, sản phẩm</div>
+      <div class="prow"><button class="btn">Bộ lọc (2)</button><button class="btn">Sắp xếp: Ngày ghi nhận ↓</button></div>
+      <div class="pchips"><span class="chip">Tất cả <span class="c">214</span></span><span class="chip on">✓ Chờ sàn duyệt <span class="c">61</span></span><span class="chip on">✓ Đã duyệt <span class="c">18</span></span><span class="chip">Đã chuyển tiền <span class="c">127</span></span></div>
+      <p class="sum" style="font-size:13px">79 đơn · Khách nhận <span class="money">1.482.906đ</span> đã duyệt</p>
+      <div class="card"><div class="ct"><b>Nồi cơm điện tử Sunhouse 1.8L</b><span class="badge b-approved">Đã duyệt</span></div><div class="cm"><span class="code">DP00012</span> Nguyễn Thị Lan · Shopee · <span class="code">251019ZT45LB</span></div><div class="cb"><span class="cm">Ngày ghi nhận 24/10</span><span class="money">9.263đ</span></div></div>
+      <div class="card"><div class="ct"><b>Máy hút bụi cầm tay Deerma</b><span class="badge b-approved">Đã duyệt</span></div><div class="cm"><span class="code">DP00105</span> Nguyễn Văn Đạt · Shopee · Sàn chưa thanh toán</div><div class="cb"><span class="cm">Ngày ghi nhận 24/10</span><span class="money">31.686đ</span></div></div>
+      <div class="card"><div class="ct"><b>Son kem lì Romand</b><span class="badge b-waiting">Chờ sàn duyệt</span></div><div class="cm"><span class="code">DP00141</span> Nguyễn Ngọc Trâm · TikTok Shop</div><div class="cb"><span class="cm">Ngày ghi nhận 24/10</span><span class="money est">khoảng 6.300đ<span class="tag">ước tính</span></span></div></div>
+      <div class="pager" style="border:0;padding:4px 0"><button class="btn" style="height:44px">Trước</button><span>Trang 1 / 2</span><button class="btn" style="height:44px">Sau</button></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="states">
+      <div class="st"><h3>First load (skeleton, LC-8)</h3><div class="sk" style="width:90%"></div><div class="sk" style="width:75%"></div><div class="sk" style="width:85%"></div><div class="sk" style="width:60%"></div></div>
+      <div class="st"><h3>No matches (records exist)</h3><p style="margin:0 0 8px" class="upd">Không có kết quả với bộ lọc này.</p><button class="btn">Xoá bộ lọc</button></div>
+      <div class="st"><h3>Empty (no records at all)</h3><p style="margin:0" class="upd">Chưa có đơn nào. Đơn tự hiện ở đây sau lần đối soát đầu tiên.</p></div>
+      <div class="st err"><h3>Error (never shown as empty)</h3><p style="margin:0 0 8px"><b>Không đọc được danh sách:</b> máy chủ không trả lời.</p><button class="btn">Thử lại</button></div>
+      <div class="st"><h3>Stale (background refresh failed)</h3><div class="stale" role="status"><span>Dữ liệu lúc 19:42, chưa tải lại được.</span><button class="btn" style="height:32px">Thử lại</button></div><p class="upd" style="margin:8px 0 0">Rows stay; every action still checks on the server.</p></div>
+    </div>
+    <div class="map">
+      <b>Root causes (list-defects.md) visible on this screen</b>
+      <table>
+        <thead><tr><th>Cause</th><th>Where on the mock</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td>1 Timestamps</td><td>Filter "Ngày ghi nhận 24/10 – 30/10" includes all of 30/10, Vietnam time</td><td>Date rules</td></tr>
+          <tr><td>2 Money in many places</td><td>Summary and rows from one response; no client sums</td><td>M-1, LC-1</td></tr>
+          <tr><td>3 Sort expression</td><td>"Hoa hồng duyệt" shows and sorts approved commission</td><td>LC-2</td></tr>
+          <tr><td>4 Status vocabulary</td><td>Chips and badges in lifecycle order, one label each</td><td>LC-13</td></tr>
+          <tr><td>5 Trusting the browser</td><td>No pay or refund action on this list</td><td>LC-16</td></tr>
+          <tr><td>6 Different set</td><td>Chip counts and "79 đơn" from the filtered set; "Toàn bộ" labelled</td><td>LC-6</td></tr>
+          <tr><td>7 Search</td><td>"nguyen" finds "Nguyễn"</td><td>LC-3</td></tr>
+          <tr><td>8 Local list state</td><td>URL holds the view; dimmed rows while loading; "1–50 / 79"</td><td>LC-4, LC-5, LC-7, LC-8</td></tr>
+          <tr><td>9 Placeholders</td><td>Dash for missing commission; skeleton only on first load</td><td>LC-9, LC-15</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

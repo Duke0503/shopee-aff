@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key screen: Chuyển tiền (admin desktop)</title>
+<style>
+/* Governs: EXPERIENCE.md > Information Architecture (Payouts), Component Patterns (Payout panel,
+   Payout claim, Flag badge), List Contract (LC-1, LC-2, LC-6, LC-16, settlement as a fact),
+   Money Display (M-3, M-7, M-8), State Patterns (taken by another staff member, held bank
+   change), Key Flows UJ-5. DESIGN.md: components.qr-panel, payout-confirm, flag-badge,
+   data-table, money-figure, sidebar tokens. Spines win on conflict. */
+:root{
+  --background:#F8FAFC;--foreground:#0F172A;--card:#FFFFFF;--primary:#1D4E89;--secondary:#E8EFF8;
+  --muted:#F1F5F9;--muted-fg:#5A6475;--border:#E2E8F0;--input:#7B8798;--money:#0A7A4F;
+  --attention:#7C2D12;--attention-soft:#FFF7ED;--approved:#1D4E89;--approved-soft:#E8EFF8;
+  --font:'Be Vietnam Pro',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#CBD5E1;font-family:var(--font);color:var(--foreground);padding:24px 16px}
+.caption-out{max-width:1440px;margin:0 auto 12px;font-size:13px;color:#334155}
+.frame{max-width:1440px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #94A3B8;background:var(--background);overflow-x:auto}
+.chrome{background:#E2E8F0;padding:8px 14px;font-size:12px;color:#334155;display:flex;gap:8px;align-items:center}
+.chrome i{width:10px;height:10px;border-radius:50%;background:#94A3B8;display:inline-block}
+.url{margin-left:12px;background:#fff;border-radius:6px;padding:3px 10px;font-family:var(--mono)}
+.app{display:grid;grid-template-columns:240px 1fr 480px;min-width:1280px;min-height:820px}
+.side{background:#fff;border-right:1px solid var(--border);padding:16px 12px;font-size:14px}
+.side .brand{font-weight:700;color:var(--primary);padding:4px 10px 16px}
+.grp{font-size:12px;color:var(--muted-fg);padding:12px 10px 6px;font-weight:500}
+.nav{display:flex;justify-content:space-between;align-items:center;height:36px;padding:0 10px;border-radius:6px;color:var(--foreground)}
+.nav.on{background:var(--secondary);color:var(--primary);font-weight:600}
+.nav .n{font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted-fg)}
+.nav.on .n{color:var(--primary)}
+.main{padding:20px 24px;min-width:0}
+h1{font-size:20px;font-weight:600;margin:0}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.upd{font-size:13px;color:var(--muted-fg)}
+.btn{height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:#fff;font:500 14px var(--font);color:var(--foreground)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.tab{padding:9px 12px;font-size:14px;color:var(--muted-fg);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--primary);border-color:var(--primary);font-weight:600}
+.tab .n{font-variant-numeric:tabular-nums;font-size:12px;margin-left:4px}
+.tool{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.search{flex:1;max-width:420px;height:36px;border:1px solid var(--input);border-radius:8px;padding:0 12px;font-size:14px;color:var(--muted-fg);display:flex;align-items:center}
+.sum{font-size:14px;margin:0 0 10px;color:var(--foreground)}
+.sum .m{color:var(--money);font-weight:600;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:14px}
+th{background:var(--muted);text-align:left;font-weight:500;padding:0 12px;height:40px;white-space:nowrap;font-size:13px}
+th.r,td.r{text-align:right}
+td{padding:0 12px;height:52px;border-top:1px solid var(--border);vertical-align:middle;white-space:nowrap}
+tr.sel td{background:#F3F7FC}
+tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
+.num{font-variant-numeric:tabular-nums}
+.code{font-family:var(--mono);font-size:13px;font-weight:500}
+.nm{font-size:12px;color:var(--muted-fg);display:block}
+.money{color:var(--money);font-weight:600;font-variant-numeric:tabular-nums}
+.flag{display:inline-block;background:var(--attention-soft);color:var(--attention);font-size:12px;padding:2px 6px;border-radius:4px;font-weight:500}
+.muted{color:var(--muted-fg)}
+.sort{color:var(--primary)}
+.taken{font-size:13px;color:var(--muted-fg);font-style:italic}
+.act{height:32px;padding:0 10px;border-radius:8px;background:var(--primary);color:#fff;border:0;font:500 13px var(--font)}
+.act.out{background:#fff;color:var(--primary);border:1px solid var(--border)}
+.panel{background:#fff;border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(15,23,42,.06);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.ph{display:flex;justify-content:space-between;align-items:flex-start}
+.ph h2{font-size:18px;margin:0;font-weight:600}
+.x{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:#fff}
+.qrwrap{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:14px}
+.qr{width:150px;height:150px;background:#fff;border-radius:8px;padding:8px;border:1px solid var(--border)}
+.kv{font-size:13px;display:grid;grid-template-columns:auto 1fr;gap:6px 10px}
+.kv dt{color:var(--muted-fg)}
+.kv dd{margin:0;font-weight:500}
+.big{font-size:22px;font-weight:700;color:var(--money);font-variant-numeric:tabular-nums}
+.lines{border:1px solid var(--border);border-radius:12px;font-size:13px}
+.lines div{display:flex;justify-content:space-between;padding:9px 12px;border-top:1px solid var(--border)}
+.lines div:first-child{border-top:0;background:var(--muted);font-weight:500}
+.lines .tot{font-weight:600}
+.drop{border:1px dashed var(--input);border-radius:12px;padding:14px;font-size:13px;color:var(--muted-fg);text-align:center}
+.confirm{height:44px;border-radius:8px;border:0;background:var(--primary);color:#fff;font:600 15px var(--font)}
+.hint{font-size:12px;color:var(--muted-fg);margin:-6px 0 0}
+.alt{max-width:1440px;margin:20px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.altc{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;font-size:14px}
+.altc h3{margin:0 0 8px;font-size:14px}
+.chg{background:var(--attention-soft);color:var(--attention);border-radius:6px;padding:10px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<p class="caption-out">Key screen 2 of 3. Admin desk, "Chuyển tiền" (payouts), desktop 1440 px. Tab "Chuyển được" with the payout panel open on Lan (UJ-5). Alternates below: amount changed, held bank change, phone drawer outline.</p>
+<div class="frame">
+  <div class="chrome"><i></i><i></i><i></i><span class="url">hoantiendp.com/admin/payouts?tab=payable&amp;sort=-payable</span></div>
+  <div class="app">
+    <aside class="side" aria-label="Điều hướng">
+      <div class="brand">Hoàn Tiền DP · Quản trị</div>
+      <div class="grp">Hằng ngày</div>
+      <div class="nav">Hôm nay</div>
+      <div class="nav on" aria-current="page">Chuyển tiền <span class="n">8</span></div>
+      <div class="nav">Ca cần xem <span class="n">3</span></div>
+      <div class="nav">Đơn hàng</div>
+      <div class="grp">Khách</div>
+      <div class="nav">Khách hàng</div>
+      <div class="nav">Yêu cầu link</div>
+      <div class="grp">Vận hành</div>
+      <div class="nav">Chiến dịch</div>
+      <div class="nav">Sản phẩm</div>
+      <div class="nav">Ưu đãi</div>
+      <div class="nav">Số liệu</div>
+      <div class="grp">Quản trị</div>
+      <div class="nav">Nhân viên</div>
+      <div class="nav">Nhật ký</div>
+      <div class="nav">Cài đặt</div>
+    </aside>
+
+    <main class="main">
+      <div class="head"><h1>Chuyển tiền</h1><span class="upd">Cập nhật lúc 19:42 · <button class="btn">Tải lại</button></span></div>
+      <div class="tabs" role="tablist">
+        <span class="tab on" role="tab" aria-selected="true">Chuyển được <span class="n">8</span></span>
+        <span class="tab" role="tab">Cần xử lý <span class="n">2</span></span>
+        <span class="tab" role="tab">Lịch sử</span>
+        <span class="tab" role="tab">Sàn thanh toán</span>
+      </div>
+      <div class="tool"><div class="search">Tìm mã khách, tên khách, Zalo id</div><button class="btn">Sàn: Tất cả</button><button class="btn">Cờ: Tất cả</button></div>
+      <p class="sum">8 khách · <span class="m">1.234.567đ</span> phải trả (đang lọc)</p>
+      <table>
+        <thead><tr>
+          <th>Khách</th><th class="r">Đơn</th><th class="r">Thưởng</th><th class="r"><span class="sort">Phải trả ↓</span></th><th>Tài khoản</th><th>Sàn thanh toán</th><th>Cờ</th><th></th>
+        </tr></thead>
+        <tbody>
+          <tr><td><span class="code">DP00007</span><span class="nm">Trần Văn Hùng</span></td><td class="r num">5</td><td class="r num">20.000đ</td><td class="r money">412.350đ</td><td>MB Bank <span class="code">•• 2210</span></td><td class="muted">5/5 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+          <tr><td><span class="code">DP00019</span><span class="nm">Phạm Thu Hà</span></td><td class="r num">4</td><td class="r num muted">–</td><td class="r money">286.004đ</td><td>Techcombank <span class="code">•• 0453</span></td><td class="muted">2/4 đơn</td><td><span class="flag">Mới đổi STK</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+          <tr><td><span class="code">DP00031</span><span class="nm">Lê Minh Quân</span></td><td class="r num">3</td><td class="r num muted">–</td><td class="r money">201.880đ</td><td>ACB <span class="code">•• 7781</span></td><td class="muted">0/3 đơn</td><td><span class="muted">–</span></td><td class="r"><span class="taken">Tú đang chuyển</span></td></tr>
+          <tr class="sel" aria-selected="true"><td><span class="code">DP00012</span><span class="nm">Nguyễn Thị Lan</span></td><td class="r num">3</td><td class="r num muted">–</td><td class="r money">79.216đ</td><td>Vietcombank <span class="code">•• 6789</span></td><td class="muted">3/3 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act">Đang mở</button></td></tr>
+          <tr><td><span class="code">DP00044</span><span class="nm">Đỗ Ngọc Ánh</span></td><td class="r num">2</td><td class="r num">20.000đ</td><td class="r money">78.420đ</td><td>VPBank <span class="code">•• 9902</span></td><td class="muted">1/2 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+          <tr><td><span class="code">DP00052</span><span class="nm">Võ Thanh Tùng</span></td><td class="r num">2</td><td class="r num muted">–</td><td class="r money">64.115đ</td><td>BIDV <span class="code">•• 3318</span></td><td class="muted">2/2 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+          <tr><td><span class="code">DP00003</span><span class="nm">Bùi Thị Mai</span></td><td class="r num">1</td><td class="r num muted">–</td><td class="r money">59.672đ</td><td>Vietinbank <span class="code">•• 5520</span></td><td class="muted">0/1 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+          <tr><td><span class="code">DP00061</span><span class="nm">Hoàng Đức Anh</span></td><td class="r num">1</td><td class="r num muted">–</td><td class="r money">52.910đ</td><td>TPBank <span class="code">•• 8064</span></td><td class="muted">1/1 đơn</td><td><span class="muted">–</span></td><td class="r"><button class="act out">Chuyển</button></td></tr>
+        </tbody>
+      </table>
+      <p class="upd" style="margin-top:10px">1–8 / 8 khách. "Sàn thanh toán" là thông tin riêng, không ảnh hưởng số phải trả.</p>
+    </main>
+
+    <aside class="panel" aria-label="Chuyển tiền cho DP00012" role="dialog">
+      <div class="ph"><div><h2>Chuyển tiền cho Nguyễn Thị Lan</h2><span class="code">DP00012</span></div><button class="x" aria-label="Đóng">✕</button></div>
+      <div class="qrwrap">
+        <svg class="qr" viewBox="0 0 29 29" aria-label="Mã VietQR 79.216đ" role="img" shape-rendering="crispEdges"><rect width="29" height="29" fill="#fff"/><g fill="#0F172A"><rect x="1" y="1" width="7" height="7"/><rect x="21" y="1" width="7" height="7"/><rect x="1" y="21" width="7" height="7"/></g><g fill="#fff"><rect x="2" y="2" width="5" height="5"/><rect x="22" y="2" width="5" height="5"/><rect x="2" y="22" width="5" height="5"/></g><g fill="#0F172A"><rect x="3" y="3" width="3" height="3"/><rect x="23" y="3" width="3" height="3"/><rect x="3" y="23" width="3" height="3"/><rect x="10" y="2" width="2" height="2"/><rect x="13" y="4" width="3" height="1"/><rect x="10" y="7" width="1" height="3"/><rect x="12" y="10" width="4" height="2"/><rect x="17" y="9" width="2" height="4"/><rect x="2" y="11" width="3" height="2"/><rect x="6" y="13" width="2" height="3"/><rect x="10" y="14" width="2" height="2"/><rect x="14" y="15" width="3" height="3"/><rect x="20" y="11" width="3" height="2"/><rect x="24" y="13" width="3" height="3"/><rect x="21" y="17" width="2" height="3"/><rect x="11" y="19" width="3" height="2"/><rect x="15" y="21" width="2" height="4"/><rect x="18" y="22" width="4" height="2"/><rect x="23" y="21" width="2" height="2"/><rect x="25" y="25" width="2" height="2"/><rect x="10" y="24" width="2" height="3"/><rect x="19" y="26" width="3" height="1"/></g></svg>
+        <dl class="kv">
+          <dt>Số tiền</dt><dd class="big">79.216đ</dd>
+          <dt>Ngân hàng</dt><dd>Vietcombank</dd>
+          <dt>Tài khoản</dt><dd class="code">•• 6789</dd>
+          <dt>Chủ TK</dt><dd>NGUYEN THI LAN</dd>
+          <dt>Nội dung</dt><dd class="code">DP00012</dd>
+        </dl>
+      </div>
+      <div class="lines" aria-label="Các đơn trong lần chuyển này">
+        <div><span>Đơn đã duyệt, chưa chuyển</span><span>Khách nhận</span></div>
+        <div><span>Nồi cơm điện tử Sunhouse 1.8L · Ngày duyệt 28/10</span><span class="money">9.263đ</span></div>
+        <div><span>Máy xay sinh tố Philips · Ngày duyệt 27/10</span><span class="money">31.540đ</span></div>
+        <div><span>Bình giữ nhiệt Lock&amp;Lock · Ngày duyệt 25/10</span><span class="money">38.413đ</span></div>
+        <div class="tot"><span>Tổng 3 đơn</span><span class="money">79.216đ</span></div>
+      </div>
+      <div class="drop">Ảnh chuyển khoản (không bắt buộc): dán, kéo thả hoặc chọn ảnh</div>
+      <button class="confirm">Xác nhận đã chuyển 79.216đ</button>
+      <p class="hint">Chỉ bấm sau khi tiền đã đi thật trong app ngân hàng. Khách nhận một tin nhắn kèm link biên nhận.</p>
+    </aside>
+  </div>
+</div>
+
+<div class="alt">
+  <div class="altc"><h3>Alternate: amount changed while the panel was open (M-3)</h3><div class="chg" role="alert"><b>Số tiền đã thay đổi, xem lại.</b><br>Đối soát vừa duyệt thêm 1 đơn. Số mới: <span class="money">96.820đ</span> (4 đơn). Nút xác nhận mở lại sau khi bạn xem.</div></div>
+  <div class="altc"><h3>Alternate: "Cần xử lý" row, website bank change not confirmed</h3><p style="margin:0">DP00027 · Ngô Văn Sơn · <span class="money">45.300đ</span> · <span class="flag">Chờ xác nhận STK</span><br><span class="muted">Khách đổi STK trên web lúc 30/10 18:05. Chờ khách xác nhận trên Zalo hoặc nhân viên kiểm tra. Chưa chuyển được.</span></p></div>
+  <div class="altc"><h3>Phone (360–767 px)</h3><p style="margin:0" class="muted">Same rows as stacked cards (code, name, amount, bank, flags). Tapping "Chuyển" opens the same panel as a full-height drawer: amount and account first with copy buttons for the banking app on the same phone, QR below for a second device, proof from camera, the same confirm button. Same figures as desktop (M-8).</p></div>
+</div>
+</body>
+</html>
