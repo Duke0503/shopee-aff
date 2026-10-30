@@ -26,8 +26,10 @@ Issuing attributable links, tracking orders and paying cashback.
 | `AffiliateUrl` | value-object | Type of field affiliateUrl on LinkRequest |
 | `SubIdSet` | value-object | Type of field subIds on LinkRequest: sub_id1 is the customer id, sub_id2 the request id. |
 | `CashbackEstimate` | value-object | Type of field estimate on LinkRequest: Price, rates and estimated cashback at request time. Reference only. |
+| `ProductSnapshot` | value-object | Type of field productSnapshot on LinkRequest: Name, image URL, price and rates captured once when the link is created (D56: A link request stores a product snapshot (name, image URL, price, rates) taken once at link creation). |
 | `Money` | value-object | Type of field price on ProductOffer |
 | `CommissionRate` | value-object | Type of field shopeeRate on ProductOffer |
+| `ImageUrl` | value-object | Type of field imageUrl on ProductOffer |
 
 ## Aggregates
 
@@ -41,7 +43,7 @@ One customer's request to turn one product URL into an affiliate link. It holds 
 - Every sub_id holds letters and digits only (D7: Every sub_id holds letters and digits only, and one link batch never mixes customers).
 - An affiliate link is attached once and never replaced.
 - One share code belongs to one link request.
-**11 fields:**
+**12 fields:**
 | Field | Type / reference | Required | Description |
 |---|---|---|---|
 | `requestId` | `RequestId` | yes |  |
@@ -55,6 +57,7 @@ One customer's request to turn one product URL into an affiliate link. It holds 
 | `estimate` | `CashbackEstimate` |  | Price, rates and estimated cashback at request time. Reference only. |
 | `attempts` | `Count` |  |  |
 | `deliveredAt` | `Instant` |  | Set by whoever hands the link over first. |
+| `productSnapshot` | `ProductSnapshot` |  | Name, image URL, price and rates captured once when the link is created (D56: A link request stores a product snapshot (name, image URL, price, rates) taken once at link creation). |
 
 
 ### ProductOffer · `products_cache`
@@ -64,7 +67,7 @@ The shared facts of one product on one network: price, commission rates, cap fla
 > Must be correct together: price, Shopee rate, shop rate and the capped estimate.
 **Invariants:**
 - Shopee's part of the estimate is capped at 40,000 dong; the shop's XTRA part is not (D2: Shopee's part of a commission is capped at 40,000 dong per order).
-**5 fields:**
+**7 fields:**
 | Field | Type / reference | Required | Description |
 |---|---|---|---|
 | `itemId` | `ItemId` | yes |  |
@@ -72,6 +75,8 @@ The shared facts of one product on one network: price, commission rates, cap fla
 | `shopeeRate` | `CommissionRate` |  |  |
 | `shopRate` | `CommissionRate` |  |  |
 | `refreshedAt` | `Instant` |  |  |
+| `name` | `ProductName` |  |  |
+| `imageUrl` | `ImageUrl` |  |  |
 
 
 ### LinkClick · `link_clicks`

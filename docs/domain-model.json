@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -553,6 +553,12 @@
               "type": "Instant",
               "kind": "primitive",
               "description": "Set by whoever hands the link over first."
+            },
+            {
+              "name": "productSnapshot",
+              "type": "ProductSnapshot",
+              "kind": "value-object",
+              "description": "Name, image URL, price and rates captured once when the link is created (D56)."
             }
           ],
           "lifecycle": {
@@ -744,6 +750,16 @@
               "name": "refreshedAt",
               "type": "Instant",
               "kind": "primitive"
+            },
+            {
+              "name": "name",
+              "type": "ProductName",
+              "kind": "primitive"
+            },
+            {
+              "name": "imageUrl",
+              "type": "ImageUrl",
+              "kind": "value-object"
             }
           ],
           "rules": [
@@ -981,6 +997,12 @@
                 "settled"
               ],
               "description": "Whether the network has paid the operator for this order."
+            },
+            {
+              "name": "productSnapshot",
+              "type": "ProductSnapshot",
+              "kind": "value-object",
+              "description": "Copied from the link request, or from the report row when there is no request (D56)."
             }
           ],
           "lifecycle": {
@@ -2963,6 +2985,15 @@
       "sources": [
         ".context/decisions/2026-10-30-D55-frozen-is-a-hold.md",
         "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d56-product-snapshot",
+      "decision": "A link request stores a product snapshot (name, image URL, price, rates) taken once at link creation. An order shows the snapshot of its link request; an order attributed without a request uses the name and image from the network report. No screen resolves product details at read time.",
+      "rationale": "The live system resolves name and image through four fallback lookups on every read, so lists show images inconsistently. The owner asked for product images on the order and dashboard screens. Owner request on 2026-10-30; snapshot design is the recommended option.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D56-product-snapshot.md"
       ]
     }
   ],

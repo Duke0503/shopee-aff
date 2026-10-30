@@ -481,6 +481,9 @@ the health of the browser bridge, the Zalo assistant and the last reconciliation
 Staff can search customers by code, name or Zalo id, open one customer's full page (orders, links,
 payouts, bank, flags) and search orders by id, status and network.
 
+**Consequences (testable):**
+- Every order row shows the product thumbnail and name from the snapshot taken at link creation (D56).
+
 #### FR-27: Business metrics
 Staff can see approved orders per day, effective commission rate, valid rate, approved average order
 value and orders per active customer per month, marked untrustworthy below 100 approved orders.

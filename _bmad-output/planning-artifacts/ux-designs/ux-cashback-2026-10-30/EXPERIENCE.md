@@ -165,6 +165,7 @@ One pattern, `DataList`, implements FR-37 and FR-38 for every list: orders, payo
 | LC-14 | **Dates.** See the date rules below. |
 | LC-15 | **Missing values.** A missing value is a grey dash. A zero is shown only when the server says the value is zero. |
 | LC-16 | **Selection and bulk.** No list offers "select all" for a money action. Payouts are recorded one customer at a time (FR-17). |
+| LC-17 | **Product cell.** Every list that shows a product (orders, payout preview, customer page, overview, review) shows a 32 px thumbnail from the product snapshot (D56) and the name on one line, truncated with an ellipsis; a missing image is a grey placeholder. The cell sorts by the name. |
 
 ### Date and time rules
 

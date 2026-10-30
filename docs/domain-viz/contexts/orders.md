@@ -22,6 +22,7 @@ Issuing attributable links, tracking orders and paying cashback.
 |---|---|---|
 | `CommissionSplit` | shared-kernel | The one implementation of the cap, fee, tax, cashback share and half-up rounding, used by every context. |
 | `Money` | value-object | Type of field orderValue on Order |
+| `ProductSnapshot` | value-object | Type of field productSnapshot on Order: Copied from the link request, or from the report row when there is no request (D56: A link request stores a product snapshot (name, image URL, price, rates) taken once at link creation). |
 
 ## Aggregates
 
@@ -36,7 +37,7 @@ One purchase a network reported, attributed to one customer. It holds the order 
 - An approved order is never rejected later.
 - A guest order always has 0 cashback and is never moved to another customer (D5: A link made without a customer code belongs to the guest account HOUSE).
 - Every status change is appended to the status history.
-**12 fields:**
+**13 fields:**
 | Field | Type / reference | Required | Description |
 |---|---|---|---|
 | `orderId` | `OrderId` | yes | The network's order number or transaction id. |
@@ -51,6 +52,7 @@ One purchase a network reported, attributed to one customer. It holds the order 
 | `recordedAt` | `Instant` |  | When the platform first recorded the order. Campaign ranking uses it. |
 | `paidAt` | `Instant` |  |  |
 | `settlement` | `SettlementStatus` |  | Whether the network has paid the operator for this order. |
+| `productSnapshot` | `ProductSnapshot` |  | Copied from the link request, or from the report row when there is no request (D56: A link request stores a product snapshot (name, image URL, price, rates) taken once at link creation). |
 
 
 ### ReviewCase · `manual_review`
