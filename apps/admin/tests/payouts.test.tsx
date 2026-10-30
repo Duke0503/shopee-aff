@@ -179,14 +179,14 @@ describe("Story 4.7 acceptance criteria on the desk", () => {
 });
 
 describe("Stories 4.6 and 4.7 code review on the desk", () => {
-  it("review 11: a netting-only row (0 d after clawbacks) sits in 'Can xu ly' with its badge and has no open action", async () => {
+  it("review 11, superseded by Story 4.11: a netting-only row (0 d after clawbacks) sits in 'Can xu ly' with its badge and opens as 'Tru no', never as a transfer", async () => {
     const user = userEvent.setup();
     await desk();
     await user.click(screen.getByRole("tab", { name: new RegExp(adminText("payouts_tab_action")) }));
     await screen.findByText(adminText("flag_netting_only"));
     const netting = rowOf(PAYOUT_FIXTURES.names[3] ?? "");
     expect(within(netting).getByText(adminText("flag_netting_only"))).toBeInTheDocument();
-    expect(within(netting).getByText(adminText("payout_blocked_netting"))).toBeInTheDocument();
+    expect(within(netting).getByRole("button", { name: adminText("payout_open_netting_aria", { name: PAYOUT_FIXTURES.names[3] ?? "" }) })).toHaveTextContent(adminText("payout_open_netting"));
     expect(within(netting).queryByRole("button", { name: /^Chuy/ })).toBeNull();
   });
 

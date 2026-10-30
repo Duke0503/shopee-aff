@@ -27,3 +27,17 @@ export { endSession, openSession, STAFF_SESSION_MS, type OpenedSession, type Ses
 export { staffNamesOf, staffSessionOf, staffSessionsFor } from "./staff-session.query";
 export { DUMMY_HASH, signInStaff, type StaffSignIn, type StaffSignInDeps, type StaffSignInInput } from "./staff-sign-in.command";
 export { staffSessionRoutes, type StaffSessionRouteDeps } from "./http/staff-session.routes";
+export {
+  MIN_STAFF_PASSWORD,
+  planStaffSeed,
+  resetStaffPassword,
+  seedStaff,
+  setStaffAccess,
+  STAFF_SEED_ACTOR,
+  StaffAdminError,
+  type SeedMember,
+  type SeedPlan,
+  type StaffAccess,
+  type StaffAdminErrorCode,
+  type StaffSeed,
+} from "./staff-admin.command";

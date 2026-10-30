@@ -7,6 +7,7 @@
 import type { Clock } from "@cashback/core";
 
 import { staffSessionRoutes, staffSessionsFor } from "../modules/identity/index";
+import { outboxFor } from "../modules/messaging/index";
 import { auditFor, commandAudit } from "../modules/operations/index";
 import { reviewCaseRoutes } from "../modules/orders/index";
 import { payoutRoutes } from "../modules/payouts/index";
@@ -48,7 +49,7 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
       applyDeps: (db, actor) => applyDepsFor(db, clock, { production: deps.production, actor }),
       readDeps: (actor) => reviewReadDepsFor(ledger.db, clock, actor, deps.production),
     }),
-    payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
+    payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), ...(deps.logger ? { logger: deps.logger } : {}) }),
   ];
   return { gate, routes };
 }

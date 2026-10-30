@@ -81,10 +81,10 @@ development_status:
   4-5-datalist-renders-every-list-with-url-state: review
   4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action: review
   4-7-payout-claim-and-preview-with-vietqr: review
-  4-8-confirm-a-payout-once-idempotently: backlog
+  4-8-confirm-a-payout-once-idempotently: review
   4-9-proof-image-upload-and-the-facts-only-receipt-page: backlog
   4-10-void-a-mistaken-payout: backlog
-  4-11-netting-only-payout-and-clawback-write-off: backlog
+  4-11-netting-only-payout-and-clawback-write-off: review
   4-12-payout-history-lists-every-payout-including-voided-ones: backlog
   4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac: backlog
   4-14-customers-list-and-one-customer-s-page: backlog
@@ -93,7 +93,7 @@ development_status:
   4-17-overview-shows-what-needs-the-operator-now: backlog
   4-18-settings-mark-a-shopee-settlement-period-withheld-or-not: backlog
   4-19-customer-merge-by-admin-command-with-preview-and-apply: backlog
-  4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: backlog
+  4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: review
   4-21-network-payouts-matched-to-exact-orders: backlog
   epic-4-retrospective: optional
 

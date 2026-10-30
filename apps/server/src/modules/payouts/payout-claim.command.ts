@@ -6,10 +6,11 @@
  * the snapshot, its hash, a transfer reference of its own and, when the preview carries a VietQR,
  * the time the QR was shown.
  *
- * A customer without a bank account, with a held website change, with nothing to pay, or whose
- * open clawbacks reach the gross (netting only, which Story 4.11 records) is refused: no claim and
- * no QR, because a transfer of 0 is never opened. A refusal is returned, not thrown, so the same
- * committed transaction still abandons this staff member's stale OPEN claim.
+ * A customer with nothing to pay, without a bank account or with a held website change is refused:
+ * no claim and no QR. A customer whose open clawbacks reach the gross is claimed as a netting-only
+ * payout (Story 4.11, D42): transfer 0, no QR, and no bank account needed, because no money moves.
+ * A refusal is returned, not thrown, so the same committed transaction still abandons this staff
+ * member's stale OPEN claim. Confirming a claim is payout-confirm.command.ts (Story 4.8).
  *
  * A claim is never deleted. The claim-expiry job marks one idle for 10 minutes ABANDONED, and so
  * does its own staff member closing the panel; when the last claim before a new one was abandoned
@@ -41,17 +42,23 @@ export type PayoutClaimErrorCode =
   | "claim_not_found"
   | "not_your_claim"
   | "account_changed"
-  | "snapshot_mismatch";
+  | "snapshot_mismatch"
+  | "other_claim_open"
+  | "confirm_paused";
 
 export class PayoutClaimError extends Error {
-  constructor(readonly code: PayoutClaimErrorCode) {
-    super(`payout claim: ${code}`);
+  constructor(
+    readonly code: PayoutClaimErrorCode,
+    /** Ids and counts only, for the log: why an internal check refused. */
+    readonly detail?: string,
+  ) {
+    super(`payout claim: ${code}${detail === undefined ? "" : ` (${detail})`}`);
     this.name = "PayoutClaimError";
   }
 }
 
 /**
- * Why a preview carries no QR: the whole payable is netted, the bank name matches no single VietQR
+ * Why a preview carries no QR: the whole payable is netted (a netting-only payout), the bank name matches no single VietQR
  * bank (M-7), or the account or reference cannot be put in a VietQR. Staff then pay by hand.
  */
 export type QrMissing = "netting_only" | "no_single_bank" | "qr_failed";
@@ -84,7 +91,7 @@ export function randomClaimId(): string {
   return [...randomBytes(8)].map((b) => CROCKFORD[b % 32]).join("");
 }
 
-const openClaimOf = (db: LedgerDb, customerId: string): PayoutClaimRow | undefined => db.select().from(payoutClaims).where(and(eq(payoutClaims.customerId, customerId), eq(payoutClaims.status, "OPEN"))).get();
+export const openClaimOf = (db: LedgerDb, customerId: string): PayoutClaimRow | undefined => db.select().from(payoutClaims).where(and(eq(payoutClaims.customerId, customerId), eq(payoutClaims.status, "OPEN"))).get();
 
 function lastClaimBefore(db: LedgerDb, customerId: string, claimId: string | null): PayoutClaimRow | undefined {
   const others = claimId === null ? eq(payoutClaims.customerId, customerId) : and(eq(payoutClaims.customerId, customerId), ne(payoutClaims.claimId, claimId));
@@ -112,11 +119,14 @@ function qrFor(db: LedgerDb, snapshot: PayoutSnapshot, reference: string): Pick<
   }
 }
 
+/** A payout whose open clawbacks take the whole gross: transfer 0 (AD-6, D42). */
+export const isNettingOnly = (snapshot: PayoutSnapshot): boolean => snapshot.balance.gross > 0 && snapshot.balance.payable === 0;
+
 function refusalOf(snapshot: PayoutSnapshot): PayoutClaimErrorCode | null {
   if (snapshot.balance.gross === 0) return "nothing_to_pay";
+  if (isNettingOnly(snapshot)) return null;
   if (snapshot.bank === null) return "no_bank";
-  if (snapshot.bank.held) return "bank_held";
-  return snapshot.balance.payable === 0 ? "netting_only" : null;
+  return snapshot.bank.held ? "bank_held" : null;
 }
 
 function freshClaimId(db: LedgerDb, draw: () => string): string {
@@ -134,7 +144,7 @@ function abandon(db: LedgerDb, claim: PayoutClaimRow, deps: Pick<ClaimDeps, "clo
 
 function insertClaim(db: LedgerDb, snapshot: PayoutSnapshot, deps: ClaimDeps): ClaimedPayout {
   const bank = snapshot.bank;
-  if (bank === null) throw new PayoutClaimError("no_bank");
+  if (bank === null && !isNettingOnly(snapshot)) throw new PayoutClaimError("no_bank");
   const warning = warningOf(lastClaimBefore(db, snapshot.customerId, null));
   const claimId = freshClaimId(db, deps.newClaimId ?? randomClaimId);
   const transferReference = snapshot.customerCode === null ? claimId : `${snapshot.customerCode} ${claimId}`;
@@ -152,8 +162,8 @@ function insertClaim(db: LedgerDb, snapshot: PayoutSnapshot, deps: ClaimDeps): C
       awardIds: JSON.stringify(snapshot.bonuses.map((b) => b.awardId).sort((a, b) => a - b)),
       clawbackIds: ids(snapshot.clawbacks.map((c) => c.clawbackId)),
       amount: snapshot.balance.payable,
-      bankFingerprint: bank.fingerprint,
-      bankHeld: bank.held,
+      bankFingerprint: bank?.fingerprint ?? null,
+      bankHeld: bank?.held ?? false,
       snapshotHash: snapshot.hash,
       transferReference,
       openedAt: now,
@@ -166,7 +176,7 @@ function insertClaim(db: LedgerDb, snapshot: PayoutSnapshot, deps: ClaimDeps): C
     actor: deps.by.actor,
     event: "payouts.claim.opened",
     entityId: claimId,
-    payload: { claimId, customerId: snapshot.customerId, amount: claim.amount, bankFingerprint: bank.fingerprint, snapshotHash: snapshot.hash, qrShown: qr.qrPayload !== null, warned: warning !== null },
+    payload: { claimId, customerId: snapshot.customerId, amount: claim.amount, ...(bank === null ? {} : { bankFingerprint: bank.fingerprint }), snapshotHash: snapshot.hash, qrShown: qr.qrPayload !== null, warned: warning !== null },
   });
   return { kind: "claimed", claim, snapshot, ...qr, flags: flagsOf(db, snapshot, deps.clock), warning };
 }
@@ -203,7 +213,7 @@ export function openPayoutClaim(db: LedgerDb, customerKey: string, deps: ClaimDe
   return insertClaim(db, snapshot, deps);
 }
 
-function ownClaim(db: LedgerDb, claimId: string, deps: Pick<ClaimDeps, "by">): PayoutClaimRow {
+export function ownClaim(db: LedgerDb, claimId: string, deps: Pick<ClaimDeps, "by">): PayoutClaimRow {
   if (!hasStaffRole(deps.by.actor)) throw new PayoutClaimError("staff_only");
   const claim = db.select().from(payoutClaims).where(eq(payoutClaims.claimId, claimId)).get();
   if (claim === undefined) throw new PayoutClaimError("claim_not_found");
@@ -227,6 +237,7 @@ export function releasePayoutClaim(db: LedgerDb, claimId: string, deps: Pick<Cla
 export function revealClaimAccount(db: LedgerDb, claimId: string, deps: Pick<ClaimDeps, "clock" | "by">): string {
   const claim = ownClaim(db, claimId, deps);
   if (claim.status !== "OPEN") throw new PayoutClaimError("claim_not_found");
+  if (claim.amount === 0) throw new PayoutClaimError("netting_only");
   const current = bankAccountsOf(db, [claim.customerId]).get(claim.customerId);
   const number = accountNumberOf(db, claim.customerId);
   if (current === undefined || number === null || current.fingerprint !== claim.bankFingerprint || current.held !== claim.bankHeld) throw new PayoutClaimError("account_changed");

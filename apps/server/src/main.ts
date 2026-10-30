@@ -1,6 +1,7 @@
 /**
  * Composition root: config, logger, the single-instance lock, the ledger (migrated behind a
- * checked local backup, AD-26), then the two listeners (with the admin desk's staff routes when
+ * checked local backup, AD-26), then the two listeners (the internal one with the admin commands
+ * of the internal CLI, Story 4.20; the public one with the admin desk's staff routes when
  * the config names the admin host and its Cloudflare Access settings), then the job scheduler (AD-13; each
  * module adds its job with its story, timed by platform/jobs/job-schedules.ts). A config error names the keys and exits before anything else runs; a held
  * lock exits before the ledger is opened, so a second instance never touches the data.
@@ -10,6 +11,7 @@
 import { join } from "node:path";
 import { systemClock } from "@cashback/core";
 
+import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { adminDesk } from "./admin/admin-desk";
 import { commandAudit } from "./modules/operations/index";
 import { runClaimExpiry } from "./modules/payouts/index";
@@ -56,7 +58,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Pr
     });
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger, ...(staff ? { staff } : {}) });
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock })];
+    servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger, internal, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
     jobs = createScheduler(jobsFor(config, ledger, logger), { clock: systemClock, timer: systemTimer, logger });
     jobs.start();

@@ -1,6 +1,6 @@
 /**
  * The two listeners (AD-18): public (served through the tunnel) and internal
- * (token only, for the assistant and the bridge). Both bind to 127.0.0.1 and
+ * (token only, for the assistant, the bridge and the admin CLI). Both bind to 127.0.0.1 and
  * `trustProxy` stays off, so a forwarded header never changes who the caller is.
  */
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
@@ -20,7 +20,12 @@ export interface ServerDeps {
   logger?: FastifyBaseLogger;
   /** The admin desk's routes behind Cloudflare Access; absent, no staff route exists (Story 4.2). */
   staff?: { readonly gate: StaffGate; readonly routes: readonly StaffRoutes[] };
+  /** Routes on the internal listener, behind its token (the admin commands of Story 4.20). */
+  internal?: readonly InternalRoutes[];
 }
+
+/** Adds routes to the internal listener; its token check already runs before each of them. */
+export type InternalRoutes = (app: FastifyInstance) => void;
 
 export interface Servers {
   publicApp: FastifyInstance;
@@ -42,6 +47,7 @@ export function buildServers(deps: ServerDeps): Servers {
   const internalApp = baseApp(deps.logger);
   requireInternalToken(internalApp, deps.internalToken);
   internalApp.get("/internal/ping", async () => ({ status: "ok" }));
+  for (const add of deps.internal ?? []) add(internalApp);
 
   return { publicApp, internalApp };
 }

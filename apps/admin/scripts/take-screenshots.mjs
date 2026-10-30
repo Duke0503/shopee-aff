@@ -1,4 +1,5 @@
-// Screenshots of the admin desk shell, the Orders DataList, the Payouts list and the payout panel at phone, tablet and desktop
+// Screenshots of the admin desk shell, the Orders DataList, the Payouts list and the payout panel (with its confirm step,
+// the amount-changed and recorded states, and the netting-only variant) at phone, tablet and desktop
 // widths, for the design review. Starts the Vite dev server, answers /api/admin from fixtures
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
 // sideways scrolling. Usage: node scripts/take-screenshots.mjs <output folder>
@@ -76,14 +77,25 @@ const PREVIEW = {
   bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
   clawbacks: [],
   warning: { amount: 79216, at: "2026-10-30T12:21:00.000Z" },
+  snapshotHash: "a".repeat(64), netted: 0, carriedForward: 0,
 };
+const CHANGED = { ...PREVIEW, claimId: "N3WCLA1M", snapshotHash: "c".repeat(64), amount: 144479, gross: 144479, warning: null,
+  orders: [...PREVIEW.orders, { orderId: "261001A0003", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 9263, settled: false }] };
+const NETTING = { ...PREVIEW, claimId: "N3TT1NG0", snapshotHash: "b".repeat(64), transferReference: "DP00088 N3TT1NG0", customerId: "P4", customerCode: "DP00088", customerName: payoutFixtures.names[4],
+  amount: 0, gross: 50000, deductedNext: 80000, netted: 50000, carriedForward: 30000, qrPayload: null, qrMissing: "netting_only", flags: ["NETTING_ONLY"], warning: null,
+  orders: [{ orderId: "261002N0001", productName: payoutFixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", cashback: 30000, settled: false }],
+  bonuses: [{ awardId: 2, orderId: "261002N0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
+  clawbacks: [{ clawbackId: "260901PAID07-1", orderId: "260901PAID07", open: 80000 }] };
+const RECORDED = { outcome: "recorded", payoutId: 41, claimId: "K7Q2M9XA", customerId: "P0", amount: 135216, netted: 0, nettingOnly: false, orderCount: 2, awardCount: 1, receiptToken: "rcpt_test_token_0001", recordedAt: "2026-10-30T12:45:00.000Z", replay: false };
+const NETTING_RECORDED = { ...RECORDED, claimId: "N3TT1NG0", customerId: "P4", amount: 0, netted: 50000, nettingOnly: true, orderCount: 1, receiptToken: null };
 
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5174, strictPort: true }, logLevel: "error" });
 await server.listen();
 const browser = await chromium.launch();
 const problems = [];
 
-async function shoot(name, width, height, path, after) {
+async function shoot(name, width, height, path, after, answers = {}) {
+  let claims = 0;
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: width < 1280, isMobile: width < 768 });
   await page.route("https://cf.example.test/file/*", (route) => route.fulfill({ contentType: "image/jpeg", body: readFileSync(join(photoDir, new URL(route.request().url()).pathname.split("/").pop())) }));
   await page.route("**/api/admin/**", async (route) => {
@@ -91,7 +103,11 @@ async function shoot(name, width, height, path, after) {
     if (url.pathname === "/api/admin/session") return route.fulfill({ json: { staffId: "stf_1", username: "minh", role: "ADMIN" } });
     if (url.pathname === "/api/admin/orders") return route.fulfill({ json: orders(url) });
     if (url.pathname === "/api/admin/payouts") return route.fulfill({ json: payoutRows(url) });
-    if (url.pathname.endsWith("/claim")) return route.fulfill({ json: PREVIEW });
+    if (url.pathname.endsWith("/claim")) return route.fulfill({ json: (answers.claim ?? (() => PREVIEW))(++claims) });
+    if (url.pathname.endsWith("/confirm")) {
+      const answer = (answers.confirm ?? (() => ({ json: RECORDED })))();
+      return route.fulfill(answer);
+    }
     if (url.pathname.endsWith("/release")) return route.fulfill({ json: { claimId: "K7Q2M9XA", status: "ABANDONED" } });
     return route.fulfill({ status: 404, json: { error: { code: "not_found", messageKey: "error.not_found" } } });
   });
@@ -133,6 +149,19 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`payouts-${label}`, width, height, "/admin/payouts");
   await shoot(`payouts-action-${label}`, width, height, "/admin/payouts?filter[queue]=ACTION");
   await shoot(`payout-panel-${label}-sheet`, width, height, "/admin/payouts", (page) => page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })));
+}
+const openPanel = (page, name = /^Chuy/) => page.getByRole("button", { name }).first().click().then(() => page.getByRole("dialog").waitFor({ timeout: 10_000 }));
+const toConfirm = (page) => page.locator("[data-confirm] button").waitFor({ timeout: 10_000 }).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight)));
+const press = (page) => page.locator("[data-confirm] button").click();
+const NETTING_ROW = /^Tr/;
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`payout-confirm-${label}-sheet`, width, height, "/admin/payouts", (page) => openPanel(page).then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => toConfirm(page)));
+  await shoot(`payout-changed-${label}-sheet`, width, height, "/admin/payouts", (page) => openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-changed]").waitFor({ timeout: 10_000 })),
+    { claim: (n) => (n === 1 ? PREVIEW : CHANGED), confirm: () => ({ status: 409, json: { error: { code: "conflict", messageKey: "error.payout.amount_changed" } } }) });
+  await shoot(`payout-recorded-${label}-sheet`, width, height, "/admin/payouts", (page) => openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-recorded]").waitFor({ timeout: 10_000 })));
+  await shoot(`payout-netting-${label}-sheet`, width, height, "/admin/payouts?filter[queue]=ACTION", (page) => openPanel(page, NETTING_ROW).then(() => page.locator("[data-facts=netting]").waitFor({ timeout: 10_000 })), { claim: () => NETTING });
+  await shoot(`payout-netting-recorded-${label}-sheet`, width, height, "/admin/payouts?filter[queue]=ACTION", (page) => openPanel(page, NETTING_ROW).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-recorded]").waitFor({ timeout: 10_000 })),
+    { claim: () => NETTING, confirm: () => ({ json: NETTING_RECORDED }) });
 }
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));

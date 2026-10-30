@@ -11,12 +11,17 @@
     "cutover:import": "tsx src/cutover/run-import.ts",
     "shadow:run": "tsx src/cutover/run-shadow.ts",
     "shadow:sign-off": "tsx src/cutover/sign-off-shadow.ts",
+    "staff:seed": "tsx src/admin/run-admin-command.ts staff-seed",
+    "staff:password": "tsx src/admin/run-admin-command.ts staff-password",
+    "staff:access": "tsx src/admin/run-admin-command.ts staff-access",
+    "campaign:create": "tsx src/admin/run-admin-command.ts campaign-create",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
     "@cashback/contracts": "workspace:*",
     "@cashback/core": "workspace:*",
+    "@cashback/labels": "workspace:*",
     "@cashback/money": "workspace:*",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.4",

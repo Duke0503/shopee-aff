@@ -4,8 +4,9 @@
  * customer receives (server `getBalances` payable), and the row action. On tablet the code, bank
  * and settlement columns are dropped; the phone card shows the same figures, composed as the
  * wireframe's payout card. A row another staff member holds reads `payout_taken` and has no
- * action; a row with no confirmed bank account, or with nothing to transfer because its open
- * clawbacks reach the gross (netting only, Story 4.11), has none either and says why.
+ * action; a row with no confirmed bank account has none either and says why. A netting-only row
+ * (open clawbacks reach the gross, Story 4.11) opens with `payout_open_netting`: it needs no bank account,
+ * because no money moves.
  */
 import { BLOCKING_FLAGS, type PayoutQueueRow } from "@cashback/contracts";
 import { Button, CodeChip, MoneyFigure, type ListColumn } from "@cashback/ui";
@@ -24,14 +25,16 @@ export function PayoutAction({ row, actions, wide = false }: { readonly row: Pay
     return <span className="block text-meta font-medium break-words whitespace-normal text-status-waiting">{adminText("payout_taken", { name: row.claimStaffName ?? row.claimStaffId })}</span>;
   }
   const flags = flagsOf(row.flags);
-  if (flags.some((flag) => BLOCKING_FLAGS.includes(flag))) {
-    return <span className="block text-meta break-words whitespace-normal text-muted-foreground">{adminText(flags.includes("NETTING_ONLY") ? "payout_blocked_netting" : "payout_blocked")}</span>;
+  const netting = flags.includes("NETTING_ONLY");
+  if (!netting && flags.some((flag) => BLOCKING_FLAGS.includes(flag))) {
+    return <span className="block text-meta break-words whitespace-normal text-muted-foreground">{adminText("payout_blocked")}</span>;
   }
   const mine = row.claimStaffId === actions.staffId;
   const name = row.customerName ?? row.customerCode ?? row.customerId;
-  const label = mine ? adminText("payout_continue") : adminText("payout_open");
+  const label = mine ? adminText("payout_continue") : adminText(netting ? "payout_open_netting" : "payout_open");
+  const aria = mine ? "payout_continue_aria" : netting ? "payout_open_netting_aria" : "payout_open_aria";
   return (
-    <Button type="button" size={wide ? "lg" : "sm"} className={wide ? "w-full coarse:h-11" : "coarse:h-11"} aria-label={adminText(mine ? "payout_continue_aria" : "payout_open_aria", { name })} onClick={() => actions.onOpen(row)}>
+    <Button type="button" size={wide ? "lg" : "sm"} variant={netting && !mine ? "outline" : "default"} className={wide ? "w-full coarse:h-11" : "coarse:h-11"} aria-label={adminText(aria, { name })} onClick={() => actions.onOpen(row)}>
       {label}
     </Button>
   );

@@ -2,8 +2,11 @@
  * The payout preview inside the panel (W4 payout panel, DESIGN.md qr-panel, EXPERIENCE.md payout
  * panel, M-7, UX-DR6): the abandoned-claim warning first, then the flags to check, the VietQR for
  * exactly the server's amount (or why there is none), the transfer facts with copy buttons, and
- * every covered order, bonus and netted clawback. Every figure is the server's; nothing is added
- * up here. On a phone the QR takes the full width so a second phone can scan it.
+ * every covered order, bonus and netted clawback, then the confirm step (payout-confirm.tsx). A
+ * netting-only payout (Story 4.11) has no QR and no bank facts: it shows the approved gross, what
+ * this payout nets, what is still owed after it and the transfer of 0. Every figure is the
+ * server's; nothing is added up here. On a phone the QR takes the full width so a second phone
+ * can scan it.
  */
 import type { PayoutPreview as Preview } from "@cashback/contracts";
 import { formatVnDateTime, formatVnTime, parseInstant, systemClock } from "@cashback/core";
@@ -57,19 +60,38 @@ function Fact({ label, children, copy }: { readonly label: string; readonly chil
   );
 }
 
+function NettingFacts({ preview }: { readonly preview: Preview }) {
+  return (
+    <dl className="divide-y divide-border" data-facts="netting">
+      <Fact label={adminText("panel_gross")}>
+        <MoneyFigure amount={preview.gross} />
+      </Fact>
+      <Fact label={adminText("panel_netted")}>
+        <span className="text-sm font-semibold text-status-rejected tabular-nums">{formatMoney(preview.netted)}</span>
+      </Fact>
+      <Fact label={adminText("panel_carried")}>
+        <span className="text-sm font-semibold tabular-nums">{formatMoney(preview.carriedForward)}</span>
+      </Fact>
+      <Fact label={adminText("panel_transfer")}>
+        <MoneyFigure amount={preview.amount} size="md" />
+      </Fact>
+    </dl>
+  );
+}
+
 function TransferFacts({ preview, onStale }: { readonly preview: Preview; readonly onStale: () => void }) {
-  const paying = preview.amount > 0;
+  if (preview.amount === 0) return <NettingFacts preview={preview} />;
   return (
     <dl className="divide-y divide-border">
-      <Fact label={adminText("panel_amount")} copy={paying ? <CopyButton label={adminText("panel_copy_amount")} value={() => String(preview.amount)} /> : undefined}>
+      <Fact label={adminText("panel_amount")} copy={<CopyButton label={adminText("panel_copy_amount")} value={() => String(preview.amount)} />}>
         <MoneyFigure amount={preview.amount} size="md" />
       </Fact>
       <Fact label={adminText("panel_bank")}>{preview.bankName ?? "–"}</Fact>
       <Fact label={adminText("panel_holder")}>{preview.holderName ?? "–"}</Fact>
-      <Fact label={adminText("panel_account")} copy={paying ? <CopyButton label={adminText("panel_copy_account")} value={() => revealAccountNumber(preview.claimId)} onError={(error) => isAccountChanged(error) && onStale()} /> : undefined}>
+      <Fact label={adminText("panel_account")} copy={<CopyButton label={adminText("panel_copy_account")} value={() => revealAccountNumber(preview.claimId)} onError={(error) => isAccountChanged(error) && onStale()} />}>
         <MaskedAccount lastFour={preview.accountLastFour} />
       </Fact>
-      <Fact label={adminText("panel_reference")} copy={paying ? <CopyButton label={adminText("panel_copy_reference")} value={() => preview.transferReference} /> : undefined}>
+      <Fact label={adminText("panel_reference")} copy={<CopyButton label={adminText("panel_copy_reference")} value={() => preview.transferReference} />}>
         <span className="font-mono text-sm font-medium">{preview.transferReference}</span>
       </Fact>
     </dl>
@@ -109,11 +131,21 @@ function CoveredLines({ preview }: { readonly preview: Preview }) {
   );
 }
 
-export function PayoutPreview({ preview, onStale }: { readonly preview: Preview; readonly onStale: () => void }) {
+export interface PayoutPreviewProps {
+  readonly preview: Preview;
+  readonly onStale: () => void;
+  /** Shown first: the "amount changed" notice after a refused confirm. */
+  readonly notice?: ReactNode;
+  /** Shown last: the confirm step. */
+  readonly footer?: ReactNode;
+}
+
+export function PayoutPreview({ preview, onStale, notice, footer }: PayoutPreviewProps) {
   const phone = useLayout() === "phone";
   const checks = preview.flags.filter((flag) => CHECK_FLAGS.has(flag));
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      {notice}
       {preview.warning !== null && <Warning warning={preview.warning} />}
       {checks.length > 0 && (
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -127,6 +159,7 @@ export function PayoutPreview({ preview, onStale }: { readonly preview: Preview;
       <TransferFacts preview={preview} onStale={onStale} />
       <CoveredLines preview={preview} />
       <p className="text-caption text-muted-foreground">{adminText("panel_snapshot", { time: formatVnTime(parseInstant(preview.openedAt)) })}</p>
+      {footer}
     </div>
   );
 }

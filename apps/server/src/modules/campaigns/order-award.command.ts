@@ -47,6 +47,23 @@ export function moveAwards(db: LedgerDb, clock: Clock, orderId: string, to: Awar
   return result.changes;
 }
 
+/**
+ * Pays the named CONFIRMED awards of a payout (Story 4.8): the awards on a covered order are paid
+ * by its transition already; this pays any other award the payout's snapshot covers, by id.
+ * Returns how many of the named awards are PAID afterwards, so confirm can check them all.
+ */
+export function payAwards(db: LedgerDb, clock: Clock, awardIds: readonly number[], by: CommandAudit): number {
+  if (awardIds.length === 0) return 0;
+  const ids = [...awardIds];
+  const result = db
+    .update(campaignAwards)
+    .set({ status: "PAID", paidAt: clock.now() })
+    .where(and(inArray(campaignAwards.awardId, ids), eq(campaignAwards.status, "CONFIRMED")))
+    .run();
+  if (result.changes > 0) by.audit.record({ actor: by.actor, event: "campaigns.award.paid", entityId: ids.join(","), payload: { awards: result.changes } });
+  return db.select({ awardId: campaignAwards.awardId }).from(campaignAwards).where(and(inArray(campaignAwards.awardId, ids), eq(campaignAwards.status, "PAID"))).all().length;
+}
+
 /** The orders port bound to one transaction's handle. */
 export function orderAwardsFor(db: LedgerDb, clock: Clock, by: CommandAudit): OrderAwardsPort {
   return { paidBonus: (orderId) => paidBonusOn(db, orderId), move: (orderId, to) => void moveAwards(db, clock, orderId, to, by) };

@@ -2,7 +2,8 @@
  * The outbox (AD-16, D46): producers enqueue a notification inside their own transaction with
  * the dedup key `<entity>:<id>:<event>`; a key already in the outbox, enqueued or seeded by the
  * cutover as already sent, makes the enqueue a no-op. Guests (HOUSE) and customers who no longer
- * resolve (erased) are refused: nothing is ever told to them (D5). An enqueue that adds a row, and
+ * resolve (erased) are refused: nothing is ever told to them (D5); so is a netting-only payout,
+ * whose transfer is 0 (AD-16, D42). An enqueue that adds a row, and
  * the cutover seed, each write one audit entry in the same transaction (AD-17); a no-op writes
  * none. Delivery, retries, the daily cap and `messaging.silent` come with Stories 6.4 and 6.10.
  */
@@ -17,10 +18,11 @@ import { outbox } from "./schema";
 
 export { DEDUP_KEY_PATTERN, dedupKey, dedupKeyParts, encodeDedupKeyId } from "../../platform/ports/outbox.port";
 
-export type EnqueueResult = "enqueued" | "duplicate" | "refused_guest" | "refused_unknown_customer";
+export type EnqueueResult = "enqueued" | "duplicate" | "refused_guest" | "refused_unknown_customer" | "refused_netting_only";
 
 export function enqueue(db: LedgerDb, clock: Clock, message: OutboxMessage, by: CommandAudit): EnqueueResult {
   if (!DEDUP_KEY_PATTERN.test(message.dedupKey)) throw new RangeError(`not a dedup key: ${message.dedupKey}`);
+  if (message.transferAmount === 0) return "refused_netting_only";
   const customer = resolveCustomer(db, message.customerId);
   if (customer === null) return "refused_unknown_customer";
   if (customer.role === "HOUSE") return "refused_guest";

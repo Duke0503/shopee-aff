@@ -1,6 +1,6 @@
 /**
- * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql and
- * 0013_payout_claims.sql. Only this module
+ * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql,
+ * 0013_payout_claims.sql and 0014_payout_confirm.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -70,7 +70,7 @@ export const payoutClaims = sqliteTable("payout_claims", {
   awardIds: text("award_ids").notNull(),
   clawbackIds: text("clawback_ids").notNull(),
   amount: integer("amount").notNull(),
-  bankFingerprint: text("bank_fingerprint").notNull(),
+  bankFingerprint: text("bank_fingerprint"),
   bankHeld: integer("bank_held", { mode: "boolean" }).notNull(),
   snapshotHash: text("snapshot_hash").notNull(),
   transferReference: text("transfer_reference").notNull().unique(),
@@ -84,3 +84,4 @@ export const payoutClaims = sqliteTable("payout_claims", {
 export type PayoutRow = typeof payouts.$inferInsert;
 export type PayoutClaimRow = typeof payoutClaims.$inferSelect;
 export type PayoutItemRow = typeof payoutItems.$inferInsert;
+export type RecordedPayoutRow = typeof payouts.$inferSelect;

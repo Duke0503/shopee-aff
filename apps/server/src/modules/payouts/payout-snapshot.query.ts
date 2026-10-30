@@ -8,11 +8,13 @@
  *
  * The hash covers exactly what confirm re-checks (Story 4.8): customer, order ids with their
  * stored cashback, award ids with their amounts, clawback ids with their open amounts, the
- * amount, and the bank account as a whole: its fingerprint, the hold flag, the bank as written
- * (folded), the VietQR BIN it matches and the holder. A change to any of them is a new claim.
+ * amount, and, when money moves, the bank account as a whole: its fingerprint, the hold flag, the
+ * bank as written (folded), the VietQR BIN it matches and the holder. A change to any of them is a
+ * new claim. A netting-only snapshot (amount 0) pays into no account, so a bank edit leaves its
+ * hash, and the confirm, alone.
  */
 import { createHash } from "node:crypto";
-import { clawbackOpenAmount, openClawbackTotal, sumDong } from "@cashback/money";
+import { clawbackOpenAmount, nettingPlan, openClawbackTotal, sumDong, type NettingPlan } from "@cashback/money";
 import { inArray, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -24,6 +26,8 @@ import { ledgerEntries } from "./schema";
 
 export interface ClawbackLine {
   readonly clawbackId: string;
+  /** The customer id the clawback's original entry is stored under (an alias resolves to the survivor). */
+  readonly customerId: string;
   readonly orderId: string | null;
   /** Still owed back, positive. */
   readonly open: number;
@@ -50,27 +54,33 @@ export class PayoutSnapshotError extends Error {
 
 function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
   const rows = db
-    .select({ clawbackId: ledgerEntries.clawbackId, total: sql<number>`sum(${ledgerEntries.amount})`, orderId: sql<string | null>`max(case when ${ledgerEntries.kind} = 'CLAWBACK' then ${ledgerEntries.orderId} end)` })
+    .select({
+      clawbackId: ledgerEntries.clawbackId,
+      total: sql<number>`sum(${ledgerEntries.amount})`,
+      orderId: sql<string | null>`max(case when ${ledgerEntries.kind} = 'CLAWBACK' then ${ledgerEntries.orderId} end)`,
+      customerId: sql<string>`max(case when ${ledgerEntries.kind} = 'CLAWBACK' then ${ledgerEntries.customerId} end)`,
+    })
     .from(ledgerEntries)
     .where(inArray(ledgerEntries.customerId, [...keys]))
     .groupBy(ledgerEntries.clawbackId)
     .orderBy(ledgerEntries.clawbackId)
     .all();
-  return rows.map((r) => ({ clawbackId: r.clawbackId, orderId: r.orderId, open: openClawbackTotal([clawbackOpenAmount([r.total])]) })).filter((c) => c.open > 0);
+  return rows.map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, open: openClawbackTotal([clawbackOpenAmount([r.total])]) })).filter((c) => c.open > 0);
 }
 
 export function snapshotHash(s: Omit<PayoutSnapshot, "hash" | "customerCode" | "customerName">): string {
+  const bank = s.balance.payable === 0 ? null : s.bank;
   const canonical = JSON.stringify({
     customerId: s.customerId,
     orders: s.orders.map((o) => [o.orderId, o.cashback]),
     awards: s.bonuses.map((b) => [b.awardId, b.amount]),
     clawbacks: s.clawbacks.map((c) => [c.clawbackId, c.open]),
     amount: s.balance.payable,
-    bankFingerprint: s.bank?.fingerprint ?? null,
-    bankHeld: s.bank?.held ?? null,
-    bankName: s.bank === null ? null : plainBankText(s.bank.bankName ?? ""),
-    bankBin: s.bank?.vietQrBank?.bin ?? null,
-    holder: s.bank?.holderName?.trim() ?? null,
+    bankFingerprint: bank?.fingerprint ?? null,
+    bankHeld: bank?.held ?? null,
+    bankName: bank === null ? null : plainBankText(bank.bankName ?? ""),
+    bankBin: bank?.vietQrBank?.bin ?? null,
+    holder: bank?.holderName?.trim() ?? null,
   });
   return createHash("sha256").update(canonical).digest("hex");
 }
@@ -89,3 +99,6 @@ export function payoutSnapshot(db: LedgerDb, key: string): PayoutSnapshot | null
   const parts = { customerId, balance, orders, bonuses, clawbacks: openClawbacks(db, found.keys), bank: bankAccountsOf(db, [customerId]).get(customerId) ?? null };
   return { ...parts, customerCode: card?.customerCode ?? null, customerName: card?.displayName ?? null, hash: snapshotHash(parts) };
 }
+
+/** What confirming this snapshot nets and carries forward (AD-6): the preview shows it, confirm writes it. */
+export const nettingOf = (snapshot: PayoutSnapshot): NettingPlan => nettingPlan(snapshot.balance.gross, snapshot.clawbacks);

@@ -17,7 +17,14 @@
   "error.payout.claim_not_found": "Lần chuyển này đã đóng. Mở lại khách để xem số mới.",
   "error.payout.not_your_claim": "Lần chuyển này do nhân viên khác mở.",
   "error.payout.staff_only": "Chỉ nhân viên làm được việc này.",
-  "error.payout.netting_only": "Khoản trừ nợ đã bằng số khách được nhận nên không có gì để chuyển. Lần trừ nợ này sẽ ghi nhận ở bước trừ nợ riêng.",
+  "error.payout.netting_only": "Lần này chỉ trừ nợ, không chuyển tiền nên không có số tài khoản để chép.",
   "error.payout.account_changed": "Số tài khoản của khách vừa thay đổi. Bảng đã lấy lại số mới, kiểm tra lại trước khi chuyển.",
-  "error.payout.snapshot_mismatch": "Số liệu của khách đang không khớp nhau nên chưa mở được. Báo quản trị viên kiểm tra."
+  "error.payout.snapshot_mismatch": "Số liệu của khách đang không khớp nhau nên chưa mở được. Báo quản trị viên kiểm tra.",
+  "error.payout.amount_changed": "Số tiền đã thay đổi, xem lại",
+  "error.payout.other_claim_open": "Khách này đang có một lần chuyển khác mở. Đóng lần đó trước khi xác nhận lần này.",
+  "error.payout.confirm_paused": "Đang trong thời gian chốt chuyển hệ thống nên tạm chưa ghi nhận chuyển tiền.",
+  "error.clawback.admin_only": "Chỉ quản trị viên được xoá nợ.",
+  "error.clawback.clawback_not_found": "Không tìm thấy khoản trừ nợ này.",
+  "error.clawback.clawback_closed": "Khoản trừ nợ này đã đóng.",
+  "error.clawback.reason_required": "Cần ghi lý do xoá nợ."
 }

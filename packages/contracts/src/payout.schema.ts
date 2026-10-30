@@ -20,14 +20,14 @@ export type PayoutQueue = (typeof PAYOUT_QUEUES)[number];
 
 /**
  * A row's flags, in display order. Every flag puts the row in "needs action". NETTING_ONLY (open
- * clawbacks reach the gross, AD-6) is a transfer of 0: it is never opened as a payout until the
- * netting-only payout of Story 4.11 records it.
+ * clawbacks reach the gross, AD-6) is a transfer of 0: it opens as a netting-only payout (Story
+ * 4.11) that needs no bank account, so no flag blocks it.
  */
 export const PAYOUT_FLAGS = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY"] as const;
 export type PayoutFlag = (typeof PAYOUT_FLAGS)[number];
 export const ACTION_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY"];
-/** Flags that refuse a claim outright: no confirmed account, or nothing to transfer. */
-export const BLOCKING_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD", "NETTING_ONLY"];
+/** Flags that refuse a claim outright: no confirmed account to transfer to (a netting-only row is never blocked). */
+export const BLOCKING_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD"];
 
 /** The settled fact of a row's payable orders (D27): information only, never a status. */
 export const SETTLEMENT_FACTS = ["UNSETTLED", "PARTLY_SETTLED", "SETTLED"] as const;
@@ -77,6 +77,8 @@ const previewClawbackSchema = z.object({ clawbackId: z.string(), orderId: z.stri
 export const payoutPreviewSchema = z.object({
   outcome: z.literal("claimed"),
   claimId: z.string(),
+  /** What confirm sends back, so the server can tell the preview the panel showed (AD-9). */
+  snapshotHash: z.string().regex(/^[0-9a-f]{64}$/),
   transferReference: z.string(),
   openedAt: instant,
   customerId: z.string(),
@@ -86,6 +88,9 @@ export const payoutPreviewSchema = z.object({
   amount: dong,
   gross: dong,
   deductedNext: dong,
+  /** What this payout nets from the open clawbacks, and what they still owe after it (AD-6). */
+  netted: dong,
+  carriedForward: dong,
   bankName: z.string().nullable(),
   holderName: z.string().nullable(),
   accountLastFour: z.string(),
@@ -106,3 +111,35 @@ export type PayoutClaimResponse = z.infer<typeof payoutClaimResponseSchema>;
 
 export const payoutAccountResponseSchema = z.object({ accountNumber: z.string() });
 export const payoutReleaseResponseSchema = z.object({ claimId: z.string(), status: z.enum(["OPEN", "CONFIRMED", "ABANDONED"]) });
+
+/**
+ * Confirming a payout (Story 4.8, INV-4): the claim id is in the path and the body is exactly the
+ * snapshot hash; an amount, an order list or any other field is refused by the strict object. A
+ * proof image comes with Story 4.9.
+ */
+export const payoutConfirmRequestSchema = z.strictObject({ snapshotHash: z.string().regex(/^[0-9a-f]{64}$/) });
+export type PayoutConfirmRequest = z.infer<typeof payoutConfirmRequestSchema>;
+
+export const payoutConfirmResponseSchema = z.object({
+  outcome: z.literal("recorded"),
+  payoutId: z.number().int().min(1),
+  claimId: z.string(),
+  customerId: z.string(),
+  /** What left the bank; 0 for a netting-only payout. */
+  amount: dong,
+  netted: dong,
+  nettingOnly: z.boolean(),
+  orderCount: z.number().int().min(0),
+  awardCount: z.number().int().min(0),
+  /** The receipt link's token, /b/<token>; none for a netting-only payout. */
+  receiptToken: z.string().nullable(),
+  recordedAt: instant,
+  /** True when this claim was already confirmed and nothing new was written. */
+  replay: z.boolean(),
+});
+export type PayoutConfirmResponse = z.infer<typeof payoutConfirmResponseSchema>;
+
+export const clawbackParamsSchema = z.strictObject({ clawbackId: z.string().min(3).max(140) });
+/** An admin's write-off of what a clawback still owes (Story 4.11): a reason, nothing else. */
+export const clawbackWriteOffRequestSchema = z.strictObject({ reason: z.string().trim().min(1).max(500) });
+export const clawbackWriteOffResponseSchema = z.object({ clawbackId: z.string(), amount: z.number().int().min(1) });

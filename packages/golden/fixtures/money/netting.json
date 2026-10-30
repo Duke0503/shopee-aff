@@ -1,0 +1,126 @@
+{
+  "rule": "nettingPlan",
+  "source": "AD-6, D42, Story 4.8 AC1 and AC6, Story 4.11 AC2: a payout nets open clawbacks, in order, up to the gross and carries the rest forward; transfer = gross - netted, never negative",
+  "cases": [
+    {
+      "name": "Story 4.8 AC1: no clawback, two orders 79,216 and 36,000 and a bonus of 20,000 transfer 135,216",
+      "input": {
+        "cashback": [
+          79216,
+          36000
+        ],
+        "bonuses": [
+          20000
+        ],
+        "openClawbacks": []
+      },
+      "expected": {
+        "gross": 135216,
+        "netting": [],
+        "carried": [],
+        "transfer": 135216,
+        "carriedForward": 0
+      }
+    },
+    {
+      "name": "Story 4.8 AC6: an open clawback of 49,216 below the gross nets in full and 86,000 is transferred",
+      "input": {
+        "cashback": [
+          79216,
+          36000
+        ],
+        "bonuses": [
+          20000
+        ],
+        "openClawbacks": [
+          49216
+        ]
+      },
+      "expected": {
+        "gross": 135216,
+        "netting": [
+          49216
+        ],
+        "carried": [
+          0
+        ],
+        "transfer": 86000,
+        "carriedForward": 0
+      }
+    },
+    {
+      "name": "Story 4.8 AC6: clawbacks of 20,000 and 90,000 against a gross of 100,000 net 20,000 and 80,000, carrying 10,000 forward",
+      "input": {
+        "cashback": [
+          100000
+        ],
+        "bonuses": [],
+        "openClawbacks": [
+          20000,
+          90000
+        ]
+      },
+      "expected": {
+        "gross": 100000,
+        "netting": [
+          20000,
+          80000
+        ],
+        "carried": [
+          0,
+          10000
+        ],
+        "transfer": 0,
+        "carriedForward": 10000
+      }
+    },
+    {
+      "name": "Story 4.11 AC2: a gross of 50,000 against an open clawback of 80,000 is netting only: +50,000, 30,000 still open, transfer 0",
+      "input": {
+        "cashback": [
+          30000
+        ],
+        "bonuses": [
+          20000
+        ],
+        "openClawbacks": [
+          80000
+        ]
+      },
+      "expected": {
+        "gross": 50000,
+        "netting": [
+          50000
+        ],
+        "carried": [
+          30000
+        ],
+        "transfer": 0,
+        "carriedForward": 30000
+      }
+    },
+    {
+      "name": "a clawback exactly equal to the gross closes it and transfers 0",
+      "input": {
+        "cashback": [
+          9263
+        ],
+        "bonuses": [],
+        "openClawbacks": [
+          9263
+        ]
+      },
+      "expected": {
+        "gross": 9263,
+        "netting": [
+          9263
+        ],
+        "carried": [
+          0
+        ],
+        "transfer": 0,
+        "carriedForward": 0
+      }
+    }
+  ]
+}

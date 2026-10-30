@@ -41,6 +41,11 @@ export interface OutboxMessage {
   readonly messageKey: string;
   /** Ids and amounts in dong only; never names, phone numbers or bank numbers. */
   readonly params: Readonly<Record<string, string | number>>;
+  /**
+   * For a message about a payout, what left the bank. A netting-only payout (0) is never told:
+   * the outbox refuses it (AD-16, D42).
+   */
+  readonly transferAmount?: number;
 }
 
 export interface OutboxPort {

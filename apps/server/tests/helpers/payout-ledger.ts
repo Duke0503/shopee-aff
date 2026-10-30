@@ -1,5 +1,5 @@
 /**
- * A migrated ledger for the Payouts tests (Stories 4.6, 4.7): the fake customers of
+ * A migrated ledger for the Payouts tests (Stories 4.6, 4.7, 4.8, 4.11): the fake customers of
  * fixtures/payout-customers.json, two staff members, and builders for orders, bonuses, clawbacks
  * and bank accounts. Fingerprints use a test key; account numbers are made up.
  */
@@ -7,8 +7,9 @@ import { readFileSync } from "node:fs";
 import { fixedClock, searchText, sortKey, type Clock } from "@cashback/core";
 
 import { bankFingerprint } from "../../src/modules/identity/index";
+import { outboxFor } from "../../src/modules/messaging/index";
 import { commandAudit } from "../../src/modules/operations/index";
-import { openPayoutClaim, type ClaimOutcome } from "../../src/modules/payouts/index";
+import { confirmPayout, openPayoutClaim, type ClaimOutcome, type ConfirmDeps, type ConfirmOutcome } from "../../src/modules/payouts/index";
 import type { Ledger } from "../../src/platform/db/ledger";
 import type { Actor } from "../../src/platform/ports/audit.port";
 import { freshLedger } from "./order-ledger";
@@ -92,3 +93,17 @@ export function openClaim(ledger: Ledger, key: string, actor: Actor = MINH, cloc
 }
 
 export const claimRows = (ledger: Ledger) => ledger.sqlite.prepare("SELECT claim_id, customer_id, staff_id, status, amount, qr_shown_at, abandoned_at, transfer_reference, order_ids, award_ids, clawback_ids FROM payout_claims ORDER BY rowid").all() as Record<string, unknown>[];
+
+/** Confirms a claim as `actor`, with the outbox of messaging, in one transaction. */
+export function confirmClaim(ledger: Ledger, claimId: string, snapshotHash: string, actor: Actor = MINH, clock: Clock = CLOCK, extra: Partial<Pick<ConfirmDeps, "confirmPaused" | "newReceiptToken">> = {}): ConfirmOutcome {
+  return ledger.tx((db) => {
+    const by = commandAudit(db, clock, actor);
+    return confirmPayout(db, { claimId, snapshotHash }, { clock, by, outbox: outboxFor(db, clock, by), newReceiptToken: () => "rcpt_test_token_0001", ...extra });
+  });
+}
+
+/** Row counts of every table a confirm writes, to show that a refused or repeated confirm writes nothing. */
+export function writeCounts(ledger: Ledger): Record<string, number> {
+  const tables = ["payouts", "payout_items", "ledger_entries", "outbox", "audit_entries", "order_status_history"];
+  return Object.fromEntries(tables.map((t) => [t, (ledger.sqlite.prepare(`SELECT count(*) AS n FROM ${t}`).get() as { n: number }).n]));
+}

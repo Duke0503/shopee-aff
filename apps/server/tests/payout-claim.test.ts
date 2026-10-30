@@ -167,13 +167,15 @@ describe("Story 4.7 context: refusals, netting only, the protected set, the audi
     expect(claimRows(ledger)).toEqual([]);
   });
 
-  it("review 11: a netting-only customer (payable 0) is never opened as a transfer of 0", () => {
+  it("review 11, superseded by Story 4.11: a netting-only customer (payable 0) opens as a netting-only claim of 0 with no QR, never as a transfer", () => {
     const ledger = payoutLedger();
     addOrder(ledger, { id: "261001N0002", customer: "P1", cashback: 9263 });
     addClawback(ledger, "P1", "260901PAID03", 20000);
     addBank(ledger, "P1");
-    expect(openClaim(ledger, "P1")).toEqual({ kind: "refused", code: "netting_only" });
-    expect(claimRows(ledger)).toEqual([]);
+    const out = claimed(openClaim(ledger, "P1"));
+    expect(out).toMatchObject({ qrPayload: null, qrMissing: "netting_only" });
+    expect(claimRows(ledger)).toEqual([expect.objectContaining({ status: "OPEN", amount: 0, qr_shown_at: null })]);
+    expect(() => ledger.tx((db) => revealClaimAccount(db, out.claim.claimId, { clock: CLOCK, by: commandAudit(db, CLOCK, MINH) }))).toThrow(expect.objectContaining({ code: "netting_only" }));
   });
 
   it("the QR amount nets open clawbacks and never includes awaiting money (list-defects 'QR amount falls back')", () => {

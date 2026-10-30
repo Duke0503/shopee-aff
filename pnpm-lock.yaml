@@ -275,6 +275,9 @@ importers:
       '@cashback/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cashback/labels':
+        specifier: workspace:*
+        version: link:../../packages/labels
       '@cashback/money':
         specifier: workspace:*
         version: link:../../packages/money
