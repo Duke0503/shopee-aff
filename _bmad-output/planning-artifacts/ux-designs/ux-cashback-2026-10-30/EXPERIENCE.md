@@ -50,7 +50,7 @@ Navigation: top bar (brand left; "Đăng nhập" (sign in) or the customer code 
 
 | Surface | Route | Purpose | Traces to |
 |---|---|---|---|
-| Today | `/admin` (landing) | What needs staff now: payable customers, open review cases, failed links, health of browser bridge, Zalo assistant, last reconciliation, last backup | FR-25, FR-30, FR-32 |
+| Overview (Tổng quan) | `/admin` (landing) | One screen for the current state, only what leads to an action or a decision: three to-dos (customers to pay with the amount, open review cases, failed links), three state figures (what the networks still owe us, what we keep this month, cancellation rate with the change), the weekly money chart (approved commission vs paid to customers), orders awaiting approval for over 60 days, one quiet line of monthly metrics (effective commission rate, valid rate, approved order value) and system health. Nothing decorative. | FR-25, FR-27, FR-30, FR-32 |
 | Payouts | `/admin/payouts` | Tabs: "Chuyển được" (payable now), "Cần xử lý" (blocked: no bank, held, flagged), "Lịch sử" (payout history incl. voided), "Sàn thanh toán" (network settlement) | UJ-5, FR-16, FR-17, FR-19, FR-34 |
 | Orders | `/admin/orders` | Search and filter every order by id, status, network, date kind | FR-26, FR-12, FR-37 |
 | Customers | `/admin/customers` | Search by code, name, Zalo id; fraud flag filter | FR-26, FR-31 |
@@ -58,13 +58,11 @@ Navigation: top bar (brand left; "Đăng nhập" (sign in) or the customer code 
 | Review cases | `/admin/review` | Open cases and merge proposals; apply or dismiss with a reason | UJ-6, FR-14, FR-11 |
 | Campaigns | `/admin/campaigns` (admin only) | Create, run and watch a campaign; slots and awards | UJ-7, FR-23 |
 | Link requests | `/admin/links` | Every link request with queue state, channel, delivery, failures | FR-1, FR-4, FR-7 |
-| Products | `/admin/products` | Product lookups: rates, request and order counts | FR-5, FR-7 |
 | Staff | `/admin/staff` (admin only) | Create employees, change role or status, reset passwords | FR-24 |
 | Audit trail and logs | `/admin/audit` | Append-only business acts; bank accounts as fingerprints | FR-29 |
-| Metrics | `/admin/metrics` | FR-27 metrics with the 100-approved-orders trust mark | FR-27 |
 | Settings | `/admin/settings` | Withheld settlement periods (mark a Shopee period withheld), Zalo assistant connection, alert contacts | FR-13, FR-36, FR-30 |
 
-Navigation: desktop sidebar grouped "Hằng ngày" (daily: Today, Payouts, Review cases, Orders), "Khách" (customers: Customers, Link requests), "Vận hành" (operations: Campaigns, Products, Metrics), "Quản trị" (admin: Staff, Audit trail and logs, Settings). Admin-only items are hidden for employees, not disabled. Tablet: icon rail with tooltips. Phone: bottom tab bar "Hôm nay", "Chuyển tiền", "Đơn", "Khách" (today, payouts, orders, customers) plus "Thêm" (more) opening a sheet with the rest. Each sidebar item shows a count badge only when the count is exact and from the same definition as the target list (LC-6).
+Navigation: desktop sidebar grouped "Hằng ngày" (daily: Overview, Payouts, Review cases, Orders), "Khách" (customers: Customers, Link requests, Campaigns), "Quản trị" (admin: Staff, Audit trail and logs, Settings). Admin-only items are hidden for employees, not disabled. Tablet: icon rail with tooltips. Phone: bottom tab bar "Tổng quan", "Chuyển tiền", "Đơn", "Khách" (today, payouts, orders, customers) plus "Thêm" (more) opening a sheet with the rest. Each sidebar item shows a count badge only when the count is exact and from the same definition as the target list (LC-6).
 
 ### Not a screen
 

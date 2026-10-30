@@ -450,8 +450,8 @@ cannot be demoted.
 - Every payout, void, merge, erase, review decision and period mark records the staff member and
   time.
 
-#### FR-25: Today view
-Staff can see in one screen what needs them today: payable customers, review cases, failed links,
+#### FR-25: Overview (one landing screen)
+Staff can see in one screen what needs them now and the state of the business (FR-27 metrics in one quiet line): payable customers, review cases, failed links,
 the health of the browser bridge, the Zalo assistant and the last reconciliation.
 
 #### FR-26: Customers and orders
