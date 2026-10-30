@@ -5,7 +5,7 @@
 **Mới tiếp nhận dự án?** Đọc đúng bốn file này, theo thứ tự:
 
 1. [`../README.md`](../README.md) — hệ thống làm gì, chạy thế nào
-2. [`../CLAUDE.md`](../CLAUDE.md) — **quy ước và những bẫy đã dính**
+2. [`reference/v1-handover.vi.md`](reference/v1-handover.vi.md) — **quy ước và những bẫy đã dính**
 3. [`diagrams/sequence-link-request.md`](diagrams/sequence-link-request.md) — luồng chạy nhiều nhất
 4. [`02-architecture/overview.md`](02-architecture/overview.md) — các tầng và ranh giới
 

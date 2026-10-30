@@ -1,0 +1,9 @@
+# Team override for bmad-create-epics-and-stories (committed). Merges over
+# .claude/skills/bmad-create-epics-and-stories/customize.toml; arrays append.
+
+[workflow]
+
+persistent_facts = [
+  "Story writing: before designing epics and before writing stories, read {project-root}/_bmad/custom/bmad-create-epics-and-stories/story-guide/README.md and follow it (3 C's, INVEST, 4 to 6 testable criteria, tracer-bullet vertical slices with explicit Blocked by edges, walking skeleton first, project rules).",
+  "Inputs: the PRD, UX spines and architecture spine listed in {project-root}/docs/index.md, the domain model {project-root}/docs/domain-model.json and the decisions in {project-root}/.context/decisions/.",
+]

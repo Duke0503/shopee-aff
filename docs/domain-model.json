@@ -1,0 +1,215 @@
+{
+  "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
+  "application": "cashback",
+  "version": "0.1.0",
+  "generatedAt": "2026-10-30",
+  "locale": "en",
+  "status": "proposed",
+  "strategicModel": {
+    "primaryDomain": "",
+    "classificationRationale": "",
+    "subdomains": []
+  },
+  "contexts": [],
+  "relations": [],
+  "buildingBlocks": [],
+  "decisions": [
+    {
+      "id": "d1-whole-dong-half-up",
+      "decision": "Every amount is a whole number of dong. Money rounds half-up through one shared helper.",
+      "rationale": "Python round() and JS Math.round() round half to even or toward infinity; every tool in the market shows 9,263 for 9,262.5.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md",
+        "docs/reference/v2-agent-rules.md"
+      ]
+    },
+    {
+      "id": "d2-commission-cap",
+      "decision": "Shopee's part of a commission is capped at 40,000 dong per order. The shop's XTRA part is not capped.",
+      "rationale": "Checked on 18 of 18 products. Forgetting the cap promised almost three times the real amount.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d3-approved-commission-only",
+      "decision": "Cashback is calculated from the approved commission only, never from the estimate shown to the customer.",
+      "rationale": "The estimate changes or disappears after returns; paying from it loses money.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d4-never-pay-twice",
+      "decision": "An order with a payout time (paid_at) is never changed or paid again.",
+      "rationale": "Reconciliation runs over overlapping periods; without this lock one order is paid two or three times.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d5-guest-no-cashback",
+      "decision": "A link made without a customer code belongs to the guest account HOUSE. A guest link never earns cashback, and its orders are never moved to a customer who registers later.",
+      "rationale": "All guests are the same payee, so one link per product is enough and the operator keeps the commission.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d6-link-belongs-to-one-customer",
+      "decision": "A link belongs to exactly one customer through sub_id1. A link is reused only for the same customer; product facts (price, rates) may be shared.",
+      "rationale": "Reusing a link by product sent customer B's money to customer A in production (fixed on 2026-09-25).",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d7-sub-id-alphanumeric",
+      "decision": "Every sub_id holds letters and digits only, and one link batch never mixes customers.",
+      "rationale": "A dash silently breaks attribution; the network applies one sub_id to every link in a batch.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d8-real-browser-only",
+      "decision": "Every call to Shopee goes through the operator's real signed-in browser. No code rebuilds Shopee's signature headers or calls its internal APIs directly.",
+      "rationale": "The Open API was refused on 2026-09-10; direct calls put the whole session into captcha; forged signatures risk the affiliate account.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d9-personal-zalo-human-pace",
+      "decision": "Customer chat runs on one personal Zalo account at a human pace. No bulk messages and no bulk friend requests.",
+      "rationale": "The Zalo Bot API is gone since 2026-09-25. A locked account cuts contact with every customer at once.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d10-only-assistant-creates-customers",
+      "decision": "Only the Zalo assistant creates customers. The public web signs in or accepts an existing code; an unknown code is not found.",
+      "rationale": "The assistant has just seen the person in Zalo; the web cannot prove who someone is.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d11-no-payout-threshold",
+      "decision": "Every approved, unpaid order is payable, grouped by customer. The operator decides when to pay, so no message promises a date.",
+      "rationale": "The old 50,000 dong threshold was a rule customers could not see or act on.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d12-cashback-split",
+      "decision": "The approved commission is split as service fee 0.98%, withheld tax 10% in a withheld period, then net. Cashback is 80% of net; the operator keeps the rest.",
+      "rationale": "These are the rates the live system pays today.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v2-agent-rules.md"
+      ]
+    },
+    {
+      "id": "d13-keep-customers-who-are-owed",
+      "decision": "A customer who is still owed money is never deleted, except by an explicit forced action of the operator.",
+      "rationale": "Deleting such a customer loses a debt the operator must still pay.",
+      "status": "proposed",
+      "sources": [
+        "docs/reference/v1-handover.vi.md"
+      ]
+    },
+    {
+      "id": "d14-replan-from-scratch",
+      "decision": "The platform is re-planned from scratch: domain model, UX, architecture and PRD come before any code. The current Python system and the earlier v2 TypeScript code are reference only.",
+      "rationale": "The owner wants the web and the architecture redesigned and optimized; the earlier v2 design documents are not in the repository.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D14-replan-from-scratch.md"
+      ]
+    },
+    {
+      "id": "d15-english-everywhere",
+      "decision": "Code, docs, the domain model, decisions and logs are written in English. Chat follows the person's language. Customer-facing text is Vietnamese and lives only in the message and label files.",
+      "rationale": "One ubiquitous language in documents and code; customers read Vietnamese.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D15-english-everywhere.md"
+      ]
+    },
+    {
+      "id": "d16-commit-planning-docs",
+      "decision": "Planning documents (docs/, .context/, _bmad-output/) are committed. The GitHub repository is made private first.",
+      "rationale": "The earlier v2 design documents were lost because they were never committed.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D16-commit-planning-docs.md"
+      ]
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "oq1-storage",
+      "question": "Does the re-planned platform keep SQLite, or move to PostgreSQL?",
+      "impact": "Decides the migration path, backups and how many writers can run at once.",
+      "owner": "Architect, confirmed by the project owner",
+      "status": "open"
+    },
+    {
+      "id": "oq2-stack",
+      "question": "Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)?",
+      "impact": "Decides how much of the main-v2 code can be reused.",
+      "owner": "Architect, confirmed by the project owner",
+      "status": "open"
+    },
+    {
+      "id": "oq3-networks-in-scope",
+      "question": "Which affiliate networks are in the first release: Shopee only, or also TikTok Shop through AccessTrade and Lazada?",
+      "impact": "Decides whether the Affiliate Network port needs more than one adapter at launch.",
+      "owner": "Project owner",
+      "status": "open"
+    },
+    {
+      "id": "oq4-network-list-owner",
+      "question": "Who owns the network list when a new affiliate network is added?",
+      "impact": "Decides which context holds network rules such as caps, sub_id format and report shape.",
+      "owner": "Architect",
+      "status": "open"
+    },
+    {
+      "id": "oq5-v2-design-docs",
+      "question": "Does a copy of the earlier docs/architecture-v2 folder exist on another machine?",
+      "impact": "It would be useful reference input for the re-plan.",
+      "owner": "Project owner",
+      "status": "open"
+    },
+    {
+      "id": "oq6-confirm-v1-rules",
+      "question": "Does the owner confirm D1 to D13, the rules carried over from the live system, as accepted for the new platform?",
+      "impact": "Until confirmed they stay proposed and the model treats them as candidates.",
+      "owner": "Project owner",
+      "status": "open"
+    }
+  ],
+  "sources": [
+    "docs/index.md",
+    "docs/reference/v1-handover.vi.md",
+    "docs/reference/v2-agent-rules.md",
+    "docs/01-business",
+    "docs/02-architecture",
+    "docs/04-reference"
+  ]
+}

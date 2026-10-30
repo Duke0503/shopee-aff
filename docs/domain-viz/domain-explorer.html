@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Domain map cashback</title>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    /* Neutrals, type, radii, shadows, motion: Stripe's real tokens (OpenDesign, opendesign.cc/packs/stripe). */
+    --paper: #F8FAFD; --surface: #FFFFFF; --sunk: #E5EDF5; --line: #E5EDF5; --line-soft: rgba(229,237,245,.6);
+    --ink: #061B31; --ink-2: #50617A; --muted: #64748D; --accent: #533AFD; --rule: rgba(6,27,49,.18);
+    --shadow-rest: 0 3px 6px rgba(23,23,23,.06); --shadow-lift: 0 15px 35px rgba(23,23,23,.08);
+    --ease: cubic-bezier(.25,1,.5,1);
+    /* EventStorming sticky grammar — information, not decoration. */
+    --event: #8C430A; --event-soft: #FDF1E4; --event-edge: #F0CFA8;
+    --cmd: #16458C;   --cmd-soft: #E8F0FC;   --cmd-edge: #B8D0F0;
+    --agg: #6F5309;   --agg-soft: #FBF3DC;   --agg-edge: #EBD9A6;
+    --policy: #543596;--policy-soft: #F3EFFC;--policy-edge: #D8CBF2;
+    --lang: #0C5E46;  --lang-soft: #E1F3EC;  --lang-edge: #A9DCC9;
+    --hot: #B32C63;   --hot-soft: #FBE6EE;   --hot-edge: #F2C9D9;
+    --svc: #1F5FBF; --read: #4A5A6B;
+    --core: #11795A; --supporting: #9A7310; --generic: #5A6472;
+    --sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --rail-w: 264px; --top-h: 56px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.5; }
+  button, select { font: inherit; color: inherit; } button { cursor: pointer; }
+  a { color: var(--accent); }
+  a, button { transition: color .22s var(--ease), background-color .22s var(--ease), border-color .22s var(--ease), box-shadow .22s var(--ease), opacity .22s var(--ease); }
+  h1, h2, h3, h4 { margin: 0; text-wrap: balance; font-weight: 500; letter-spacing: -.01em; }
+  p { margin: 0; } ul { margin: 0; padding-left: 18px; }
+  code { font-family: var(--mono); font-size: .86em; }
+  .mono { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  :where(a, button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* ---------- frame ---------- */
+  .topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 8; height: var(--top-h); background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+  .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 13px; }
+  .crumbs { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; min-width: 0; }
+  .crumbs a { color: var(--muted); text-decoration: none; } .crumbs a:hover { color: var(--ink); }
+  .crumbs .cur { color: var(--ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crumbs .sep { color: var(--rule); }
+  .topmeta { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; line-height: 1; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+  .chip.core { color: var(--core); border-color: var(--lang-edge); background: var(--lang-soft); }
+  .chip.supporting { color: var(--supporting); border-color: var(--agg-edge); background: var(--agg-soft); }
+  .chip.generic, .chip.unknown { color: var(--generic); background: var(--sunk); border-color: transparent; }
+  .chip.hot { color: var(--hot); background: var(--hot-soft); border-color: var(--hot-edge); }
+  .chip.quiet { color: var(--muted); border-color: transparent; background: transparent; padding: 0; height: auto; font-weight: 400; }
+  .chip.up { text-transform: uppercase; letter-spacing: .07em; font-size: 11px; font-weight: 600; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  .layout { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); align-items: start; }
+  .rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--top-h)); height: calc(100vh - var(--top-h)); overflow-y: auto; background: var(--surface); border-right: 1px solid var(--line); padding: 14px 12px 32px; }
+  .rail-head { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 16px 12px 6px; }
+  .rail-group { display: flex; flex-direction: column; gap: 1px; }
+  .rail-group:first-child .rail-head { padding-top: 0; }
+  .rail-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; text-align: left; border: 0; background: transparent; border-radius: 6px; padding: 7px 12px; color: var(--ink-2); font-size: 14px; line-height: 1.3; }
+  .rail-item:hover { background: var(--paper); color: var(--ink); }
+  .rail-item[aria-current="true"] { background: var(--sunk); color: var(--ink); font-weight: 500; }
+  .rail-name { flex: 1 1 auto; min-width: 0; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--generic); }
+  .dot.core { background: var(--core); } .dot.supporting { background: var(--supporting); }
+  .ring { flex: none; width: 16px; height: 16px; }
+  .ring circle { fill: none; stroke-width: 3; }
+  .ring .bg { stroke: var(--sunk); } .ring .fg { stroke: var(--ink-2); stroke-linecap: butt; transform: rotate(-90deg); transform-origin: 50% 50%; }
+
+  .main { padding: 32px 40px 96px; min-width: 0; }
+  .wrap { display: flex; flex-direction: column; gap: 40px; }
+
+  /* ---------- section rhythm ---------- */
+  .sec { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: calc(var(--top-h) + 64px); }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .sec-head h2 { font-size: 20px; }
+  .sec-head .why { font-size: 14px; color: var(--muted); }
+  .sec-head .n { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 14px; }
+  .lbl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .empty { border: 1px dashed var(--rule); border-radius: 8px; padding: 18px 20px; color: var(--muted); font-size: 14.5px; background: var(--surface); }
+  .empty b { color: var(--ink-2); font-weight: 500; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--paper); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); color: var(--ink-2); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; } td.k { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+  details.fold > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink-2); padding: 6px 0; }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold > summary::before { content: "▸"; color: var(--muted); font-size: 11px; } details.fold[open] > summary::before { content: "▾"; }
+  details.fold > summary:hover { color: var(--ink); }
+
+  /* ---------- landscape ---------- */
+  .hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 24px; }
+  .hero h1 { font-size: clamp(28px, 3.2vw, 36px); line-height: 1.05; letter-spacing: -.02em; }
+  .hero .sub { color: var(--ink-2); font-size: 16px; margin-top: 6px; max-width: 70ch; }
+  .hero .meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .stats { display: flex; gap: 28px; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .stat span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+
+  .smap { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 0; }
+  .smap svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .edges path { fill: none; stroke-width: 1.4; opacity: .32; transition: opacity .22s var(--ease), stroke-width .22s var(--ease); }
+  .edges .e-port { stroke: var(--svc); } .edges .e-event { stroke: #C25E0A; stroke-dasharray: 5 3; } .edges .e-reference { stroke: var(--rule); } .edges .e-external { stroke: var(--generic); stroke-dasharray: 2 3; }
+  .edges .target { opacity: .45; }
+  .smap.focus .edges path { opacity: .06; } .smap.focus .edges path.on { opacity: 1; stroke-width: 2; }
+  .band { position: relative; display: grid; grid-template-columns: 136px minmax(0, 1fr); align-items: start; padding: 18px 24px 18px 0; border-top: 1px solid var(--line-soft); }
+  .band:first-of-type { border-top: 0; }
+  .band-label { display: flex; flex-direction: column; gap: 4px; padding-left: 24px; }
+  .band-label b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .band-label span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+  .band.core .band-label b { color: var(--core); } .band.supporting .band-label b { color: var(--supporting); } .band.generic .band-label b { color: var(--generic); }
+  .tiles { display: flex; flex-wrap: wrap; gap: 12px; position: relative; z-index: 1; }
+  .tile { position: relative; width: 196px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-rest); }
+  .tile:hover { box-shadow: var(--shadow-lift); border-color: var(--rule); }
+  .tile.target { border-style: dashed; box-shadow: none; }
+  .tile::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: var(--generic); }
+  .tile.core::before { background: var(--core); } .tile.supporting::before { background: var(--supporting); }
+  .tile h3 { font-size: 14.5px; line-height: 1.25; }
+  .tile .addon { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+  .smap.focus .tile { opacity: .45; } .smap.focus .tile.on { opacity: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); padding: 2px 4px; }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--svc); vertical-align: middle; margin-right: 6px; }
+  .legend i.ev { border-top-style: dashed; border-color: #C25E0A; } .legend i.ref { border-color: var(--rule); } .legend i.tg { border-color: var(--rule); border-top-style: dashed; }
+
+  .hot { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--hot); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .hot p { font-size: 15px; line-height: 1.45; color: var(--ink); }
+  .hot .sub { font-size: 13px; color: var(--ink-2); }
+  .hot .sub b { color: var(--hot); font-weight: 600; }
+
+  /* ---------- dossier header ---------- */
+  .dhead { display: flex; flex-direction: column; gap: 14px; }
+  .dhead .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .dhead h1 { font-size: clamp(28px, 3.2vw, 38px); line-height: 1.05; letter-spacing: -.02em; }
+  .dhead .cap { font-size: 17px; color: var(--ink-2); max-width: 78ch; }
+  .cover { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
+  .cover a { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink-2); font-size: 11.5px; font-weight: 500; letter-spacing: .02em; }
+  .cover a i { display: block; height: 4px; border-radius: 2px; background: var(--ink-2); }
+  .cover a.gap { color: var(--muted); } .cover a.gap i { background: var(--sunk); }
+  .cover a:hover { color: var(--ink); }
+  .cover a span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chipnav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--top-h)); z-index: 6; background: rgba(248,250,253,.96); backdrop-filter: blur(8px); margin: 0 -40px; padding: 10px 40px; border-bottom: 1px solid var(--line); display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .chipnav::-webkit-scrollbar { display: none; }
+  .chipnav a { flex: none; text-decoration: none; color: var(--ink-2); font-size: 13.5px; font-weight: 500; padding: 6px 12px; border-radius: 6px; }
+  .chipnav a:hover { background: var(--sunk); color: var(--ink); }
+  .chipnav a .n { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: 5px; }
+
+  /* ---------- canvas ---------- */
+  .canvas { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.6fr) minmax(220px, 1fr); gap: 14px; align-items: stretch; }
+  .cv { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .cv.in { border-top: 3px solid var(--cmd); } .cv.out { border-top: 3px solid #C25E0A; } .cv.mid { border-top: 3px solid var(--ink); }
+  .cv h3 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; }
+  .cv h3 small { font-family: var(--mono); font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .msg { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); }
+  .msg.cmd { background: var(--cmd-soft); border-color: var(--cmd-edge); } .msg.ev { background: var(--event-soft); border-color: var(--event-edge); }
+  .msg b { font-family: var(--mono); font-size: 12.5px; font-weight: 500; color: var(--ink); word-break: break-word; }
+  .msg span { font-size: 12.5px; color: var(--ink-2); }
+  .msg .who { font-size: 12px; color: var(--muted); }
+  .kv { display: flex; flex-direction: column; gap: 4px; }
+  .kv .lbl { margin-bottom: 2px; } .kv p { font-size: 15px; line-height: 1.5; color: var(--ink); }
+  .terms { display: flex; flex-wrap: wrap; gap: 6px; }
+  .term { font-family: var(--mono); font-size: 12px; padding: 4px 8px; border-radius: 4px; background: var(--lang-soft); color: var(--lang); border: 1px solid var(--lang-edge); }
+  .rulelist { display: flex; flex-direction: column; gap: 8px; }
+  .rule { display: grid; grid-template-columns: 92px 1fr; gap: 10px; font-size: 14px; line-height: 1.45; color: var(--ink); padding: 8px 0; border-top: 1px solid var(--line-soft); }
+  .rule:first-child { border-top: 0; padding-top: 0; }
+  .rule .kind { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--policy); font-weight: 600; padding-top: 3px; }
+
+  /* ---------- aggregates ---------- */
+  .aggs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 14px; }
+  .agg { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+  .agg .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .agg h3 { font-size: 19px; flex-grow: 1; }
+  .agg .res { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .agg p.desc { font-size: 14.5px; color: var(--ink-2); line-height: 1.5; }
+  .key { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .key .tag { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--ink-2); padding-top: 3px; }
+  .key b { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--ink); }
+  .key span { display: block; font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .key.none { border-style: dashed; border-color: var(--hot-edge); background: var(--hot-soft); } .key.none b { color: var(--hot); }
+  .bound { font-size: 14.5px; line-height: 1.5; color: var(--ink); padding-left: 12px; border-left: 2px solid var(--ink); }
+  .inv { font-size: 14px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+  .inv li { padding-left: 2px; }
+  .fields { display: flex; flex-wrap: wrap; gap: 5px; }
+  .fld { font-family: var(--mono); font-size: 11.5px; padding: 3px 7px; border-radius: 4px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); }
+  .fld.ref { border-color: var(--cmd-edge); color: var(--cmd); }
+
+  /* ---------- lifecycle / diagrams ---------- */
+  .lc { display: flex; flex-direction: column; gap: 10px; }
+  .lc .t { display: flex; align-items: baseline; gap: 10px; } .lc .t h3 { font-size: 16px; } .lc .t code { color: var(--muted); }
+  .diagram { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+  .diagram pre.mmd { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: pre; }
+  .diagram svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .diagram figcaption { font-size: 12.5px; color: var(--muted); padding-top: 8px; }
+  .kind { border-radius: 4px; padding: 2px 7px; font-family: var(--mono); font-size: 11px; font-weight: 500; }
+  .kind.policy { background: var(--policy-soft); color: var(--policy); } .kind.event { background: var(--event-soft); color: var(--event); }
+  .kind.cmd, .kind.svc { background: var(--cmd-soft); color: var(--cmd); } .kind.agg { background: var(--agg-soft); color: var(--agg); }
+  .kind.lang { background: var(--lang-soft); color: var(--lang); } .kind.read { background: var(--sunk); color: var(--read); } .kind.hot { background: var(--hot-soft); color: var(--hot); }
+
+  /* ---------- EventStorming strip ---------- */
+  .strip { display: flex; flex-direction: column; gap: 10px; }
+  .sentence { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+  .sentence:first-child { border-top: 0; padding-top: 0; }
+  .sn { border-radius: 4px; padding: 9px 12px; font-family: var(--mono); font-size: 13px; border: 1px solid; box-shadow: 0 1px 0 rgba(6,27,49,.06); }
+  .sn.cmd { background: var(--cmd-soft); color: var(--cmd); border-color: var(--cmd-edge); }
+  .sn.agg { background: var(--agg-soft); color: var(--agg); border-color: var(--agg-edge); font-family: var(--sans); font-weight: 500; }
+  .sn.ev { background: var(--event-soft); color: var(--event); border-color: var(--event-edge); }
+  .sn[data-role]::before { content: attr(data-role); display: block; font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .65; margin-bottom: 3px; }
+  abbr.ref { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; color: var(--ink); font-weight: 500; }
+  .refgist { color: var(--muted); font-size: .92em; }
+  .glossary table td:first-child { font-weight: 500; color: var(--ink); white-space: nowrap; }
+  .sn.mute { background: var(--surface); color: var(--muted); border-color: var(--line); border-style: dashed; }
+  .arrow { color: var(--rule); font-size: 16px; }
+  .then { font-size: 13px; color: var(--muted); font-style: italic; }
+
+  /* ---------- blocks ---------- */
+  .bgroup { display: flex; flex-direction: column; gap: 8px; }
+  .bgroup-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; } .bgroup-head .why { font-size: 13px; color: var(--muted); }
+  .bgroup-n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .brows { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .brow { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px 12px 14px; border-left: 3px solid var(--rule); border-bottom: 1px solid var(--line-soft); }
+  .brow:last-child { border-bottom: 0; }
+  .brow.agg { border-left-color: var(--supporting); } .brow.cmd, .brow.svc { border-left-color: var(--svc); } .brow.lang { border-left-color: var(--core); }
+  .brow.event { border-left-color: #C25E0A; } .brow.policy { border-left-color: #6845B8; } .brow.read { border-left-color: var(--read); }
+  .brow-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .brow-name { font-weight: 500; font-size: 15px; }
+  .brow-purpose { font-size: 14px; line-height: 1.5; color: var(--ink-2); max-width: 90ch; }
+  .brow-list { font-size: 13.5px; color: var(--ink-2); }
+  .brow-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .ghost { border: 1px dashed var(--rule); color: var(--muted); border-radius: 4px; padding: 3px 8px; font-family: var(--mono); font-size: 11px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 1100px) { .canvas { grid-template-columns: 1fr 1fr; } .canvas .mid { grid-column: 1 / -1; order: -1; } }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .main { padding: 20px 16px 72px; }
+    .topbar { padding: 0 16px; gap: 10px; } .topmeta { display: none; }
+    .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px; }
+    .rail::-webkit-scrollbar { display: none; }
+    .rail-group { display: contents; } .rail-head { padding: 0 6px 0 10px; white-space: nowrap; }
+    .rail-item { flex: none; width: auto; min-height: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); gap: 7px; }
+    .rail-item[aria-current="true"] { border-color: var(--ink); background: var(--surface); }
+    .rail-name { font-size: 13px; white-space: nowrap; } .rail .ring { display: none; }
+    .chipnav { margin: 0 -16px; padding: 8px 16px; }
+    .band { grid-template-columns: 1fr; padding: 14px 16px; gap: 10px; } .band-label { padding-left: 0; flex-direction: row; align-items: baseline; gap: 10px; }
+    .tile { width: calc(50% - 6px); }
+    .canvas { grid-template-columns: 1fr; } .canvas .mid { order: 0; }
+    .cover { grid-template-columns: repeat(3, 1fr); } .cover a { flex-direction: row; align-items: center; } .cover a i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  }
+  @media (max-width: 560px) {
+    .tile { width: 100%; } .smap svg.edges { display: none; }
+    .rule { grid-template-columns: 1fr; gap: 2px; }
+    .sentence { gap: 6px; } .sentence .arrow { display: none; } .sentence .sn { width: 100%; }
+    .panel, .cv, .agg { padding: 16px; }
+  }
+</style>
+<header class="topbar">
+  <a class="brand" href="#" id="home"><span class="mark" id="mark">V</span><span id="app-name"></span></a>
+  <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <div class="topmeta" id="app-meta"></div>
+</header>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: false, securityLevel: "strict", theme: "base",
+    themeVariables: { fontFamily: "Instrument Sans, ui-sans-serif, system-ui, sans-serif", fontSize: "14px",
+      primaryColor: "#FFFFFF", primaryTextColor: "#061B31", primaryBorderColor: "#50617A", lineColor: "#50617A",
+      secondaryColor: "#F8FAFD", tertiaryColor: "#E5EDF5", edgeLabelBackground: "#FFFFFF" },
+    state: { useMaxWidth: true }
+  });
+  window.__mermaid = mermaid;
+  document.dispatchEvent(new Event("mermaid-ready"));
+</script>
+<div class="layout">
+  <nav class="rail" id="rail" aria-label="Domains"></nav>
+  <main class="main"><div class="wrap" id="view"></div></main>
+</div>
+
+</head>
+<body>
+<script>
+const MODEL = {"$schema":"../.claude/skills/bmad-domain-driven/references/domain-model.schema.json","application":"cashback","version":"0.1.0","generatedAt":"2026-10-30","locale":"en","status":"proposed","strategicModel":{"primaryDomain":"","classificationRationale":"","subdomains":[]},"contexts":[],"relations":[],"buildingBlocks":[],"decisions":[{"id":"d1-whole-dong-half-up","decision":"Every amount is a whole number of dong. Money rounds half-up through one shared helper.","rationale":"Python round() and JS Math.round() round half to even or toward infinity; every tool in the market shows 9,263 for 9,262.5.","status":"proposed","sources":["docs/reference/v1-handover.vi.md","docs/reference/v2-agent-rules.md"]},{"id":"d2-commission-cap","decision":"Shopee's part of a commission is capped at 40,000 dong per order. The shop's XTRA part is not capped.","rationale":"Checked on 18 of 18 products. Forgetting the cap promised almost three times the real amount.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d3-approved-commission-only","decision":"Cashback is calculated from the approved commission only, never from the estimate shown to the customer.","rationale":"The estimate changes or disappears after returns; paying from it loses money.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d4-never-pay-twice","decision":"An order with a payout time (paid_at) is never changed or paid again.","rationale":"Reconciliation runs over overlapping periods; without this lock one order is paid two or three times.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d5-guest-no-cashback","decision":"A link made without a customer code belongs to the guest account HOUSE. A guest link never earns cashback, and its orders are never moved to a customer who registers later.","rationale":"All guests are the same payee, so one link per product is enough and the operator keeps the commission.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d6-link-belongs-to-one-customer","decision":"A link belongs to exactly one customer through sub_id1. A link is reused only for the same customer; product facts (price, rates) may be shared.","rationale":"Reusing a link by product sent customer B's money to customer A in production (fixed on 2026-09-25).","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d7-sub-id-alphanumeric","decision":"Every sub_id holds letters and digits only, and one link batch never mixes customers.","rationale":"A dash silently breaks attribution; the network applies one sub_id to every link in a batch.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d8-real-browser-only","decision":"Every call to Shopee goes through the operator's real signed-in browser. No code rebuilds Shopee's signature headers or calls its internal APIs directly.","rationale":"The Open API was refused on 2026-09-10; direct calls put the whole session into captcha; forged signatures risk the affiliate account.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d9-personal-zalo-human-pace","decision":"Customer chat runs on one personal Zalo account at a human pace. No bulk messages and no bulk friend requests.","rationale":"The Zalo Bot API is gone since 2026-09-25. A locked account cuts contact with every customer at once.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d10-only-assistant-creates-customers","decision":"Only the Zalo assistant creates customers. The public web signs in or accepts an existing code; an unknown code is not found.","rationale":"The assistant has just seen the person in Zalo; the web cannot prove who someone is.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d11-no-payout-threshold","decision":"Every approved, unpaid order is payable, grouped by customer. The operator decides when to pay, so no message promises a date.","rationale":"The old 50,000 dong threshold was a rule customers could not see or act on.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d12-cashback-split","decision":"The approved commission is split as service fee 0.98%, withheld tax 10% in a withheld period, then net. Cashback is 80% of net; the operator keeps the rest.","rationale":"These are the rates the live system pays today.","status":"proposed","sources":["docs/reference/v2-agent-rules.md"]},{"id":"d13-keep-customers-who-are-owed","decision":"A customer who is still owed money is never deleted, except by an explicit forced action of the operator.","rationale":"Deleting such a customer loses a debt the operator must still pay.","status":"proposed","sources":["docs/reference/v1-handover.vi.md"]},{"id":"d14-replan-from-scratch","decision":"The platform is re-planned from scratch: domain model, UX, architecture and PRD come before any code. The current Python system and the earlier v2 TypeScript code are reference only.","rationale":"The owner wants the web and the architecture redesigned and optimized; the earlier v2 design documents are not in the repository.","status":"accepted","sources":[".context/decisions/2026-10-30-D14-replan-from-scratch.md"]},{"id":"d15-english-everywhere","decision":"Code, docs, the domain model, decisions and logs are written in English. Chat follows the person's language. Customer-facing text is Vietnamese and lives only in the message and label files.","rationale":"One ubiquitous language in documents and code; customers read Vietnamese.","status":"accepted","sources":[".context/decisions/2026-10-30-D15-english-everywhere.md"]},{"id":"d16-commit-planning-docs","decision":"Planning documents (docs/, .context/, _bmad-output/) are committed. The GitHub repository is made private first.","rationale":"The earlier v2 design documents were lost because they were never committed.","status":"accepted","sources":[".context/decisions/2026-10-30-D16-commit-planning-docs.md"]}],"openQuestions":[{"id":"oq1-storage","question":"Does the re-planned platform keep SQLite, or move to PostgreSQL?","impact":"Decides the migration path, backups and how many writers can run at once.","owner":"Architect, confirmed by the project owner","status":"open"},{"id":"oq2-stack","question":"Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)?","impact":"Decides how much of the main-v2 code can be reused.","owner":"Architect, confirmed by the project owner","status":"open"},{"id":"oq3-networks-in-scope","question":"Which affiliate networks are in the first release: Shopee only, or also TikTok Shop through AccessTrade and Lazada?","impact":"Decides whether the Affiliate Network port needs more than one adapter at launch.","owner":"Project owner","status":"open"},{"id":"oq4-network-list-owner","question":"Who owns the network list when a new affiliate network is added?","impact":"Decides which context holds network rules such as caps, sub_id format and report shape.","owner":"Architect","status":"open"},{"id":"oq5-v2-design-docs","question":"Does a copy of the earlier docs/architecture-v2 folder exist on another machine?","impact":"It would be useful reference input for the re-plan.","owner":"Project owner","status":"open"},{"id":"oq6-confirm-v1-rules","question":"Does the owner confirm D1 to D13, the rules carried over from the live system, as accepted for the new platform?","impact":"Until confirmed they stay proposed and the model treats them as candidates.","owner":"Project owner","status":"open"}],"sources":["docs/index.md","docs/reference/v1-handover.vi.md","docs/reference/v2-agent-rules.md","docs/01-business","docs/02-architecture","docs/04-reference"]};
+const FACETS = [["purpose", "Purpose & classification", "What this domain gives the business, and which subdomain it belongs to", "Purpose"], ["language", "Ubiquitous language", "The words this domain owns and defines", "Language"], ["aggregates", "Aggregates", "Data that must stay correct together, and what each aggregate holds", "Aggregates"], ["blocks", "Identity & building blocks", "How each aggregate is recognised, and its building blocks in DDD order", "Blocks"], ["lifecycle", "Lifecycle", "Each transition lists the guard that must hold before it can happen", "Lifecycle"], ["commands", "Commands & use cases", "Who may ask this domain to do what", "Commands"], ["events", "Events", "Things that happened and that other parts can react to", "Events"], ["rules", "Rules & policies", "Invariants, policies, authorization", "Rules"], ["integration", "Integration & hotspots", "Which contexts it works with, through what, and what is still unclear", "Integration"]];
+const TONES = {"aggregate-root": "agg", "entity": "agg", "value-object": "lang", "domain-primitive": "lang", "shared-kernel": "lang", "domain-event": "event", "command": "cmd", "policy": "policy", "specification": "policy", "port": "cmd", "adapter": "cmd", "anti-corruption-layer": "cmd", "domain-service": "svc", "process-manager": "svc", "factory": "svc", "repository": "read", "read-model": "read"};
+const GAP_KINDS = ["entity", "value-object", "domain-service", "repository", "specification", "policy", "read-model"];
+const KIND_ORDER = [["aggregate-root", "Aggregate root"], ["entity", "Entity"], ["value-object", "Value object"], ["domain-primitive", "Domain primitive"], ["domain-service", "Domain service"], ["factory", "Factory"], ["repository", "Repository"], ["specification", "Specification"], ["policy", "Policy"], ["command", "Command"], ["domain-event", "Domain event"], ["port", "Port"], ["adapter", "Adapter"], ["anti-corruption-layer", "Anti-corruption layer"], ["process-manager", "Process manager"], ["read-model", "Read model"], ["shared-kernel", "Shared kernel"]];
+const SHARED = "__shared__";
+// DDD terms keep their DDD wording (references/glossary.md); status adds a short hint.
+const VI = {
+  status: { observed: "observed · exists in code", target: "target · agreed goal", proposed: "proposed · not yet agreed", unknown: "unknown · unclear", accepted: "accepted · approved", superseded: "superseded · replaced", rejected: "rejected · turned down", open: "open · awaiting answer", resolved: "resolved · answered", deferred: "deferred · for later" },
+  type: { core: "core", supporting: "supporting", generic: "generic", unknown: "unknown" },
+  ruleKind: { invariant: "invariant", policy: "policy", specification: "specification", authorization: "authorization", uniqueness: "uniqueness", workflow: "workflow", rule: "rule", unknown: "unknown" },
+  relKind: { PORT: "port", EVENT: "event", REFERENCE: "reference", SHARED_KERNEL: "shared kernel", EXTERNAL: "external" },
+  lcKind: { "state-machine": "state machine", lifecycle: "lifecycle", workflow: "workflow", unknown: "" },
+  pattern: { "shared-kernel": "shared kernel", "open-host-service": "open-host service", "published-language": "published language", "customer-supplier": "customer–supplier", "anti-corruption-layer": "anti-corruption layer", conformist: "conformist", partnership: "partnership", "upstream-downstream": "upstream–downstream", "separate-ways": "separate ways" },
+};
+const GLOSSARY = [["Domain", "The business area the system serves"], ["Subdomain · core / supporting / generic", "A part of the domain, ranked by how much to invest: what makes us different / needed, but every competitor needs it / shared plumbing"], ["Bounded context", "The boundary of one model and its language. The same word may mean something else in the next context. Usually a service or package"], ["Ubiquitous language", "The vocabulary shared by the business and the code inside one context"], ["Aggregate / aggregate root", "Data that must stay correct together. Every change goes through one door, the aggregate root"], ["Entity", "A thing with its own identity that lives over time"], ["Value object", "A value with no identity, compared by content (Money, Weight)"], ["Domain primitive", "A single value type with constraints (Symbol, Price)"], ["Invariant", "What must never be false inside an aggregate"], ["Rule · policy / specification / authorization / uniqueness / workflow", "A named business rule: a decision that may change / a condition to check / who may do what / no duplicates / order of steps"], ["Lifecycle · state / transition / guard", "The states an aggregate moves through; the step between them; the condition that must hold before the step"], ["Command", "A request to do something (confirm, approve). It can be refused"], ["Event", "Something that already happened, in past tense (order.approved). Other parts can react to it"], ["Use case", "What a user does with the domain, usually several commands"], ["Building block", "A named DDD piece in the model: aggregate, entity, value object, service, port…"], ["Domain service", "A business operation that belongs to no single aggregate"], ["Repository / factory", "The door to read and write one aggregate / the place that creates an aggregate when creation has many rules"], ["Port / adapter", "The interface a context declares to call out or be called / the implementation for one concrete system (Shopee browser bridge, AccessTrade API)"], ["Anti-corruption layer (ACL)", "A layer that translates an outside language into our own"], ["Process manager", "A process that coordinates several aggregates over time (a job that expires a reservation)"], ["Read model", "Read-only data built from other sources for display and reports. It holds no rules"], ["Shared kernel", "A small part of the model two sides own together, such as the shared money package"], ["Context map pattern", "How two contexts relate: open-host service, published language, customer–supplier, conformist, partnership, ACL, separate ways"], ["EventStorming", "Reading a domain as a sentence: actor → command → aggregate → event ← policy. The colours on the page follow this convention"], ["Hotspot / open question (OQ)", "An unclear or disputed point, recorded as an open question with an owner who answers"], ["Decision (D)", "A decision agreed with the project owner. Cite the code D<n> with a short gist each time"], ["Status · observed / target / proposed / unknown", "exists in code / agreed goal, not yet coded / proposed, not yet agreed / unclear"]];
+const BUSINESS_GLOSSARY = [["Affiliate network", "A program that pays a commission for purchases it can trace to a partner link: Shopee Affiliate, TikTok Shop through AccessTrade, Lazada"], ["Affiliate link", "A product link that carries the operator's affiliate id and a sub_id. A purchase through it earns a commission"], ["Link request", "One customer's request to turn one product URL into an affiliate link. It belongs to exactly one customer"], ["sub_id", "A tag on an affiliate link that the network reports back with each order. sub_id1 is the customer id. Letters and digits only"], ["Share link", "The operator's own short link (hoantiendp.com/s/<code>) that redirects to one affiliate link. One per link request"], ["Link click", "One visit to a share link by a person. Preview bots do not count"], ["Link delivery", "The moment a customer receives a finished link, in chat or on the web. A delivered link is never sent again"], ["Attribution window", "The days after a link request during which a repeat request reuses its link. It is not the link's expiry; a link never expires"], ["Customer", "A person who earns cashback. Identified by a customer id that never changes, and shown a customer code"], ["Customer id", "The permanent identity of a customer, today the Zalo UID. It is written in sub_id1 of every link the customer received"], ["Customer code", "The short code a customer sees and signs in with, for example DP00012. Never reused after deletion"], ["Customer alias", "An old customer id kept after a merge, so orders on old links still reach the right customer"], ["Guest account (HOUSE)", "The account that owns links made without a customer code. The operator keeps the commission; cashback is always 0"], ["Staff", "A team member account. Staff never hold a campaign slot"], ["Product lookup", "Reading a product's price and commission rates from the network before a link is made. Reads page 1 only"], ["Estimated commission", "The commission the network predicts when an order is placed. Shown for reference only, never paid from"], ["Approved commission", "The commission the network confirms after the return window. The only base for cashback"], ["Commission cap", "Shopee caps its own part of a commission at 40,000 dong per order. The shop's XTRA part has no cap"], ["XTRA commission", "The extra commission a shop adds on top of Shopee's rate. Not covered by the commission cap"], ["Commission split", "How an approved commission is divided: service fee 0.98%, withheld tax 10% in a withheld period, then net"], ["Cashback", "The customer's share of the net commission, 80%, rounded half-up to a whole dong"], ["Operator share", "The net commission minus the cashback. What the operator keeps"], ["Order", "One purchase the network reports, attributed to a customer through sub_id1 of the link it came from"], ["Order approval", "The network confirms an order's commission. The cashback becomes owed to the customer"], ["Order cancellation", "The network rejects an order. No cashback is owed"], ["Reconciliation", "Matching the network's conversion report to link requests and orders. Runs over overlapping periods, so it must be idempotent"], ["Payout", "One bank transfer to one customer that covers all of their approved, unpaid orders. The operator decides when to pay"], ["Paid order", "An order with a payout time (paid_at). It is never changed or paid again"], ["Bank account", "Where a customer receives payouts. A missing bank account is the only thing that blocks a payout"], ["Dong (VND)", "The money unit. Every amount is a whole number of dong; no fractions are stored"], ["Half-up rounding", "Money rounds .5 upwards (9,262.5 becomes 9,263), unlike banker's rounding"], ["Example amount", "A worked amount in dong shown next to every percentage, because a percentage alone is misread as a share of the price"], ["Campaign", "A limited event that gives a bonus to the first N qualifying orders recorded inside its time window"], ["Campaign slot", "One of a campaign's N places. It belongs to an order, not a person, and passes on if that order is cancelled during the event"], ["Held slot / bonus", "A slot whose order is not yet approved is held. The bonus is paid only with the approved order's cashback"], ["Zalo assistant", "The personal Zalo account that answers customers in chat and delivers links. Losing it cuts contact with every customer"], ["Notification", "A message the system starts on its own: late link, order recorded, order approved, payout sent"], ["Browser bridge", "The Chrome extension that runs short scripts in the operator's signed-in affiliate tab to make links and read rates"], ["Link queue", "The ordered list of link requests waiting for the browser bridge. Zalo first, then web customers, then guests"], ["Web quota", "The limit on links made from the website: 60 per hour for the whole site, 20 per day per customer code"], ["Deal", "A featured product the operator shows on the website"], ["Customer message", "Any text a customer reads. Lives only in the message files, never in code"]];
+// D12 / OQ8 -> short gist, so a reader never has to go and look a code up.
+const REFS = (() => { const out = {}; const gist = (t) => { t = String(t || "").replace(/\s+/g, " ").trim(); let o = ""; for (const p of t.split(/(?<=[.;])\s/)) { if (o && o.length >= 60) break; o = (o + " " + p).trim(); } o = o.replace(/\s*\[[^\]]*\]\s*$/, "").replace(/[.; ]+$/, ""); return o.length <= 120 ? o : o.slice(0, 117).trimEnd() + "…"; };
+  for (const d of (MODEL.decisions || [])) { const m = /^d(\d+)-/.exec(d.id || ""); if (m) { let g = gist(d.decision); if (d.status === "superseded") { const by = /^d(\d+)-/.exec(d.supersededBy || ""); g = (by ? "superseded by D" + by[1] : "superseded") + ": " + g; } out["D" + m[1]] = { gist: g, full: d.decision }; } }
+  for (const q of (MODEL.openQuestions || [])) { const m = /^oq(\d+)-/.exec(q.id || ""); if (m) out["OQ" + m[1]] = { gist: gist(q.question), full: q.question }; }
+  return out; })();
+const REF_RE = /\b(D|OQ)(\d{1,3})\b(?![-\w])(?=[^(]|$)/g;
+function annotateRefs(root) {
+  const skip = new Set(["CODE", "PRE", "ABBR", "SCRIPT", "STYLE", "SVG"]);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => { let p = n.parentElement; while (p && p !== root) { if (skip.has(p.tagName) || p.classList.contains("k") || p.classList.contains("sn") || p.classList.contains("fld") || p.classList.contains("res") || p.classList.contains("refgist")) return NodeFilter.FILTER_REJECT; p = p.parentElement; } return REF_RE.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+  const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const frag = document.createDocumentFragment(); let last = 0; const text = n.nodeValue; REF_RE.lastIndex = 0; let m;
+    while ((m = REF_RE.exec(text))) { const key = m[0]; const ref = REFS[key]; if (!ref) continue;
+      frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const ab = document.createElement("abbr"); ab.className = "ref"; ab.title = ref.full; ab.textContent = key; frag.appendChild(ab);
+      const after = text.slice(m.index + key.length); const before = text.slice(Math.max(0, m.index - 1), m.index);
+      if (!/^\s*[(—:]/.test(after)) { const g = document.createElement("span"); g.className = "refgist"; g.textContent = (before === "(" || /^\)/.test(after)) ? ": " + ref.gist : " (" + ref.gist + ")"; frag.appendChild(g); }
+      last = m.index + key.length; }
+    frag.appendChild(document.createTextNode(text.slice(last))); n.parentNode.replaceChild(frag, n);
+  }
+}
+const vi = (map, k) => (VI[map] && VI[map][k]) || k || "";
+
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const arr = (v) => Array.isArray(v) ? v : [];
+const contexts = arr(MODEL.contexts);
+const blocks = arr(MODEL.buildingBlocks);
+const relations = arr(MODEL.relations);
+const byId = new Map(contexts.map((c) => [c.id, c]));
+const tone = (kind) => TONES[kind] || "read";
+const mid = (v) => String(v ?? "").replace(/[^A-Za-z0-9_]/g, "_");
+const nameOf = (id) => (byId.get(id) || {}).name || id;
+const typeOf = (id) => (byId.get(id) || {}).domainType || "unknown";
+
+// ---------------------------------------------------------------- derivations
+const ownBlocks = (cid) => blocks.filter((b) => b.context === cid);
+const sharedBlocks = () => blocks.filter((b) => !b.context);
+const aggsOf = (c) => arr(c && c.aggregates);
+const relsOf = (cid) => relations.filter((r) => r.from === cid || r.to === cid);
+const ID_RE = /(code|_id|id|uid|ref|number|no)$/i;
+function identityOf(a) {
+  const fields = arr(a.fields).filter((f) => f.identity !== false);
+  const flagged = fields.filter((f) => f.identity === true);
+  const strong = fields.filter((f) => f.kind === "primitive" && f.required && f.readOnly);
+  const named = fields.filter((f) => f.kind === "primitive" && (ID_RE.test(String(f.type || "")) || /(^|_)(code|uid|number|no)$/i.test(String(f.name || ""))));
+  const pick = flagged[0] || strong[0] || named[0];
+  if (!pick) return null;
+  const prim = blocks.find((b) => b.kind === "domain-primitive" && b.aggregate === a.id && (b.name === pick.type || (b.name || "").includes(pick.type)));
+  const rule = arr(a.invariants).find((i) => i.toLowerCase().includes(String(pick.name).toLowerCase()) || i.includes(String(pick.type)));
+  return { field: pick.name, type: pick.type, note: (prim && prim.purpose) || pick.description || rule || "" };
+}
+function termsOf(cid) {
+  const kinds = new Set(["value-object", "domain-primitive", "shared-kernel"]);
+  const out = ownBlocks(cid).filter((b) => kinds.has(b.kind)).map((b) => ({ name: b.name, note: b.purpose, src: b.kind }));
+  const seen = new Set(out.map((t) => t.name));
+  for (const a of aggsOf(byId.get(cid))) for (const f of arr(a.fields)) {
+    if ((f.kind === "value-object" || f.kind === "entity") && f.type && !seen.has(f.type) && !/^(json|string|datetime|date|boolean|integer|float|number|enum)$/i.test(f.type)) { seen.add(f.type); out.push({ name: f.type, note: `Type of field ${f.name} on ${a.name}` + (f.description ? `: ${f.description}` : ""), src: f.kind }); }
+  }
+  return out;
+}
+const lifecyclesOf = (cid) => aggsOf(byId.get(cid)).filter((a) => a.lifecycle && arr(a.lifecycle.states).length).map((a) => ({ agg: a.name, lc: a.lifecycle }));
+function commandsOf(cid) {
+  const c = byId.get(cid);
+  const out = arr(c && c.useCases).map((u) => ({ name: u.name || u, note: u.description, from: u.actor || "use case" }));
+  const seen = new Set(out.map((o) => o.name));
+  for (const { agg, lc } of lifecyclesOf(cid)) for (const t of arr(lc.transitions)) {
+    const key = agg + "." + t.action; if (seen.has(key)) continue; seen.add(key);
+    out.push({ name: t.action, note: t.description || `${t.from} → ${t.to}`, from: agg });
+  }
+  for (const b of ownBlocks(cid).filter((b) => b.kind === "command")) out.push({ name: b.name, note: b.purpose, from: "command" });
+  return out;
+}
+function eventsOf(cid) {
+  const c = byId.get(cid);
+  const out = arr(c && c.events).map((e) => ({ name: e.name || e, id: e.id, note: e.description, from: "declared", consumers: arr(e.consumers) }));
+  const seen = new Set(out.map((o) => o.name).concat(out.map((o) => o.id)));
+  const push = (name, note, from) => { if (name && !seen.has(name)) { seen.add(name); out.push({ name, note, from, consumers: [] }); } };
+  for (const a of aggsOf(c)) for (const e of arr(a.events)) push(e.name || e, e.description, a.name);
+  for (const { agg, lc } of lifecyclesOf(cid)) for (const t of arr(lc.transitions)) for (const e of arr(t.emits)) push(e, `Emitted on ${t.action}`, agg);
+  for (const b of ownBlocks(cid).filter((b) => b.kind === "domain-event")) push(b.name, b.purpose, "building block");
+  return out;
+}
+function flowsOf(cid) {
+  const out = [];
+  for (const { agg, lc } of lifecyclesOf(cid)) for (const t of arr(lc.transitions)) for (const e of arr(t.emits)) out.push({ cmd: t.action, agg, event: e, side: arr(t.sideEffects).join("; ") });
+  return out;
+}
+function mutesOf(cid) {
+  const emitting = new Set(flowsOf(cid).map((f) => f.cmd)); const all = new Set();
+  for (const { lc } of lifecyclesOf(cid)) for (const t of arr(lc.transitions)) all.add(t.action);
+  return [...all].filter((a) => !emitting.has(a));
+}
+function rulesOf(cid) {
+  const c = byId.get(cid);
+  const out = arr(c && c.rules).map((r) => ({ ...r, on: c.name }));
+  for (const a of aggsOf(c)) { for (const r of arr(a.rules)) out.push({ ...r, on: a.name }); for (const inv of arr(a.invariants)) out.push({ description: inv, kind: "invariant", on: a.name }); }
+  for (const b of ownBlocks(cid).filter((b) => b.kind === "policy" || b.kind === "specification")) out.push({ id: b.id, description: b.purpose, kind: b.kind, on: b.aggregate || (c && c.name) });
+  return out;
+}
+const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const touches = (item, ctx) => {
+  if (Array.isArray(item.contexts)) return item.contexts.includes(ctx.id);
+  const text = JSON.stringify(Object.fromEntries(Object.entries(item).filter(([k]) => k !== "id")));
+  if (new RegExp("(^|[^\\w-])" + escRe(ctx.id) + "\\.[a-z]").test(text)) return true;
+  return !!ctx.name && text.toLowerCase().includes(ctx.name.toLowerCase());
+};
+const questionsTouching = (ctx) => arr(MODEL.openQuestions).filter((q) => touches(q, ctx));
+const decisionsTouching = (ctx) => arr(MODEL.decisions).filter((d) => touches(d, ctx));
+function counts(cid) {
+  const c = byId.get(cid); const own = cid === SHARED ? sharedBlocks() : ownBlocks(cid);
+  return { purpose: (c && (c.businessCapability || c.description)) ? 1 : 0, language: termsOf(cid).length, aggregates: aggsOf(c).length, blocks: own.length,
+    lifecycle: lifecyclesOf(cid).length, commands: commandsOf(cid).length, events: eventsOf(cid).length, rules: rulesOf(cid).length, integration: relsOf(cid).length + questionsTouching(c || { id: cid }).length };
+}
+const domains = [
+  ...contexts.map((c) => ({ id: c.id, name: c.name || c.id, type: c.domainType || "unknown", ctx: c })),
+  ...(sharedBlocks().length ? [{ id: SHARED, name: "Shared kernel", type: "generic", ctx: null }] : []),
+];
+const filledOf = (id) => { const n = counts(id); return FACETS.filter((f) => n[f[0]]).length; };
+
+// ---------------------------------------------------------------- atoms
+let state = { view: "landscape" };
+const chip = (t, cls) => `<span class="chip ${cls || ""}">${esc(t)}</span>`;
+const statusChip = (st) => st ? chip(vi("status", st), (st === "target" || st === "proposed" || st === "unknown") ? "hot" : ((st === "observed" || st === "accepted") ? "" : "quiet")) : "";
+const typeChip = (t) => `<span class="chip ${esc(t)} up"><i class="dot ${esc(t)}"></i>${esc(vi("type", t))}</span>`;
+const plural = (n, one) => `${n} ${one}`;
+const empty = (what, why) => `<div class="empty"><b>${esc(what)}: nothing recorded.</b> ${esc(why)}</div>`;
+const table = (head, rows) => rows.length ? `<div class="tablewrap"><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>` : "";
+const ring = (filled, total) => { const r = 6, c = 2 * Math.PI * r; return `<svg class="ring" viewBox="0 0 16 16" aria-hidden="true"><circle class="bg" cx="8" cy="8" r="${r}"/><circle class="fg" cx="8" cy="8" r="${r}" stroke-dasharray="${(c * filled / total).toFixed(2)} ${c.toFixed(2)}"/></svg>`; };
+const diagram = (code, caption) => `<figure class="diagram"><pre class="mmd">${esc(code)}</pre>${caption ? `<figcaption>${esc(caption)}</figcaption>` : ""}</figure>`;
+function lifecycleMermaid(lc) {
+  const lines = ["stateDiagram-v2", "  direction LR", `  [*] --> ${mid(lc.initial)}`];
+  const trans = arr(lc.transitions);
+  for (const t of trans) { const g = arr(t.guards).map((x) => x.split(".").pop()).join(", "); lines.push(`  ${mid(t.from)} --> ${mid(t.to)}: ${String(t.action).replace(/[<>"]/g, "")}${g ? " [" + g.replace(/[<>"]/g, "") + "]" : ""}`); }
+  for (const st of arr(lc.states)) { const n = st.name || st; if (st.terminal || !trans.some((t) => t.from === n)) lines.push(`  ${mid(n)} --> [*]`); }
+  return lines.join("\n");
+}
+async function drawDiagrams() {
+  const m = window.__mermaid;
+  if (!m) { document.addEventListener("mermaid-ready", drawDiagrams, { once: true }); return; }
+  const nodes = [...document.querySelectorAll("pre.mmd:not([data-processed])")];
+  if (nodes.length) { try { await m.run({ nodes }); } catch (e) { console.warn("mermaid", e); } }
+}
+
+// ---------------------------------------------------------------- landscape
+const qaDate = (x) => { for (const src of arr(x.sources)) { const m = /(\d{4}-\d{2}-\d{2})/.exec(String(src)); if (m) return m[1]; } return ""; };
+const qaNum = (id) => { const m = /(\d+)/.exec(String(id || "")); return m ? parseInt(m[1], 10) : 0; };
+const ctxLinks = (ids) => arr(ids).map((cid) => { const c = byId.get(cid); return c ? `<a href="#" data-go="${esc(cid)}">${esc(c.name)}</a>` : esc(cid); }).join(", ");
+function renderQA() {
+  const qs = arr(MODEL.openQuestions).slice().sort((a, b) => qaNum(b.id) - qaNum(a.id));
+  const open = qs.filter((q) => (q.status || "open") === "open"), deferred = qs.filter((q) => q.status === "deferred"), resolved = qs.filter((q) => q.status === "resolved");
+  const ds = arr(MODEL.decisions).slice().sort((a, b) => qaNum(b.id) - qaNum(a.id));
+  const proposed = ds.filter((d) => d.status === "proposed"), accepted = ds.filter((d) => (d.status || "accepted") === "accepted"), rejected = ds.filter((d) => d.status === "rejected" || d.status === "superseded");
+  const qCode = (q) => { const m = /^oq-?(\d+)/i.exec(q.id || ""); return m ? "OQ" + m[1] : esc(q.id); };
+  const dCode = (d) => { const m = /^d(\d+)/i.exec(d.id || ""); return m ? "D" + m[1] : esc(d.id); };
+  const qRows = (list) => list.map((q) => `<tr><td class="k">${qCode(q)}</td><td>${esc(q.question)}</td><td>${esc(q.impact || "")}</td><td>${ctxLinks(q.contexts)}</td><td>${esc(q.owner || "")}</td><td>${chip(vi("status", q.status || "open"), (q.status || "open") === "open" ? "hot" : "quiet")}</td></tr>`);
+  const byOwner = {}; for (const q of open) { const k = q.owner || "unassigned"; (byOwner[k] = byOwner[k] || []).push(q); }
+  const ownerGroups = Object.keys(byOwner).sort((a, b) => byOwner[b].length - byOwner[a].length).map((k) => `<div class="bgroup"><div class="bgroup-head"><span class="lbl">${esc(k)}</span><span class="bgroup-n">${byOwner[k].length}</span></div>${table(["Code", "Question", "Impact", "Context", "Who answers", "Status"], qRows(byOwner[k]))}</div>`).join("");
+  const dRows = (list) => list.map((d) => `<tr><td class="k">${dCode(d)}</td><td class="k">${esc(qaDate(d))}</td><td>${esc(d.decision)}</td><td>${esc((d.supersededBy ? "Superseded by " + dCode({ id: d.supersededBy }) + ". " : "") + (d.rationale || ""))}</td><td>${ctxLinks(d.contexts)}</td><td>${chip(vi("status", d.status || "accepted"), d.status === "proposed" ? "hot" : (d.status === "rejected" || d.status === "superseded") ? "quiet" : "")}</td></tr>`);
+  const dHead = ["Code", "Date", "Decision", "Why", "Context", "Status"];
+  return `<header class="hero"><div><h1>Q&amp;A</h1><p class="sub">Every open question and every decision of the domain, in one place. Questions are grouped by who must answer. Decisions are newest first. Decide in the meeting, then record the result in <code>.context/decisions</code> and the model. This page only reflects it.</p></div>
+      <div class="stats"><div class="stat"><b style="color:${open.length ? "var(--hot)" : "inherit"}">${open.length}</b><span>open</span></div><div class="stat"><b>${deferred.length}</b><span>deferred</span></div><div class="stat"><b>${resolved.length}</b><span>resolved</span></div><div class="stat"><b style="color:${proposed.length ? "var(--hot)" : "inherit"}">${proposed.length}</b><span>proposed</span></div><div class="stat"><b>${accepted.length}</b><span>accepted</span></div></div></header>
+    <section class="sec" id="qa-open"><div class="sec-head"><h2>Open questions</h2><span class="why">By who answers, most questions first</span><span class="n">${open.length}</span></div>${open.length ? ownerGroups : empty("Open questions", "No open questions left.")}</section>
+    ${deferred.length ? `<section class="sec"><details class="fold"><summary>Deferred · ${deferred.length}</summary><div style="margin-top:8px">${table(["Code", "Question", "Reopen when", "Context", "Who answers", "Status"], qRows(deferred))}</div></details></section>` : ""}
+    ${resolved.length ? `<section class="sec"><details class="fold"><summary>Answered · ${resolved.length}</summary><div style="margin-top:8px">${table(["Code", "Question", "Answer", "Context", "Who answers", "Status"], qRows(resolved))}</div></details></section>` : ""}
+    <section class="sec" id="qa-decisions"><div class="sec-head"><h2>Decisions</h2><span class="why">Log in time order, newest first. Proposals not yet signed off by the project owner are in red</span><span class="n">${ds.length}</span></div>
+      ${proposed.length ? `<div class="bgroup"><div class="bgroup-head"><span class="lbl">Proposed, awaiting sign-off</span><span class="bgroup-n">${proposed.length}</span></div>${table(dHead, dRows(proposed))}</div>` : ""}
+      <div class="bgroup"><div class="bgroup-head"><span class="lbl">Accepted</span><span class="bgroup-n">${accepted.length}</span></div>${table(dHead, dRows(accepted))}</div>
+      ${rejected.length ? `<details class="fold"><summary>Rejected or superseded · ${rejected.length}</summary><div style="margin-top:8px">${table(dHead, dRows(rejected))}</div></details>` : ""}
+    </section>`;
+}
+function renderLandscape() {
+  const sm = MODEL.strategicModel || {};
+  const nAgg = contexts.reduce((n, c) => n + aggsOf(c).length, 0);
+  const nq = arr(MODEL.openQuestions).filter((q) => (q.status || "open") === "open").length;
+  const observed = contexts.filter((c) => c.status === "observed").length;
+  const bands = [["core", "Core", "Invest here: what makes the platform different"], ["supporting", "Supporting", "Needed, but every competitor needs it"], ["generic", "Generic", "Plumbing: buy or keep thin"], ["unknown", "Unknown", "Not classified: decide before building"]];
+  const tiles = (type) => domains.filter((d) => d.type === type).map((d) => {
+    const c = d.ctx || {}; const f = filledOf(d.id);
+    return `<button class="tile ${esc(d.type)} ${c.status === "target" ? "target" : ""}" data-tile="${esc(d.id)}" data-go="${esc(d.id)}" title="${esc(d.name)}">
+      <h3>${esc(d.name)}</h3>
+      ${c.label ? `<span class="addon">${esc(c.label)}</span>` : `<span class="addon">${c.status === "target" ? "no code yet" : ""}</span>`}
+      <span class="foot"><span>${plural(aggsOf(c).length, "aggregate")}</span><span style="display:inline-flex;align-items:center;gap:5px">${ring(f, FACETS.length)}${f}/${FACETS.length}</span></span>
+    </button>`;
+  }).join("");
+  const bandHtml = bands.filter(([t]) => domains.some((d) => d.type === t)).map(([t, label, why]) =>
+    `<div class="band ${t}"><div class="band-label"><b>${label}</b><span>${why}</span></div><div class="tiles">${tiles(t)}</div></div>`).join("");
+  return `<header class="hero">
+      <div><h1>Domain map ${esc(MODEL.application || "")}</h1>
+        <p class="sub">${esc(contexts.length)} bounded context, ${observed} observed (exists in code). Click a tile to read that context's dossier. Hover a tile to see who it talks to. DDD terms keep their DDD wording; see <a href="#glossary" data-go-glossary>Glossary</a>.</p>
+        <div class="meta" style="margin-top:10px">${chip("v" + (MODEL.version || "?"), "quiet")}${MODEL.status ? chip(MODEL.status, MODEL.status === "proposed" ? "hot" : "") : ""}${MODEL.generatedAt ? chip(MODEL.generatedAt, "quiet") : ""}</div></div>
+      <div class="stats"><div class="stat"><b>${contexts.length}</b><span>contexts</span></div><div class="stat"><b>${nAgg}</b><span>aggregates</span></div><div class="stat"><b>${relations.length}</b><span>relations</span></div><div class="stat"><b style="color:${nq ? "var(--hot)" : "inherit"}">${nq}</b><span>open questions</span></div></div>
+    </header>
+    <section class="sec"><div class="sec-head"><h2>Strategic map</h2><span class="why">Each row is a subdomain type, which means a level of investment. Hover a tile to light up its links. Solid lines exist in code, dashed lines are planned.</span></div>
+      <div class="smap" id="smap"><svg class="edges" aria-hidden="true"></svg>${bandHtml}</div>
+      <div class="legend"><span><i></i>port (direct call)</span><span><i class="ev"></i>event (emitted, the other side listens)</span><span><i class="ref"></i>reference (data link)</span><span><i class="tg"></i>target (dashed tile = no code yet)</span><span>Shared kernel (Platform) has no links drawn. Every context uses it.</span></div>
+    </section>
+    ${sm.classificationRationale ? `<details class="fold"><summary>Why this classification</summary><div class="panel" style="margin-top:8px;font-size:15px;color:var(--ink-2);max-width:80ch">${esc(sm.classificationRationale)}</div></details>` : ""}
+    <section class="sec glossary" id="glossary"><div class="sec-head"><h2>Glossary</h2><span class="why">Business language, then DDD terms. One line per word, written the way the team says it</span></div>
+      <details class="fold" open><summary>Business language · ${BUSINESS_GLOSSARY.length} terms</summary><div style="margin-top:8px">${table(["Term", "Meaning"], BUSINESS_GLOSSARY.map(([t, m]) => `<tr><td>${esc(t)}</td><td>${esc(m)}</td></tr>`))}</div></details>
+      <details class="fold" id="glossary-ddd"><summary>DDD terms · ${GLOSSARY.length} terms</summary><div style="margin-top:8px">${table(["Term", "Meaning"], GLOSSARY.map(([t, m]) => `<tr><td>${esc(t)}</td><td>${esc(m)}</td></tr>`))}</div></details></section>
+    ${nq ? `<section class="sec"><div class="sec-head"><h2>Open questions</h2><span class="why">Recorded here, decided in the meeting, never decided on this page</span><span class="n">${nq}</span><a href="#" data-go="qa" style="font-size:14px">See every question and the decision log in Q&amp;A</a></div><div class="grid2">${arr(MODEL.openQuestions).filter((q) => (q.status || "open") === "open").map((q) =>
+      `<div class="hot"><p>${esc(q.question)}</p><span class="sub">${q.impact ? esc(q.impact) + " " : ""}${q.owner ? `<b>· who answers: ${esc(q.owner)}</b>` : ""}</span></div>`).join("")}</div></section>` : ""}`;
+}
+function drawMapEdges() {
+  const map = document.querySelector("#smap"); if (!map) return;
+  const svg = map.querySelector("svg.edges"); const R = map.getBoundingClientRect();
+  const pos = (id) => { const el = map.querySelector(`[data-tile="${CSS.escape(id)}"]`); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left - R.left + b.width / 2, y: b.top - R.top + b.height / 2, w: b.width, h: b.height }; };
+  svg.setAttribute("viewBox", `0 0 ${R.width} ${R.height}`);
+  const paths = [];
+  for (const r of relations) {
+    if (r.kind === "SHARED_KERNEL") continue;
+    const a = pos(r.from), b = pos(r.to); if (!a || !b) continue;
+    let x1 = a.x, y1 = a.y, x2 = b.x, y2 = b.y, d;
+    if (Math.abs(a.y - b.y) > a.h) { y1 = b.y > a.y ? a.y + a.h / 2 : a.y - a.h / 2; y2 = b.y > a.y ? b.y - b.h / 2 : b.y + b.h / 2; const dy = (y2 - y1) / 2; d = `M${x1},${y1} C${x1},${y1 + dy} ${x2},${y2 - dy} ${x2},${y2}`; }
+    else { x1 = b.x > a.x ? a.x + a.w / 2 : a.x - a.w / 2; x2 = b.x > a.x ? b.x - b.w / 2 : b.x + b.w / 2; const dx = (x2 - x1) / 2; const bow = (a.y === b.y ? -22 : 0); d = `M${x1},${y1} C${x1 + dx},${y1 + bow} ${x2 - dx},${y2 + bow} ${x2},${y2}`; }
+    paths.push(`<path d="${d}" class="e-${r.kind.toLowerCase()} ${r.status === "target" ? "target" : ""}" data-from="${esc(r.from)}" data-to="${esc(r.to)}" marker-end="url(#arr)"/>`);
+  }
+  svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="context-stroke"/></marker></defs>${paths.join("")}`;
+  map.querySelectorAll(".tile").forEach((t) => {
+    t.addEventListener("mouseenter", () => { const id = t.dataset.tile; map.classList.add("focus");
+      svg.querySelectorAll("path").forEach((p) => p.classList.toggle("on", p.dataset.from === id || p.dataset.to === id));
+      const linked = new Set([id]); svg.querySelectorAll("path.on").forEach((p) => { linked.add(p.dataset.from); linked.add(p.dataset.to); });
+      map.querySelectorAll(".tile").forEach((x) => x.classList.toggle("on", linked.has(x.dataset.tile))); });
+    t.addEventListener("mouseleave", () => { map.classList.remove("focus"); map.querySelectorAll(".on").forEach((x) => x.classList.remove("on")); });
+  });
+}
+
+// ---------------------------------------------------------------- dossier
+const SECTIONS = [
+  ["canvas", "Canvas", (n) => n.purpose + n.language + n.commands + n.events + n.rules],
+  ["aggregates", "Aggregates", (n) => n.aggregates],
+  ["lifecycle", "Lifecycle", (n) => n.lifecycle],
+  ["flow", "Events", (n) => n.events],
+  ["blocks", "Building blocks", (n) => n.blocks],
+  ["rules", "Rules", (n) => n.rules],
+  ["integration", "Integration", (n) => n.integration],
+];
+function renderDomain(id) {
+  const d = domains.find((x) => x.id === id); if (!d) return renderLandscape();
+  const c = d.ctx || {}; const n = counts(id); const gaps = FACETS.filter((f) => !n[f[0]]);
+  const head = `<header class="dhead">
+    <div class="row"><h1>${esc(d.name)}</h1>${typeChip(d.type)}${statusChip(c.status)}</div>
+    ${c.businessCapability ? `<p class="cap">${esc(c.businessCapability)}</p>` : ""}
+    <div class="row">${c.label ? `<span class="chip"><code>${esc(c.label)}</code></span>` : ""}${c.strategicImportance ? chip("importance · " + c.strategicImportance) : ""}${arr(c.contextMapPatterns).map((p) => chip(vi("pattern", p), "quiet")).join("")}${c.owner ? chip("owner · " + c.owner, "quiet") : ""}</div>
+    <div class="cover" title="${FACETS.length - gaps.length}/${FACETS.length} facets filled">${FACETS.map((f) => `<a href="#f-${sectionFor(f[0])}" class="${n[f[0]] ? "" : "gap"}"><i></i><span>${esc(f[3])}</span></a>`).join("")}</div>
+  </header>
+  <nav class="chipnav" id="chipnav" aria-label="Sections">${SECTIONS.map(([k, label, cnt]) => `<a href="#f-${k}">${label}<span class="n">${cnt(n)}</span></a>`).join("")}</nav>`;
+  const secs = [
+    sec("canvas", "Bounded Context Canvas", "Inbound: who calls in · middle: what this context owns · Outbound: what it emits", fCanvas(d)),
+    sec("aggregates", "Aggregates", "Each aggregate is data that must stay correct together, recognised by one identity", fAggregates(d)),
+    sec("lifecycle", "Lifecycle", "Each arrow reads: command [guard that must hold]", fLifecycle(d)),
+    sec("flow", "Event flow", "command → aggregate → event, read from the lifecycle (EventStorming)", fFlow(d)),
+    sec("blocks", "Identity & building blocks", "Identity of each aggregate, and the building blocks in DDD order", fBlocks(d)),
+    sec("rules", "Rules & policies", "Invariants, policies, specifications, authorization: the named rules of this context", fRules(d)),
+    sec("integration", "Integration & open questions", "Which contexts it works with, through what; what is unclear; related decisions", fIntegration(d)),
+  ];
+  return head + secs.join("");
+}
+const sectionFor = (facet) => ({ purpose: "canvas", language: "canvas", commands: "canvas", events: "flow", aggregates: "aggregates", blocks: "blocks", lifecycle: "lifecycle", rules: "rules", integration: "integration" })[facet] || "canvas";
+const sec = (k, title, why, body) => `<section class="sec" id="f-${k}"><div class="sec-head"><h2>${esc(title)}</h2><span class="why">${esc(why)}</span></div>${body}</section>`;
+
+function fCanvas(d) {
+  const c = d.ctx; const id = d.id;
+  const inb = relsOf(id).filter((r) => r.to === id && r.kind !== "SHARED_KERNEL");
+  const outb = relsOf(id).filter((r) => r.from === id && r.kind !== "SHARED_KERNEL");
+  const msg = (cls, title, who, note) => `<div class="msg ${cls}"><b>${esc(title)}</b>${note ? `<span>${esc(note)}</span>` : ""}${who ? `<span class="who">${esc(who)}</span>` : ""}</div>`;
+  const inbound = [
+    ...inb.filter((r) => r.kind !== "EVENT").map((r) => msg("cmd", r.via || vi("relKind", r.kind), "from " + nameOf(r.from) + (r.status === "target" ? " · target" : ""), r.description)),
+    ...inb.filter((r) => r.kind === "EVENT").map((r) => msg("ev", r.via || "event", "listens to " + nameOf(r.from) + (r.status === "target" ? " · target" : ""), r.description)),
+    ...commandsOf(id).filter((x) => x.from !== "command").slice(0, 8).map((x) => msg("cmd", x.name, "command on " + x.from, x.note)),
+  ];
+  const outbound = [
+    ...outb.filter((r) => r.kind === "EVENT").map((r) => msg("ev", r.via || "event", "to " + nameOf(r.to) + (r.status === "target" ? " · target" : ""), r.description)),
+    ...outb.filter((r) => r.kind !== "EVENT").map((r) => msg("cmd", r.via || vi("relKind", r.kind), "calls " + nameOf(r.to) + (r.status === "target" ? " · target" : ""), r.description)),
+  ];
+  const terms = termsOf(id);
+  const rules = rulesOf(id).filter((r) => r.kind === "policy" || r.kind === "invariant").slice(0, 6);
+  const sm = MODEL.strategicModel || {}; const sub = arr(sm.subdomains).find((s) => arr(s.contextIds).includes(id));
+  const mid_ = `<div class="cv mid">
+      ${c && c.description ? `<div class="kv"><span class="lbl">What this context does</span><p>${esc(c.description)}</p></div>` : ""}
+      ${sub ? `<div class="kv"><span class="lbl">Subdomain</span><p><b style="font-weight:500">${esc(sub.name)}</b> · ${typeChip(sub.domainType)}</p>${sub.description ? `<p style="font-size:14px;color:var(--ink-2)">${esc(sub.description)}</p>` : ""}</div>` : ""}
+      <div class="kv"><span class="lbl">Ubiquitous language</span>${terms.length ? `<div class="terms">${terms.map((t) => `<span class="term" title="${esc(t.note || "")}">${esc(t.name)}</span>`).join("")}</div>` : `<p style="font-size:14px;color:var(--muted)">No words declared for this domain. A word can mean something else in the next domain without anyone noticing.</p>`}</div>
+      <div class="kv"><span class="lbl">Key rules</span>${rules.length ? `<div class="rulelist">${rules.map((r) => `<div class="rule"><span class="kind">${esc(vi("ruleKind", r.kind))}</span><span>${esc(r.description)}</span></div>`).join("")}</div>` : `<p style="font-size:14px;color:var(--muted)">No rules recorded.</p>`}</div>
+    </div>`;
+  return `<div class="canvas">
+    <div class="cv in"><h3>Inbound <small>${inbound.length}</small></h3>${inbound.length ? inbound.join("") : `<p style="font-size:14px;color:var(--muted)">No one asks this domain to do anything yet.</p>`}</div>
+    ${mid_}
+    <div class="cv out"><h3>Outbound <small>${outbound.length}</small></h3>${outbound.length ? outbound.join("") : `<p style="font-size:14px;color:var(--muted)">This domain tells no one anything. Nothing elsewhere can react.</p>`}</div>
+  </div>`;
+}
+function fAggregates(d) {
+  const aggs = aggsOf(d.ctx); if (!aggs.length) return empty("Aggregate", "No aggregate owns its own rules in this domain.");
+  return `<div class="aggs">${aggs.map((a) => { const idn = identityOf(a); return `<article class="agg">
+    <div class="top"><h3>${esc(a.name)}</h3>${statusChip(a.status)}</div>
+    ${a.resource ? `<span class="res">${esc(a.resource)}</span>` : ""}
+    ${a.description ? `<p class="desc">${esc(a.description)}</p>` : ""}
+    ${idn ? `<div class="key"><span class="tag">Identity</span><div><b>${esc(idn.field)} : ${esc(idn.type)}</b>${idn.note ? `<span>${esc(idn.note)}</span>` : ""}</div></div>` : `<div class="key none"><span class="tag">Identity</span><div><b>no identity yet</b><span>No field names a single record, so two records cannot be told apart.</span></div></div>`}
+    ${a.consistencyBoundary ? `<div class="bound">${esc(a.consistencyBoundary)}</div>` : ""}
+    ${arr(a.invariants).length ? `<div><span class="lbl">Invariants</span><ul class="inv" style="margin-top:6px">${arr(a.invariants).map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>` : ""}
+    ${arr(a.fields).length ? `<details class="fold"><summary>${plural(arr(a.fields).length, "fields")}</summary><div class="fields" style="margin-top:6px">${arr(a.fields).map((f) => `<span class="fld ${f.references ? "ref" : ""}" title="${esc(f.description || "")}">${esc(f.name)}${f.references ? " → " + esc(f.references) : ": " + esc(f.type)}</span>`).join("")}</div></details>` : ""}
+  </article>`; }).join("")}</div>`;
+}
+function fLifecycle(d) {
+  const lcs = lifecyclesOf(d.id); if (!lcs.length) return empty("Lifecycle", "Nothing here changes state in a way that changes what is allowed.");
+  return lcs.map(({ agg, lc }) => { const trans = arr(lc.transitions);
+    const rows = trans.map((t) => `<tr><td class="k">${esc(t.from)}</td><td class="k">${esc(t.action)}</td><td class="k">${esc(t.to)}</td>
+      <td>${arr(t.guards).map((g) => `<span class="kind policy">${esc(g.split(".").pop())}</span>`).join(" ") || "<span class='ghost'>no guard</span>"}</td>
+      <td>${arr(t.emits).map((e) => `<span class="kind event">${esc(e)}</span>`).join(" ")}</td>
+      <td>${esc([...arr(t.sideEffects), t.description || ""].filter(Boolean).join(" · "))}${t.reversible === false ? ` <span class="kind hot">one-way</span>` : ""}${t.compensating ? ` <span class="kind read">compensating</span>` : ""}</td></tr>`);
+    return `<div class="lc"><div class="t"><h3>${esc(agg)}</h3>${lc.stateType ? `<code>${esc(lc.stateType)}</code>` : ""}${lc.kind ? chip(vi("lcKind", lc.kind), "quiet") : ""}</div>
+      ${lc.description ? `<p style="font-size:14px;color:var(--muted)">${esc(lc.description)}</p>` : ""}
+      ${diagram(lifecycleMermaid(lc))}
+      <details class="fold"><summary>${plural(trans.length, "transitions")}: guard, event emitted, what happens next</summary><div style="margin-top:8px">${table(["From", "Command", "To", "Guard", "Emits", "Then"], rows)}</div></details></div>`;
+  }).join("");
+}
+function fFlow(d) {
+  const flows = flowsOf(d.id); const es = eventsOf(d.id);
+  if (!es.length && !flows.length) return empty("Events", "This context emits no events. Nothing elsewhere can react to what happens here.");
+  const parts = [];
+  if (flows.length) parts.push(`<div class="panel strip">${flows.map((f) => `<div class="sentence"><span class="sn cmd" data-role="command">${esc(f.cmd)}</span><span class="arrow">→</span><span class="sn agg" data-role="aggregate">${esc(f.agg)}</span><span class="arrow">→</span><span class="sn ev" data-role="event">${esc(f.event)}</span>${f.side ? `<span class="then">then ${esc(f.side)}</span>` : ""}</div>`).join("")}
+    ${mutesOf(d.id).length ? `<div class="sentence">${mutesOf(d.id).map((m) => `<span class="sn mute" data-role="command">${esc(m)}</span>`).join("")}<span class="then" style="color:var(--hot);font-style:normal">emits no event, so nothing elsewhere can react</span></div>` : ""}</div>`);
+  const extra = es.filter((e) => !flows.some((f) => f.event === e.name || f.event === e.id));
+  if (extra.length) parts.push(table(["Event", "Happens when", "Who listens"], extra.map((e) => `<tr><td class="k">${esc(e.id || e.name)}</td><td>${esc(e.note || "")}</td><td>${esc(arr(e.consumers).join(", ") || e.from)}</td></tr>`)));
+  return parts.join("");
+}
+function bbRow(b) {
+  const t = tone(b.kind); const meta = [b.scope || "", b.aggregate ? "in " + b.aggregate : "", b.location || ""].filter(Boolean); const lists = [...arr(b.responsibilities), ...arr(b.invariants)];
+  return `<li class="brow ${t}"><div class="brow-head"><span class="brow-name">${esc(b.name)}</span><span class="kind ${t}">${esc(b.kind)}</span></div>
+    ${b.purpose ? `<p class="brow-purpose">${esc(b.purpose)}</p>` : ""}${lists.length ? `<ul class="brow-list">${lists.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
+    ${meta.length ? `<div class="brow-meta">${meta.map((m) => `<span>${esc(m)}</span>`).join("")}</div>` : ""}</li>`;
+}
+function groupedBlocks(list) {
+  const byKind = new Map(); for (const b of list) { if (!byKind.has(b.kind)) byKind.set(b.kind, []); byKind.get(b.kind).push(b); }
+  const known = new Set(KIND_ORDER.map((k) => k[0])); const order = [...KIND_ORDER, ...[...byKind.keys()].filter((k) => !known.has(k)).map((k) => [k, k])];
+  return order.filter(([k]) => byKind.has(k)).map(([k, label]) => `<div class="bgroup"><div class="bgroup-head"><span class="lbl">${esc(label)}</span><span class="bgroup-n">${byKind.get(k).length}</span></div><ul class="brows">${byKind.get(k).map(bbRow).join("")}</ul></div>`).join("");
+}
+function fBlocks(d) {
+  const parts = []; const aggs = aggsOf(d.ctx);
+  if (aggs.length) parts.push(`<div class="bgroup"><div class="bgroup-head"><span class="lbl">Identity</span><span class="bgroup-n">${aggs.length}</span><span class="why">what names exactly one record. It separates an entity from a value object</span></div>
+    ${table(["Aggregate", "Field", "Type", "Rule"], aggs.map((a) => { const i = identityOf(a); return i ? `<tr><td class="k">${esc(a.name)}</td><td class="k">${esc(i.field)}</td><td><span class="kind lang">${esc(i.type)}</span></td><td>${esc(i.note)}</td></tr>` : `<tr><td class="k">${esc(a.name)}</td><td colspan="3"><span class="ghost">no identity yet</span></td></tr>`; }))}</div>`);
+  const own = d.id === SHARED ? sharedBlocks() : ownBlocks(d.id); const shared = d.id === SHARED ? [] : sharedBlocks();
+  parts.push(own.length ? groupedBlocks(own) : empty("Building blocks", "This context names no building blocks of its own. A code review has nothing to point at."));
+  if (shared.length) parts.push(`<details class="fold"><summary>Borrowed from shared kernel · ${shared.length}</summary><div style="margin-top:8px">${groupedBlocks(shared)}</div></details>`);
+  const have = new Set(own.map((b) => b.kind)); const missing = GAP_KINDS.filter((k) => !have.has(k));
+  if (own.length && missing.length) parts.push(`<div class="empty"><b>Not modelled yet:</b> <span class="pills" style="display:inline-flex;margin:0 6px">${missing.map((k) => `<span class="ghost">${esc(k)}</span>`).join("")}</span> This is not always a gap: a supporting domain often keeps its rules inside the aggregate root. Saying so here beats finding out while reading code.</div>`);
+  return parts.join("");
+}
+function fRules(d) {
+  const rs = rulesOf(d.id); if (!rs.length) return empty("Rules", "No invariant or policy recorded for this context.");
+  const byKind = new Map(); for (const r of rs) { const k = r.kind || "rule"; if (!byKind.has(k)) byKind.set(k, []); byKind.get(k).push(r); }
+  const order = ["invariant", "policy", "specification", "authorization", "uniqueness", "workflow", "rule", "unknown"];
+  return [...byKind.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((k) => `<div class="bgroup"><div class="bgroup-head"><span class="lbl">${esc(vi("ruleKind", k))}</span><span class="bgroup-n">${byKind.get(k).length}</span></div>
+    ${table(["Rule", "Declared on", "Status"], byKind.get(k).map((r) => `<tr><td style="color:var(--ink)">${esc(r.description)}</td><td class="k">${esc(r.declaredOn || r.on || "")}</td><td>${statusChip(r.status)}</td></tr>`))}</div>`).join("");
+}
+function fIntegration(d) {
+  const parts = []; const rels = relsOf(d.id);
+  if (rels.length) parts.push(table(["Direction", "Context", "Kind", "Via", "Pattern", "Status"], rels.map((r) => { const outb = r.from === d.id; const other = outb ? r.to : r.from;
+    return `<tr><td>${outb ? (r.kind === "EVENT" ? "notifies" : "calls") : (r.kind === "EVENT" ? "listens to" : "used by")}</td><td style="color:var(--ink);font-weight:500">${esc(nameOf(other))}</td><td><span class="kind ${r.kind === "EVENT" ? "event" : r.kind === "PORT" ? "cmd" : "read"}">${esc(vi("relKind", r.kind))}</span></td><td class="k" style="white-space:normal">${esc(r.via || "")}<div style="font-family:var(--sans);font-size:13px;color:var(--ink-2);margin-top:2px">${esc(r.description || "")}</div></td><td>${esc(vi("pattern", r.pattern || ""))}</td><td>${statusChip(r.status)}</td></tr>`; })));
+  else parts.push(empty("Integration", "No relations declared. Either this context stands alone, or the context map is incomplete."));
+  const qs = questionsTouching(d);
+  if (qs.length) parts.push(`<div class="bgroup"><div class="bgroup-head"><span class="lbl">Open questions</span><span class="bgroup-n">${qs.length}</span></div><div class="grid2">${qs.map((q) => `<div class="hot"><p>${esc(q.question)}</p><span class="sub">${esc(q.impact || "")} ${q.owner ? `<b>· who answers: ${esc(q.owner)}</b>` : ""} ${q.status && q.status !== "open" ? chip(vi("status", q.status), "quiet") : ""}</span></div>`).join("")}</div></div>`);
+  const ds = decisionsTouching(d);
+  if (ds.length) parts.push(`<div class="bgroup"><div class="bgroup-head"><span class="lbl">Related decisions</span><span class="bgroup-n">${ds.length}</span></div>${table(["Decision", "Why", "Status"], ds.map((x) => `<tr><td style="color:var(--ink)">${esc(x.decision)}</td><td>${esc(x.rationale || "")}</td><td>${statusChip(x.status || "proposed")}</td></tr>`))}</div>`);
+  return parts.join("");
+}
+
+// ---------------------------------------------------------------- chrome
+function renderChrome() {
+  const app = MODEL.application || "Domain model";
+  document.querySelector("#app-name").textContent = app;
+  document.querySelector("#mark").textContent = app.trim().charAt(0).toUpperCase() || "D";
+  document.querySelector("#app-meta").innerHTML = [MODEL.version ? chip("v" + MODEL.version, "quiet") : "", MODEL.generatedAt ? chip(MODEL.generatedAt, "quiet") : ""].join("");
+  const crumbs = document.querySelector("#crumbs");
+  crumbs.innerHTML = state.view === "landscape" ? "" : `<span class="sep">/</span><a href="#" data-go="landscape">All contexts</a><span class="sep">/</span><span class="cur">${state.view === "qa" ? "Q&amp;A" : esc((domains.find((d) => d.id === state.view) || {}).name || "")}</span>`;
+  const groups = [["core", "Core"], ["supporting", "Supporting"], ["generic", "Generic"], ["unknown", "Unknown"]];
+  let rail = `<div class="rail-group"><button class="rail-item" data-go="landscape" aria-current="${state.view === "landscape"}"><span class="rail-name">All contexts</span><span class="mono">${domains.length}</span></button><button class="rail-item" data-go="qa" aria-current="${state.view === "qa"}"><span class="rail-name">Q&amp;A</span><span class="mono">${arr(MODEL.openQuestions).filter((q) => (q.status || "open") === "open").length}</span></button><button class="rail-item" data-go-glossary><span class="rail-name">Glossary</span><span class="mono">${BUSINESS_GLOSSARY.length + GLOSSARY.length}</span></button></div>`;
+  for (const [type, label] of groups) { const list = domains.filter((d) => d.type === type); if (!list.length) continue;
+    rail += `<div class="rail-group"><div class="rail-head">${esc(label)}</div>${list.map((d) => `<button class="rail-item" data-go="${esc(d.id)}" aria-current="${state.view === d.id}" title="${esc(d.name)} — ${filledOf(d.id)}/${FACETS.length} facets filled"><i class="dot ${esc(d.type)}"></i><span class="rail-name">${esc(d.name)}</span>${ring(filledOf(d.id), FACETS.length)}</button>`).join("")}</div>`; }
+  document.querySelector("#rail").innerHTML = rail;
+}
+function render() {
+  renderChrome();
+  document.querySelector("#view").innerHTML = state.view === "landscape" ? renderLandscape() : state.view === "qa" ? renderQA() : renderDomain(state.view);
+  annotateRefs(document.querySelector("#view"));
+  document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); state.view = b.dataset.go; window.scrollTo({ top: 0 }); render(); }));
+  document.querySelectorAll("[data-go-glossary]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); if (state.view !== "landscape") { state.view = "landscape"; render(); } const g = document.querySelector("#glossary"); if (g) { g.querySelectorAll("details").forEach((x) => { x.open = true; }); g.scrollIntoView({ block: "start" }); } }));
+  const cur = document.querySelector('.rail-item[aria-current="true"]'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
+  drawDiagrams(); drawMapEdges();
+}
+document.querySelector("#home").addEventListener("click", (e) => { e.preventDefault(); state.view = "landscape"; window.scrollTo({ top: 0 }); render(); });
+new ResizeObserver(() => drawMapEdges()).observe(document.body);
+document.fonts && document.fonts.ready.then(() => drawMapEdges());
+render();
+</script>
+
+</body>
+</html>

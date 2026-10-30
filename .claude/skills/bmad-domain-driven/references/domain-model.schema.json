@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://harness.local/schemas/bmad-domain-model.schema.json",
+  "title": "BMAD Domain Model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application", "version", "contexts", "relations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "application": { "type": "string", "minLength": 1 },
+    "version": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "locale": { "type": "string" },
+    "status": { "$ref": "#/$defs/status" },
+    "strategicModel": { "$ref": "#/$defs/strategicModel" },
+    "contexts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/context" }
+    },
+    "relations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relation" }
+    },
+    "buildingBlocks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/buildingBlock" }
+    },
+    "decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "openQuestions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["observed", "target", "proposed", "unknown"]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "text": { "type": "string" },
+    "sourceList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "aggregates"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "$ref": "#/$defs/status" },
+        "owner": { "type": "string" },
+        "domainType": { "$ref": "#/$defs/domainType" },
+        "businessCapability": { "type": "string" },
+        "strategicImportance": { "type": "string", "enum": ["high", "medium", "low"] },
+        "contextMapPatterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextMapPattern" }
+        },
+        "aggregates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/aggregate" }
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" }
+        },
+        "useCases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/useCase" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "fields"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "resource": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "$ref": "#/$defs/status" },
+        "domainRole": { "$ref": "#/$defs/domainType" },
+        "aggregateRoot": { "type": "string" },
+        "consistencyBoundary": { "type": "string" },
+        "invariants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "buildingBlockIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "useCases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "readOnly": { "type": "boolean" },
+        "identity": { "type": "boolean", "description": "true: this field names exactly one record of the aggregate; false: never treat it as identity even if its name looks like one" },
+        "kind": {
+          "type": "string",
+          "enum": ["primitive", "value-object", "entity", "collection", "reference", "derived", "unknown"]
+        },
+        "references": { "type": "string" },
+        "enumValues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initial", "states", "transitions"],
+      "properties": {
+        "stateType": { "type": "string" },
+        "initial": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["state-machine", "lifecycle", "workflow", "unknown"]
+        },
+        "description": { "type": "string" },
+        "states": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/state" }
+        },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/transition" }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "action", "to"],
+      "properties": {
+        "from": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "guards": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "emits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reversible": { "type": "boolean" },
+        "compensating": { "type": "boolean" }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "description": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["invariant", "policy", "authorization", "uniqueness", "workflow", "specification", "unknown"]
+        },
+        "declaredOn": { "type": "string" },
+        "status": { "$ref": "#/$defs/status" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "producer": { "type": "string" },
+        "consumers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "status": { "$ref": "#/$defs/status" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "useCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "actor": { "type": "string" },
+        "commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": { "$ref": "#/$defs/status" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind", "description"],
+      "properties": {
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "kind": {
+          "type": "string",
+          "enum": ["PORT", "EVENT", "REFERENCE", "SHARED_KERNEL", "EXTERNAL"]
+        },
+        "via": { "type": "string" },
+        "description": { "type": "string", "minLength": 1 },
+        "fromAggregate": { "type": "string" },
+        "toAggregate": { "type": "string" },
+        "status": { "$ref": "#/$defs/status" },
+        "pattern": { "$ref": "#/$defs/contextMapPattern" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "buildingBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "purpose"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "aggregate-root",
+            "entity",
+            "value-object",
+            "domain-primitive",
+            "domain-service",
+            "repository",
+            "factory",
+            "specification",
+            "policy",
+            "domain-event",
+            "command",
+            "port",
+            "adapter",
+            "anti-corruption-layer",
+            "read-model",
+            "shared-kernel",
+            "process-manager"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["domain", "bounded-context", "aggregate", "shared-kernel", "integration", "application"]
+        },
+        "context": { "type": "string" },
+        "aggregate": { "type": "string" },
+        "location": { "type": "string" },
+        "purpose": { "type": "string" },
+        "responsibilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "invariants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": { "$ref": "#/$defs/status" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "domainType": {
+      "type": "string",
+      "enum": ["core", "supporting", "generic", "unknown"]
+    },
+    "contextMapPattern": {
+      "type": "string",
+      "enum": [
+        "upstream-downstream",
+        "customer-supplier",
+        "partnership",
+        "conformist",
+        "anti-corruption-layer",
+        "open-host-service",
+        "published-language",
+        "shared-kernel",
+        "separate-ways"
+      ]
+    },
+    "strategicModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primaryDomain": { "type": "string" },
+        "classificationRationale": { "type": "string" },
+        "subdomains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "domainType", "description"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "type": "string" },
+              "domainType": { "$ref": "#/$defs/domainType" },
+              "description": { "type": "string" },
+              "contextIds": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/id" }
+              },
+              "sources": { "$ref": "#/$defs/sourceList" }
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "decision"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "decision": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string" },
+        "status": { "type": "string", "enum": ["accepted", "proposed", "rejected", "superseded"], "description": "superseded = replaced by a later decision; keep the text, point at the replacement with supersededBy" },
+        "supersededBy": { "$ref": "#/$defs/id", "description": "Id of the decision that replaced this one (status superseded)" },
+        "contexts": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "Context ids this decision belongs on; when absent the renderer infers from cited ids and context names" },
+        "sources": { "$ref": "#/$defs/sourceList" }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "question": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string" },
+        "owner": { "type": "string" },
+        "contexts": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "Context ids this question belongs on; when absent the renderer infers from cited ids and context names" },
+        "status": { "type": "string", "enum": ["open", "resolved", "deferred"] }
+      }
+    }
+  }
+}

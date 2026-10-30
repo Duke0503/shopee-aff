@@ -102,9 +102,12 @@ dashboard-preview.html
 Thumbs.db
 desktop.ini
 
-# Tooling and AI assistant caches
-_bmad-output/
+# Tooling and AI assistant personal state (planning output in _bmad-output/ is committed, D16)
+_bmad/config.user.toml
 _bmad/custom/config.user.toml
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+CLAUDE.local.md
 
 # Zalo Bot secrets & runtime state
 zalo_assistant/credentials.json

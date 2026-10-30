@@ -236,7 +236,7 @@ loopback**, không phải chỉ dựa vào địa chỉ bind. Nên khi anh đưa
 | Khách đòi xoá dữ liệu | `cashback forget C0003` |
 
 `forget` từ chối nếu khách còn được nợ tiền. Muốn xoá thật thì phải trả
-xong trước — xem [CLAUDE.md](../../CLAUDE.md) mục 2.
+xong trước — xem [v1-handover.vi.md](../reference/v1-handover.vi.md) mục 2.
 
 ---
 

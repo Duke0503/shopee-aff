@@ -1,0 +1,4 @@
+interface:
+  display_name: "BMAD Domain Driven Party"
+  short_description: "Discuss and model DDD with BA and Architect"
+  default_prompt: "Use $bmad-domain-driven to run a DDD party discussion and rebuild this project's domain model."

@@ -1,0 +1,10 @@
+# Team override for bmad-architecture (committed). Merges over
+# .claude/skills/bmad-architecture/customize.toml; arrays append.
+
+[workflow]
+
+persistent_facts = [
+  "Diagrams: draw the spine's diagrams as C4 in Mermaid. When drawing or reviewing a diagram, first read {project-root}/_bmad/custom/bmad-architecture/c4/README.md (project rules and the Mermaid C4 currency note), then the reference files it lists in the same folder. Save diagrams in the run folder with the spine.",
+  "Technology skills to consult on demand during the run: cashback-infra (Docker Compose, proxy and tunnel, backups, host processes, Redis only if adopted), cashback-security-model (SECURITY_MODEL.md and a STRIDE pass over the C4 Container and Dynamic diagrams).",
+  "Inputs: the domain model {project-root}/docs/domain-model.json, the decisions in {project-root}/.context/decisions/, the money rules and pitfalls in {project-root}/CLAUDE.md, and the current system notes in {project-root}/docs/reference/. The current Python system and the earlier v2 TypeScript code are reference, not a constraint.",
+]

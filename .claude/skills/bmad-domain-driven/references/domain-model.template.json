@@ -1,0 +1,19 @@
+{
+  "$schema": "./domain-model.schema.json",
+  "application": "replace-me",
+  "version": "0.1.0",
+  "generatedAt": "",
+  "locale": "en",
+  "status": "proposed",
+  "strategicModel": {
+    "primaryDomain": "",
+    "classificationRationale": "",
+    "subdomains": []
+  },
+  "contexts": [],
+  "relations": [],
+  "buildingBlocks": [],
+  "decisions": [],
+  "openQuestions": [],
+  "sources": []
+}

@@ -1,0 +1,390 @@
+{
+  "$schema": "./domain-model.schema.json",
+  "application": "example-erp",
+  "version": "target-reference",
+  "generatedAt": "2026-10-05",
+  "locale": "en",
+  "status": "target",
+  "strategicModel": {
+    "primaryDomain": "catalog",
+    "classificationRationale": "The catalog model expresses product identity, pricing, and sellability decisions that differentiate the ERP.",
+    "subdomains": [
+      {
+        "id": "subdomain.catalog",
+        "name": "Product Catalog",
+        "domainType": "core",
+        "description": "Product, variant, pricing, and sellability language.",
+        "contextIds": ["catalog"]
+      },
+      {
+        "id": "subdomain.sales",
+        "name": "Sales Operations",
+        "domainType": "supporting",
+        "description": "Customer orders and fulfillment coordination.",
+        "contextIds": ["sales"]
+      },
+      {
+        "id": "subdomain.identity",
+        "name": "Identity and Access",
+        "domainType": "generic",
+        "description": "Authentication and staff authorization.",
+        "contextIds": ["identity"]
+      }
+    ]
+  },
+  "contexts": [
+    {
+      "id": "catalog",
+      "name": "Catalog",
+      "description": "What the business sells and how products are priced.",
+      "status": "target",
+      "domainType": "core",
+      "businessCapability": "Define and price sellable products",
+      "strategicImportance": "high",
+      "contextMapPatterns": ["open-host-service", "published-language"],
+      "aggregates": [
+        {
+          "id": "catalog.product",
+          "name": "Product",
+          "resource": "products",
+          "description": "Sellable product definition.",
+          "status": "target",
+          "domainRole": "core",
+          "aggregateRoot": "catalog.product",
+          "consistencyBoundary": "Product identity, composition, and sellability invariants.",
+          "invariants": ["A product cannot become active without a priced variant."],
+          "buildingBlockIds": ["bb.catalog.product-root", "bb.catalog.product-policy"],
+          "fields": [
+            { "name": "spuCode", "type": "SpuCode", "required": true, "kind": "primitive" },
+            { "name": "name", "type": "LocalizedText", "required": true, "kind": "value-object" },
+            { "name": "variants", "type": "Variant[]", "kind": "collection" }
+          ],
+          "lifecycle": {
+            "stateType": "ProductStatus",
+            "kind": "state-machine",
+            "description": "Controls when a product may be sold.",
+            "initial": "DRAFT",
+            "states": [
+              { "name": "DRAFT" },
+              { "name": "PENDING_APPROVAL" },
+              { "name": "ACTIVE" },
+              { "name": "DISCONTINUED", "terminal": true }
+            ],
+            "transitions": [
+              { "from": "DRAFT", "action": "submit", "to": "PENDING_APPROVAL", "guards": ["catalog.product.complete"] },
+              { "from": "PENDING_APPROVAL", "action": "activate", "to": "ACTIVE", "guards": ["catalog.product.priced-variant-required"], "emits": ["catalog.product.activated"] },
+              { "from": "ACTIVE", "action": "discontinue", "to": "DISCONTINUED", "guards": ["catalog.product.discontinuation-allowed"], "reversible": true }
+            ]
+          },
+          "rules": [
+            {
+              "id": "catalog.product.priced-variant-required",
+              "description": "A product must have a priced variant before activation.",
+              "kind": "invariant",
+              "status": "target"
+            }
+          ],
+          "events": ["catalog.product.activated"]
+        },
+        {
+          "id": "catalog.variant",
+          "name": "Variant",
+          "resource": "variants",
+          "description": "Sellable SKU and its pricing boundary.",
+          "status": "target",
+          "domainRole": "core",
+          "aggregateRoot": "catalog.variant",
+          "consistencyBoundary": "SKU identity and variant pricing invariants.",
+          "invariants": ["SKU is unique across the catalog."],
+          "buildingBlockIds": ["bb.catalog.variant-root"],
+          "fields": [
+            { "name": "sku", "type": "Sku", "required": true, "kind": "primitive" },
+            { "name": "productId", "type": "ProductId", "required": true, "kind": "reference", "references": "catalog.product" },
+            { "name": "sellingPrice", "type": "Money", "kind": "value-object" }
+          ],
+          "rules": [
+            {
+              "id": "catalog.variant.sku-unique",
+              "description": "SKU is unique across the catalog.",
+              "kind": "uniqueness",
+              "status": "target"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "catalog.product.activated",
+          "name": "ProductActivated",
+          "description": "A product became sellable.",
+          "producer": "catalog.product",
+          "consumers": ["sales", "inventory"],
+          "status": "target"
+        }
+      ]
+    },
+    {
+      "id": "identity",
+      "name": "Identity",
+      "description": "Staff accounts and authorization.",
+      "status": "target",
+      "domainType": "generic",
+      "businessCapability": "Authenticate and authorize staff",
+      "strategicImportance": "low",
+      "contextMapPatterns": ["conformist"],
+      "aggregates": [
+        {
+          "id": "identity.user-account",
+          "name": "UserAccount",
+          "resource": "users",
+          "description": "Staff account used for authentication and authorization.",
+          "status": "target",
+          "domainRole": "generic",
+          "aggregateRoot": "identity.user-account",
+          "consistencyBoundary": "Username, roles, and account status.",
+          "buildingBlockIds": ["bb.identity.user-root"],
+          "fields": [
+            { "name": "username", "type": "string", "required": true, "kind": "primitive" },
+            { "name": "roles", "type": "Role[]", "required": true, "kind": "collection" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "description": "Warehouses, physical items, and stock movements.",
+      "status": "target",
+      "domainType": "supporting",
+      "businessCapability": "Track and reserve physical stock",
+      "strategicImportance": "medium",
+      "contextMapPatterns": ["anti-corruption-layer", "customer-supplier"],
+      "aggregates": [
+        {
+          "id": "inventory.warehouse",
+          "name": "Warehouse",
+          "resource": "warehouses",
+          "description": "A place where stock is held.",
+          "status": "target",
+          "domainRole": "supporting",
+          "aggregateRoot": "inventory.warehouse",
+          "consistencyBoundary": "Warehouse identity and operational status.",
+          "buildingBlockIds": ["bb.inventory.warehouse-root"],
+          "fields": [
+            { "name": "code", "type": "WarehouseCode", "required": true, "kind": "primitive" }
+          ]
+        },
+        {
+          "id": "inventory.stock-item",
+          "name": "StockItem",
+          "resource": "stock-items",
+          "description": "Stock quantity for a SKU at a warehouse.",
+          "status": "target",
+          "domainRole": "supporting",
+          "aggregateRoot": "inventory.stock-item",
+          "consistencyBoundary": "Available, reserved, and on-hand quantity for one SKU and warehouse.",
+          "invariants": ["Reserved quantity cannot exceed on-hand quantity."],
+          "buildingBlockIds": ["bb.inventory.stock-root"],
+          "fields": [
+            { "name": "variantId", "type": "VariantId", "required": true, "kind": "reference", "references": "catalog.variant" },
+            { "name": "warehouseId", "type": "WarehouseId", "required": true, "kind": "reference", "references": "inventory.warehouse" },
+            { "name": "available", "type": "integer", "required": true, "kind": "primitive" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "procurement",
+      "name": "Procurement",
+      "description": "Suppliers and inbound purchasing.",
+      "status": "target",
+      "domainType": "supporting",
+      "businessCapability": "Source products and materials",
+      "strategicImportance": "medium",
+      "contextMapPatterns": ["customer-supplier"],
+      "aggregates": [
+        {
+          "id": "procurement.supplier",
+          "name": "Supplier",
+          "resource": "suppliers",
+          "description": "A source of products, materials, or services.",
+          "status": "target",
+          "domainRole": "supporting",
+          "aggregateRoot": "procurement.supplier",
+          "consistencyBoundary": "Supplier approval and commercial identity.",
+          "buildingBlockIds": ["bb.procurement.supplier-root"],
+          "fields": [
+            { "name": "code", "type": "SupplierCode", "required": true, "kind": "primitive" },
+            { "name": "name", "type": "string", "required": true, "kind": "primitive" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sales",
+      "name": "Sales",
+      "description": "Customers, orders, and the commercial buying journey.",
+      "status": "target",
+      "domainType": "supporting",
+      "businessCapability": "Convert sellable products into fulfilled orders",
+      "strategicImportance": "medium",
+      "contextMapPatterns": ["anti-corruption-layer", "customer-supplier"],
+      "aggregates": [
+        {
+          "id": "sales.sales-order",
+          "name": "SalesOrder",
+          "resource": "orders",
+          "description": "A customer order with prices frozen at confirmation.",
+          "status": "target",
+          "domainRole": "supporting",
+          "aggregateRoot": "sales.sales-order",
+          "consistencyBoundary": "Order status, frozen line prices, and order totals.",
+          "invariants": ["An order cannot be confirmed without available stock."],
+          "buildingBlockIds": ["bb.sales.order-root", "bb.sales.inventory-port"],
+          "fields": [
+            { "name": "orderNumber", "type": "OrderNumber", "required": true, "kind": "primitive" },
+            { "name": "customerId", "type": "CustomerId", "required": true, "kind": "reference", "references": "sales.customer" },
+            { "name": "lines", "type": "SalesOrderLine[]", "required": true, "kind": "collection" }
+          ],
+          "lifecycle": {
+            "stateType": "SalesOrderStatus",
+            "kind": "lifecycle",
+            "description": "Tracks the commercial order journey.",
+            "initial": "DRAFT",
+            "states": [
+              { "name": "DRAFT" },
+              { "name": "CONFIRMED" },
+              { "name": "PAID" },
+              { "name": "FULFILLED", "terminal": true },
+              { "name": "CANCELLED", "terminal": true }
+            ],
+            "transitions": [
+              { "from": "DRAFT", "action": "confirm", "to": "CONFIRMED", "guards": ["sales.order.stock-available"], "emits": ["sales.order.confirmed"], "sideEffects": ["Reserve inventory"] },
+              { "from": "CONFIRMED", "action": "pay", "to": "PAID", "guards": ["sales.order.payment-authorized"] },
+              { "from": "PAID", "action": "fulfill", "to": "FULFILLED", "guards": ["sales.order.fulfillment-ready"] },
+              { "from": "DRAFT", "action": "cancel", "to": "CANCELLED", "guards": ["sales.order.cancellable"], "reversible": false },
+              { "from": "CONFIRMED", "action": "cancel", "to": "CANCELLED", "guards": ["sales.order.cancellable"], "emits": ["sales.order.cancelled"], "sideEffects": ["Release inventory"] }
+            ]
+          },
+          "events": ["sales.order.confirmed"]
+        },
+        {
+          "id": "sales.customer",
+          "name": "Customer",
+          "resource": "customers",
+          "description": "A buyer in the sales context.",
+          "status": "target",
+          "domainRole": "supporting",
+          "aggregateRoot": "sales.customer",
+          "consistencyBoundary": "Customer identity and customer status.",
+          "buildingBlockIds": ["bb.sales.customer-root"],
+          "fields": [
+            { "name": "code", "type": "CustomerCode", "required": true, "kind": "primitive" },
+            { "name": "name", "type": "string", "required": true, "kind": "primitive" }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "sales.order.confirmed",
+          "name": "SalesOrderConfirmed",
+          "description": "An order was confirmed and stock should be reserved.",
+          "producer": "sales.sales-order",
+          "consumers": ["inventory"],
+          "status": "target"
+        },
+        {
+          "id": "sales.order.cancelled",
+          "name": "SalesOrderCancelled",
+          "description": "An order was cancelled and its stock reservation should be released.",
+          "producer": "sales.sales-order",
+          "consumers": ["inventory"],
+          "status": "target"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "sales",
+      "to": "catalog",
+      "kind": "PORT",
+      "via": "ProductCatalog",
+      "pattern": "anti-corruption-layer",
+      "description": "Read sellability and current price through a translated product snapshot.",
+      "status": "target",
+      "fromAggregate": "sales.sales-order",
+      "toAggregate": "catalog.variant"
+    },
+    {
+      "from": "sales",
+      "to": "inventory",
+      "kind": "PORT",
+      "via": "InventoryGateway",
+      "pattern": "anti-corruption-layer",
+      "description": "Check and reserve stock without importing inventory domain classes.",
+      "status": "target",
+      "fromAggregate": "sales.sales-order",
+      "toAggregate": "inventory.stock-item"
+    },
+    {
+      "from": "sales",
+      "to": "inventory",
+      "kind": "EVENT",
+      "via": "SalesOrderConfirmed",
+      "pattern": "published-language",
+      "description": "After-commit event consumed by inventory stock policy.",
+      "status": "target",
+      "fromAggregate": "sales.sales-order",
+      "toAggregate": "inventory.stock-item"
+    },
+    {
+      "from": "inventory",
+      "to": "catalog",
+      "kind": "REFERENCE",
+      "via": "variantId",
+      "pattern": "upstream-downstream",
+      "description": "Inventory stores the identity of a catalog variant, not the aggregate class.",
+      "status": "target",
+      "fromAggregate": "inventory.stock-item",
+      "toAggregate": "catalog.variant"
+    }
+  ],
+  "buildingBlocks": [
+    { "id": "bb.catalog.product-root", "name": "Product", "kind": "aggregate-root", "scope": "aggregate", "context": "catalog", "aggregate": "catalog.product", "purpose": "Owns product identity, sellability, and composition invariants.", "invariants": ["A product cannot activate without a priced variant."], "status": "target" },
+    { "id": "bb.catalog.product-policy", "name": "ProductActivationPolicy", "kind": "policy", "scope": "aggregate", "context": "catalog", "aggregate": "catalog.product", "purpose": "Determines whether a product can become active.", "status": "target" },
+    { "id": "bb.catalog.variant-root", "name": "Variant", "kind": "aggregate-root", "scope": "aggregate", "context": "catalog", "aggregate": "catalog.variant", "purpose": "Owns SKU identity and variant pricing.", "status": "target" },
+    { "id": "bb.identity.user-root", "name": "UserAccount", "kind": "aggregate-root", "scope": "aggregate", "context": "identity", "aggregate": "identity.user-account", "purpose": "Owns account status and authorization roles.", "status": "target" },
+    { "id": "bb.inventory.warehouse-root", "name": "Warehouse", "kind": "aggregate-root", "scope": "aggregate", "context": "inventory", "aggregate": "inventory.warehouse", "purpose": "Owns warehouse identity and operational status.", "status": "target" },
+    { "id": "bb.inventory.stock-root", "name": "StockItem", "kind": "aggregate-root", "scope": "aggregate", "context": "inventory", "aggregate": "inventory.stock-item", "purpose": "Owns stock quantity invariants.", "status": "target" },
+    { "id": "bb.procurement.supplier-root", "name": "Supplier", "kind": "aggregate-root", "scope": "aggregate", "context": "procurement", "aggregate": "procurement.supplier", "purpose": "Owns supplier approval and identity.", "status": "target" },
+    { "id": "bb.sales.order-root", "name": "SalesOrder", "kind": "aggregate-root", "scope": "aggregate", "context": "sales", "aggregate": "sales.sales-order", "purpose": "Owns order status, frozen prices, and totals.", "status": "target" },
+    { "id": "bb.sales.inventory-port", "name": "InventoryGateway", "kind": "port", "scope": "integration", "context": "sales", "purpose": "Hides inventory language behind a sales-owned interface.", "status": "target" },
+    { "id": "bb.sales.customer-root", "name": "Customer", "kind": "aggregate-root", "scope": "aggregate", "context": "sales", "aggregate": "sales.customer", "purpose": "Owns customer identity and status.", "status": "target" },
+    { "id": "bb.shared.money", "name": "Money", "kind": "value-object", "scope": "shared-kernel", "purpose": "Models amount and currency immutably.", "status": "target" },
+    { "id": "bb.shared.domain-event", "name": "DomainEvent", "kind": "domain-event", "scope": "integration", "purpose": "Publishes a past-tense fact after a successful transaction.", "status": "target" }
+  ],
+  "decisions": [
+    {
+      "id": "decision.no-cross-context-imports",
+      "decision": "Contexts communicate through ports, translated snapshots, or domain events.",
+      "rationale": "Keeps bounded-context language and ownership independent.",
+      "status": "accepted"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "question.stock-truth",
+      "question": "Is stock quantity derived from physical items, maintained as a stock aggregate, or both?",
+      "impact": "Affects inventory consistency and read-model design.",
+      "owner": "Inventory",
+      "status": "open"
+    }
+  ],
+  "sources": [
+    "docs/ARCHITECTURE.md",
+    "docs/MAP.md",
+    "docs/CHEATSHEET.md",
+    "docs/domain/product-model/handover.md"
+  ]
+}
