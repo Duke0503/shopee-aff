@@ -474,6 +474,10 @@ cannot be demoted.
   time.
 
 #### FR-25: Overview (one landing screen)
+
+The content, formulas and time bases of every figure are specified in
+`docs/operations/dashboard-spec.md`; the owner can read, for any period, what the networks paid,
+what customers received, what each event cost and the final profit.
 Staff can see in one screen what needs them now and the state of the business (FR-27 metrics in one quiet line): payable customers, review cases, failed links,
 the health of the browser bridge, the Zalo assistant and the last reconciliation.
 

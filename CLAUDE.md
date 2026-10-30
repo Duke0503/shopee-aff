@@ -73,8 +73,9 @@ Applies whenever the conversation is about screens, layout, colours or UX, even 
 - **Everything is written in English** (D15): code, comments, docs, commit messages, the domain
   model, decisions and logs. **Chat in the person's language**; record a decision given in
   Vietnamese in English.
-- **Customer-facing text is Vietnamese** and lives only in `resources/messages.vi.json` and
-  `resources/dashboard.vi.json`. No Vietnamese and no emoji in code.
+- **Customer-facing text is Vietnamese.** The live system's text is in `resources/` (never edited from
+  main-v2); the new platform's labels and messages live only in `packages/labels/vi/` (D57). No
+  Vietnamese and no emoji in code.
 - **Professional and plain.** Standard terms, defined on first use, short sentences, the same
   domain terms everywhere (ubiquitous language). Rules in `docs/rules/writing.md`.
 - Planning documents are committed; the GitHub repository must be private first (D16).
