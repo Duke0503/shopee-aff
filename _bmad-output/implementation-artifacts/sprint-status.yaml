@@ -37,9 +37,9 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   epic-1: in-progress
   1-1-workspace-on-the-pinned-stack-with-required-checks-in-ci: review
-  1-2-money-package-computes-the-fr-13-split-with-golden-tests: review
-  1-3-time-module-stores-utc-instants-and-computes-vietnam-busines: review
-  1-4-server-walking-skeleton-answers-its-health-route-through-the: review
+  1-2-money-package-computes-the-fr-13-split-with-golden-tests: done
+  1-3-time-module-stores-utc-instants-and-computes-vietnam-busines: done
+  1-4-server-walking-skeleton-answers-its-health-route-through-the: done
   1-5-config-single-instance-lock-and-redacted-logs: backlog
   1-6-ledger-database-with-the-synchronous-transaction-helper: backlog
   1-7-migrations-run-only-after-a-checked-local-backup: backlog
