@@ -1,0 +1,62 @@
+{
+  "rule": "fromNetworkUnits",
+  "source": "AD-5",
+  "cases": [
+    {
+      "name": "Shopee units 926250000",
+      "input": {
+        "value": 926250000,
+        "scale": 100000
+      },
+      "expected": 9263
+    },
+    {
+      "name": "Shopee units .5 boundary 50000",
+      "input": {
+        "value": 50000,
+        "scale": 100000
+      },
+      "expected": 1
+    },
+    {
+      "name": "Shopee units just below .5",
+      "input": {
+        "value": 49999,
+        "scale": 100000
+      },
+      "expected": 0
+    },
+    {
+      "name": "Decimal string 12345.5",
+      "input": {
+        "value": "12345.5",
+        "scale": 1
+      },
+      "expected": 12346
+    },
+    {
+      "name": "Decimal string 12345.49",
+      "input": {
+        "value": "12345.49",
+        "scale": 1
+      },
+      "expected": 12345
+    },
+    {
+      "name": "Negative -2.5",
+      "input": {
+        "value": "-2.5",
+        "scale": 1
+      },
+      "expected": -3
+    },
+    {
+      "name": "Plain integer AccessTrade",
+      "input": {
+        "value": 36000,
+        "scale": 1
+      },
+      "expected": 36000
+    }
+  ]
+}

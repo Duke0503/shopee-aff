@@ -1,10 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"],
-    "verbatimModuleSyntax": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "types": ["node"]
   },
-  "include": ["src", "drizzle.config.ts", "tests"]
+  "include": ["src", "tests"]
 }

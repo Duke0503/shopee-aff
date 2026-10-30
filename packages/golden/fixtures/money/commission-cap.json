@@ -1,30 +1,89 @@
 {
-  "rule": "commission_estimate",
-  "source": "src/cashback/shopee/commission.py::_build",
+  "rule": "shopeeCommission",
+  "source": "D2",
   "cases": [
     {
-      "name": "5,290,000d at 7% + 3% is 198,700d with the cap (would be 529,000d without)",
-      "input": { "price": 5290000, "shopee_rate": 7, "seller_rate": 3 },
+      "name": "84,600,000 at 3% Shopee, 0% XTRA",
+      "input": {
+        "price": 84600000,
+        "shopeeRateBps": 300,
+        "xtraRateBps": 0
+      },
       "expected": {
-        "commission": 198700,
-        "shopee_part": 40000,
-        "seller_part": 158700,
-        "is_capped": true
+        "shopeePart": 40000,
+        "xtraPart": 0,
+        "commission": 40000,
+        "capped": true
       }
     },
     {
-      "name": "below the cap, no XTRA part",
-      "input": { "price": 100000, "shopee_rate": 5, "seller_rate": 0 },
-      "expected": { "commission": 5000, "shopee_part": 5000, "seller_part": 0, "is_capped": false }
+      "name": "84,600,000 at 3% Shopee, 2% XTRA",
+      "input": {
+        "price": 84600000,
+        "shopeeRateBps": 300,
+        "xtraRateBps": 200
+      },
+      "expected": {
+        "shopeePart": 40000,
+        "xtraPart": 1692000,
+        "commission": 1732000,
+        "capped": true
+      }
     },
     {
-      "name": "Shopee part exactly at the cap is not flagged as capped",
-      "input": { "price": 400000, "shopee_rate": 10, "seller_rate": 0 },
+      "name": "450,000 at 2.6% Shopee",
+      "input": {
+        "price": 450000,
+        "shopeeRateBps": 260,
+        "xtraRateBps": 0
+      },
       "expected": {
+        "shopeePart": 11700,
+        "xtraPart": 0,
+        "commission": 11700,
+        "capped": false
+      }
+    },
+    {
+      "name": "Exactly at the cap 1,000,000 at 4%",
+      "input": {
+        "price": 1000000,
+        "shopeeRateBps": 400,
+        "xtraRateBps": 0
+      },
+      "expected": {
+        "shopeePart": 40000,
+        "xtraPart": 0,
         "commission": 40000,
-        "shopee_part": 40000,
-        "seller_part": 0,
-        "is_capped": false
+        "capped": false
+      }
+    },
+    {
+      "name": "Half dong boundary 50 at 1%",
+      "input": {
+        "price": 50,
+        "shopeeRateBps": 100,
+        "xtraRateBps": 0
+      },
+      "expected": {
+        "shopeePart": 1,
+        "xtraPart": 0,
+        "commission": 1,
+        "capped": false
+      }
+    },
+    {
+      "name": "Half dong 150 at 1%",
+      "input": {
+        "price": 150,
+        "shopeeRateBps": 100,
+        "xtraRateBps": 0
+      },
+      "expected": {
+        "shopeePart": 2,
+        "xtraPart": 0,
+        "commission": 2,
+        "capped": false
       }
     }
   ]

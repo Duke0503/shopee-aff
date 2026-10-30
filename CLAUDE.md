@@ -24,6 +24,22 @@ One monorepo. Start Claude Code at the repository root so every skill and rule l
 
 Git rules are in `docs/rules/git.md`.
 
+## Commands (new platform, main-v2)
+
+pnpm 12 through corepack (`corepack enable pnpm`). Node 24.
+
+```bash
+pnpm install          # workspace install (esbuild build allowed in pnpm-workspace.yaml)
+pnpm test             # Vitest in every package, golden money fixtures included
+pnpm typecheck        # tsc per package
+pnpm lint             # code.md guardrails: names, sizes, money rounding, clock, process.env
+pnpm depcruise        # module boundaries
+pnpm guard:paths      # fails if production paths owned by main changed
+cd apps/server && INTERNAL_TOKEN=<32+ chars> pnpm dev   # public :9080, internal :9081 (dev ports)
+```
+
+`reference/v2/` holds the earlier v2 attempt, read-only and outside the workspace.
+
 ## Planning work
 
 - The workflow and the location of every current artifact are in `docs/index.md`. Keep its

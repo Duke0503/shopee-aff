@@ -1,85 +1,45 @@
-// eslint.config.mjs — architecture guardrails for the v2 monorepo (ADR-10).
-// Rules enforced here (see docs/architecture-v2/05-migration/03-coding-rules.md):
-//   - file names: kebab-case + a role suffix from the allowed list (plain names
-//     are allowed for small pure-function modules, e.g. money.ts)
-//   - max-lines: 400 for server/lib .ts, 300 for frontend .ts/.tsx
-//   - max-lines-per-function: 60
+// eslint.config.mjs — guardrails from docs/rules/code.md (AD-3, NFR-9).
+//   - file names: kebab-case with an optional role suffix (§2)
+//   - size: 400 lines per server/package .ts file, 300 per frontend file, 60 per function (§3)
+//   - money: no Math.round / toFixed / legacy rounding in packages/money (§4)
+//   - time: no Date.now() or new Date() outside packages/core/src/time (§7)
+//   - config: no process.env outside apps/server/src/platform/config (§9)
 import js from "@eslint/js";
 import checkFile from "eslint-plugin-check-file";
 import tseslint from "typescript-eslint";
 
 const ROLES = [
-  "module",
-  "controller",
-  "use-case",
-  "repository",
-  "provider",
-  "registry",
-  "port",
-  "job",
-  "guard",
-  "client",
-  "source",
-  "template",
-  "styles",
-  "page",
-  "schema",
-  "types",
-  "config",
-  "service",
-  "queries",
-  "spec",
-  "test",
+  "routes", "command", "query", "repository", "list", "adapter", "port", "job", "guard",
+  "schema", "types", "config", "test", "page", "queries",
 ];
-
-// check-file uses micromatch (glob/extglob), NOT regular expressions. The
-// tested name has its LAST extension stripped, e.g. "customer.repository".
-//   KEBAB       = one or more kebab-case words
-//   *(.@(...))  = zero or more dot-role segments, e.g. "customer.repository.spec"
 const KEBAB = "+([a-z])*([a-z0-9])*(-+([a-z0-9]))";
 const FILE_NAME_PATTERN = `${KEBAB}*(.@(${ROLES.join("|")}))`;
 
 const SIZE_400 = ["error", { max: 400, skipBlankLines: true, skipComments: true }];
 const SIZE_300 = ["error", { max: 300, skipBlankLines: true, skipComments: true }];
 const FN_60 = ["error", { max: 60, skipBlankLines: true, skipComments: true }];
-const UNUSED_VARS = [
-  "error",
-  {
-    argsIgnorePattern: "^_",
-    varsIgnorePattern: "^_",
-    caughtErrorsIgnorePattern: "^_",
-  },
+
+const NO_CLOCK = [
+  { selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']", message: "Use a Clock from @cashback/core (code.md §7)." },
+  { selector: "NewExpression[callee.name='Date']", message: "Only packages/core/src/time creates dates (code.md §7)." },
+];
+const NO_ROUNDING = [
+  { selector: "CallExpression[callee.object.name='Math'][callee.property.name='round']", message: "Money rounds only with roundHalfUp (code.md §4)." },
+  { selector: "CallExpression[callee.property.name='toFixed']", message: "Money is whole dong; never toFixed (code.md §4)." },
+  { selector: "Identifier[name='legacyRoundHalfEven']", message: "Half-even rounding was retired by D34." },
 ];
 
 export default tseslint.config(
   {
     ignores: [
-      "**/dist/**",
-      "**/node_modules/**",
-      "**/coverage/**",
-      "src/**", // legacy Python backend
-      "web/**", // legacy React console (has its own tooling)
-      "zalo_assistant/**", // legacy Node assistant
-      "extension/**", // legacy Chrome extension
-      "scripts/**",
-      ".browser-profile/**", // locked Chrome profile used by the Shopee bridge
-      "backups/**",
-      "uploads/**",
-      "logs/**",
-      "scratch/**",
-      "resources/**",
-      "nginx/**",
-      "docs/**",
-      "_bmad/**",
-      "_bmad-output/**",
-      ".agents/**",
-      ".claude/**",
-      ".commandcode/**",
-      ".git/**",
-      ".venv/**",
-      "**/site-packages/**",
-      "**/*.d.ts",
-      "**/*.cjs",
+      "**/dist/**", "**/node_modules/**", "**/coverage/**",
+      // Production code on main and its tooling: never linted or changed from here.
+      "src/**", "web/**", "zalo_assistant/**", "extension/**", "resources/**", "tests/**",
+      "scripts/**", "nginx/**", "ops/**",
+      // Reference only: the earlier v2 attempt (AD-3 disposition table).
+      "reference/**",
+      "docs/**", "_bmad/**", "_bmad-output/**", ".claude/**", ".git/**", ".venv/**",
+      "**/*.d.ts", "**/*.cjs", "**/*.mjs",
     ],
   },
   js.configs.recommended,
@@ -88,34 +48,32 @@ export default tseslint.config(
     files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     plugins: { "check-file": checkFile },
     rules: {
-      "check-file/filename-naming-convention": [
-        "error",
-        { "**/*.{ts,tsx}": FILE_NAME_PATTERN },
-        { ignoreMiddleExtensions: false },
-      ],
-      "@typescript-eslint/no-unused-vars": UNUSED_VARS,
+      "check-file/filename-naming-convention": ["error", { "**/*.{ts,tsx}": FILE_NAME_PATTERN }, { ignoreMiddleExtensions: false }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "max-lines-per-function": FN_60,
+      "max-lines": SIZE_400,
+      "no-restricted-syntax": ["error", ...NO_CLOCK],
+      "no-restricted-properties": ["error", { object: "process", property: "env", message: "Read configuration through platform/config (code.md §9)." }],
     },
-  },
-  {
-    files: ["apps/**/*.ts", "packages/**/*.ts"],
-    rules: { "max-lines": SIZE_400 },
   },
   {
     files: ["apps/web/**/*.{ts,tsx}", "apps/admin/**/*.{ts,tsx}"],
     rules: { "max-lines": SIZE_300 },
   },
   {
-    // Generated by `drizzle-kit pull` — one flat file per schema, written by a
-    // tool, not by hand; exempt from the size and unused-var rules.
-    files: ["apps/server/src/shared/database/schema/**"],
-    rules: {
-      "max-lines": "off",
-      "@typescript-eslint/no-unused-vars": "off",
-    },
+    files: ["packages/money/**/*.ts"],
+    rules: { "no-restricted-syntax": ["error", ...NO_CLOCK, ...NO_ROUNDING] },
   },
   {
-    files: ["**/*.spec.ts", "**/*.test.ts", "**/tests/**/*.ts"],
+    files: ["packages/core/src/time/**/*.ts"],
+    rules: { "no-restricted-syntax": "off" },
+  },
+  {
+    files: ["apps/server/src/platform/config/**/*.ts"],
+    rules: { "no-restricted-properties": "off" },
+  },
+  {
+    files: ["**/tests/**/*.ts", "**/*.test.ts"],
     rules: { "max-lines": "off", "max-lines-per-function": "off" },
   },
 );

@@ -1,71 +1,58 @@
 /**
- * The cashback split: how one APPROVED commission becomes cashback.
- * Ports `core/policy.py::split_commission`, matching today's code to the dong.
+ * The commission split (FR-13, D34): how one approved commission becomes cashback.
  *
- *   fee      = round(C x 0.98%)                 (legacy: half to even)
- *   tax      = round(C x 10%)  only in a withheld period
- *   net      = C - fee - tax
- *   receives = roundDong(net x cashback_rate)    (half up)
- *   keeps    = net - receives
+ *   fee      = commission x feeBps            (shown rounded half-up)
+ *   tax      = commission x 10% when withheld (shown rounded half-up)
+ *   net      = commission - fee - tax
+ *   cashback = roundHalfUp(exactNet x 80%)    the only rounding a customer feels
+ *   operator = commission - fee - tax - cashback
+ *
+ * `exactNet` is the unrounded commission x (1 - fee - tax), kept as an exact
+ * fraction, so the cashback never inherits a rounded fee or tax.
  */
-import { legacyRoundHalfEven, roundDong } from "./rounding";
-import { WITHHOLDING_TAX_RATE, type TaxPolicy } from "./tax";
+import { assertNonNegativeDong, roundHalfUp } from "./rounding";
+import {
+  BPS,
+  CASHBACK_SHARE_BPS,
+  NETWORK_MONEY_RULES,
+  WITHHOLDING_TAX_BPS,
+  type AffiliateNetwork,
+} from "./network-rules";
 
-/** Shopee Affiliate service fee, VAT included (0.98% of what Shopee pays us). */
-export const SERVICE_FEE_RATE = 0.0098;
+export interface SplitInput {
+  approvedCommission: number;
+  network: AffiliateNetwork;
+  /** Whether the order's settlement period is withheld. Ignored for networks that always withhold. */
+  withheld: boolean;
+  /** The guest account (HOUSE) never earns cashback (D5). */
+  guest?: boolean;
+}
 
 export interface Split {
   approvedCommission: number;
-  serviceFee: number;
-  withheldTax: number;
-  nominalCashback: number;
-  customerReceives: number;
-  operatorKeeps: number;
+  fee: number;
+  tax: number;
+  net: number;
+  cashback: number;
+  operatorShare: number;
 }
 
-const ZERO_SPLIT: Split = {
-  approvedCommission: 0,
-  serviceFee: 0,
-  withheldTax: 0,
-  nominalCashback: 0,
-  customerReceives: 0,
-  operatorKeeps: 0,
-};
+export function isWithheld(network: AffiliateNetwork, periodWithheld: boolean): boolean {
+  return NETWORK_MONEY_RULES[network].alwaysWithheld || periodWithheld;
+}
 
-/**
- * Split one approved order.
- *
- * `approvedCommission` must be the figure the platform actually approved,
- * never the estimate shown at link-creation time.
- *
- * `taxPolicy` is accepted for API parity with Python but is IGNORED, exactly
- * as today's code ignores it: in a withheld period the 10% always comes out of
- * the customer's share. See the open question in the ledger doc.
- */
-export function splitCommission(
-  approvedCommission: number,
-  cashbackRate: number,
-  periodIsWithheld: boolean,
-  _taxPolicy: TaxPolicy = "user_absorbs",
-): Split {
-  if (approvedCommission <= 0) {
-    return { ...ZERO_SPLIT };
-  }
+export function splitCommission(input: SplitInput): Split {
+  const commission = assertNonNegativeDong(input.approvedCommission, "approvedCommission");
+  const rules = NETWORK_MONEY_RULES[input.network];
+  const taxBps = isWithheld(input.network, input.withheld) ? WITHHOLDING_TAX_BPS : 0n;
+  const c = BigInt(commission);
 
-  const serviceFee = legacyRoundHalfEven(approvedCommission * SERVICE_FEE_RATE);
-  const withheldTax = periodIsWithheld
-    ? legacyRoundHalfEven(approvedCommission * WITHHOLDING_TAX_RATE)
-    : 0;
-  const net = approvedCommission - serviceFee - withheldTax;
-  const customerReceives = roundDong(net * cashbackRate);
-  const operatorKeeps = net - customerReceives;
+  const fee = roundHalfUp(c * rules.feeBps, BPS);
+  const tax = roundHalfUp(c * taxBps, BPS);
+  const net = commission - fee - tax;
+  const exactNetTimesBps = c * (BPS - rules.feeBps - taxBps);
+  const cashback = input.guest ? 0 : roundHalfUp(exactNetTimesBps * CASHBACK_SHARE_BPS, BPS * BPS);
+  const operatorShare = commission - fee - tax - cashback;
 
-  return {
-    approvedCommission,
-    serviceFee,
-    withheldTax,
-    nominalCashback: customerReceives,
-    customerReceives,
-    operatorKeeps,
-  };
+  return { approvedCommission: commission, fee, tax, net, cashback, operatorShare };
 }

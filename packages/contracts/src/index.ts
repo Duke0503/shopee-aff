@@ -1,8 +1,2 @@
-export * from "./platform";
-export * from "./customer.schema";
-export * from "./order.schema";
-export * from "./link-request.schema";
-export * from "./ledger.schema";
-export * from "./bridge.schema";
-export * from "./api-client";
-export * from "./assistant-client";
+export { ERROR_CODES, ERROR_STATUS, errorEnvelopeSchema, type ErrorCode, type ErrorEnvelope } from "./error.schema";
+export { healthResponseSchema, type HealthResponse } from "./health.schema";

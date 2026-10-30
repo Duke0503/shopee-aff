@@ -1,38 +1,27 @@
 /**
- * Architecture boundaries, checked by a program (ADR-10).
- *   - no import cycles
- *   - `domain/` stays plain TypeScript (no NestJS, no Drizzle)
- *   - a server module reaches another module only through its `index.ts`
- *   - frontend imports go DOWN the Feature-Sliced layers
+ * Architecture boundaries checked in CI (AD-1, code.md §1).
+ *   - no import cycles, every import resolves
+ *   - packages/money and packages/core have no framework, database or app imports
+ *   - a server module reaches another module only through its index.ts
+ *   - module domain/ code stays pure
+ *   - nothing imports the reference/ code of the earlier v2 attempt
  */
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+    { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
+    { name: "no-unresolvable", severity: "error", from: {}, to: { couldNotResolve: true } },
     {
-      name: "no-circular",
+      name: "pure-packages",
       severity: "error",
-      comment: "A cycle makes every change riskier.",
-      from: {},
-      to: { circular: true },
-    },
-    {
-      name: "no-unresolvable",
-      severity: "error",
-      comment: "Every import must resolve.",
-      from: {},
-      to: { couldNotResolve: true },
-    },
-    {
-      name: "domain-stays-pure",
-      severity: "error",
-      comment: "domain/ is plain TypeScript: no NestJS, no Drizzle, no SQLite driver.",
-      from: { path: "^apps/server/src/modules/[^/]+/domain/" },
-      to: { path: "node_modules/(@nestjs|drizzle-orm|better-sqlite3)" },
+      comment: "money and core are pure: no Fastify, Drizzle, SQLite driver or app code.",
+      from: { path: "^packages/(money|core)/src/" },
+      to: { path: ["node_modules/(fastify|drizzle-orm|better-sqlite3)", "^apps/"] },
     },
     {
       name: "server-module-walls",
       severity: "error",
-      comment: "A server module may only reach another module through its index.ts.",
+      comment: "A module may only reach another module through its index.ts.",
       from: { path: "^apps/server/src/modules/([^/]+)/" },
       to: {
         path: "^apps/server/src/modules/[^/]+/",
@@ -40,31 +29,24 @@ module.exports = {
       },
     },
     {
-      name: "fsd-shared-is-a-leaf",
+      name: "domain-stays-pure",
       severity: "error",
-      from: { path: "^apps/(web|admin)/src/shared/" },
-      to: { path: "^apps/(web|admin)/src/(entities|features|pages)/" },
+      from: { path: "^apps/server/src/modules/[^/]+/domain/" },
+      to: { path: ["node_modules/(fastify|drizzle-orm|better-sqlite3)", "^apps/server/src/platform/"] },
     },
     {
-      name: "fsd-entities-stay-low",
+      name: "no-reference-code",
       severity: "error",
-      from: { path: "^apps/(web|admin)/src/entities/" },
-      to: { path: "^apps/(web|admin)/src/(features|pages)/" },
-    },
-    {
-      name: "fsd-features-stay-below-pages",
-      severity: "error",
-      from: { path: "^apps/(web|admin)/src/features/" },
-      to: { path: "^apps/(web|admin)/src/pages/" },
+      comment: "reference/ is read-only history of the earlier v2 attempt.",
+      from: {},
+      to: { path: "^reference/" },
     },
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(node_modules|/dist/|/coverage/|/\\.data/|/tests?/|\\.spec\\.|\\.test\\.)" },
+    exclude: { path: "(^|/)(node_modules|dist|coverage)/" },
     tsPreCompilationDeps: true,
-    enhancedResolveOptions: {
-      exportsFields: ["exports"],
-      conditionNames: ["import", "require", "node", "default"],
-    },
+    tsConfig: { fileName: "tsconfig.base.json" },
+    enhancedResolveOptions: { exportsFields: ["exports"], conditionNames: ["import", "default"] },
   },
 };

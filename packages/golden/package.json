@@ -1,24 +1,19 @@
 {
-  "name": "@mmo/golden",
+  "name": "@cashback/golden",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared golden test examples (JSON) that both Python and TypeScript must pass.",
+  "description": "Golden fixtures (JSON, computed with exact fractions) that the money package must reproduce to the dong.",
   "main": "./src/runner.ts",
   "types": "./src/runner.ts",
   "exports": {
     ".": "./src/runner.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "@mmo/money": "workspace:*"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "@cashback/money": "workspace:*"
   }
 }

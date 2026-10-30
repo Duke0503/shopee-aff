@@ -1,24 +1,19 @@
 {
-  "name": "@mmo/contracts",
+  "name": "@cashback/contracts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Zod schemas and types shared by the server, frontends and the browser bridge.",
+  "description": "Every request and response shape as a Zod schema, and the one error envelope (AD-20).",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "zod": "^3.23.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "zod": "4.6.7"
   }
 }

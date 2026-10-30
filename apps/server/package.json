@@ -1,32 +1,19 @@
 {
-  "name": "@mmo/server",
+  "name": "@cashback/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Architecture v2 backend: NestJS + Fastify, Drizzle over the shared SQLite file.",
+  "description": "The one server: seven modules, the two listeners, the jobs, the only writer of the ledger database.",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "db:pull": "drizzle-kit pull",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@mmo/contracts": "workspace:*",
-    "@mmo/money": "workspace:*",
-    "@nestjs/common": "11",
-    "@nestjs/core": "11",
-    "@nestjs/platform-fastify": "11",
-    "better-sqlite3": "^13.0.3",
-    "drizzle-orm": "^0.36.4",
-    "fastify": "5",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^22.0.0",
-    "drizzle-kit": "^0.28.1",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "@cashback/contracts": "workspace:*",
+    "@cashback/core": "workspace:*",
+    "@cashback/money": "workspace:*",
+    "fastify": "5.12.7"
   }
 }

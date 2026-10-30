@@ -1,106 +1,176 @@
 {
-  "rule": "split_commission",
-  "source": "src/cashback/core/policy.py::split_commission",
+  "rule": "splitCommission",
+  "source": "PRD FR-13, D34",
   "cases": [
     {
-      "name": "normal period, 12,000d approved, 80%",
+      "name": "Shopee 100,000 not withheld",
       "input": {
-        "approved_commission": 12000,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": false
+        "approvedCommission": 100000,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
       },
       "expected": {
-        "service_fee": 118,
-        "withheld_tax": 0,
-        "customer_receives": 9506,
-        "operator_keeps": 2376
+        "approvedCommission": 100000,
+        "fee": 980,
+        "tax": 0,
+        "net": 99020,
+        "cashback": 79216,
+        "operatorShare": 19804
       }
     },
     {
-      "name": "withheld period, 12,000d approved, 80%",
+      "name": "Shopee 100,000 withheld",
       "input": {
-        "approved_commission": 12000,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": true
+        "approvedCommission": 100000,
+        "network": "shopee",
+        "withheld": true,
+        "guest": false
       },
       "expected": {
-        "service_fee": 118,
-        "withheld_tax": 1200,
-        "customer_receives": 8546,
-        "operator_keeps": 2136
+        "approvedCommission": 100000,
+        "fee": 980,
+        "tax": 10000,
+        "net": 89020,
+        "cashback": 71216,
+        "operatorShare": 17804
       }
     },
     {
-      "name": "withheld period, 12,345d — tax rounds a half to even (1,234)",
+      "name": "AccessTrade 50,000",
       "input": {
-        "approved_commission": 12345,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": true
+        "approvedCommission": 50000,
+        "network": "accesstrade",
+        "withheld": false,
+        "guest": false
       },
       "expected": {
-        "service_fee": 121,
-        "withheld_tax": 1234,
-        "customer_receives": 8792,
-        "operator_keeps": 2198
+        "approvedCommission": 50000,
+        "fee": 0,
+        "tax": 5000,
+        "net": 45000,
+        "cashback": 36000,
+        "operatorShare": 9000
       }
     },
     {
-      "name": "normal period, 12,345d",
+      "name": "Shopee 12,000 not withheld",
       "input": {
-        "approved_commission": 12345,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": false
+        "approvedCommission": 12000,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
       },
       "expected": {
-        "service_fee": 121,
-        "withheld_tax": 0,
-        "customer_receives": 9779,
-        "operator_keeps": 2445
+        "approvedCommission": 12000,
+        "fee": 118,
+        "tax": 0,
+        "net": 11882,
+        "cashback": 9506,
+        "operatorShare": 2376
       }
     },
     {
-      "name": "withheld period, 12,500d — fee rounds a half to even (122)",
+      "name": "Shopee 11,693 not withheld (rice cooker example)",
       "input": {
-        "approved_commission": 12500,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": true
+        "approvedCommission": 11693,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
       },
       "expected": {
-        "service_fee": 122,
-        "withheld_tax": 1250,
-        "customer_receives": 8902,
-        "operator_keeps": 2226
+        "approvedCommission": 11693,
+        "fee": 115,
+        "tax": 0,
+        "net": 11578,
+        "cashback": 9263,
+        "operatorShare": 2315
       }
     },
     {
-      "name": "owner_absorbs gives the same result as user_absorbs (known deviation)",
+      "name": "Shopee 3,218,400 monthly total",
       "input": {
-        "approved_commission": 12000,
-        "cashback_rate": 0.8,
-        "tax_policy": "owner_absorbs",
-        "period_is_withheld": true
+        "approvedCommission": 3218400,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
       },
       "expected": {
-        "service_fee": 118,
-        "withheld_tax": 1200,
-        "customer_receives": 8546,
-        "operator_keeps": 2136
+        "approvedCommission": 3218400,
+        "fee": 31540,
+        "tax": 0,
+        "net": 3186860,
+        "cashback": 2549488,
+        "operatorShare": 637372
       }
     },
     {
-      "name": "zero commission splits to all zeros",
+      "name": "Shopee 1 dong",
       "input": {
-        "approved_commission": 0,
-        "cashback_rate": 0.8,
-        "tax_policy": "user_absorbs",
-        "period_is_withheld": true
+        "approvedCommission": 1,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
       },
-      "expected": { "service_fee": 0, "withheld_tax": 0, "customer_receives": 0, "operator_keeps": 0 }
+      "expected": {
+        "approvedCommission": 1,
+        "fee": 0,
+        "tax": 0,
+        "net": 1,
+        "cashback": 1,
+        "operatorShare": 0
+      }
+    },
+    {
+      "name": "Shopee 0 dong",
+      "input": {
+        "approvedCommission": 0,
+        "network": "shopee",
+        "withheld": false,
+        "guest": false
+      },
+      "expected": {
+        "approvedCommission": 0,
+        "fee": 0,
+        "tax": 0,
+        "net": 0,
+        "cashback": 0,
+        "operatorShare": 0
+      }
+    },
+    {
+      "name": "Guest order 100,000",
+      "input": {
+        "approvedCommission": 100000,
+        "network": "shopee",
+        "withheld": false,
+        "guest": true
+      },
+      "expected": {
+        "approvedCommission": 100000,
+        "fee": 980,
+        "tax": 0,
+        "net": 99020,
+        "cashback": 0,
+        "operatorShare": 99020
+      }
+    },
+    {
+      "name": "Shopee 9,999,999,999 large",
+      "input": {
+        "approvedCommission": 9999999999,
+        "network": "shopee",
+        "withheld": true,
+        "guest": false
+      },
+      "expected": {
+        "approvedCommission": 9999999999,
+        "fee": 98000000,
+        "tax": 1000000000,
+        "net": 8901999999,
+        "cashback": 7121599999,
+        "operatorShare": 1780400000
+      }
     }
   ]
 }
