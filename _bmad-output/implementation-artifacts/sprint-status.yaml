@@ -266,12 +266,13 @@ sprint_plan:
       - 4-9-proof-image-upload-and-the-facts-only-receipt-page
       - 4-10-void-a-mistaken-payout
   - sprint: 17
-    goal: "Payout history, orders list, withheld settings"
-    points: 4
+    goal: "Payout history, orders list, withheld settings, network payouts matched to orders"
+    points: 6
     stories:
       - 4-12-payout-history-lists-every-payout-including-voided-ones
       - 4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac
       - 4-18-settings-mark-a-shopee-settlement-period-withheld-or-not
+      - 4-21-network-payouts-matched-to-exact-orders
   - sprint: 18
     goal: "Customers, customer page, review queue screen"
     points: 4
