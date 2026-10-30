@@ -51,3 +51,11 @@ export interface OutboxMessage {
 export interface OutboxPort {
   enqueue(message: OutboxMessage): void;
 }
+
+/**
+ * Whether a customer was already told something: an outbox row with the key exists, enqueued by an
+ * event or seeded by the cutover as sent (D46). A correction (a payout void) is sent only then.
+ */
+export interface OutboxLookup {
+  told(dedupKey: string): boolean;
+}

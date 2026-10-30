@@ -112,7 +112,7 @@ function Line({ title, amount, image, note }: { readonly title: string; readonly
 }
 
 function CoveredLines({ preview }: { readonly preview: Preview }) {
-  const count = preview.orders.length + preview.bonuses.length;
+  const count = preview.orders.length + preview.bonuses.length + preview.refunds.length;
   return (
     <section className="min-w-0">
       <h3 className="text-sm font-semibold">{adminText("panel_covered", { count })}</h3>
@@ -122,6 +122,9 @@ function CoveredLines({ preview }: { readonly preview: Preview }) {
         ))}
         {preview.bonuses.map((b) => (
           <Line key={`award-${b.awardId}`} title={adminText("panel_bonus", { campaign: b.campaignName })} amount={<MoneyFigure amount={b.amount} />} />
+        ))}
+        {preview.refunds.map((r) => (
+          <Line key={`refund-${r.clawbackId}`} title={adminText("panel_refund", { order: r.orderId ?? r.clawbackId })} amount={<MoneyFigure amount={r.amount} />} />
         ))}
         {preview.clawbacks.map((c) => (
           <Line key={`claw-${c.clawbackId}`} title={adminText("panel_deducted", { order: c.orderId ?? c.clawbackId })} amount={<span className="text-sm font-semibold text-status-rejected tabular-nums">{formatMoney(c.open)}</span>} />

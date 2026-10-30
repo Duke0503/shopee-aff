@@ -61,6 +61,7 @@ export function preview(overrides: Partial<PayoutPreview> = {}): PayoutPreview {
     ],
     bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: fixtures.campaign, amount: 20000 }],
     clawbacks: [],
+    refunds: [],
     warning: null,
     ...overrides,
   };
@@ -110,7 +111,7 @@ export function payoutServer(
     const method = init?.method ?? "GET";
     const path = url.pathname;
     if (!path.startsWith("/api/admin/payout")) return undefined;
-    calls.push({ method, path, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) });
+    calls.push({ method, path, body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body });
     if (path === "/api/admin/payouts") return list(url);
     const claimed = /^\/api\/admin\/payouts\/([^/]+)\/claim$/.exec(path);
     if (claimed !== null) return claim(claimed[1] ?? "");

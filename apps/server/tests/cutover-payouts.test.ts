@@ -45,7 +45,8 @@ describe("Story 2.4 acceptance criteria", () => {
     const live = new Database(source, { readonly: true });
     try {
       withLedger(targetPath, (ledger) => {
-        ledger.sqlite.exec("UPDATE payouts SET transfer_amount = 6000 WHERE payout_id = 1");
+        // A recorded amount never changes (0015's trigger); the corruption is simulated past it.
+        ledger.sqlite.exec("DROP TRIGGER payouts_facts_fixed; UPDATE payouts SET transfer_amount = 6000 WHERE payout_id = 1");
         expect(fullPaidParity(live, ledger.sqlite, new Set(["HOUSE"]))).toEqual({
           result: "fail",
           customers: 3,
@@ -74,7 +75,7 @@ describe("Story 2.4 acceptance criteria", () => {
     expect(run.report.comparison["payouts"]).toEqual({ source: 3, imported: 3, mismatches: [] });
     withLedger(run.targetPath, (ledger) => {
       const receipt = ledger.tx((db) => findReceipt(db, "Rk3vQ9xZtYw2mN8pL4sH6dF1gJ0aBcDe"));
-      expect(receipt).toEqual({ payoutId: 1, customerCode: "DP00001", bankLastFour: "4455", amount: 6232, recordedAt: "2026-10-05T03:00:05.000Z", voided: false });
+      expect(receipt).toEqual({ payoutId: 1, customerCode: "DP00001", bankLastFour: "4455", amount: 6232, recordedAt: "2026-10-05T03:00:05.000Z", voided: false, voidedAt: null });
       expect(ledger.tx((db) => findReceipt(db, "Zq8wE7rT6yU5iO4p-3sD2fG1hJ0kL9m_"))).toMatchObject({ payoutId: 2, customerCode: "DP00003", amount: 30000 });
       // An old /b/<number> link and an unknown token find nothing.
       for (const token of ["1", "", "Rk3vQ9xZtYw2mN8pL4sH6dF1gJ0aBcDx", "../etc/passwd"]) expect(ledger.tx((db) => findReceipt(db, token))).toBeNull();

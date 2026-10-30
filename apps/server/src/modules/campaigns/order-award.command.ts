@@ -64,6 +64,30 @@ export function payAwards(db: LedgerDb, clock: Clock, awardIds: readonly number[
   return db.select({ awardId: campaignAwards.awardId }).from(campaignAwards).where(and(inArray(campaignAwards.awardId, ids), eq(campaignAwards.status, "PAID"))).all().length;
 }
 
+/**
+ * A payout void (Story 4.10, D41): the named awards the voided payout paid go back to CONFIRMED,
+ * or to VOID when `voided` names them because their order is now REVERSED or REJECTED. Only
+ * awards still PAID move, so a bonus another payout paid is never touched.
+ */
+export function returnPaidAwards(db: LedgerDb, clock: Clock, awards: { readonly confirmed: readonly number[]; readonly voided: readonly number[] }, by: CommandAudit): number {
+  const at = clock.now();
+  let moved = 0;
+  for (const [ids, set, event] of [
+    [awards.confirmed, { status: "CONFIRMED" as const, paidAt: null }, "payout_voided"],
+    [awards.voided, { status: "VOID" as const, paidAt: null, voidedAt: at }, "voided"],
+  ] as const) {
+    if (ids.length === 0) continue;
+    const result = db
+      .update(campaignAwards)
+      .set(set)
+      .where(and(inArray(campaignAwards.awardId, [...ids]), eq(campaignAwards.status, "PAID")))
+      .run();
+    if (result.changes > 0) by.audit.record({ actor: by.actor, event: `campaigns.award.${event}`, entityId: ids.join(","), payload: { awards: result.changes } });
+    moved += result.changes;
+  }
+  return moved;
+}
+
 /** The orders port bound to one transaction's handle. */
 export function orderAwardsFor(db: LedgerDb, clock: Clock, by: CommandAudit): OrderAwardsPort {
   return { paidBonus: (orderId) => paidBonusOn(db, orderId), move: (orderId, to) => void moveAwards(db, clock, orderId, to, by) };

@@ -20,6 +20,7 @@ export { nextVnTimeOfDay, type VnTimeOfDay } from "./time/daily";
 export { parseLegacyTime, type LegacyTime, type NaiveZone } from "./time/legacy";
 export { LIKE_ESCAPE, matchesSearch, searchPattern, searchText, type SearchText } from "./text/search-text";
 export { sortKey, type SortKey } from "./text/sort-key";
+export { formatAmountDigits } from "./text/amount-digits";
 export {
   STATUS_REGISTRY,
   TONES,

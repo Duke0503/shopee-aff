@@ -7,22 +7,23 @@
  * amount and no order list: everything here is the server's (INV-4).
  *
  * The hash covers exactly what confirm re-checks (Story 4.8): customer, order ids with their
- * stored cashback, award ids with their amounts, clawback ids with their open amounts, the
+ * stored cashback, award ids with their amounts, clawback ids with their open amounts, the void
+ * credits it pays back (Story 4.10), the
  * amount, and, when money moves, the bank account as a whole: its fingerprint, the hold flag, the
  * bank as written (folded), the VietQR BIN it matches and the holder. A change to any of them is a
  * new claim. A netting-only snapshot (amount 0) pays into no account, so a bank edit leaves its
  * hash, and the confirm, alone.
  */
 import { createHash } from "node:crypto";
-import { clawbackOpenAmount, nettingPlan, openClawbackTotal, sumDong, type NettingPlan } from "@cashback/money";
-import { inArray, sql } from "drizzle-orm";
+import { clawbackOpenAmount, creditOpenAmount, nettingPlan, openClawbackTotal, sumDong, type NettingPlan } from "@cashback/money";
+import { and, inArray, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { confirmedBonusLines, type BonusLine } from "../campaigns/index";
 import { bankAccountsOf, customerCardOf, customerKeys, plainBankText, type BankAccountFacts } from "../identity/index";
 import { orderBalanceRows, payableOrderLines, type PayableOrderLine } from "../orders/index";
 import { getBalances, type Balance } from "./balance.query";
-import { ledgerEntries } from "./schema";
+import { CLAWBACK_KINDS, CREDIT_KINDS, ledgerEntries, type LEDGER_ENTRY_KINDS } from "./schema";
 
 export interface ClawbackLine {
   readonly clawbackId: string;
@@ -33,6 +34,15 @@ export interface ClawbackLine {
   readonly open: number;
 }
 
+/** A credit a payout void left (netting a clawback already took), paid with this payout. */
+export interface RefundLine {
+  readonly clawbackId: string;
+  readonly customerId: string;
+  readonly orderId: string | null;
+  /** Still owed to the customer, positive. */
+  readonly amount: number;
+}
+
 export interface PayoutSnapshot {
   readonly customerId: string;
   readonly customerCode: string | null;
@@ -41,6 +51,7 @@ export interface PayoutSnapshot {
   readonly orders: readonly PayableOrderLine[];
   readonly bonuses: readonly BonusLine[];
   readonly clawbacks: readonly ClawbackLine[];
+  readonly refunds: readonly RefundLine[];
   readonly bank: BankAccountFacts | null;
   readonly hash: string;
 }
@@ -52,19 +63,31 @@ export class PayoutSnapshotError extends Error {
   }
 }
 
-function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
-  const rows = db
+/** Entry sums per clawback id over `kinds`; order and customer are those of the `origin` entry (the clawback's original, or the credit). */
+function entrySums(db: LedgerDb, keys: readonly string[], kinds: readonly (typeof LEDGER_ENTRY_KINDS)[number][], origin: "CLAWBACK" | "NETTING_REFUND") {
+  return db
     .select({
       clawbackId: ledgerEntries.clawbackId,
       total: sql<number>`sum(${ledgerEntries.amount})`,
-      orderId: sql<string | null>`max(case when ${ledgerEntries.kind} = 'CLAWBACK' then ${ledgerEntries.orderId} end)`,
-      customerId: sql<string>`max(case when ${ledgerEntries.kind} = 'CLAWBACK' then ${ledgerEntries.customerId} end)`,
+      orderId: sql<string | null>`max(case when ${ledgerEntries.kind} = ${origin} then ${ledgerEntries.orderId} end)`,
+      customerId: sql<string>`max(case when ${ledgerEntries.kind} = ${origin} then ${ledgerEntries.customerId} end)`,
     })
     .from(ledgerEntries)
-    .where(inArray(ledgerEntries.customerId, [...keys]))
+    .where(and(inArray(ledgerEntries.customerId, [...keys]), inArray(ledgerEntries.kind, [...kinds])))
     .groupBy(ledgerEntries.clawbackId)
     .orderBy(ledgerEntries.clawbackId)
     .all();
+}
+
+/** The void credits still owed, one per clawback whose netting a void gave back. */
+function openRefunds(db: LedgerDb, keys: readonly string[]): RefundLine[] {
+  return entrySums(db, keys, CREDIT_KINDS, "NETTING_REFUND")
+    .map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, amount: creditOpenAmount([r.total]) }))
+    .filter((r) => r.amount > 0);
+}
+
+function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
+  const rows = entrySums(db, keys, CLAWBACK_KINDS, "CLAWBACK");
   return rows.map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, open: openClawbackTotal([clawbackOpenAmount([r.total])]) })).filter((c) => c.open > 0);
 }
 
@@ -75,6 +98,7 @@ export function snapshotHash(s: Omit<PayoutSnapshot, "hash" | "customerCode" | "
     orders: s.orders.map((o) => [o.orderId, o.cashback]),
     awards: s.bonuses.map((b) => [b.awardId, b.amount]),
     clawbacks: s.clawbacks.map((c) => [c.clawbackId, c.open]),
+    refunds: s.refunds.map((r) => [r.clawbackId, r.amount]),
     amount: s.balance.payable,
     bankFingerprint: bank?.fingerprint ?? null,
     bankHeld: bank?.held ?? null,
@@ -94,9 +118,10 @@ export function payoutSnapshot(db: LedgerDb, key: string): PayoutSnapshot | null
   if (balance === undefined) return null;
   const orders = payableOrderLines(db, found.keys, true);
   const bonuses = confirmedBonusLines(db, found.keys, orderBalanceRows(db, found.keys).frozenOrderIds);
-  if (sumDong([...orders.map((o) => o.cashback), ...bonuses.map((b) => b.amount)], "gross") !== balance.gross) throw new PayoutSnapshotError("lines_disagree_with_balance");
+  const refunds = openRefunds(db, found.keys);
+  if (sumDong([...orders.map((o) => o.cashback), ...bonuses.map((b) => b.amount), ...refunds.map((r) => r.amount)], "gross") !== balance.gross) throw new PayoutSnapshotError("lines_disagree_with_balance");
   const card = customerCardOf(db, customerId);
-  const parts = { customerId, balance, orders, bonuses, clawbacks: openClawbacks(db, found.keys), bank: bankAccountsOf(db, [customerId]).get(customerId) ?? null };
+  const parts = { customerId, balance, orders, bonuses, clawbacks: openClawbacks(db, found.keys), refunds, bank: bankAccountsOf(db, [customerId]).get(customerId) ?? null };
   return { ...parts, customerCode: card?.customerCode ?? null, customerName: card?.displayName ?? null, hash: snapshotHash(parts) };
 }
 

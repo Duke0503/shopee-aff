@@ -1,3 +1,4 @@
+export { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./components/alert-dialog";
 export { Badge, badgeVariants } from "./components/badge";
 export { Button, buttonVariants } from "./components/button";
 export { Input } from "./components/input";
@@ -5,6 +6,7 @@ export { Label } from "./components/label";
 export { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "./components/sheet";
 export { Skeleton } from "./components/skeleton";
 export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "./components/table";
+export { Textarea } from "./components/textarea";
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/tooltip";
 export { CodeChip, COPIED_FOR_MS, type CodeChipProps } from "./brand/code-chip";
 export { FilterChip, type FilterChipProps } from "./brand/filter-chip";

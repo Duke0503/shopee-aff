@@ -7,5 +7,6 @@
   "order_rejected": "Không được duyệt: {reason}",
   "clawback_opened": "Đơn {orderId} bị sàn huỷ sau khi mình đã chuyển tiền, mình sẽ trừ {amount} vào lần chuyển sau.",
   "clawback_commission_dropped": "Sàn giảm hoa hồng đơn {orderId} sau khi mình đã chuyển tiền, mình sẽ trừ {amount} vào lần chuyển sau.",
-  "payout_recorded": "Mình đã chuyển {amount} cho bạn. Biên nhận: hoantiendp.com/b/{receiptToken}"
+  "payout_recorded": "Mình đã chuyển {amount} cho bạn. Biên nhận: hoantiendp.com/b/{receiptToken}",
+  "payout_voided": "Mình ghi nhận nhầm lần chuyển {amount} trước đó nên đã huỷ ghi nhận. Biên nhận của lần đó nay hiện \"Đã huỷ ghi nhận\"; số dư của bạn đã được tính lại."
 }

@@ -22,7 +22,12 @@ export interface ServerDeps {
   staff?: { readonly gate: StaffGate; readonly routes: readonly StaffRoutes[] };
   /** Routes on the internal listener, behind its token (the admin commands of Story 4.20). */
   internal?: readonly InternalRoutes[];
+  /** Public routes on the public listener: the server pages and the signed-in customer's reads (Story 4.9). */
+  public?: readonly PublicRoutes[];
 }
+
+/** Adds public routes; each checks its own customer session where it needs one. */
+export type PublicRoutes = (app: FastifyInstance) => void;
 
 /** Adds routes to the internal listener; its token check already runs before each of them. */
 export type InternalRoutes = (app: FastifyInstance) => void;
@@ -42,6 +47,7 @@ function baseApp(logger: FastifyBaseLogger | undefined): FastifyInstance {
 export function buildServers(deps: ServerDeps): Servers {
   const publicApp = baseApp(deps.logger);
   registerHealthRoutes(publicApp, deps.clock);
+  for (const add of deps.public ?? []) add(publicApp);
   if (deps.staff) registerStaffRoutes(publicApp, deps.staff.gate, deps.staff.routes);
 
   const internalApp = baseApp(deps.logger);

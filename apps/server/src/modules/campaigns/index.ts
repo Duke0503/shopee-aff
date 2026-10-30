@@ -11,7 +11,7 @@ export {
   type ImportedCampaign,
 } from "./campaign-import.command";
 export { confirmedBonusByCustomer, confirmedBonusLines, type BonusLine } from "./award-balance.query";
-export { moveAwards, orderAwardsFor, paidBonusOn, payAwards } from "./order-award.command";
+export { moveAwards, orderAwardsFor, paidBonusOn, payAwards, returnPaidAwards } from "./order-award.command";
 export { CAMPAIGN_AWARD_STATUSES } from "./schema";
 export {
   CAMPAIGN_PLATFORMS,

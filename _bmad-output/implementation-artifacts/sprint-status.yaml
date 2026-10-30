@@ -82,8 +82,8 @@ development_status:
   4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action: review
   4-7-payout-claim-and-preview-with-vietqr: review
   4-8-confirm-a-payout-once-idempotently: review
-  4-9-proof-image-upload-and-the-facts-only-receipt-page: backlog
-  4-10-void-a-mistaken-payout: backlog
+  4-9-proof-image-upload-and-the-facts-only-receipt-page: review
+  4-10-void-a-mistaken-payout: review
   4-11-netting-only-payout-and-clawback-write-off: review
   4-12-payout-history-lists-every-payout-including-voided-ones: backlog
   4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac: backlog

@@ -25,6 +25,7 @@ export { DEFAULT_ARGON2, hashPassword, MAX_PASSWORD_LENGTH, verifyPassword, type
 export { newSessionToken, SESSION_TOKEN_BYTES, sessionTokenHash, type SessionToken } from "./session-token";
 export { endSession, openSession, STAFF_SESSION_MS, type OpenedSession, type SessionOwner } from "./session.command";
 export { staffNamesOf, staffSessionOf, staffSessionsFor } from "./staff-session.query";
+export { customerSessionOf } from "./customer-session.query";
 export { DUMMY_HASH, signInStaff, type StaffSignIn, type StaffSignInDeps, type StaffSignInInput } from "./staff-sign-in.command";
 export { staffSessionRoutes, type StaffSessionRouteDeps } from "./http/staff-session.routes";
 export {

@@ -12,7 +12,7 @@ import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import { payoutItems, payouts, type PayoutItemRow, type PayoutRow } from "./schema";
 
-export type ImportedPayout = Omit<PayoutRow, "origin" | "status" | "claimId" | "voidedAt" | "voidReason" | "payoutId"> & { payoutId: number };
+export type ImportedPayout = Omit<PayoutRow, "origin" | "status" | "claimId" | "voidedAt" | "voidReason" | "voidedBy" | "payoutId"> & { payoutId: number };
 export type ImportedPayoutItem = Omit<PayoutItemRow, "lineNo">;
 
 export interface PayoutsImport {

@@ -26,5 +26,17 @@
   "error.clawback.admin_only": "Chỉ quản trị viên được xoá nợ.",
   "error.clawback.clawback_not_found": "Không tìm thấy khoản trừ nợ này.",
   "error.clawback.clawback_closed": "Khoản trừ nợ này đã đóng.",
-  "error.clawback.reason_required": "Cần ghi lý do xoá nợ."
+  "error.clawback.reason_required": "Cần ghi lý do xoá nợ.",
+  "error.payout.admin_only": "Chỉ quản trị viên được huỷ ghi nhận chuyển tiền.",
+  "error.payout.reason_required": "Cần ghi lý do huỷ ghi nhận.",
+  "error.payout.payout_not_found": "Không tìm thấy lần chuyển này.",
+  "error.payout.void_inconsistent": "Các đơn của lần chuyển này không còn khớp nên chưa huỷ được. Báo quản trị viên kiểm tra.",
+  "error.proof.not_an_image": "Chỉ nhận ảnh JPEG hoặc PNG.",
+  "error.proof.malformed": "Ảnh bị lỗi hoặc không đọc được. Chụp lại rồi tải lên.",
+  "error.proof.too_large": "Ảnh quá lớn. Chọn ảnh nhỏ hơn 8 MB.",
+  "error.proof.not_found": "Lần chuyển này chưa có ảnh chuyển khoản.",
+  "error.proof.payout_not_found": "Không tìm thấy lần chuyển này.",
+  "error.proof.payout_voided": "Lần chuyển này đã huỷ ghi nhận nên không thêm ảnh.",
+  "error.proof.proof_not_needed": "Lần này chỉ trừ nợ, không chuyển tiền nên không cần ảnh.",
+  "error.proof.staff_only": "Chỉ nhân viên làm được việc này."
 }

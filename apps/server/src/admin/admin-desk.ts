@@ -7,10 +7,10 @@
 import type { Clock } from "@cashback/core";
 
 import { staffSessionRoutes, staffSessionsFor } from "../modules/identity/index";
-import { outboxFor } from "../modules/messaging/index";
+import { outboxFor, wasTold } from "../modules/messaging/index";
 import { auditFor, commandAudit } from "../modules/operations/index";
 import { reviewCaseRoutes } from "../modules/orders/index";
-import { payoutRoutes } from "../modules/payouts/index";
+import { payoutRecordRoutes, payoutRoutes, type ProofStore } from "../modules/payouts/index";
 import type { StaffAccessConfig } from "../platform/config/env.config";
 import type { Ledger } from "../platform/db/ledger";
 import type { Logger } from "../platform/log/logger";
@@ -28,6 +28,8 @@ export interface AdminDeskDeps {
   readonly keys?: AccessKeySource;
   /** Where a failed key fetch is reported while the held keys still verify. */
   readonly logger?: Logger;
+  /** Where proof images are kept: data/<env>/files/proofs (Story 4.9). */
+  readonly proofs: ProofStore;
 }
 
 export interface AdminDesk {
@@ -50,6 +52,7 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
       readDeps: (actor) => reviewReadDepsFor(ledger.db, clock, actor, deps.production),
     }),
     payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), ...(deps.logger ? { logger: deps.logger } : {}) }),
+    payoutRecordRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), lookup: (db) => ({ told: (key) => wasTold(db, key) }), proofs: deps.proofs }),
   ];
   return { gate, routes };
 }

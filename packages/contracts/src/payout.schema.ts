@@ -73,6 +73,8 @@ export const payoutClaimRequestSchema = z.strictObject({});
 const previewOrderSchema = z.object({ orderId: z.string(), productName: z.string().nullable(), productImageUrl: z.url({ protocol: /^https$/ }).nullable(), cashback: dong, settled: z.boolean() });
 const previewBonusSchema = z.object({ awardId: z.number().int(), orderId: z.string(), campaignName: z.string(), amount: dong });
 const previewClawbackSchema = z.object({ clawbackId: z.string(), orderId: z.string().nullable(), open: z.number().int().min(1) });
+/** Money a voided payout's clawback had already netted, credited back and paid with this payout (Story 4.10). */
+const previewRefundSchema = z.object({ clawbackId: z.string(), orderId: z.string().nullable(), amount: z.number().int().min(1) });
 
 export const payoutPreviewSchema = z.object({
   outcome: z.literal("claimed"),
@@ -101,6 +103,7 @@ export const payoutPreviewSchema = z.object({
   orders: z.array(previewOrderSchema),
   bonuses: z.array(previewBonusSchema),
   clawbacks: z.array(previewClawbackSchema),
+  refunds: z.array(previewRefundSchema),
   /** The last claim was abandoned after its QR was shown: a transfer may have been made (D39). */
   warning: z.object({ amount: dong, at: instant }).nullable(),
 });

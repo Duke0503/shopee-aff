@@ -24,11 +24,16 @@ afterEach(async () => {
   closeLedgers();
 });
 
-/** Stand-ins for routes later stories add (Stories 4.10, 6.x), on the real gate and policy; GET /api/admin/payouts is the real list (Story 4.6). */
+/**
+ * A stand-in for a route a later story adds (Story 6.x), on the real gate and policy. Payout void
+ * is the real route of Story 4.10: an admin past the gate reaches the command, which answers
+ * `reason_required` for the empty body these tests send (400), never 403.
+ */
 const LATER_ROUTES: StaffRoutes = (add) => {
-  add({ method: "POST", url: "/api/admin/payouts/:payoutId/void", adminOnly: true, handler: async () => ({ voided: true }) });
   add({ method: "POST", url: "/api/admin/customers/:customerId/force-erase", adminOnly: true, handler: async () => ({ erased: true }) });
 };
+/** The status an admin past the gate gets: the stand-in's 200, or the real void's 400 reason_required. */
+const PASSED: Record<string, number> = { "/api/admin/payouts/1/void": 400, "/api/admin/customers/C1/force-erase": 200 };
 
 interface Desk {
   ledger: Ledger;
@@ -83,7 +88,7 @@ describe("Story 4.2 acceptance criteria", () => {
     const onPublic = await call(d, "GET", "/api/admin/payouts", { host: PUBLIC_HOST, cookie });
     expect(onPublic.statusCode).toBe(404);
     expect(codeOf(onPublic.body)).toBe("not_found");
-    for (const [method, url] of [["POST", "/api/admin/session"], ["GET", "/api/admin/session"], ["POST", "/api/admin/payouts/P1/void"]] as const) {
+    for (const [method, url] of [["POST", "/api/admin/session"], ["GET", "/api/admin/session"], ["POST", "/api/admin/payouts/1/void"]] as const) {
       expect((await call(d, method, url, { host: PUBLIC_HOST, cookie, body: {} })).statusCode, url).toBe(404);
     }
     expect((await call(d, "GET", "/api/admin/payouts", { host: `${ADMIN_HOST}.evil.test`, cookie })).statusCode).toBe(404);
@@ -157,12 +162,13 @@ describe("Story 4.2 acceptance criteria", () => {
     const d = await desk();
     const employee = await staffCookie(d, "lan");
     const admin = await staffCookie(d, "root");
-    for (const url of ["/api/admin/payouts/P1/void", "/api/admin/customers/C1/force-erase"]) {
+    for (const url of ["/api/admin/payouts/1/void", "/api/admin/customers/C1/force-erase"]) {
       const refused = await call(d, "POST", url, { cookie: employee, body: {} });
       expect(refused.statusCode, url).toBe(403);
       expect(codeOf(refused.body)).toBe("forbidden");
-      expect((await call(d, "POST", url, { cookie: admin, body: {} })).statusCode, url).toBe(200);
+      expect((await call(d, "POST", url, { cookie: admin, body: {} })).statusCode, url).toBe(PASSED[url]);
     }
+    expect((await call(d, "GET", "/api/admin/payouts/1/void", { cookie: employee })).statusCode).toBe(403);
     expect((await call(d, "GET", "/api/admin/payouts", { cookie: employee })).statusCode).toBe(200);
   });
 
@@ -177,9 +183,9 @@ describe("Story 4.2 acceptance criteria", () => {
     const password = generatedPassword();
     await addStaff(d.ledger, "minh", "ADMIN", password);
     const minh = await staffCookie({ ...d, passwords: { ...d.passwords, minh: password } }, "minh");
-    expect((await call(d, "POST", "/api/admin/payouts/P1/void", { cookie: minh, body: {} })).statusCode).toBe(200);
+    expect((await call(d, "POST", "/api/admin/payouts/1/void", { cookie: minh, body: {} })).statusCode).toBe(400);
     d.ledger.sqlite.prepare("UPDATE staff SET role = 'EMPLOYEE' WHERE staff_id = 'minh'").run();
-    expect((await call(d, "POST", "/api/admin/payouts/P1/void", { cookie: minh, body: {} })).statusCode).toBe(403);
+    expect((await call(d, "POST", "/api/admin/payouts/1/void", { cookie: minh, body: {} })).statusCode).toBe(403);
     d.ledger.sqlite.prepare("UPDATE staff SET status = 'DISABLED' WHERE staff_id = 'minh'").run();
     expect((await call(d, "GET", "/api/admin/payouts", { cookie: minh })).statusCode).toBe(401);
   });
@@ -240,8 +246,8 @@ describe("staff sign-in rules (AD-18, D48)", () => {
   it("a staff request that changes something needs the admin host's own Origin", async () => {
     const d = await desk();
     const admin = await staffCookie(d, "root");
-    expect((await call(d, "POST", "/api/admin/payouts/P1/void", { cookie: admin, body: {}, origin: null })).statusCode).toBe(403);
-    expect((await call(d, "POST", "/api/admin/payouts/P1/void", { cookie: admin, body: {}, origin: `https://${PUBLIC_HOST}` })).statusCode).toBe(403);
+    expect((await call(d, "POST", "/api/admin/payouts/1/void", { cookie: admin, body: {}, origin: null })).statusCode).toBe(403);
+    expect((await call(d, "POST", "/api/admin/payouts/1/void", { cookie: admin, body: {}, origin: `https://${PUBLIC_HOST}` })).statusCode).toBe(403);
     expect((await call(d, "POST", "/api/admin/session", { body: { username: "root", password: d.passwords.root }, origin: "https://evil.test" })).statusCode).toBe(403);
   });
 

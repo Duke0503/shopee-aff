@@ -3,6 +3,7 @@
  * is owed. Every screen, chat reply, QR amount and export reads it, so they cannot disagree.
  *
  *   gross        = stored cashback of APPROVED unpaid orders + CONFIRMED bonuses (not on a FROZEN order)
+ *                  + credits a payout void left (netting already taken by a clawback it closed)
  *   deductedNext = the open clawbacks, each the sum of its insert-only entries
  *   payable      = max(0, gross - deductedNext)
  *   waiting      = the estimated cashback of AWAITING_APPROVAL orders
@@ -14,14 +15,14 @@
  * account (HOUSE) has no balance and is in no payable list (D5). SQL only SUMs stored integers;
  * every other step is `packages/money`.
  */
-import { clawbackOpenAmount, estimatedCashback, openClawbackTotal, payableBalance, sumDong } from "@cashback/money";
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { clawbackOpenAmount, creditOpenAmount, estimatedCashback, openClawbackTotal, payableBalance, sumDong } from "@cashback/money";
+import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { confirmedBonusByCustomer } from "../campaigns/index";
 import { customerKeys, resolveCustomer } from "../identity/index";
 import { orderBalanceRows } from "../orders/index";
-import { ledgerEntries, payouts } from "./schema";
+import { CREDIT_KINDS, ledgerEntries, payouts } from "./schema";
 
 export interface Balance {
   /** The surviving customer id. */
@@ -41,6 +42,8 @@ interface Parts {
   readonly paid: number[];
   /** Each clawback's entry sums, by clawback id. */
   readonly clawbacks: Map<string, number[]>;
+  /** Each void credit's entry sums, by clawback id. */
+  readonly credits: Map<string, number[]>;
 }
 
 const within = (column: typeof payouts.customerId | typeof ledgerEntries.customerId, ids: readonly string[] | null): SQL | undefined => (ids === null ? undefined : inArray(column, [...ids]));
@@ -54,13 +57,20 @@ function paidRows(db: LedgerDb, ids: readonly string[] | null) {
     .all();
 }
 
-function clawbackRows(db: LedgerDb, ids: readonly string[] | null) {
+function ledgerRows(db: LedgerDb, ids: readonly string[] | null, credits: boolean) {
+  const kinds = credits ? inArray(ledgerEntries.kind, [...CREDIT_KINDS]) : notInArray(ledgerEntries.kind, [...CREDIT_KINDS]);
   return db
     .select({ customerId: ledgerEntries.customerId, clawbackId: ledgerEntries.clawbackId, total: sql<number>`sum(${ledgerEntries.amount})` })
     .from(ledgerEntries)
-    .where(within(ledgerEntries.customerId, ids))
+    .where(and(kinds, within(ledgerEntries.customerId, ids)))
     .groupBy(ledgerEntries.customerId, ledgerEntries.clawbackId)
     .all();
+}
+
+function addEntry(into: Map<string, number[]>, clawbackId: string, total: number): void {
+  const entries = into.get(clawbackId);
+  if (entries === undefined) into.set(clawbackId, [total]);
+  else entries.push(total);
 }
 
 /** The survivor a stored customer id belongs to, resolved once per id; null for nobody, an erased customer or HOUSE (D5). */
@@ -78,11 +88,12 @@ export function survivorResolver(db: LedgerDb): (stored: string) => string | nul
 /** Every balance part over the stored ids (null: all), credited to survivors; `seed` survivors start at 0. */
 function collect(db: LedgerDb, ids: readonly string[] | null, seed: readonly string[]): Map<string, Parts> {
   const owner = survivorResolver(db);
-  const parts = new Map<string, Parts>(seed.map((id) => [id, { gross: [], waiting: [], paid: [], clawbacks: new Map() }]));
+  const empty = (): Parts => ({ gross: [], waiting: [], paid: [], clawbacks: new Map(), credits: new Map() });
+  const parts = new Map<string, Parts>(seed.map((id) => [id, empty()]));
   const of = (stored: string): Parts | undefined => {
     const id = owner(stored);
     if (id === null) return undefined;
-    if (!parts.has(id)) parts.set(id, { gross: [], waiting: [], paid: [], clawbacks: new Map() });
+    if (!parts.has(id)) parts.set(id, empty());
     return parts.get(id);
   };
   const orders = orderBalanceRows(db, ids);
@@ -90,18 +101,19 @@ function collect(db: LedgerDb, ids: readonly string[] | null, seed: readonly str
   for (const r of confirmedBonusByCustomer(db, ids, orders.frozenOrderIds)) of(r.customerId)?.gross.push(r.total);
   for (const r of orders.awaiting) of(r.customerId)?.waiting.push(estimatedCashback(r.estimatedCommission, r.network));
   for (const r of paidRows(db, ids)) of(r.customerId)?.paid.push(r.total);
-  for (const r of clawbackRows(db, ids)) {
+  for (const r of ledgerRows(db, ids, false)) {
     const p = of(r.customerId);
-    if (p === undefined) continue;
-    const entries = p.clawbacks.get(r.clawbackId);
-    if (entries === undefined) p.clawbacks.set(r.clawbackId, [r.total]);
-    else entries.push(r.total);
+    if (p !== undefined) addEntry(p.clawbacks, r.clawbackId, r.total);
+  }
+  for (const r of ledgerRows(db, ids, true)) {
+    const p = of(r.customerId);
+    if (p !== undefined) addEntry(p.credits, r.clawbackId, r.total);
   }
   return parts;
 }
 
 function balanceOf(customerId: string, p: Parts): Balance {
-  const gross = sumDong(p.gross, "gross");
+  const gross = sumDong([...p.gross, ...[...p.credits.values()].map(creditOpenAmount)], "gross");
   const deductedNext = openClawbackTotal([...p.clawbacks.values()].map(clawbackOpenAmount));
   return { customerId, gross, payable: payableBalance({ gross, openClawbacks: deductedNext }), waiting: sumDong(p.waiting, "waiting"), paid: sumDong(p.paid, "paid"), deductedNext };
 }

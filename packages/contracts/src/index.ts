@@ -73,6 +73,20 @@ export {
   type PayoutQueueRow,
 } from "./payout.schema";
 export {
+  payoutIdParamsSchema,
+  payoutProofResponseSchema,
+  payoutVoidPreviewSchema,
+  payoutVoidRequestSchema,
+  payoutVoidResponseSchema,
+  PROOF_MAX_BYTES,
+  PROOF_TYPES,
+  type ProofType,
+  type PayoutProofResponse,
+  type PayoutVoidPreview,
+  type PayoutVoidRequest,
+  type PayoutVoidResponse,
+} from "./payout-void.schema";
+export {
   adminSignInRequestSchema,
   adminSignInResponseSchema,
   campaignInputSchema,

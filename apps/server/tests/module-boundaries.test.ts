@@ -42,7 +42,8 @@ function spineEdges(): Record<string, string[]> {
 /** Runs the depcruise CLI as CI does; the JSON report carries the violations. */
 function cruise(cwd: string, targets: string[]): { violations: Violation[] } {
   const args = [CLI, ...targets, "--config", CONFIG, "--output-type", "json"];
-  const out = execFileSync(process.execPath, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  // The JSON report of the whole repository is past the 1 MB default buffer.
+  const out = execFileSync(process.execPath, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
   return { violations: (JSON.parse(out) as { summary: { violations: Violation[] } }).summary.violations };
 }
 

@@ -8,10 +8,13 @@ import { parseInstant, toMs, type Clock } from "@cashback/core";
 
 import { adminDesk } from "../../src/admin/admin-desk";
 import { hashPassword } from "../../src/modules/identity/index";
+import { customerProofRoutes, fileProofStore, proofFilesDir, type ProofStore } from "../../src/modules/payouts/index";
+import { receiptPageRoutes } from "../../src/pages/receipt.page";
 import type { StaffAccessConfig } from "../../src/platform/config/env.config";
 import type { Ledger } from "../../src/platform/db/ledger";
 import type { AccessKeySource } from "../../src/platform/http/access-jwt.guard";
 import { buildServers, type Servers } from "../../src/platform/http/servers";
+import { tempDir } from "./live-fixture";
 import type { StaffRoutes } from "../../src/platform/http/staff-routes";
 
 export const ADMIN_HOST = "admin.hoantiendp.com";
@@ -61,9 +64,13 @@ export async function addStaff(ledger: Ledger, staffId: string, role: "ADMIN" | 
     .run(staffId, staffId, role, options.status ?? "ACTIVE", options.root ? 1 : 0, hash);
 }
 
-export function deskServers(ledger: Ledger, clock: Clock, extra: readonly StaffRoutes[] = []): Servers {
-  const desk = adminDesk({ access: ACCESS, ledger, clock, production: false, keys: TEAM_KEYS });
-  return buildServers({ clock, internalToken: randomBytes(24).toString("hex"), staff: { gate: desk.gate, routes: [...desk.routes, ...extra] } });
+/** A proof store in a fresh temporary directory, one per desk under test. */
+export const testProofStore = (): ProofStore => fileProofStore(proofFilesDir(tempDir("cashback-proofs-")));
+
+export function deskServers(ledger: Ledger, clock: Clock, extra: readonly StaffRoutes[] = [], proofs: ProofStore = testProofStore()): Servers {
+  const desk = adminDesk({ access: ACCESS, ledger, clock, production: false, keys: TEAM_KEYS, proofs });
+  const pages = [receiptPageRoutes({ ledger, clock }), customerProofRoutes({ ledger, clock, proofs })];
+  return buildServers({ clock, internalToken: randomBytes(24).toString("hex"), public: pages, staff: { gate: desk.gate, routes: [...desk.routes, ...extra] } });
 }
 
 /** The value of one cookie from a response's Set-Cookie header. */

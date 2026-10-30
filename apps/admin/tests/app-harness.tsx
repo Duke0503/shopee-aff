@@ -53,7 +53,7 @@ export function fakeServer({ session = EMPLOYEE, routes = [] }: ServerOptions = 
   let current = session;
   const fetchStub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "https://admin.example.test");
-    requests.push({ method: init?.method ?? "GET", url, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) });
+    requests.push({ method: init?.method ?? "GET", url, body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body });
     let answer: Answer | undefined;
     for (const route of routes) {
       answer = await route(url, init);

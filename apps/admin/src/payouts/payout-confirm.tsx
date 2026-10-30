@@ -4,12 +4,14 @@
  * a netting-only payout, `panel_confirm_netting`; it is the single confirmation, with no second
  * dialog. When the server says the set changed, the panel shows `error.payout.amount_changed` with the
  * new and the previous amount above the fresh preview, and the button stays disabled until the
- * new figures are acknowledged. Once recorded, the panel shows what the server recorded.
+ * new figures are acknowledged. Once recorded, the panel shows what the server recorded, then the
+ * proof upload and, for an admin, the void action (recorded-actions.tsx, Stories 4.9 and 4.10).
  */
 import type { PayoutConfirmResponse, PayoutPreview } from "@cashback/contracts";
 import { Button, CheckIcon, formatMoney, TriangleAlertIcon } from "@cashback/ui";
 
 import { adminText, errorText } from "../labels";
+import { RecordedActions } from "./recorded-actions";
 
 export interface ConfirmActionProps {
   readonly preview: PayoutPreview;
@@ -56,7 +58,7 @@ export function ChangedNotice({ previous, current, acked, onAck }: { readonly pr
   );
 }
 
-export function RecordedNotice({ result, onDone }: { readonly result: PayoutConfirmResponse; readonly onDone: () => void }) {
+export function RecordedNotice({ result, proof, onDone }: { readonly result: PayoutConfirmResponse; readonly proof: File | null; readonly onDone: () => void }) {
   const text = result.nettingOnly ? adminText("panel_recorded_netting", { amount: formatMoney(result.netted) ?? "" }) : adminText("panel_recorded", { amount: formatMoney(result.amount) ?? "" });
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -68,6 +70,7 @@ export function RecordedNotice({ result, onDone }: { readonly result: PayoutConf
         <p className="text-sm break-words">{adminText("panel_recorded_items", { count: result.orderCount + result.awardCount })}</p>
         {result.replay && <p className="text-sm break-words">{adminText("panel_recorded_replay")}</p>}
       </div>
+      <RecordedActions result={result} proof={proof} />
       <Button type="button" size="lg" className="h-11 w-full" onClick={onDone}>
         {adminText("panel_done")}
       </Button>

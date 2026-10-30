@@ -12,6 +12,7 @@ export {
   outboxFor,
   OutboxSeedError,
   seedSentNotifications,
+  wasTold,
   type EnqueueResult,
   type SeededNotification,
 } from "./outbox.command";

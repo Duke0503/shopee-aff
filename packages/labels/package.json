@@ -8,6 +8,7 @@
     "./vi/messages.json": "./vi/messages.json",
     "./vi/ui.json": "./vi/ui.json",
     "./vi/admin.json": "./vi/admin.json",
-    "./vi/errors.json": "./vi/errors.json"
+    "./vi/errors.json": "./vi/errors.json",
+    "./vi/pages.json": "./vi/pages.json"
   }
 }

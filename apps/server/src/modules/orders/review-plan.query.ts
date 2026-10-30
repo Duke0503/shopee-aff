@@ -112,7 +112,7 @@ export function openCaseOf(db: LedgerDb, caseId: number): ReviewCaseRow {
 const candidatesOf = (c: ReviewCaseRow): string[] => JSON.parse(c.candidates) as string[];
 
 /** A stored row (a case's or an observation's JSON, as reconciliation wrote it) as the row it was; null when it holds none. */
-function storedRow(json: string, network: SourcedRow["network"]): SourcedRow | null {
+export function storedRow(json: string, network: SourcedRow["network"]): SourcedRow | null {
   const o = JSON.parse(json) as Partial<SourcedRow>;
   if (typeof o.orderId !== "string" || !Array.isArray(o.items) || !Array.isArray(o.subIds)) return null;
   const { orderId, rawOrderStatus = null, orderStatus = null, items, subIds, problems = [] } = o;

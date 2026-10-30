@@ -1,9 +1,10 @@
 /**
  * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql,
- * 0013_payout_claims.sql and 0014_payout_confirm.sql. Only this module
+ * 0013_payout_claims.sql, 0014_payout_confirm.sql and 0015_payout_proofs_and_void.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
+import { PROOF_TYPES, type ProofType } from "@cashback/contracts";
 import type { PayoutClaimStatus, PayoutStatus } from "@cashback/core";
 import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -26,6 +27,26 @@ export const payouts = sqliteTable("payouts", {
   voidedAt: text("voided_at"),
   voidReason: text("void_reason"),
   origin: text("origin", { enum: ["CUTOVER", "CONFIRM"] }).notNull(),
+  voidedBy: text("voided_by"),
+});
+
+export const PROOF_CONTENT_TYPES = PROOF_TYPES;
+export type ProofContentType = ProofType;
+
+/** The staff-only proof image of a payout (D49): where its file is, and what it is. */
+export const payoutProofs = sqliteTable("payout_proofs", {
+  payoutId: integer("payout_id")
+    .primaryKey()
+    .notNull()
+    .references(() => payouts.payoutId),
+  fileName: text("file_name").notNull().unique(),
+  contentType: text("content_type", { enum: PROOF_CONTENT_TYPES }).notNull(),
+  byteSize: integer("byte_size").notNull(),
+  sha256: text("sha256").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: text("uploaded_at").notNull(),
 });
 
 export const payoutItems = sqliteTable(
@@ -43,7 +64,11 @@ export const payoutItems = sqliteTable(
   (t) => [primaryKey({ columns: [t.payoutId, t.lineNo] })],
 );
 
-export const LEDGER_ENTRY_KINDS = ["CLAWBACK", "NETTING", "WRITE_OFF", "OFFSET"] as const;
+export const LEDGER_ENTRY_KINDS = ["CLAWBACK", "NETTING", "WRITE_OFF", "OFFSET", "NETTING_REFUND", "REFUND_PAID"] as const;
+/** Entries of a credit owed to the customer after a void (0015), never part of a clawback's open amount. */
+export const CREDIT_KINDS = ["NETTING_REFUND", "REFUND_PAID"] as const;
+/** The entries a clawback's open amount sums (D42). */
+export const CLAWBACK_KINDS = ["CLAWBACK", "NETTING", "WRITE_OFF", "OFFSET"] as const;
 
 export const ledgerEntries = sqliteTable("ledger_entries", {
   entryId: integer("entry_id").primaryKey({ autoIncrement: true }),
@@ -85,3 +110,4 @@ export type PayoutRow = typeof payouts.$inferInsert;
 export type PayoutClaimRow = typeof payoutClaims.$inferSelect;
 export type PayoutItemRow = typeof payoutItems.$inferInsert;
 export type RecordedPayoutRow = typeof payouts.$inferSelect;
+export type PayoutProofRow = typeof payoutProofs.$inferSelect;

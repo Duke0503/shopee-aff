@@ -11,9 +11,11 @@
  * Sign-in and sign-out are the routes without a session (sign-out must work with an expired
  * one); they still need the Access JWT and the Origin. Every handler gets the verified Access
  * identity. The group is absent when the config has no staff access settings. Responses are
- * never cached.
+ * never cached. A JPEG or PNG body arrives as raw bytes for the one route that takes it (its own
+ * `bodyLimit`); every other route still refuses anything over the listener's 64 KB.
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { PROOF_TYPES } from "@cashback/contracts";
+import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { StaffPrincipal, StaffSessionPort } from "../ports/staff-session.port";
 import { ACCESS_JWT_HEADER, verifyAccessJwt, type AccessCheck, type AccessIdentity } from "./access-jwt.guard";
@@ -43,6 +45,10 @@ export interface StaffRoute {
   readonly session?: boolean;
   /** Admin-only actions (FR-24): staff accounts, campaigns, payout void, forced erase. */
   readonly adminOnly?: boolean;
+  /** A route that takes an image body (a payout proof) raises the listener's 64 KB limit to this. */
+  readonly bodyLimit?: number;
+  /** The message key of the refusal when the body passes `bodyLimit` (otherwise the generic invalid request). */
+  readonly tooLargeKey?: string;
   readonly handler: (request: FastifyRequest, reply: FastifyReply, context: StaffRequest) => Promise<unknown>;
 }
 
@@ -85,8 +91,17 @@ function guard(gate: StaffGate, route: StaffRoute, contexts: WeakMap<FastifyRequ
   };
 }
 
+/** Turns the body limit's 413 into the route's own refusal; any other error goes on to the listener's handler. */
+const tooLarge =
+  (messageKey: string) =>
+  (error: FastifyError): never => {
+    if (error.statusCode === 413) throw new HttpError("invalid_request", messageKey);
+    throw error;
+  };
+
 export function registerStaffRoutes(app: FastifyInstance, gate: StaffGate, routes: readonly StaffRoutes[]): void {
   const contexts = new WeakMap<FastifyRequest, StaffRequest>();
+  if (!app.hasContentTypeParser("image/png")) app.addContentTypeParser([...PROOF_TYPES], { parseAs: "buffer" }, (_request, body, done) => done(null, body));
   const add = (route: StaffRoute): void => {
     if (!route.url.startsWith(STAFF_PATH_PREFIX)) throw new Error(`staff route outside ${STAFF_PATH_PREFIX}: ${route.url}`);
     if (route.adminOnly !== true && ADMIN_ONLY_PATHS.some((path) => path.test(route.url))) throw new Error(`admin-only staff route registered for every role: ${route.url}`);
@@ -94,6 +109,8 @@ export function registerStaffRoutes(app: FastifyInstance, gate: StaffGate, route
       method: route.method,
       url: route.url,
       constraints: { host: gate.adminHost },
+      ...(route.bodyLimit === undefined ? {} : { bodyLimit: route.bodyLimit }),
+      ...(route.tooLargeKey === undefined ? {} : { errorHandler: tooLarge(route.tooLargeKey) }),
       onRequest: guard(gate, route, contexts),
       handler: async (request, reply) => {
         void reply.header("cache-control", "no-store");

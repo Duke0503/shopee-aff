@@ -137,6 +137,7 @@ function previewOf(outcome: ClaimOutcome): PayoutClaimResponse {
     orders: snapshot.orders.map((o) => ({ orderId: o.orderId, productName: o.productName, productImageUrl: o.productImageUrl, cashback: o.cashback, settled: o.settled })),
     bonuses: snapshot.bonuses.map((b) => ({ awardId: b.awardId, orderId: b.orderId, campaignName: b.campaignName, amount: b.amount })),
     clawbacks: snapshot.clawbacks.map((c) => ({ clawbackId: c.clawbackId, orderId: c.orderId, open: c.open })),
+    refunds: snapshot.refunds.map((r) => ({ clawbackId: r.clawbackId, orderId: r.orderId, amount: r.amount })),
     warning: outcome.warning,
   };
 }

@@ -1,0 +1,20 @@
+{
+  "brand_name": "Hoàn Tiền DP",
+  "money_sign": "đ",
+  "value_missing": "–",
+  "receipt_title": "Biên nhận chuyển tiền",
+  "receipt_paid": "Đã chuyển",
+  "receipt_voided": "Đã huỷ ghi nhận",
+  "receipt_voided_at": "Huỷ ghi nhận lúc {time}. Lần chuyển này không còn được tính.",
+  "receipt_amount": "Số tiền",
+  "receipt_customer": "Mã khách",
+  "receipt_account": "Tài khoản nhận",
+  "receipt_account_masked": "•• {lastFour}",
+  "receipt_date": "Thời gian chuyển",
+  "receipt_copy": "Chép {code}",
+  "receipt_copied": "Đã chép",
+  "receipt_not_found": "Không tìm thấy biên nhận",
+  "receipt_not_found_body": "Đường dẫn này không mở được biên nhận nào. Kiểm tra lại đường dẫn trong tin nhắn Zalo.",
+  "receipt_voided_no_time": "Lần chuyển này đã được huỷ ghi nhận, không còn được tính.",
+  "receipt_help": "Chưa thấy tiền hoặc cần hỏi về lần chuyển này? Nhắn Zalo cho Hoàn Tiền DP kèm mã khách."
+}

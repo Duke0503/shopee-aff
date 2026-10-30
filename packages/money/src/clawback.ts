@@ -63,3 +63,11 @@ export function clawbackOpenAmount(entries: readonly number[]): number {
   }
   return total;
 }
+
+/**
+ * What a payout void credit still owes the customer (Story 4.10): the sum of its entries, the
+ * positive NETTING_REFUND and the negative REFUND_PAID of the payout that paid it, never below 0.
+ */
+export function creditOpenAmount(entries: readonly number[]): number {
+  return Math.max(0, clawbackOpenAmount(entries));
+}

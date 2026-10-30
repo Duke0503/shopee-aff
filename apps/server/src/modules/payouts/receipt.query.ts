@@ -18,6 +18,7 @@ export interface Receipt {
   readonly amount: number;
   readonly recordedAt: string | null;
   readonly voided: boolean;
+  readonly voidedAt: string | null;
 }
 
 /**
@@ -34,7 +35,7 @@ export const isReceiptToken = (token: string): boolean => TOKEN.test(token) && !
 export function findReceipt(db: LedgerDb, token: string): Receipt | null {
   if (!isReceiptToken(token)) return null;
   const row = db
-    .select({ payoutId: payouts.payoutId, customerId: payouts.customerId, bankLastFour: payouts.bankLastFour, amount: payouts.transferAmount, recordedAt: payouts.recordedAt, status: payouts.status })
+    .select({ payoutId: payouts.payoutId, customerId: payouts.customerId, bankLastFour: payouts.bankLastFour, amount: payouts.transferAmount, recordedAt: payouts.recordedAt, status: payouts.status, voidedAt: payouts.voidedAt })
     .from(payouts)
     .where(eq(payouts.receiptToken, token))
     .get();
@@ -46,5 +47,6 @@ export function findReceipt(db: LedgerDb, token: string): Receipt | null {
     amount: row.amount,
     recordedAt: row.recordedAt,
     voided: row.status === "VOIDED",
+    voidedAt: row.status === "VOIDED" ? row.voidedAt : null,
   };
 }

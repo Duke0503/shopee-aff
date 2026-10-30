@@ -4,20 +4,11 @@
  * 79216 shown as "79.216" plus the sign. It never adds, rounds or converts; a value that is not a whole dong integer is
  * refused (null), and the caller shows the missing-value dash instead of a made-up figure.
  */
+import { formatAmountDigits } from "@cashback/core";
+
 import { uiText } from "../labels";
 
-const MINUS = "−";
-
-function groupDigits(digits: string): string {
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-}
-
-/** Grouped digits with a minus sign when negative, or null for anything but a safe integer. */
-export function formatAmountDigits(amount: number): string | null {
-  if (!Number.isSafeInteger(amount)) return null;
-  const digits = groupDigits(String(Math.abs(amount)));
-  return amount < 0 ? `${MINUS}${digits}` : digits;
-}
+export { formatAmountDigits };
 
 export function formatMoney(amount: number): string | null {
   const digits = formatAmountDigits(amount);

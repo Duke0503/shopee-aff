@@ -11,7 +11,8 @@
  *     changed) nothing is written and the answer is "changed", for the panel to re-open;
  *   - otherwise it writes the payout, one item per covered order and bonus, each order PAID with
  *     paid_at and history through `transition` (R2 re-reads it), the bonuses PAID, the netting
- *     entries of `nettingPlan` (nettingOf; the rest of a clawback carries forward), the audit entry, the
+ *     entries of `nettingPlan` (nettingOf; the rest of a clawback carries forward), a REFUND_PAID
+ *     entry for each void credit it pays (Story 4.10), the audit entry, the
  *     outbox row "payout recorded" with the receipt link, and the claim CONFIRMED.
  *
  * A netting-only payout (transfer 0) is the same command: no receipt token, and the outbox
@@ -153,10 +154,20 @@ function writeNetting(db: LedgerDb, payoutId: number, snapshot: PayoutSnapshot, 
   return plan.netted;
 }
 
+/** Pays each void credit the snapshot covers with a REFUND_PAID entry of what it still owed (Story 4.10). */
+function payRefunds(db: LedgerDb, payoutId: number, snapshot: PayoutSnapshot, deps: ConfirmDeps): void {
+  for (const r of snapshot.refunds) {
+    db.insert(ledgerEntries)
+      .values({ customerId: r.customerId, clawbackId: r.clawbackId, kind: "REFUND_PAID", amount: -r.amount, orderId: r.orderId, payoutId, reason: "payout_refund", createdAt: deps.clock.now(), createdBy: deps.by.actor.id })
+      .run();
+  }
+}
+
 function record(db: LedgerDb, claim: PayoutClaimRow, snapshot: PayoutSnapshot, deps: ConfirmDeps): RecordedPayout {
   const row = insertPayout(db, claim, snapshot, deps);
   insertItems(db, row.payoutId, snapshot);
   payLines(db, snapshot, deps);
+  payRefunds(db, row.payoutId, snapshot, deps);
   const netted = writeNetting(db, row.payoutId, snapshot, deps);
   const now = deps.clock.now();
   db.update(payoutClaims).set({ status: "CONFIRMED", confirmedAt: now, lastActiveAt: now }).where(eq(payoutClaims.claimId, claim.claimId)).run();

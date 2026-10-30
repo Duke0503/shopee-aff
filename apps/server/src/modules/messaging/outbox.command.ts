@@ -8,11 +8,12 @@
  * none. Delivery, retries, the daily cap and `messaging.silent` come with Stories 6.4 and 6.10.
  */
 import type { Clock, Instant } from "@cashback/core";
+import { eq } from "drizzle-orm";
 
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
-import { DEDUP_KEY_PATTERN, type OutboxMessage, type OutboxPort } from "../../platform/ports/outbox.port";
+import { DEDUP_KEY_PATTERN, type OutboxLookup, type OutboxMessage, type OutboxPort } from "../../platform/ports/outbox.port";
 import { resolveCustomer } from "../identity/index";
 import { outbox } from "./schema";
 
@@ -37,9 +38,14 @@ export function enqueue(db: LedgerDb, clock: Clock, message: OutboxMessage, by: 
   return "enqueued";
 }
 
+/** True when the outbox holds the key, enqueued or seeded as already sent. */
+export function wasTold(db: LedgerDb, dedupKey: string): boolean {
+  return db.select({ key: outbox.dedupKey }).from(outbox).where(eq(outbox.dedupKey, dedupKey)).get() !== undefined;
+}
+
 /** The outbox port bound to one transaction's handle (platform/ports/outbox.port.ts). */
-export function outboxFor(db: LedgerDb, clock: Clock, by: CommandAudit): OutboxPort & { enqueue(message: OutboxMessage): EnqueueResult } {
-  return { enqueue: (message) => enqueue(db, clock, message, by) };
+export function outboxFor(db: LedgerDb, clock: Clock, by: CommandAudit): OutboxPort & OutboxLookup & { enqueue(message: OutboxMessage): EnqueueResult } {
+  return { enqueue: (message) => enqueue(db, clock, message, by), told: (key) => wasTold(db, key) };
 }
 
 export interface SeededNotification {

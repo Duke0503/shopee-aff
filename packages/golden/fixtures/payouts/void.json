@@ -1,0 +1,319 @@
+{
+  "rule": "voidPayout",
+  "source": "D41, docs/operations/status-flows.md sections 1, 2 and 4; Story 4.10. Cashback of a Shopee approval in a withheld period: 30,000 gives 21,365 and 20,000 gives 14,243 (packages/money splitCommission).",
+  "cases": [
+    {
+      "name": "combination 1: no covered order saw a cancel, so every order returns APPROVED and its bonus CONFIRMED",
+      "story": "4.10 AC1",
+      "combination": 1,
+      "steps": [
+        {
+          "step": "approve",
+          "orderId": "261001V1001",
+          "parts": [
+            30000
+          ]
+        },
+        {
+          "step": "approve",
+          "orderId": "261001V1002",
+          "parts": [
+            20000
+          ]
+        },
+        {
+          "step": "bonus",
+          "orderId": "261001V1001",
+          "amount": 20000
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "confirm"
+        }
+      ],
+      "expected": {
+        "payout": {
+          "amount": 55608,
+          "netted": 0
+        },
+        "orders": [
+          {
+            "orderId": "261001V1001",
+            "status": "APPROVED",
+            "paidAt": null
+          },
+          {
+            "orderId": "261001V1002",
+            "status": "APPROVED",
+            "paidAt": null
+          }
+        ],
+        "awards": [
+          {
+            "orderId": "261001V1001",
+            "status": "CONFIRMED"
+          }
+        ],
+        "offsets": [],
+        "clawbackOpen": {},
+        "payable": 55608,
+        "refunds": []
+      }
+    },
+    {
+      "name": "combination 2: a cancel held back by the open claim is the order's latest row, so it returns REVERSED and its bonus VOID",
+      "story": "4.10 AC2",
+      "combination": 2,
+      "steps": [
+        {
+          "step": "approve",
+          "orderId": "261001V2001",
+          "parts": [
+            30000
+          ]
+        },
+        {
+          "step": "approve",
+          "orderId": "261001V2002",
+          "parts": [
+            20000
+          ]
+        },
+        {
+          "step": "bonus",
+          "orderId": "261001V2001",
+          "amount": 20000
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "cancel",
+          "orderId": "261001V2001"
+        },
+        {
+          "step": "confirm"
+        }
+      ],
+      "expected": {
+        "payout": {
+          "amount": 55608,
+          "netted": 0
+        },
+        "orders": [
+          {
+            "orderId": "261001V2001",
+            "status": "REVERSED",
+            "paidAt": null
+          },
+          {
+            "orderId": "261001V2002",
+            "status": "APPROVED",
+            "paidAt": null
+          }
+        ],
+        "awards": [
+          {
+            "orderId": "261001V2001",
+            "status": "VOID"
+          }
+        ],
+        "offsets": [],
+        "clawbackOpen": {},
+        "payable": 14243,
+        "refunds": []
+      }
+    },
+    {
+      "name": "combination 3: a cancel after the payout opened a clawback of cashback plus bonus; the order returns REVERSED, its bonus VOID and the clawback is closed by an offsetting entry",
+      "story": "4.10 AC2",
+      "combination": 3,
+      "steps": [
+        {
+          "step": "approve",
+          "orderId": "261001V3001",
+          "parts": [
+            30000
+          ]
+        },
+        {
+          "step": "approve",
+          "orderId": "261001V3002",
+          "parts": [
+            20000
+          ]
+        },
+        {
+          "step": "bonus",
+          "orderId": "261001V3001",
+          "amount": 20000
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "confirm"
+        },
+        {
+          "step": "cancel",
+          "orderId": "261001V3001"
+        }
+      ],
+      "expected": {
+        "payout": {
+          "amount": 55608,
+          "netted": 0
+        },
+        "orders": [
+          {
+            "orderId": "261001V3001",
+            "status": "REVERSED",
+            "paidAt": null
+          },
+          {
+            "orderId": "261001V3002",
+            "status": "APPROVED",
+            "paidAt": null
+          }
+        ],
+        "awards": [
+          {
+            "orderId": "261001V3001",
+            "status": "VOID"
+          }
+        ],
+        "offsets": [
+          {
+            "clawbackId": "261001V3001-1",
+            "amount": 41365
+          }
+        ],
+        "clawbackOpen": {
+          "261001V3001-1": 0
+        },
+        "payable": 14243,
+        "refunds": []
+      }
+    },
+    {
+      "name": "combination 4: the payout netted an open clawback; the void reverses the netting entry and the clawback owes its prior amount again",
+      "story": "4.10 AC3",
+      "combination": 4,
+      "steps": [
+        {
+          "step": "clawback",
+          "orderId": "261001K4001",
+          "amount": 10000
+        },
+        {
+          "step": "approve",
+          "orderId": "261001V4001",
+          "parts": [
+            30000
+          ]
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "confirm"
+        }
+      ],
+      "expected": {
+        "payout": {
+          "amount": 11365,
+          "netted": 10000
+        },
+        "orders": [
+          {
+            "orderId": "261001V4001",
+            "status": "APPROVED",
+            "paidAt": null
+          }
+        ],
+        "awards": [],
+        "offsets": [
+          {
+            "clawbackId": "261001K4001-1",
+            "amount": -10000
+          }
+        ],
+        "clawbackOpen": {
+          "261001K4001-1": -10000
+        },
+        "payable": 11365,
+        "refunds": []
+      }
+    },
+    {
+      "name": "combination 5: a later payout already netted the clawback of an order this payout covered; the void closes the clawback and credits the netted part back, so it is payable again",
+      "story": "4.10 code review 1",
+      "combination": 5,
+      "voidPayout": 1,
+      "steps": [
+        {
+          "step": "approve",
+          "orderId": "261001V5001",
+          "parts": [
+            30000
+          ]
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "confirm"
+        },
+        {
+          "step": "cancel",
+          "orderId": "261001V5001"
+        },
+        {
+          "step": "approve",
+          "orderId": "261001V5002",
+          "parts": [
+            20000
+          ]
+        },
+        {
+          "step": "claim"
+        },
+        {
+          "step": "confirm"
+        }
+      ],
+      "expected": {
+        "payout": {
+          "amount": 21365,
+          "netted": 0
+        },
+        "orders": [
+          {
+            "orderId": "261001V5001",
+            "status": "REVERSED",
+            "paidAt": null
+          }
+        ],
+        "awards": [],
+        "offsets": [
+          {
+            "clawbackId": "261001V5001-1",
+            "amount": 7122
+          }
+        ],
+        "refunds": [
+          {
+            "clawbackId": "261001V5001-1",
+            "amount": 14243
+          }
+        ],
+        "clawbackOpen": {
+          "261001V5001-1": 0
+        },
+        "payable": 14243
+      }
+    }
+  ]
+}

@@ -12,6 +12,8 @@
  * that the amount changed, the panel opens the customer again for the new preview and keeps the
  * confirm disabled until the new figures are acknowledged (M-3). A recorded payout replaces the
  * preview with what the server recorded; its claim is CONFIRMED, so closing releases nothing.
+ * The proof image is chosen above the confirm button and uploaded once the payout is recorded
+ * (Story 4.9); closing the panel forgets a proof not yet sent.
  */
 import type { PayoutConfirmResponse, PayoutQueueRow } from "@cashback/contracts";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Skeleton, useLayout } from "@cashback/ui";
@@ -21,6 +23,7 @@ import { ApiError } from "../api/api.queries";
 import { adminText, errorText } from "../labels";
 import { ChangedNotice, ConfirmAction, RecordedNotice } from "./payout-confirm";
 import { PayoutPreview } from "./payout-preview";
+import { ProofPicker } from "./proof-picker";
 import { useConfirmPayout, useOpenPayout, useReleasePayout } from "./payouts.queries";
 
 export interface PayoutPanelProps {
@@ -42,12 +45,14 @@ interface BodyProps {
   readonly onStale: () => void;
   readonly onConfirm: () => void;
   readonly onDone: () => void;
+  readonly proof: File | null;
+  readonly onProof: (file: File | null) => void;
 }
 
 const isAmountChanged = (error: unknown): boolean => error instanceof ApiError && error.messageKey === "error.payout.amount_changed";
 
-function PanelBody({ open, confirm, changed, onAck, onStale, onConfirm, onDone }: BodyProps) {
-  if (confirm.data !== undefined) return <RecordedNotice result={confirm.data} onDone={onDone} />;
+function PanelBody({ open, confirm, changed, onAck, onStale, onConfirm, onDone, proof, onProof }: BodyProps) {
+  if (confirm.data !== undefined) return <RecordedNotice result={confirm.data} proof={confirm.data.nettingOnly ? null : proof} onDone={onDone} />;
   if (open.isError) {
     const error = open.error;
     const text = error instanceof ApiError ? errorText(error.messageKey, error.code) : errorText("error.internal", "internal");
@@ -80,7 +85,12 @@ function PanelBody({ open, confirm, changed, onAck, onStale, onConfirm, onDone }
       preview={data}
       onStale={onStale}
       notice={changed === null ? undefined : <ChangedNotice previous={changed.previous} current={data.amount} acked={changed.acked} onAck={onAck} />}
-      footer={<ConfirmAction preview={data} pending={confirm.isPending} locked={changed !== null && !changed.acked} error={failure} onConfirm={onConfirm} />}
+      footer={
+        <>
+          {data.amount > 0 && <ProofPicker file={proof} onChange={onProof} disabled={confirm.isPending} hint={adminText("proof_after_confirm")} />}
+          <ConfirmAction preview={data} pending={confirm.isPending} locked={changed !== null && !changed.acked} error={failure} onConfirm={onConfirm} />
+        </>
+      }
     />
   );
 }
@@ -126,12 +136,14 @@ export function PayoutPanel({ row, onClose }: PayoutPanelProps) {
   };
   const step = useConfirmStep(open, reload);
   const { clear } = step;
+  const [proof, setProof] = useState<File | null>(null);
 
   useEffect(() => {
     if (row === null || opened.current === row.customerId) return;
     opened.current = row.customerId;
     reset();
     clear();
+    setProof(null);
     mutate(row.customerId);
   }, [row, mutate, reset, clear]);
 
@@ -142,6 +154,7 @@ export function PayoutPanel({ row, onClose }: PayoutPanelProps) {
     opened.current = null;
     reset();
     clear();
+    setProof(null);
     onClose();
   };
 
@@ -164,7 +177,7 @@ export function PayoutPanel({ row, onClose }: PayoutPanelProps) {
           <SheetDescription>{row?.customerCode ?? ""}</SheetDescription>
         </SheetHeader>
         <div data-panel={phone ? "drawer" : "sheet"} className="min-w-0 p-4">
-          <PanelBody open={open} confirm={step.confirm} changed={step.changed} onAck={step.ack} onStale={reload} onConfirm={step.submit} onDone={close} />
+          <PanelBody open={open} confirm={step.confirm} changed={step.changed} onAck={step.ack} onStale={reload} onConfirm={step.submit} onDone={close} proof={proof} onProof={setProof} />
         </div>
       </SheetContent>
     </Sheet>

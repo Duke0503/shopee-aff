@@ -2,7 +2,8 @@
 // the amount-changed and recorded states, and the netting-only variant) at phone, tablet and desktop
 // widths, for the design review. Starts the Vite dev server, answers /api/admin from fixtures
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
-// sideways scrolling. Usage: node scripts/take-screenshots.mjs <output folder>
+// sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too.
+// Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +13,7 @@ import { createServer } from "vite";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const out = process.argv[2];
+const only = process.argv[3];
 if (!out) {
   console.error("usage: node scripts/take-screenshots.mjs <output folder>");
   process.exit(2);
@@ -75,7 +77,7 @@ const PREVIEW = {
     { orderId: "261001A0002", productName: payoutFixtures.products[2], productImageUrl: "https://cf.example.test/file/deal_home_4.jpg", cashback: 36000, settled: false },
   ],
   bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
-  clawbacks: [],
+  clawbacks: [], refunds: [],
   warning: { amount: 79216, at: "2026-10-30T12:21:00.000Z" },
   snapshotHash: "a".repeat(64), netted: 0, carriedForward: 0,
 };
@@ -88,6 +90,14 @@ const NETTING = { ...PREVIEW, claimId: "N3TT1NG0", snapshotHash: "b".repeat(64),
   clawbacks: [{ clawbackId: "260901PAID07-1", orderId: "260901PAID07", open: 80000 }] };
 const RECORDED = { outcome: "recorded", payoutId: 41, claimId: "K7Q2M9XA", customerId: "P0", amount: 135216, netted: 0, nettingOnly: false, orderCount: 2, awardCount: 1, receiptToken: "rcpt_test_token_0001", recordedAt: "2026-10-30T12:45:00.000Z", replay: false };
 const NETTING_RECORDED = { ...RECORDED, claimId: "N3TT1NG0", customerId: "P4", amount: 0, netted: 50000, nettingOnly: true, orderCount: 1, receiptToken: null };
+const PROOF_PHOTO = join(photoDir, "deal_tech_1.jpg");
+const PROOF_SAVED = { payoutId: 41, byteSize: 48213, width: 800, height: 800, uploadedAt: "2026-10-30T12:45:02.000Z", replaced: false };
+const VOID_PREVIEW = {
+  payoutId: 41, customerId: "P0", customerCode: "DP00012", amount: 135216, status: "RECORDED", recordedAt: "2026-10-30T12:45:00.000Z", voidedAt: null,
+  orders: [{ orderId: "261001A0001", cashback: 79216, to: "REVERSED" }, { orderId: "261001A0002", cashback: 36000, to: "APPROVED" }],
+  awards: [{ awardId: 1, orderId: "261001A0001", amount: 20000, to: "VOID" }], nettingReversed: 0, clawbacksClosed: 99216, refunded: 0, told: true,
+};
+const VOIDED = { payoutId: 41, customerId: "P0", amount: 135216, voidedAt: "2026-10-30T12:50:00.000Z", orders: [{ orderId: "261001A0001", to: "REVERSED" }, { orderId: "261001A0002", to: "APPROVED" }], offsets: 1, corrected: true, replay: false };
 
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5174, strictPort: true }, logLevel: "error" });
 await server.listen();
@@ -95,6 +105,7 @@ const browser = await chromium.launch();
 const problems = [];
 
 async function shoot(name, width, height, path, after, answers = {}) {
+  if (only !== undefined && !name.startsWith(only)) return;
   let claims = 0;
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: width < 1280, isMobile: width < 768 });
   await page.route("https://cf.example.test/file/*", (route) => route.fulfill({ contentType: "image/jpeg", body: readFileSync(join(photoDir, new URL(route.request().url()).pathname.split("/").pop())) }));
@@ -109,6 +120,8 @@ async function shoot(name, width, height, path, after, answers = {}) {
       return route.fulfill(answer);
     }
     if (url.pathname.endsWith("/release")) return route.fulfill({ json: { claimId: "K7Q2M9XA", status: "ABANDONED" } });
+    if (url.pathname.endsWith("/proof")) return route.request().method() === "POST" ? route.fulfill({ json: PROOF_SAVED }) : route.fulfill({ contentType: "image/jpeg", body: readFileSync(PROOF_PHOTO) });
+    if (url.pathname.endsWith("/void")) return route.fulfill({ json: route.request().method() === "POST" ? VOIDED : VOID_PREVIEW });
     return route.fulfill({ status: 404, json: { error: { code: "not_found", messageKey: "error.not_found" } } });
   });
   await page.goto(`http://localhost:5174${path}`);
@@ -162,6 +175,17 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`payout-netting-${label}-sheet`, width, height, "/admin/payouts?filter[queue]=ACTION", (page) => openPanel(page, NETTING_ROW).then(() => page.locator("[data-facts=netting]").waitFor({ timeout: 10_000 })), { claim: () => NETTING });
   await shoot(`payout-netting-recorded-${label}-sheet`, width, height, "/admin/payouts?filter[queue]=ACTION", (page) => openPanel(page, NETTING_ROW).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-recorded]").waitFor({ timeout: 10_000 })),
     { claim: () => NETTING, confirm: () => ({ json: NETTING_RECORDED }) });
+}
+const chooseProof = (page) => page.locator("[data-proof] input[type=file]").setInputFiles(PROOF_PHOTO).then(() => page.locator("[data-proof] img").waitFor({ timeout: 10_000 }));
+const openVoid = (page) => page.getByRole("button", { name: /^Hu/ }).click().then(() => page.locator("[data-void-lines]").waitFor({ timeout: 10_000 }));
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`payout-proof-${label}-sheet`, width, height, "/admin/payouts", (page) => openPanel(page).then(() => chooseProof(page)).then(() => toConfirm(page)));
+  await shoot(`payout-proof-saved-${label}-sheet`, width, height, "/admin/payouts", (page) =>
+    openPanel(page).then(() => chooseProof(page)).then(() => toConfirm(page)).then(() => press(page)).then(() => page.locator("[data-proof-state=saved] img").waitFor({ timeout: 10_000 })));
+  await shoot(`payout-void-${label}-sheet`, width, height, "/admin/payouts", (page) =>
+    openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => openVoid(page)).then(() => page.getByRole("alertdialog").locator("textarea").fill("Ghi nh\u1ea7m kh\u00e1ch, ch\u01b0a chuy\u1ec3n kho\u1ea3n")));
+  await shoot(`payout-voided-${label}-sheet`, width, height, "/admin/payouts", (page) =>
+    openPanel(page).then(() => toConfirm(page)).then(() => press(page)).then(() => openVoid(page)).then(() => page.getByRole("alertdialog").locator("textarea").fill("Ghi nh\u1ea7m kh\u00e1ch")).then(() => page.getByRole("alertdialog").getByRole("button", { name: /^Hu/ }).click()).then(() => page.locator("[data-voided]").waitFor({ timeout: 10_000 })));
 }
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));

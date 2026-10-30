@@ -41,6 +41,7 @@ export {
 export { applyResult, type ApprovalEffect, type AppliedStep } from "./domain/applied-order";
 export type { ClawbackRequest, OrderAwardsPort, OrderEventsPort, OrderPayoutsPort, OrderRecorded } from "./order-effects.port";
 export { markOrderPaid, OrderPayoutError, type OrderPaidDeps, type OrderPayoutErrorCode } from "./order-payout.command";
+export { applyUnpaid, orderStatusOf, unpaidStateOf, type OrderUnpaidDeps, type UnpaidState } from "./order-payout-void.command";
 export { stepEvent } from "./order-steps.command";
 export { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
 export { applyReportRow, ReportApplyError, type ApplyDeps, type ApplyOutcome, type ContextDeps, type ApplyReport } from "./report-apply.command";
