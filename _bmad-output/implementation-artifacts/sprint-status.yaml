@@ -70,11 +70,11 @@ development_status:
   3-6-clawback-entries-for-a-cancel-after-payout: done
   3-7-hourly-reconciliation-over-the-last-7-days-with-run-records: done
   3-8-nightly-sweep-reads-every-day-that-still-holds-an-open-order: done
-  3-9-review-case-apply-and-dismiss-commands: backlog
+  3-9-review-case-apply-and-dismiss-commands: review
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-one-payable-definition-returns-balances-for-any-customer: backlog
+  epic-4: in-progress
+  4-1-one-payable-definition-returns-balances-for-any-customer: review
   4-2-staff-sign-in-on-the-admin-host-behind-cloudflare-access: backlog
   4-3-list-contract-on-the-server-with-definelist: backlog
   4-4-admin-desk-shell-on-the-design-tokens: backlog

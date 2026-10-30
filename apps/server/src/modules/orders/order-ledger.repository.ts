@@ -10,7 +10,7 @@ import type { LedgerDb } from "../../platform/db/ledger";
 import { resolveCustomer } from "../identity/index";
 import type { ObservedStatus } from "./domain/report-signal";
 import type { TransitionOrder } from "./domain/transition";
-import { orderItems, orderObservations, orders } from "./schema";
+import { orderItems, orderObservations, orders, orderStatusHistory } from "./schema";
 
 export type StoredOrder = typeof orders.$inferSelect;
 
@@ -46,6 +46,31 @@ export function latestObservations(db: LedgerDb, orderId: string): LatestObserva
           .limit(1)
           .get();
   return { appliedFingerprint: applied?.fingerprint ?? null, latest };
+}
+
+/** The last row stored for the order, applied or not (D38: "the latest observation"); null when never observed. */
+export function latestObservation(db: LedgerDb, orderId: string): { readonly fingerprint: string; readonly observation: string } | null {
+  return (
+    db
+      .select({ fingerprint: orderObservations.fingerprint, observation: orderObservations.observation })
+      .from(orderObservations)
+      .where(eq(orderObservations.orderId, orderId))
+      .orderBy(desc(orderObservations.id))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+/** The state the order was in when it was last frozen, from its history; null when the history does not say. */
+export function frozenFrom(db: LedgerDb, orderId: string): string | null {
+  const row = db
+    .select({ from: orderStatusHistory.fromStatus })
+    .from(orderStatusHistory)
+    .where(and(eq(orderStatusHistory.orderId, orderId), eq(orderStatusHistory.toStatus, "FROZEN")))
+    .orderBy(desc(orderStatusHistory.id))
+    .limit(1)
+    .get();
+  return row?.from ?? null;
 }
 
 export function insertObservation(db: LedgerDb, row: { orderId: string; observedAt: Instant; fingerprint: string; observation: string; applied: boolean }): void {

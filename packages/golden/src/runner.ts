@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { clawbackAmount, clawbackOpenAmount, fromNetworkUnits, partialClawbackAmount, shopeeCommission, splitCommission, type AffiliateNetwork } from "@cashback/money";
+import { clawbackAmount, clawbackOpenAmount, fromNetworkUnits, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance";
   source?: string;
   cases: GoldenCase[];
 }
@@ -26,6 +26,13 @@ function num(input: Input, key: string): number {
   if (typeof value !== "number") throw new Error(`golden input "${key}" must be a number`);
   return value;
 }
+
+function asNumbers(value: unknown, what: string): number[] {
+  if (!Array.isArray(value) || !value.every((v) => typeof v === "number")) throw new Error(`golden input ${what} must be an array of numbers`);
+  return value;
+}
+
+const numbers = (input: Input, key: string): number[] => asNumbers(input[key], `"${key}"`);
 
 function network(input: Input): AffiliateNetwork {
   const value = input["network"];
@@ -58,10 +65,14 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
       return input["kind"] === "partial"
         ? partialClawbackAmount({ storedCashback: num(input, "storedCashback"), newCashback: num(input, "newCashback"), alreadyClawedBack: num(input, "alreadyClawedBack") })
         : clawbackAmount({ storedCashback: num(input, "storedCashback"), paidBonus: num(input, "paidBonus"), alreadyClawedBack: num(input, "alreadyClawedBack") });
-    case "clawbackOpenAmount": {
-      const entries = input["entries"];
-      if (!Array.isArray(entries) || !entries.every((e) => typeof e === "number")) throw new Error("entries must be an array of numbers");
-      return clawbackOpenAmount(entries);
+    case "clawbackOpenAmount":
+      return clawbackOpenAmount(numbers(input, "entries"));
+    case "payableBalance": {
+      const series = input["clawbackEntries"];
+      if (!Array.isArray(series)) throw new Error("clawbackEntries must be an array of entry arrays");
+      const gross = sumDong([...numbers(input, "cashback"), ...numbers(input, "bonuses")], "gross");
+      const deductedNext = openClawbackTotal(series.map((entries, i) => clawbackOpenAmount(asNumbers(entries, `"clawbackEntries"[${i}]`))));
+      return { gross, payable: payableBalance({ gross, openClawbacks: deductedNext }), deductedNext };
     }
   }
 }

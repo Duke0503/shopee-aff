@@ -1,0 +1,26 @@
+{
+  "rule": "payableBalance",
+  "source": "AD-6, D27, D42, Story 4.1 AC1 and AC2: gross = approved unpaid cashback + confirmed bonuses; payable = max(0, gross - open clawbacks)",
+  "cases": [
+    {
+      "name": "two approved unpaid orders 79,216 and 36,000 and a confirmed bonus of 20,000 are payable 135,216",
+      "input": { "cashback": [79216, 36000], "bonuses": [20000], "clawbackEntries": [] },
+      "expected": { "gross": 135216, "payable": 135216, "deductedNext": 0 }
+    },
+    {
+      "name": "an open clawback of -49,216 leaves 86,000 payable and 49,216 deducted next",
+      "input": { "cashback": [79216, 36000], "bonuses": [20000], "clawbackEntries": [[-99216, 50000]] },
+      "expected": { "gross": 135216, "payable": 86000, "deductedNext": 49216 }
+    },
+    {
+      "name": "an open clawback of -200,000 above the gross leaves 0 payable, never negative",
+      "input": { "cashback": [79216, 36000], "bonuses": [20000], "clawbackEntries": [[-200000]] },
+      "expected": { "gross": 135216, "payable": 0, "deductedNext": 200000 }
+    },
+    {
+      "name": "a closed clawback deducts nothing",
+      "input": { "cashback": [36000], "bonuses": [], "clawbackEntries": [[-99216, 50000, 49216]] },
+      "expected": { "gross": 36000, "payable": 36000, "deductedNext": 0 }
+    }
+  ]
+}

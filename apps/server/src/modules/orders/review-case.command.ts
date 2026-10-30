@@ -20,9 +20,10 @@ import { reviewCases } from "./schema";
 /**
  * Every reason a case opens with: the transition's (D31 freeze reasons, D55 drops, cancels after
  * approval or payout), attribution's (D58), a row whose order id belongs to another network, and
- * an awaiting order the report has not shown for 14 days (R5, D43).
+ * an awaiting order the report has not shown for 14 days (R5, D43), and a wrong rejection staff
+ * reported (D38, Story 3.9).
  */
-export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report";
+export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report" | "wrong_rejection";
 
 export interface CaseEvidence {
   readonly network: AffiliateNetwork;

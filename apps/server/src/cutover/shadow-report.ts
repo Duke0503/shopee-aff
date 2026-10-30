@@ -6,12 +6,12 @@
  * dong exactly when the import does. The report holds no time and no personal data beyond
  * customer ids, and lists everything sorted, so the same inputs give a byte-identical file.
  */
-import { differenceDong, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { differenceDong, estimatedCashback, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 import type { FullPaidParity } from "./import-report";
 import { networkOfPlatform } from "./cutover-context";
 import { countBy } from "./order-checks";
-import { estimateCashback, NOT_JUDGED, type ShadowOrder } from "./shadow-evaluate";
+import { NOT_JUDGED, type ShadowOrder } from "./shadow-evaluate";
 import type { ShadowLedger } from "./shadow-ledger";
 import { SHADOW_REASONS, type ShadowReason } from "./shadow-reasons";
 import { wholeDong } from "./live-values";
@@ -92,7 +92,7 @@ function liveWaitingTotals(ledger: ShadowLedger): Map<string, number> {
   for (const row of ledger.liveWaiting) {
     if (row.customer_id === null) continue;
     const estimate = wholeDong(row.estimated_commission, { allowZero: true });
-    add(out, row.customer_id, estimateCashback(estimate, networkOfPlatform(row.platform), false));
+    add(out, row.customer_id, estimatedCashback(estimate, networkOfPlatform(row.platform), false));
   }
   return out;
 }

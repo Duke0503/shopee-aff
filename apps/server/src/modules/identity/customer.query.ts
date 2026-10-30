@@ -47,14 +47,20 @@ function firstMatch(db: LedgerDb, compact: string, upper: string): Row | undefin
   );
 }
 
-export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | null {
-  const compact = key.replace(/\s+/g, "");
-  if (compact === "") return null;
-  let row = firstMatch(db, compact, compact.toUpperCase());
+/** The one merge walker: a MERGED row to its survivor through its alias, at most MAX_MERGE_HOPS hops. */
+function followMerges(db: LedgerDb, start: Row | undefined): Row | undefined {
+  let row = start;
   for (let hop = 0; row?.status === "MERGED" && hop < MAX_MERGE_HOPS; hop++) {
     const survivor = aliasTarget(db, [row.customerId]);
     row = survivor === undefined || survivor === row.customerId ? undefined : byId(db, survivor);
   }
+  return row;
+}
+
+export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | null {
+  const compact = key.replace(/\s+/g, "");
+  if (compact === "") return null;
+  const row = followMerges(db, firstMatch(db, compact, compact.toUpperCase()));
   if (!row || row.status === "MERGED" || row.status === "ERASED") return null;
   return { customerId: row.customerId, role: row.role, status: row.status };
 }
@@ -62,4 +68,34 @@ export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | n
 /** A customer's code by its permanent id, or null (staff, HOUSE and unknown ids have none). */
 export function customerCodeOf(db: LedgerDb, customerId: string): string | null {
   return db.select({ code: customers.customerCode }).from(customers).where(eq(customers.customerId, customerId)).get()?.code ?? null;
+}
+
+export interface CustomerKeys {
+  readonly customer: ResolvedCustomer;
+  /** The survivor's id and every alias that leads to it, merged ids through a chain included. */
+  readonly keys: readonly string[];
+}
+
+/**
+ * The surviving customer behind `key` and every id its records may sit under (AD-23, D42): a merge
+ * moves no order, award or ledger entry, so a balance reads them through the aliases. An alias is a
+ * key only when `resolveCustomer` itself resolves it to this survivor, so the two share one merge
+ * walker and its hop limit, and an alias that is another live customer's id never pulls that
+ * customer's records in.
+ */
+export function customerKeys(db: LedgerDb, key: string): CustomerKeys | null {
+  const customer = resolveCustomer(db, key);
+  if (customer === null) return null;
+  const keys = new Set([customer.customerId]);
+  const seen = new Set(keys);
+  let frontier = [customer.customerId];
+  for (let hop = 0; frontier.length > 0 && hop < MAX_MERGE_HOPS; hop++) {
+    const next = db.select({ alias: customerAliases.alias }).from(customerAliases).where(inArray(customerAliases.customerId, frontier)).all().map((r) => r.alias).filter((a) => !seen.has(a));
+    for (const alias of next) {
+      seen.add(alias);
+      if (resolveCustomer(db, alias)?.customerId === customer.customerId) keys.add(alias);
+    }
+    frontier = next.filter((a) => keys.has(a));
+  }
+  return { customer, keys: [...keys].sort() };
 }

@@ -17,7 +17,7 @@
  * as the ledger apply does (orders/domain/settlement.ts): the run's month, with any staff marks.
  */
 import { canTransition, type Instant, type OrderStatus } from "@cashback/core";
-import { differenceDong, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { differenceDong, estimatedCashback, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 import type { SourcedRow } from "../modules/linking/index";
 import { applyResult, attribute, periodIsWithheld, rowCommission, settlementPeriodOf, splitWithheld, transition, type AttributionDirectory, type ImportedOrder, type TransitionOrder } from "../modules/orders/index";
@@ -86,14 +86,6 @@ interface Bonus {
   paid: number;
 }
 
-/** The waiting estimate uses the live 10% withholding, as the import's cashback check does. */
-const WITHHELD = true;
-
-export function estimateCashback(estimate: number | null, network: AffiliateNetwork | null, guest: boolean): number {
-  if (estimate === null || network === null || guest || !Number.isSafeInteger(estimate) || estimate < 0) return 0;
-  return splitCommission({ approvedCommission: estimate, network, withheld: WITHHELD }).cashback;
-}
-
 /** Bonus riding on each order: only CONFIRMED is payable (bonus_owed, D27; HELD never is); PAID counts for a clawback (D35). */
 function bonusesOf(live: LiveData): Map<string, Bonus> {
   const out = new Map<string, Bonus>();
@@ -114,7 +106,7 @@ interface SideFacts {
 
 function sideOf(status: OrderStatus | null, paidAt: string | null, cashback: number | null, estimate: number | null, facts: SideFacts): ShadowSide {
   const payable = status === "APPROVED" && paidAt === null && !facts.guest ? sumDong([cashback ?? 0, facts.bonus], "payable") : 0;
-  const waiting = status === "AWAITING_APPROVAL" ? estimateCashback(estimate, facts.network, facts.guest) : 0;
+  const waiting = status === "AWAITING_APPROVAL" ? estimatedCashback(estimate, facts.network, facts.guest) : 0;
   return { status, cashback, payable, waiting };
 }
 

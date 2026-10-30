@@ -83,7 +83,7 @@ export class ReportApplyError extends Error {
 }
 
 /** A claim matters only to an APPROVED order (D39), paid bonus and earlier clawbacks only to a PAID one (D35, D42): each is read only then. */
-function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | null, directory: LedgerDirectory, deps: ApplyDeps, now: Instant): TransitionContext {
+export function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | null, directory: LedgerDirectory, deps: ApplyDeps, now: Instant, chosen?: Attribution): TransitionContext {
   const status = stored?.status ?? null;
   return {
     network: row.network,
@@ -91,7 +91,7 @@ function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | null, d
     coveredByOpenClaim: status === "APPROVED" && deps.payouts.coveredByOpenClaim(row.orderId),
     paidBonus: status === "PAID" ? deps.awards.paidBonus(row.orderId) : 0,
     alreadyClawedBack: status === "PAID" ? deps.payouts.clawedBack(row.orderId) : 0,
-    attribution: stored === null ? attribute(row, directory, deps.production) : undefined,
+    attribution: stored === null ? (chosen ?? attribute(row, directory, deps.production)) : undefined,
   };
 }
 
@@ -119,7 +119,12 @@ interface Applying {
   readonly attribution: Attribution | undefined;
   readonly directory: LedgerDirectory;
   readonly now: Instant;
+  /** Set when staff apply a review case (Story 3.9): the case and the staff reason the history records. */
+  readonly review?: { readonly caseId: number; readonly reason: string };
 }
+
+/** A staff review of a recorded order re-reads its latest row: nothing new was observed. */
+const reReads = (a: Applying): boolean => a.review !== undefined && a.stored !== null;
 
 /** The candidates a case carries: attribution's when it declined, else the order's own customer. */
 function candidatesOf(a: Applying, customerId: string | null): readonly string[] {
@@ -167,9 +172,12 @@ const itemValue = (row: SourcedRow): number | null => {
 /** The row approves an order that was awaiting: a new approval, stamped from this row's period. */
 const isNewApproval = (a: Applying): boolean => a.result.steps.some(([from, to]) => to === "APPROVED" && (from === null || from === "AWAITING_APPROVAL"));
 
+/** The approval is stamped now: a new approval, or an order reaching APPROVED that has no approval time (a restore). */
+const stampsApproval = (a: Applying): boolean => isNewApproval(a) || (a.result.steps.some(([, to]) => to === "APPROVED") && (a.stored?.approvedAt ?? null) === null);
+
 function approvalChanges(a: Applying, approval: ApprovalEffect): Partial<OrderRow> {
   const amounts = { approvedCommission: approval.approvedCommission, cashback: approval.cashback, cashbackFee: approval.fee, cashbackTax: approval.tax, cashbackWithheld: approval.withheld };
-  if (isNewApproval(a)) return { ...amounts, settlementPeriod: settlementPeriodOf(a.now), approvedAt: a.now };
+  if (stampsApproval(a)) return { ...amounts, settlementPeriod: settlementPeriodOf(a.now), approvedAt: a.now };
   // Amending an earlier approval keeps its period and time; an imported one's period is its approval month.
   const approvedAt = (a.stored?.approvedAt ?? null) as Instant | null;
   return { ...amounts, settlementPeriod: a.stored?.settlementPeriod ?? (approvedAt === null ? null : settlementPeriodOf(approvedAt)) };
@@ -178,22 +186,37 @@ function approvalChanges(a: Applying, approval: ApprovalEffect): Partial<OrderRo
 /** An imported order of no network takes the row's network, unless it is PAID (D4). */
 const takesNetwork = (a: Applying, order: TransitionOrder): boolean => a.stored !== null && a.stored.network === null && a.stored.status !== "PAID" && order.status !== "PAID";
 
-/** The order columns the row changes; a PAID order gets only its last-seen time (D4). */
+/** The approval time a restore stamps on an order that reached APPROVED without one; the period stays when it has one. */
+function approvalStamp(a: Applying): Partial<OrderRow> {
+  if (a.step.approval !== null || !stampsApproval(a)) return {};
+  return { approvedAt: a.now, settlementPeriod: a.stored?.settlementPeriod ?? settlementPeriodOf(a.now) };
+}
+
+/**
+ * The order columns the row changes; a PAID order gets only its last-seen time (D4). A staff review
+ * re-reads the latest row, so the last-seen time, the estimate and the value are left as they are.
+ */
 function orderChanges(a: Applying, order: TransitionOrder): Partial<OrderRow> {
-  const changes: Partial<OrderRow> = { lastSeenInReportAt: a.now };
+  const changes: Partial<OrderRow> = reReads(a) ? {} : { lastSeenInReportAt: a.now };
   if (a.result.steps.length > 0) Object.assign(changes, { status: order.status, updatedAt: a.now });
   if (takesNetwork(a, order)) Object.assign(changes, { network: a.row.network, updatedAt: a.now });
   if (a.step.deferred || order.status === "PAID") return changes;
-  const estimate = rowCommission(a.row);
-  if (estimate !== null) changes.estimatedCommission = estimate;
-  changes.orderValue = itemValue(a.row) ?? a.stored?.orderValue ?? null;
+  if (!reReads(a)) {
+    const estimate = rowCommission(a.row);
+    if (estimate !== null) changes.estimatedCommission = estimate;
+    changes.orderValue = itemValue(a.row) ?? a.stored?.orderValue ?? null;
+  }
   if (a.step.approval !== null) Object.assign(changes, approvalChanges(a, a.step.approval), { updatedAt: a.now });
+  Object.assign(changes, approvalStamp(a));
   const rejection = a.result.effects.find((e): e is Extract<Effect, { kind: "record_rejection" }> => e.kind === "record_rejection");
   if (rejection !== undefined) changes.rejectionReason = rejection.reason;
+  // A wrong rejection reopened (D38): the rejection no longer holds.
+  if (a.result.steps.some(([from, to]) => from === "REJECTED" && to === "AWAITING_APPROVAL")) changes.rejectionReason = null;
   return changes;
 }
 
 function storeObservation(db: LedgerDb, a: Applying, orderId: string): void {
+  if (reReads(a)) return;
   const repeat = a.step.deferred && a.seen?.latest?.fingerprint === a.row.fingerprint && !a.seen.latest.applied;
   if (!repeat) insertObservation(db, { orderId, observedAt: a.now, fingerprint: a.row.fingerprint, observation: observationJson(a.row), applied: !a.step.deferred });
   if (a.step.deferred || a.step.order?.status === "PAID") return;
@@ -216,6 +239,7 @@ function carryOut(a: Applying, orderId: string, customerId: string | null, deps:
 }
 
 function reasonOf(a: Applying): string {
+  if (a.review !== undefined) return a.review.reason;
   const rejection = a.result.effects.find((e) => e.kind === "record_rejection");
   if (rejection?.kind === "record_rejection") return rejection.reason;
   return a.step.reviewCases[0] ?? "report";
@@ -224,12 +248,12 @@ function reasonOf(a: Applying): string {
 function writeSteps(db: LedgerDb, a: Applying, order: TransitionOrder, customerId: string | null, deps: ApplyDeps): void {
   const orderId = a.row.orderId;
   const approval = a.step.approval;
-  const period = approval !== null && isNewApproval(a) ? settlementPeriodOf(a.now) : null;
-  const facts: Record<string, AuditValue> = { network: a.row.network };
+  const period = approval !== null && stampsApproval(a) ? settlementPeriodOf(a.now) : null;
+  const facts: Record<string, AuditValue> = { network: a.row.network, ...(a.review === undefined ? {} : { caseId: a.review.caseId }) };
   const params: Record<string, number> = {};
   if (approval !== null) Object.assign(facts, { cashback: approval.cashback, withheld: approval.withheld }, period === null ? {} : { settlementPeriod: period });
   if (approval !== null) params.cashback = approval.cashback;
-  const approvalReason = period === null || approval === null ? undefined : `approved in settlement period ${a.row.network} ${period}, ${approval.withheld ? "withheld" : "not withheld"}`;
+  const approvalReason = period === null || approval === null || a.review !== undefined ? undefined : `approved in settlement period ${a.row.network} ${period}, ${approval.withheld ? "withheld" : "not withheld"}`;
   recordSteps(db, { orderId, customerId, guest: order.guest, steps: a.result.steps, reason: reasonOf(a), approvalReason, facts, params }, deps);
   if (takesNetwork(a, order)) recordNetworkSet(db, { orderId, status: order.status, network: a.row.network }, deps);
 }
@@ -273,5 +297,27 @@ export function applyReportRow(db: LedgerDb, row: SourcedRow, deps: ApplyDeps): 
   const result = transition(before, { kind: "report", row }, context);
   const a: Applying = { row, stored, seen, result, step: applyResult(before, result), attribution: context.attribution, directory, now };
   if (a.step.order === null) return { outcome: "unrecorded", orderId: row.orderId, steps: [], reviewCases: openCases(db, a, null, a.step.reviewCases, deps) };
+  return applyToOrder(db, a, deps);
+}
+
+/** A transition staff planned from a review case (Story 3.9): the result is written as it was previewed, never recomputed. */
+export interface PlannedApply {
+  readonly row: SourcedRow;
+  /** The recorded order, or null when the row records one for the chosen attribution. */
+  readonly stored: StoredOrder | null;
+  readonly result: TransitionResult;
+  readonly attribution?: Attribution;
+  readonly review: { readonly caseId: number; readonly reason: string };
+}
+
+/**
+ * Writes a planned review result through the same path as a report row, every effect included;
+ * call inside `tx`. A recorded order's latest row is re-read, not observed again.
+ */
+export function applyPlanned(db: LedgerDb, p: PlannedApply, deps: ApplyDeps): ApplyReport {
+  const before = p.stored === null ? null : transitionOrderOf(db, p.stored);
+  const step = applyResult(before, p.result);
+  const a: Applying = { row: p.row, stored: p.stored, seen: null, result: p.result, step, attribution: p.attribution, directory: ledgerDirectory(db), now: deps.clock.now(), review: p.review };
+  if (step.order === null) return { outcome: "unrecorded", orderId: p.row.orderId, steps: [], reviewCases: [] };
   return applyToOrder(db, a, deps);
 }

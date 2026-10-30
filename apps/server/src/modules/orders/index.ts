@@ -55,6 +55,9 @@ export {
   type OrdersImportResult,
 } from "./order-import.command";
 export { openOrRefreshCase, resolveOpenCase, type CaseEvidence, type CaseReason, type CaseWrite } from "./review-case.command";
+export { orderBalanceRows, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows } from "./order-balance.query";
+export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
+export { previewReviewApply, ReviewCaseError, type ReviewApplyInput, type ReviewCaseErrorCode, type ReviewPreview } from "./review-plan.query";
 export { openOrderDays, type OpenOrderDay, type OpenOrderDays } from "./open-order-days.query";
 export { AGED_AFTER_DAYS, FLAG_AFTER_DAYS, flagUnseenOrders, orderAging, resolveSeenAgain, type AgingCounts } from "./order-aging.command";
 export { lastSucceededRun, ReconciliationRunError, runReconciliation, SOURCE_STALE_AFTER_MS, type RunCounts, type RunDeps, type RunKind, type RunOutcome, type RunRecord } from "./reconciliation-run.command";
