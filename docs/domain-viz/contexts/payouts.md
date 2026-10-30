@@ -36,6 +36,9 @@ One bank transfer the operator made to one customer. It covers that customer's a
 - The payout amount equals the sum of the cashback and bonuses it covers, computed by the server.
 - A payout is never made to a customer without a bank account.
 - A guest order is never covered by a payout (D5: A link made without a customer code belongs to the guest account HOUSE).
+- A payout claim is kept (OPEN, CONFIRMED, ABANDONED); confirm is idempotent by claim id and succeeds on an abandoned claim whose orders are unchanged (D39: Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time).
+- A void returns each covered order to the state its latest report row gives and reverses the payout's netting entries (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…).
+- A netting-only payout (transfer 0) is allowed when open clawbacks cover the gross payable; it sends no message (D42: A clawback's open amount is the sum of its insert-only ledger entries: the negative original (stored cashback plus an…).
 **9 fields:**
 | Field | Type / reference | Required | Description |
 |---|---|---|---|
@@ -123,7 +126,7 @@ _Nothing here changes state in a way that changes what is allowed._
 
 ## Rules & policies
 
-**invariant** (6)
+**invariant** (9)
 
 | Rule | Declared on | Status |
 |---|---|---|
@@ -132,6 +135,9 @@ _Nothing here changes state in a way that changes what is allowed._
 | The payout amount equals the sum of the cashback and bonuses it covers, computed by the server. | Payout |  |
 | A payout is never made to a customer without a bank account. | Payout |  |
 | A guest order is never covered by a payout (D5: A link made without a customer code belongs to the guest account HOUSE). | Payout |  |
+| A payout claim is kept (OPEN, CONFIRMED, ABANDONED); confirm is idempotent by claim id and succeeds on an abandoned claim whose orders are unchanged (D39: Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time). | Payout |  |
+| A void returns each covered order to the state its latest report row gives and reverses the payout's netting entries (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). | Payout |  |
+| A netting-only payout (transfer 0) is allowed when open clawbacks cover the gross payable; it sends no message (D42: A clawback's open amount is the sum of its insert-only ledger entries: the negative original (stored cashback plus an…). | Payout |  |
 | Settlement never changes an order's customer status. | NetworkSettlement |  |
 
 

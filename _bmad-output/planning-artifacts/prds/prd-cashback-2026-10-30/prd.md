@@ -3,6 +3,7 @@ title: Cashback Platform (hoantiendp.com), re-plan
 status: final
 created: 2026-10-30
 updated: 2026-10-30
+revised: 2026-10-30 after the independent architecture review (D38 to D55; Release scope in §8.3)
 ---
 
 # PRD: Cashback Platform (hoantiendp.com)
@@ -129,7 +130,10 @@ queue, web quota, customer message. Terms added by this PRD:
 
 - **Customer website** — the public site at hoantiendp.com for customers and guests.
 - **Admin desk** — the staff-only application for the operator and employees.
-- **Payable balance** — a customer's approved, unpaid cashback plus confirmed campaign bonuses.
+- **Payable balance** — a customer's approved, unpaid cashback plus confirmed campaign bonuses,
+  minus open clawbacks, never below 0. The deducted clawbacks are shown as their own line.
+- **Clawback** — what a customer owes back when a paid order is cancelled: the order's cashback
+  plus any bonus paid on it (D35), deducted from later payouts.
 - **Receipt page** — the public page of one payout, opened by its bill token.
 - **Review case** — a report row the system will not guess at, waiting for staff.
 - **Cutover** — the moment the new platform takes over from the live Python system.
@@ -237,7 +241,8 @@ and that password. Realizes UJ-2.
 
 **Consequences (testable):**
 - Each /matkhau issues a new password and ends every other session (D21).
-- Five failed sign-ins lock the account for 15 minutes.
+- After five failed sign-ins the customer code waits a delay that doubles from 1 minute up to
+  15 minutes, so nobody can lock every customer out (spine AD-18).
 - A session stays valid on a trusted phone until sign-out or a new password.
 
 #### FR-10: Bank account
@@ -277,8 +282,14 @@ through its API, every 60 minutes.
 - Attribution uses sub_id1, then customer aliases, then the owner of the sub_id2 request; anything
   else becomes a review case.
 - Unknown statuses become review cases instead of a guess.
+- Each network's statuses are read through an explicit status map tested on real report rows;
+  Shopee's `UNPAID` (the buyer has not paid yet) means awaiting, never cancelled (D38). Staff can
+  undo a wrong rejection through a review case.
 - Cancel signals follow a fixed precedence (order status, then each item, then a 0 commission); an
-  unknown status, a missing order id or a page-cap read freezes the order out of every total (D31).
+  unknown status or a missing order id freezes the order out of every total (D31). A read that hits
+  the page cap fails the run and alerts the owner; it freezes no order (D43).
+- Each hourly run reads the last 7 days; a nightly sweep reads every day that still holds an
+  awaiting or approved unpaid order, so approvals 30 to 70 days after purchase are seen (D43).
 - A cancel after approval reverses the order before payout; a cancel after payout keeps it paid and
   nets a clawback against the next payout (D30). Every status is defined in
   `docs/operations/status-flows.md`.
@@ -295,7 +306,8 @@ On approval, the platform computes cashback with the one commission split (D3, D
    settlement period is withheld when Shopee withholds personal income tax on that period's payout
    (a payout of 2,000,000 dong or more); staff mark the period on the admin desk, and orders
    approved before the mark use the setting in force at approval. AccessTrade periods are always
-   withheld. [ASSUMPTION: staff mark withheld Shopee periods; the network report does not say it.]
+   withheld. A Shopee period counts as withheld unless staff unmark it (D54), because the tax is
+   known only after approval. [ASSUMPTION: the network report does not say it.]
 4. `net = commission - fee - tax`.
 5. `cashback = roundHalfUp(net x 80%)`, the only rounding step, to a whole dong (D1). The operator
    share is `net - cashback`.
@@ -364,21 +376,32 @@ Staff can record a payout for one customer, with an optional proof image, throug
   with "the amount changed, review again" if reconciliation changed that set in between.
 - Only one payout per customer can be in progress; a second staff member sees it as taken.
 - A customer whose bank account was changed on the website and not yet confirmed in Zalo is held
-  (FR-10).
+  (FR-10); confirmation re-checks the bank account and the hold.
+- The operator transfers before confirming, so a transfer is never refused for timing: confirming
+  an expired claim succeeds when the covered orders are unchanged, a retried confirmation returns the
+  same payout, and a cancel arriving while the claim is open is applied after it ends (D39). Each
+  claim has its own transfer reference (customer code plus a short claim id).
+- Opening a customer whose last claim was abandoned after the QR was shown warns that a transfer
+  may already have been made.
+- When open clawbacks cover the whole gross payable, staff record a netting-only payout (transfer
+  0, no QR, no message) (D42).
 
 #### FR-34: Void a mistaken payout
 An admin can void a payout recorded by mistake, as a compensating action (D24).
 
 **Consequences (testable):**
-- The covered orders return from paid to approved and their bonuses to confirmed; the void, the
-  reason and the admin are recorded in the order history and the audit trail.
+- Each covered order returns to the state its latest report row gives: approved, or reversed if a
+  cancel was seen; its bonuses return to confirmed, or void when the order is reversed; clawback
+  netting written by the payout is reversed (D41). The void, the reason and the admin are recorded
+  in the order history and the audit trail.
 - A void never deletes the payout; it stays visible as voided.
 - If the customer was already told about the payout, the customer gets one correction message.
 - Reconciliation still never changes a paid order (D4); only this admin command can.
 
 #### FR-18: Receipt page
 Anyone with the link can open the receipt page of one payout: customer code, last four digits,
-amount, date, proof. The token is random and unguessable.
+amount, date. The token is random and unguessable. The proof image is never on the public page; it
+is shown only to staff and to the signed-in customer (D49).
 
 #### FR-19: Network settlement
 Staff can see what each network has paid the operator and which approved orders those payments
@@ -541,11 +564,18 @@ The new platform imports the live database without changing any customer id, cus
 paid time, payout, campaign award or share code.
 
 **Consequences (testable):**
-- After import, every customer's payable balance, waiting amount and paid amount equal the live
-  system's, to the dong.
+- After import, every customer's paid amount equals the live system's, to the dong. Payable and
+  waiting amounts are checked by a shadow run of the new reconciliation on the rehearsal copy: the
+  owner signs off the per-order differences it reports, because the live figures carry known defects
+  (D44). An order the report can no longer verify is frozen with a review case.
+- The first reconciliation after import sends no messages, and messages the live system already
+  sent are never sent again (D46).
+- For 72 hours after the switch the new system records no payouts; rollback to the live system is
+  allowed only inside that window (D40).
 - Old share links and receipt links keep working.
-- The import converts every stored time to the one UTC format (FR-38) and reports each row it could
-  not convert instead of guessing.
+- The import converts every stored time to the one UTC format (FR-38) by a per-column rule (UTC,
+  Vietnam time, or approximate), and reports each row it could not convert instead of guessing
+  (D45).
 - A rehearsal on a copy of the live database passes before the real cutover.
 
 ## 5. Cross-Cutting NFRs
@@ -576,8 +606,9 @@ paid time, payout, campaign award or share code.
   account loses about two months of unpaid commission. Hence D8 and FR-7.
 - **Zalo.** One personal account through an unofficial library. A lock cuts every customer at once;
   the customer website is the customer fallback (FR-36). Telegram carries owner alerts only.
-- **Exposed secrets.** A deploy webhook secret and a third-party key are committed on `main`. They
-  are rotated and removed before cutover; this is a release blocker (OQ8).
+- **Exposed secrets.** A deploy webhook secret and a third-party key are committed on `main`. The
+  owner rotates both values now on the live system and in Cloudflare, without code changes on
+  `main`, and makes the repository private (OQ8, D51).
 - **Host.** Production runs on one home machine (currently a Mac) with a Cloudflare tunnel. Two
   machines must never run production at the same time.
 - **Money law.** The platform never holds a customer wallet; it records what is owed and the
@@ -599,7 +630,8 @@ paid time, payout, campaign award or share code.
 
 ### 8.1 In Scope
 
-- FR-1 to FR-38 for Shopee and TikTok Shop through AccessTrade.
+- FR-1 to FR-38 for Shopee and TikTok Shop through AccessTrade, delivered in two steps: the v1
+  cutover scope, then the rest (§8.3).
 - A redesigned customer website and admin desk on one design system.
 - Cutover from the live system with a rehearsal.
 
@@ -610,6 +642,23 @@ paid time, payout, campaign award or share code.
 - A staging environment with its own Zalo account. [NOTE FOR PM: needed before cutover rehearsal
   if possible.]
 - Public metrics or marketing pages beyond the home page and the guide.
+
+### 8.3 Release scope (v1 cutover vs after cutover)
+
+Cutover is big-bang (one Zalo session, two databases), so v1 is bounded by what paying,
+attributing and reconciling depend on (D53, spine AD-28). The FRs below stay in the PRD; only
+their delivery moves after cutover. None of them is on the pay, attribute or reconcile path.
+
+| Deferred until after cutover | Reason | Until then |
+|---|---|---|
+| FR-27 business metrics beyond the one quiet line on the Overview | Reporting, not money; ratios are untrustworthy below 100 approved orders anyway | The Overview line (FR-25) |
+| FR-31 fraud flags except the shared-bank-account flag | Detection aids; only the shared bank account can send money to the wrong person | The shared-bank-account flag on the payout row |
+| FR-19 network settlement screen | Settlement never changes what a customer is owed | Settlement data kept; no screen |
+| FR-23 campaign creation UI | Imported awards are honoured by the balance; a new campaign is rare | An admin command creates a campaign if one must run at cutover |
+| FR-11 merge UI | Needed only when the Zalo account changes | An admin command with preview and apply, as live does |
+| FR-24 staff management UI | Staff change rarely | Staff are seeded |
+| FR-29 audit trail screen | The audit trail is still written by every command | Audit read by admin query |
+| Guide page redesign, product and link-request lists beyond a basic list | Not on the money path | Basic list from the list contract |
 
 ## 9. Success Metrics
 
@@ -639,11 +688,13 @@ paid time, payout, campaign award or share code.
 1. OQ1 (storage: keep SQLite or move to PostgreSQL) — for the architecture step.
 2. OQ2 (stack: keep the v2 TypeScript monorepo) — for the architecture step.
 3. OQ5 (does a copy of the earlier v2 design documents exist) — owner.
-4. OQ8 (hard-coded secrets on `main`) — release blocker; rotate before cutover.
+4. OQ8 (hard-coded secrets on `main`) — owner action now: rotate the values without code changes
+   and make the repository private (D51).
 5. Does the operator want a dev environment with a second Zalo account before cutover? — owner.
 
 ## 11. Assumptions Index
 
-- §4.3 FR-13: staff mark withheld Shopee settlement periods, because the report does not say it.
+- §4.3 FR-13: Shopee settlement periods are withheld by default and staff unmark them, because the
+  report does not say it (D54).
 - §5 NFR-3: 2-second interactive target on a mid-range phone.
 - §5 NFR-8: 15 minutes of operator work per day at 30 orders a day.

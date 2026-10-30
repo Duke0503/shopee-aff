@@ -4,7 +4,10 @@ Legend: every job and the queue is its own element (C4 project rule 3). The serv
 Node process and the only writer of the ledger (AD-2); the jobs run inside it (AD-13). The Zalo
 assistant and the affiliate browser are host processes on the operator's machine (AD-25). The
 public listener is reached only through the Cloudflare tunnel; the internal listener is loopback
-only and token-protected (AD-18).
+only and token-protected (AD-18). Revised 2026-10-30 after the independent review: the assistant
+pulls notifications from the internal API (no assistant listener), the server takes an OS lock
+file instead of a job lease, off-site backups go to Google Drive (D36), and an external heartbeat
+checker watches the machine (AD-29).
 
 ```mermaid
 C4Container
@@ -18,18 +21,19 @@ C4Container
   System_Ext(accesstrade, "AccessTrade", "Publisher API")
   System_Ext(telegram, "Telegram", "Owner alerts")
   System_Ext(cf, "Cloudflare edge", "Tunnel, TLS, Access on admin host")
-  System_Ext(offsite, "Off-machine backup store", "rclone remote, encrypted copies")
+  System_Ext(offsite, "Google Drive", "rclone remote, age-encrypted copies (D36)")
+  System_Ext(heartbeat, "External heartbeat checker", "healthchecks.io or Cloudflare Worker cron")
 
   System_Boundary(p, "Cashback Platform") {
     Container(web, "Customer website", "React, Vite, Tailwind, shadcn/ui", "Sign in, my money, account, link converter")
     Container(admin, "Admin desk", "React, Vite, Tailwind, shadcn/ui", "Overview, payouts, orders, customers, review, campaigns")
     Container(server, "Server", "Node 24, Fastify, Drizzle", "7 context modules; public API, share and receipt pages; internal API")
     ContainerQueue(linkq, "Link queue", "link_requests table", "QUEUED requests, Zalo first")
-    Container(linkjob, "Link job (5 s)", "in-process job", "Hands one customer's batch to the bridge, applies results")
+    Container(linkjob, "Link job (5 s)", "in-process job", "Hands one link (sub_id1 and sub_id2) to the bridge, checks and applies results")
     ContainerQueue(outbox, "Notification outbox", "outbox table", "One row per change to tell, unique dedup key")
-    Container(notifyjob, "Notify job (10 s)", "in-process job", "Delivers due outbox rows to the assistant")
-    Container(recjob, "Reconciliation run (60 min)", "in-process job", "Reads network reports, applies order transitions")
-    Container(backupjob, "Backup job (daily)", "in-process job", "Online backup, integrity check, encrypt, copy off machine")
+    Container(notifyapi, "Notification pull", "internal route", "Hands out one due outbox row at a time; daily cap; silent mode")
+    Container(recjob, "Reconciliation run (60 min, nightly sweep)", "in-process job", "Hourly last 7 days; nightly paced sweep of days with unresolved orders; applies order transitions")
+    Container(backupjob, "Backup job (daily)", "in-process job", "Online backup with proof files, integrity check, restore check, encrypt, copy off machine")
     ContainerDb(db, "Ledger", "SQLite, WAL", "Customers, links, orders, payouts, ledger entries, audit")
     Container(assistant, "Zalo assistant", "Node 24, zca-js, host process", "Chat commands, registration, paced sends")
     Container(bridge, "Browser bridge", "Chrome MV3 extension in the affiliate Chrome profile", "Drives Shopee pages; no waiting in page scripts")
@@ -46,17 +50,19 @@ C4Container
   Rel(assistant, zalo, "Receives and sends messages", "zca-js")
   Rel(assistant, server, "Registers, runs commands, requests links", "X-Assistant-Token, 127.0.0.1:8081")
   Rel(server, linkq, "Enqueues link requests")
-  Rel(linkjob, linkq, "Claims the next batch")
+  Rel(linkjob, linkq, "Claims the next request")
   Rel(bridge, linkjob, "Long-polls for work, posts results", "X-Bridge-Token, 127.0.0.1:8081")
   Rel(bridge, shopee, "Creates links, reads page 1, reads the report", "real browser session")
   Rel(server, accesstrade, "Creates links, reads transactions", "HTTPS")
   Rel(recjob, bridge, "Asks for the Shopee report through the link channel")
   Rel(recjob, db, "Applies transitions, one transaction per order")
   Rel(server, outbox, "Inserts in the same transaction as the change")
-  Rel(notifyjob, outbox, "Reads due rows, marks sent")
-  Rel(notifyjob, assistant, "Delivers a notification", "X-Assistant-Token, assistant loopback")
+  Rel(notifyapi, outbox, "Reads due rows, marks sent on ack")
+  Rel(assistant, notifyapi, "Pulls the next notification, acknowledges it", "X-Assistant-Token, 127.0.0.1:8081")
   Rel(server, db, "Only writer", "better-sqlite3, BEGIN IMMEDIATE")
   Rel(backupjob, db, "Online backup API")
   Rel(backupjob, offsite, "Copies encrypted backup", "rclone")
   Rel(server, telegram, "Owner alerts with cooldowns", "HTTPS")
+  Rel(server, heartbeat, "Pings every 5 minutes while healthy", "HTTPS")
+  Rel(heartbeat, telegram, "Alerts when pings stop for 15 minutes")
 ```

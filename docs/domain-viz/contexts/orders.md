@@ -125,27 +125,37 @@ stateDiagram-v2
     direction LR
     [*] --> AWAITING_APPROVAL
     AWAITING_APPROVAL --> APPROVED: approve [approval-needs-commission]
-    AWAITING_APPROVAL --> REJECTED: reject
+    AWAITING_APPROVAL --> REJECTED: reject [network-status-map]
     APPROVED --> PAID: mark_paid [pay-once]
     AWAITING_APPROVAL --> FROZEN: freeze [cancel-signal-precedence]
     FROZEN --> AWAITING_APPROVAL: resolve
-    APPROVED --> REVERSED: reverse [cancel-signal-precedence]
+    APPROVED --> REVERSED: reverse [cancel-signal-precedence, claim-protection]
     PAID --> PAID: claw_back
+    APPROVED --> FROZEN: freeze [unknown-status-review]
+    FROZEN --> APPROVED: resolve_approved [approval-needs-commission]
+    FROZEN --> REJECTED: resolve_rejected
+    REJECTED --> AWAITING_APPROVAL: reopen [network-status-map]
+    PAID --> APPROVED: void_to_approved [void-observed-state]
+    PAID --> REVERSED: void_to_reversed [void-observed-state]
     REVERSED --> [*]
-    PAID --> [*]
-    REJECTED --> [*]
 ```
-**7 transitions**: guard, event emitted, what happens next
+**13 transitions**: guard, event emitted, what happens next
 
 | From | Command | To | Guard | Emits | Then |
 |---|---|---|---|---|---|
 | AWAITING_APPROVAL | approve | APPROVED | approval-needs-commission | orders.order.approved | The customer balance grows. · The customer is told the amount, without a payout date (D11: Every approved, unpaid order is payable, grouped by customer). · Reconciliation sees the network approve the order with a commission figure. The cashback becomes owed. |
-| AWAITING_APPROVAL | reject | REJECTED | — | orders.order.rejected | The customer is told the reason. · Reconciliation sees the network cancel the order. |
+| AWAITING_APPROVAL | reject | REJECTED | network-status-map | orders.order.rejected | The customer is told the reason. · Reconciliation sees a cancel signal through the network's status map. Shopee UNPAID is not one (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). |
 | APPROVED | mark_paid | PAID | pay-once | orders.order.paid | A payout covering this order is recorded. |
-| AWAITING_APPROVAL | freeze | FROZEN | cancel-signal-precedence | orders.order.frozen | A review case opens. The order leaves every total. · The report carries an unknown status, no order id, or the read hit the page cap. |
+| AWAITING_APPROVAL | freeze | FROZEN | cancel-signal-precedence | orders.order.frozen | A review case opens. The order leaves every total. · The report carries an unknown status or no order id. A page-cap read fails the run and freezes nothing (D43: The hourly reconciliation reads the last 7 days by purchase time). |
 | FROZEN | resolve | AWAITING_APPROVAL | — | — | Staff resolve the review case and the order returns to its known state. |
-| APPROVED | reverse | REVERSED | cancel-signal-precedence | orders.order.reversed | The order leaves the payable balance. · Staff get an alert. The customer is told once. · A cancel signal arrives after approval and before payout. |
-| PAID | claw_back | PAID | — | orders.order.clawed-back | A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout. [compensating] |
+| APPROVED | reverse | REVERSED | cancel-signal-precedence, claim-protection | orders.order.reversed | The order leaves the payable balance. · Staff get an alert. The customer is told once. · A cancel signal arrives after approval and before payout, and no OPEN payout claim covers the order (D39: Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time). |
+| PAID | claw_back | PAID | — | orders.order.clawed-back | A cancel signal, or a commission drop (partial), arrives after payout. The order does not change; a clawback of the cashback plus any paid bonus is netted against later payouts (D35: A clawback after payout also recovers a campaign bonus already paid on that order, D42 (A clawback's open amount is the sum of its insert-only ledger entries: the negative original (stored cashback plus an…), D55: A FROZEN order suspends its campaign award instead of voiding it). [compensating] |
+| APPROVED | freeze | FROZEN | unknown-status-review | orders.order.frozen | A review case opens. The order leaves every total; its campaign award is suspended. · An unknown status, a missing order id, or an approved commission that drops but stays above 0 on an unpaid order (D55: A FROZEN order suspends its campaign award instead of voiding it). |
+| FROZEN | resolve_approved | APPROVED | approval-needs-commission | — | Staff resolve the review case and the order returns to approved. |
+| FROZEN | resolve_rejected | REJECTED | — | — | Staff resolve the review case as a rejection, with a reason. |
+| REJECTED | reopen | AWAITING_APPROVAL | network-status-map | — | Staff apply a review case for a wrong rejection; the latest report row shows no cancel signal (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). |
+| PAID | void_to_approved | APPROVED | void-observed-state | — | An admin voids the payout and the latest report row shows no cancel; paid_at is cleared (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). [compensating] |
+| PAID | void_to_reversed | REVERSED | void-observed-state | — | An admin voids the payout and a cancel was seen; paid_at is cleared and the clawback is closed by an offsetting entry (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). [compensating] |
 
 
 ### ReviewCase
@@ -170,12 +180,17 @@ stateDiagram-v2
 | View my orders | Customer | A customer reads the order list and balance with /donhang or on the web. |
 | Resolve a manual review | Operator | The operator decides a report row the system would not guess at. |
 | approve | Order | Reconciliation sees the network approve the order with a commission figure. The cashback becomes owed. |
-| reject | Order | Reconciliation sees the network cancel the order. |
+| reject | Order | Reconciliation sees a cancel signal through the network's status map. Shopee UNPAID is not one (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). |
 | mark_paid | Order | A payout covering this order is recorded. |
-| freeze | Order | The report carries an unknown status, no order id, or the read hit the page cap. |
+| freeze | Order | The report carries an unknown status or no order id. A page-cap read fails the run and freezes nothing (D43: The hourly reconciliation reads the last 7 days by purchase time). |
 | resolve | Order | Staff resolve the review case and the order returns to its known state. |
-| reverse | Order | A cancel signal arrives after approval and before payout. |
-| claw_back | Order | A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout. |
+| reverse | Order | A cancel signal arrives after approval and before payout, and no OPEN payout claim covers the order (D39: Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time). |
+| claw_back | Order | A cancel signal, or a commission drop (partial), arrives after payout. The order does not change; a clawback of the cashback plus any paid bonus is netted against later payouts (D35: A clawback after payout also recovers a campaign bonus already paid on that order, D42 (A clawback's open amount is the sum of its insert-only ledger entries: the negative original (stored cashback plus an…), D55: A FROZEN order suspends its campaign award instead of voiding it). |
+| resolve_approved | Order | Staff resolve the review case and the order returns to approved. |
+| resolve_rejected | Order | Staff resolve the review case as a rejection, with a reason. |
+| reopen | Order | Staff apply a review case for a wrong rejection; the latest report row shows no cancel signal (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). |
+| void_to_approved | Order | An admin voids the payout and the latest report row shows no cancel; paid_at is cleared (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). |
+| void_to_reversed | Order | An admin voids the payout and a cancel was seen; paid_at is cleared and the clawback is closed by an offsetting entry (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). |
 | resolve | ReviewCase | The operator applies or dismisses the row. |
 
 ## Events
@@ -186,8 +201,9 @@ stateDiagram-v2
 - command `freeze` → aggregate `Order` → event **orders.order.frozen**; then A review case opens. The order leaves every total.
 - command `reverse` → aggregate `Order` → event **orders.order.reversed**; then The order leaves the payable balance.; Staff get an alert. The customer is told once.
 - command `claw_back` → aggregate `Order` → event **orders.order.clawed-back**
+- command `freeze` → aggregate `Order` → event **orders.order.frozen**; then A review case opens. The order leaves every total; its campaign award is suspended.
 
-Commands that emit no event (nothing elsewhere can react): `resolve`
+Commands that emit no event (nothing elsewhere can react): `resolve`, `resolve_approved`, `resolve_rejected`, `reopen`, `void_to_approved`, `void_to_reversed`
 
 | Event | Happens when | Who listens |
 |---|---|---|
@@ -201,7 +217,7 @@ Commands that emit no event (nothing elsewhere can react): `resolve`
 
 ## Rules & policies
 
-**invariant** (10)
+**invariant** (12)
 
 | Rule | Declared on | Status |
 |---|---|---|
@@ -209,6 +225,8 @@ Commands that emit no event (nothing elsewhere can react): `resolve`
 | Only an approved order without a paid time can be marked paid (D4: An order with a payout time (paid_at) is never changed or paid again). | Order | observed · exists in code |
 | Running reconciliation again over the same period leaves every order unchanged. | Order | observed · exists in code |
 | Only an approved order with commission above 0 is payable. Awaiting, frozen, reversed and rejected money is never shown as owed (D32: Payout confirmation re-reads every covered order inside the transaction and fails if any is not APPROVED, unpaid and…). | Order | target · agreed goal |
+| A cancel signal on an order covered by an OPEN payout claim is recorded but applied only after the claim ends (D39: Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time). | Order | target · agreed goal |
+| Only the admin payout void clears paid_at, and it sets the state the latest report row gives (D41: Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a ca…). | Order | target · agreed goal |
 | Cashback is calculated from the approved commission only (D3: Cashback is calculated from the approved commission only, never from the estimate shown to the customer). | Order |  |
 | An order with a paid time is never changed or paid again (D4: An order with a payout time (paid_at) is never changed or paid again). | Order |  |
 | An approved order is never rejected later. | Order |  |
@@ -224,13 +242,14 @@ Commands that emit no event (nothing elsewhere can react): `resolve`
 | A report status the system does not know goes to manual review instead of a guess. | Order | observed · exists in code |
 
 
-**specification** (3)
+**specification** (4)
 
 | Rule | Declared on | Status |
 |---|---|---|
-| Shopee's completed, delivered and paid statuses mean awaiting approval. Only validated or approved means approved. | Order | observed · exists in code |
+| Shopee's unpaid, paid, completed and delivered statuses mean awaiting approval; UNPAID is the buyer's payment state and never a cancel signal (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). Only validated or approved means approved. | Order | observed · exists in code |
 | AccessTrade lines are grouped per transaction. The order is approved only when every non-rejected line is confirmed, and rejected when every line is rejected. | Order | observed · exists in code |
-| A cancel signal is read in a fixed order: order status, then each item, then a zero commission. Item status never overrides an order-level cancellation (D31: A cancel signal is checked in a fixed order: order-level status, then each item, then a commission of 0). | Order | target · agreed goal |
+| A cancel signal is read in a fixed order: order status, then each item, then a zero commission, always through the network's status map. Item status never overrides an order-level cancellation (D31: A cancel signal is checked in a fixed order: order-level status, then each item, then a commission of 0). A page-cap read freezes nothing (D43: The hourly reconciliation reads the last 7 days by purchase time). | Order | target · agreed goal |
+| Each network adapter maps every raw status explicitly to awaiting, approved or cancelled; anything else is unknown. Each map is golden-tested on real report rows (D38: Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED). | Order | target · agreed goal |
 
 
 **workflow** (1)

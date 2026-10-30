@@ -3,17 +3,21 @@
 Applies to all new TypeScript code in `apps/` and `packages/`. Derived from the architecture spine
 (`_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md`);
 the `AD-n` ids point at the decision behind each rule. Where this file and the spine disagree, the
-spine wins and this file is fixed. Production code on `main` (Python) is not covered.
+spine wins and this file is fixed. Production code on `main` (Python) is not covered. Revised
+2026-10-30 after the independent architecture review (simpler module layout, `packages/core`,
+synchronous transactions, SQL `SUM()` rule).
 
 ## 1. Layering and boundaries (AD-1, AD-4)
 
 - The server has seven modules, one per bounded context: `identity`, `linking`, `orders`,
   `payouts`, `campaigns`, `messaging`, `operations`.
-- Inside a module: `domain/` ← `application/` ← `infrastructure/`, `http/`. Arrows point to what
-  may be imported.
-- `domain/` is pure TypeScript. It imports only `packages/money`, `packages/domain`,
-  `packages/time`, `packages/text`. No Fastify, no Drizzle, no I/O, no `Date.now()`.
-- `http/` calls `application/` only. It never touches a repository or the database.
+- Inside a module: `domain/` (pure), the module's own files (`*.command.ts`, `*.query.ts`,
+  `*.repository.ts`, `*.list.ts`, `*.adapter.ts`, `schema.ts`, `index.ts`) and `http/`. No separate
+  application or infrastructure layer; a port is added only when a second adapter exists.
+- `domain/` is pure TypeScript. It imports only `packages/money` and `packages/core`. No Fastify,
+  no Drizzle, no I/O, no `Date.now()`.
+- `http/` calls its module's commands and queries only. It never touches a repository or the
+  database.
 - A module imports another module only through its `index.ts`, and only along the edges of the
   spine's dependency diagram. `messaging` and `operations` are reached through the `outbox` and
   `audit` / `alert` ports in `platform/`.
@@ -49,7 +53,11 @@ spine wins and this file is fixed. Production code on `main` (Python) is not cov
 
 Every change that touches money passes all of these:
 
-- [ ] Money is computed only in `packages/money`. The frontend, SQL and exports never compute it.
+- [ ] Money is computed only in `packages/money`. The frontend and exports never compute it. SQL
+      may `SUM()` stored integer columns for list summaries and the Overview operator figures;
+      any other SQL arithmetic, and every ratio, is done in `packages/money`.
+- [ ] Network report amounts are converted only by `fromNetworkUnits(value, scale)`; an adapter
+      never scales or rounds an amount itself.
 - [ ] Every amount is a whole-dong integer. No floats in columns, fields or intermediate stored
       values.
 - [ ] Rounding uses `roundHalfUp` from `packages/money`; never `Math.round`, `toFixed` or a
@@ -59,7 +67,9 @@ Every change that touches money passes all of these:
 - [ ] Shopee's part is capped at 40,000 dong; the XTRA part is not (D2).
 - [ ] Split: fee per network, tax 10% in a withheld period, net, cashback = 80% of net (D12, D20).
 - [ ] An order with `paid_at` set is never changed by reconciliation (D4); only payout confirm and
-      void set or clear it.
+      void set or clear it, and void sets the state `transition()` gives (D41).
+- [ ] A raw network status is read only through that network's status map; Shopee `UNPAID` is
+      awaiting, never a cancel signal (D38). Each map has golden fixtures from real report rows.
 - [ ] The payable balance comes only from the payouts module's `getBalances` (D27).
 - [ ] FROZEN and REVERSED orders are in no total; HOUSE gets 0 and is in no list of payables (D5).
 - [ ] No route accepts an amount or an order list from the browser for a payout.
@@ -67,12 +77,15 @@ Every change that touches money passes all of these:
 
 ## 5. State changes and transactions (AD-2, AD-7, AD-16, AD-17)
 
-- Every write goes through the `platform/db` transaction helper (`BEGIN IMMEDIATE`).
+- Every write goes through the `platform/db` transaction helper `tx(fn)` (`BEGIN IMMEDIATE`). `fn`
+  is synchronous: the helper throws if it returns a thenable, and lint rejects an `async` callback.
 - One command is one transaction, and it includes the history row, the audit entry and the outbox
   row. Nothing that must happen together is split across transactions.
 - No network call, `await` on I/O, or timer inside a transaction.
 - An order status changes only through `orders/domain/transition.ts`.
-- `audit_entries`, `order_status_history` and `ledger_entries` are insert-only.
+- `audit_entries`, `order_status_history`, `order_observations` and `ledger_entries` are
+  insert-only. A changing amount (a clawback's open amount) is a sum of entries.
+- Audit payloads carry ids and fingerprints only, never names, phone numbers or bank numbers.
 - Every command that moves money or personal data takes an `Actor`.
 
 ## 6. List contract (AD-12, FR-37)
@@ -80,7 +93,7 @@ Every change that touches money passes all of these:
 - Every list is built with `defineList()` on the server and rendered with `DataList` from
   `packages/ui`. No screen writes its own filter, sort or pagination logic.
 - One field per column: the column key is the sort key and the displayed value.
-- Search uses the stored `search_text` column from `packages/text`; never `LIKE` on raw text or
+- Search uses the stored `search_text` column from `packages/core/text`; never `LIKE` on raw text or
   JSON, and never a client-side filter.
 - Counts, facets and summaries come from the same filtered query as the rows, or are labelled as
   the overall total.
@@ -90,7 +103,7 @@ Every change that touches money passes all of these:
 
 ## 7. Time (AD-11, FR-38, D28)
 
-- Only `packages/time` creates, parses or formats instants.
+- Only `packages/core/time` creates, parses or formats instants.
 - Store instants as `YYYY-MM-DDTHH:mm:ss.sssZ` text in columns ending in `_at`.
 - Business days, weeks and months are Asia/Ho_Chi_Minh. A date range includes its whole end day
   (half-open instant range to the next day's start).
@@ -99,7 +112,7 @@ Every change that touches money passes all of these:
 
 ## 8. Statuses and shared definitions (AD-10)
 
-- Statuses, their order, tone and label key come from `packages/domain`. A screen, message or
+- Statuses, their order, tone and label key come from `packages/core/status`. A screen, message or
   export never defines its own status text or meaning of "payable", "has a bank account" or
   "settled".
 - Adding a status means changing `docs/operations/status-flows.md` first; the registry test fails
@@ -108,7 +121,8 @@ Every change that touches money passes all of these:
 ## 9. Security (AD-18, AD-19, SECURITY_MODEL.md)
 
 - A route belongs to exactly one group: public, staff, or internal. Internal routes live only on the
-  internal listener and require their token.
+  internal listener and require their token. Staff routes are registered only for the admin host and
+  verify the Cloudflare Access JWT as well as the staff session.
 - Never authorize by source address; `trustProxy` stays off.
 - Customer reads are scoped to the session's customer id in the application layer.
 - Secrets come only from `platform/config`; no `process.env` elsewhere; no secret in a bundle, a log

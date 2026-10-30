@@ -35,13 +35,20 @@ next one reads it. Record every approved decision in `.context/decisions/` and i
 
 | Artifact | Location | Status |
 |---|---|---|
-| Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.5.0: 7 contexts, D1 to D37 accepted, OQ1 and OQ2 resolved by the architecture spine, OQ5 and OQ8 open |
-| PRD | [prd-cashback-2026-10-30/prd.md](../_bmad-output/planning-artifacts/prds/prd-cashback-2026-10-30/prd.md) | Final: FR-1 to FR-38, UJ-1 to UJ-8; list defects in `list-defects.md` |
+| Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.7.0: 7 contexts, D1 to D55 accepted (D38 to D55 from the independent architecture review), OQ1 and OQ2 resolved by the architecture spine, OQ5 and OQ8 open |
+| PRD | [prd-cashback-2026-10-30/prd.md](../_bmad-output/planning-artifacts/prds/prd-cashback-2026-10-30/prd.md) | Final: FR-1 to FR-38, UJ-1 to UJ-8; list defects in `list-defects.md`; §8.3 Release scope (v1 cutover vs after cutover) |
 | UX workspace | [ux-cashback-2026-10-30/](../_bmad-output/planning-artifacts/ux-designs/ux-cashback-2026-10-30/) (`DESIGN.md`, `EXPERIENCE.md`, `.memlog.md`, `mockups/`) | Final: both spines, List Contract for FR-37/FR-38, 3 key-screen mocks |
-| Architecture spine | [architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md](../_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md) (C4 diagrams in `diagrams/`, STRIDE in `stride.md`, `.memlog.md`) | Final: AD-1 to AD-27; OQ1 (SQLite) and OQ2 (TypeScript monorepo, Fastify) resolved; code rules in [rules/code.md](rules/code.md) |
-| Security model | [../SECURITY_MODEL.md](../SECURITY_MODEL.md) | Draft: INV-1 to INV-12, all planned enforcement; owner review pending |
+| Architecture spine | [architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md](../_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md) (C4 diagrams in `diagrams/`, STRIDE in `stride.md`, independent review and its resolution in `review-independent.md`, `.memlog.md`) | Final, revised after the independent review: AD-1 to AD-29 (AD-28 v1 cutover scope and build order, AD-29 external liveness); OQ1 (SQLite) and OQ2 (TypeScript monorepo, Fastify) resolved; code rules in [rules/code.md](rules/code.md) |
+| Security model | [../SECURITY_MODEL.md](../SECURITY_MODEL.md) | Draft: INV-1 to INV-13, all planned enforcement; accepted risks from D37; owner review pending |
 
 Update this table when an artifact is created, so every skill can find the current one.
+
+## Owner actions open now
+
+- **Rotate the exposed secrets (OQ8, D51).** The deploy webhook secret and the third-party lookup
+  key committed on `main` are exposed if the repository is public. Rotate both values in the live
+  environment and in Cloudflare, without any code change on `main`, and make the GitHub repository
+  private (D16). Scrubbing history is optional and is left to the owner.
 
 ## Rules
 

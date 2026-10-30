@@ -1,6 +1,7 @@
 # Security Model
 
-Last reviewed: draft (2026-10-30, from the architecture spine; not yet reviewed by the owner) ·
+Last reviewed: draft (2026-10-30, from the architecture spine, revised after the independent
+architecture review; not yet reviewed by the owner) ·
 Applies to: this directory and below
 
 The platform is being re-planned (D14). Every enforcement point below is a planned component of the
@@ -17,9 +18,10 @@ the affiliate networks' reports, and records the bank transfers the operator mak
   affiliate Chrome with the browser bridge extension, cloudflared). One production instance at a time.
 - Exposure: only the server's public listener is reachable from the internet, and only through the
   Cloudflare tunnel. It serves the customer website, the admin desk, the public API, the share page
-  and the receipt page. The admin hostname is also behind Cloudflare Access. The internal listener
-  (assistant and bridge routes) and the assistant's loopback endpoint are bound to 127.0.0.1 and are
-  never tunneled.
+  and the receipt page. Staff routes exist only on the admin hostname, which is behind Cloudflare
+  Access, and the server verifies the Access token on every staff route. The internal listener
+  (assistant and bridge routes) is bound to 127.0.0.1 and is never tunneled; the assistant has no
+  listener of its own.
 - Covered: the server (apps/server), the customer website (apps/web), the admin desk (apps/admin),
   the Zalo assistant (apps/assistant), the browser bridge extension, the shared packages, the
   deployment scripts and the backup procedure.
@@ -46,18 +48,24 @@ messages; network report rows (they are data from a third party, not instruction
 until checked.
 
 Boundaries: internet to tunnel to public listener; browser to public API; local processes to the
-internal listener; server to the assistant loopback; bridge to Shopee pages; server to the ledger
-file and to the off-machine backup store.
+internal listener; bridge to Shopee pages; server to the ledger file and to the off-machine backup
+store (Google Drive); server to the external heartbeat checker.
 
 ## Security Invariants
 
 - **INV-1** Money goes only to the link's owner. An order's cashback goes to the customer in sub_id1
   of the link it came from; a link is reused only for the same customer; no request moves an order,
-  a balance or a payout to another customer, except an owner-run customer merge. Enforced by:
-  planned (linking module link reuse policy and bridge result check; orders module attribution).
+  a balance or a payout to another customer, except an owner-run customer merge. One Shopee link is
+  created per submission with sub_id1 and sub_id2; a returned link is attached only when its host is
+  allow-listed and its resolved redirect carries the request's sub_ids. Enforced by: planned
+  (linking module link reuse policy and bridge result check; orders module attribution).
 - **INV-2** Never pay twice. An order with paid_at set is never changed or paid again by
-  reconciliation; only the admin payout void command returns it to approved. Enforced by: planned
-  (orders module transition function; payouts module confirm transaction).
+  reconciliation; only the admin payout void command clears paid_at, and it returns the order to
+  the state its latest report row gives (reversed if a cancel was seen). A transfer the operator
+  made is never left unrecorded: payout claims are kept, confirm is idempotent by claim id and
+  succeeds on an expired claim whose orders are unchanged, and orders under an open claim are not
+  reversed until it ends. Enforced by: planned (orders module transition function; payouts module
+  claim, confirm and void commands).
 - **INV-3** Pay from approved commission only. No code path pays cashback from an estimated
   commission; only APPROVED orders with approved commission above 0 are payable. Enforced by:
   planned (packages/money split; payouts module payable query; confirm re-read).
@@ -73,9 +81,11 @@ file and to the off-machine backup store.
   module register command, reachable only from the internal listener).
 - **INV-7** Internal routes need a token, not an address. Assistant routes require the assistant
   token header; bridge routes require the bridge token header; tokens are compared in constant time;
-  the caller's source address and proxy headers are never trusted (trustProxy off). Enforced by:
-  planned (server internal listener token guard; assistant loopback token guard).
-- **INV-8** Staff and customer sessions are separate. Staff routes accept only a staff session;
+  the caller's source address and proxy headers are never trusted for authorization (trustProxy
+  off; `CF-Connecting-IP` is read only as a rate-limit key). Enforced by: planned (server internal
+  listener token guard).
+- **INV-8** Staff and customer sessions are separate. Staff routes are registered only for the
+  admin host and verify the Cloudflare Access JWT; they accept only a staff session;
   admin-only actions check the admin role on the server; session and password secrets are stored only
   as hashes (argon2id for passwords, SHA-256 for session tokens); a new password ends every other
   session of that customer. Enforced by: planned (identity module staff guard and session store).
@@ -92,8 +102,13 @@ file and to the off-machine backup store.
   customer and the time, in the same transaction; a bank account appears only as a fingerprint.
   Enforced by: planned (operations module audit port, required by each command).
 - **INV-12** One writer. Only the server process opens the ledger for writing; a second instance
-  refuses to start while the job lease is held by a live process. Enforced by: planned (server
-  startup lease check).
+  refuses to start while another holds the exclusive OS lock on `data/<env>/server.lock`. Enforced
+  by: planned (server startup lock file).
+- **INV-13** No bank data on public pages. The public receipt page shows only the customer code,
+  the last four digits, the amount, the date and the voided state; a proof image is served only to
+  staff and to the signed-in customer, after being accepted as JPEG or PNG and re-encoded, with a
+  fixed content type, `nosniff` and a strict CSP. Enforced by: planned (server receipt page; payouts
+  module proof upload and proof route).
 
 ## Finding Classes
 
@@ -112,6 +127,8 @@ file and to the off-machine backup store.
 | Direct call to Shopee internal APIs or signature rebuilding | INV-10 | Yes | High (risks the affiliate account) |
 | Money act without an audit entry | INV-11 | Yes | Medium |
 | Second writer process on the ledger | INV-12 | Yes | High |
+| Proof image or full bank number on a public page; uploaded file served as active content | INV-13 | Yes | High |
+| Staff route reachable through the public host or without the Access token | INV-8 | Yes | Critical |
 | Missing rate limit on the web link quota | — | Yes | Medium |
 | Self-XSS requiring the victim to paste script | — | Unresolved | Default severity applies |
 | Findings in test fixtures and fake clients | — | Unresolved | Default severity applies |
@@ -119,13 +136,21 @@ file and to the off-machine backup store.
 ## Out of Scope, Exclusions, and Accepted Risk
 
 - The live Python system on the main branch — replaced at cutover; reviewed separately until then.
-- Accepted risk: none recorded. Proposed items are kept with the owner until accepted.
+- Accepted risk (D37): loss or compromise of the operator machine, under full-disk encryption and
+  an OS account used only for production; data restored from backup, sessions by hand.
+- Accepted risk: a taken-over Zalo account can change the bank account from the private chat
+  without further confirmation (FR-10); bank changes are refused in groups and the 72-hour flag
+  shows on the payout row.
+- Owner action, now (D51): the two secrets committed on main are rotated on the live system and in
+  Cloudflare without code changes, and the repository is made private.
 
 ## Known Limitations and Compensating Controls
 
 - The Zalo client library is unofficial; the account can be locked by Zalo at any time. The customer
   website is the fallback channel (FR-36).
 - The operator machine is a single point of failure for availability. Off-machine encrypted backups
-  protect the data; sessions are re-established by hand.
+  protect the data; sessions are re-established by hand; an external heartbeat checker alerts the
+  owner when the machine goes silent.
 - Cloudflare Access on the admin hostname is a second gate, not a replacement for the staff session
-  check on the server.
+  check on the server; it is a gate only because staff routes do not exist on the public host and
+  the server verifies the Access JWT.

@@ -49,6 +49,7 @@ One slot of a campaign held by one order.
 > Part of the Campaign aggregate.
 **Invariants:**
 - One order holds at most one award per campaign.
+- An award is voided only when its order is REJECTED or REVERSED; while the order is FROZEN it is suspended and not payable (D55: A FROZEN order suspends its campaign award instead of voiding it).
 **2 fields:**
 | Field | Type / reference | Required | Description |
 |---|---|---|---|
@@ -145,7 +146,7 @@ Commands that emit no event (nothing elsewhere can react): `open`, `confirm`, `p
 
 ## Rules & policies
 
-**invariant** (5)
+**invariant** (6)
 
 | Rule | Declared on | Status |
 |---|---|---|
@@ -154,6 +155,7 @@ Commands that emit no event (nothing elsewhere can react): `open`, `confirm`, `p
 | A slot belongs to an order, not a person. | Campaign |  |
 | Staff, the guest account and excluded customers never hold a slot. | Campaign |  |
 | One order holds at most one award per campaign. | CampaignAward |  |
+| An award is voided only when its order is REJECTED or REVERSED; while the order is FROZEN it is suspended and not payable (D55: A FROZEN order suspends its campaign award instead of voiding it). | CampaignAward |  |
 
 
 **policy** (2)

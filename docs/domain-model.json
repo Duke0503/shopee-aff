@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -1003,12 +1003,10 @@
                 "terminal": true
               },
               {
-                "name": "PAID",
-                "terminal": true
+                "name": "PAID"
               },
               {
-                "name": "REJECTED",
-                "terminal": true
+                "name": "REJECTED"
               }
             ],
             "transitions": [
@@ -1032,12 +1030,15 @@
                 "from": "AWAITING_APPROVAL",
                 "action": "reject",
                 "to": "REJECTED",
-                "description": "Reconciliation sees the network cancel the order.",
+                "description": "Reconciliation sees a cancel signal through the network's status map. Shopee UNPAID is not one (D38).",
                 "emits": [
                   "orders.order.rejected"
                 ],
                 "sideEffects": [
                   "The customer is told the reason."
+                ],
+                "guards": [
+                  "orders.order.network-status-map"
                 ]
               },
               {
@@ -1056,7 +1057,7 @@
                 "from": "AWAITING_APPROVAL",
                 "action": "freeze",
                 "to": "FROZEN",
-                "description": "The report carries an unknown status, no order id, or the read hit the page cap.",
+                "description": "The report carries an unknown status or no order id. A page-cap read fails the run and freezes nothing (D43).",
                 "guards": [
                   "orders.order.cancel-signal-precedence"
                 ],
@@ -1078,9 +1079,10 @@
                 "from": "APPROVED",
                 "action": "reverse",
                 "to": "REVERSED",
-                "description": "A cancel signal arrives after approval and before payout.",
+                "description": "A cancel signal arrives after approval and before payout, and no OPEN payout claim covers the order (D39).",
                 "guards": [
-                  "orders.order.cancel-signal-precedence"
+                  "orders.order.cancel-signal-precedence",
+                  "orders.order.claim-protection"
                 ],
                 "emits": [
                   "orders.order.reversed"
@@ -1094,11 +1096,72 @@
                 "from": "PAID",
                 "action": "claw_back",
                 "to": "PAID",
-                "description": "A cancel signal arrives after payout. The order does not change; a clawback entry is netted against the next payout.",
+                "description": "A cancel signal, or a commission drop (partial), arrives after payout. The order does not change; a clawback of the cashback plus any paid bonus is netted against later payouts (D35, D42, D55).",
                 "emits": [
                   "orders.order.clawed-back"
                 ],
                 "compensating": true
+              },
+              {
+                "from": "APPROVED",
+                "action": "freeze",
+                "to": "FROZEN",
+                "description": "An unknown status, a missing order id, or an approved commission that drops but stays above 0 on an unpaid order (D55).",
+                "emits": [
+                  "orders.order.frozen"
+                ],
+                "sideEffects": [
+                  "A review case opens. The order leaves every total; its campaign award is suspended."
+                ],
+                "guards": [
+                  "orders.order.unknown-status-review"
+                ]
+              },
+              {
+                "from": "FROZEN",
+                "action": "resolve_approved",
+                "to": "APPROVED",
+                "description": "Staff resolve the review case and the order returns to approved.",
+                "reversible": true,
+                "guards": [
+                  "orders.order.approval-needs-commission"
+                ]
+              },
+              {
+                "from": "FROZEN",
+                "action": "resolve_rejected",
+                "to": "REJECTED",
+                "description": "Staff resolve the review case as a rejection, with a reason."
+              },
+              {
+                "from": "REJECTED",
+                "action": "reopen",
+                "to": "AWAITING_APPROVAL",
+                "description": "Staff apply a review case for a wrong rejection; the latest report row shows no cancel signal (D38).",
+                "guards": [
+                  "orders.order.network-status-map"
+                ],
+                "reversible": true
+              },
+              {
+                "from": "PAID",
+                "action": "void_to_approved",
+                "to": "APPROVED",
+                "description": "An admin voids the payout and the latest report row shows no cancel; paid_at is cleared (D41).",
+                "compensating": true,
+                "guards": [
+                  "orders.order.void-observed-state"
+                ]
+              },
+              {
+                "from": "PAID",
+                "action": "void_to_reversed",
+                "to": "REVERSED",
+                "description": "An admin voids the payout and a cancel was seen; paid_at is cleared and the clawback is closed by an offsetting entry (D41).",
+                "compensating": true,
+                "guards": [
+                  "orders.order.void-observed-state"
+                ]
               }
             ]
           },
@@ -1135,7 +1198,7 @@
             },
             {
               "id": "orders.order.shopee-status-map",
-              "description": "Shopee's completed, delivered and paid statuses mean awaiting approval. Only validated or approved means approved.",
+              "description": "Shopee's unpaid, paid, completed and delivered statuses mean awaiting approval; UNPAID is the buyer's payment state and never a cancel signal (D38). Only validated or approved means approved.",
               "kind": "specification",
               "status": "observed"
             },
@@ -1147,13 +1210,31 @@
             },
             {
               "id": "orders.order.cancel-signal-precedence",
-              "description": "A cancel signal is read in a fixed order: order status, then each item, then a zero commission. Item status never overrides an order-level cancellation (D31).",
+              "description": "A cancel signal is read in a fixed order: order status, then each item, then a zero commission, always through the network's status map. Item status never overrides an order-level cancellation (D31). A page-cap read freezes nothing (D43).",
               "kind": "specification",
               "status": "target"
             },
             {
               "id": "orders.order.payable-only-approved",
               "description": "Only an approved order with commission above 0 is payable. Awaiting, frozen, reversed and rejected money is never shown as owed (D32).",
+              "kind": "invariant",
+              "status": "target"
+            },
+            {
+              "id": "orders.order.network-status-map",
+              "description": "Each network adapter maps every raw status explicitly to awaiting, approved or cancelled; anything else is unknown. Each map is golden-tested on real report rows (D38).",
+              "kind": "specification",
+              "status": "target"
+            },
+            {
+              "id": "orders.order.claim-protection",
+              "description": "A cancel signal on an order covered by an OPEN payout claim is recorded but applied only after the claim ends (D39).",
+              "kind": "invariant",
+              "status": "target"
+            },
+            {
+              "id": "orders.order.void-observed-state",
+              "description": "Only the admin payout void clears paid_at, and it sets the state the latest report row gives (D41).",
               "kind": "invariant",
               "status": "target"
             }
@@ -1373,7 +1454,10 @@
             "A payout covers only approved orders without a paid time, and only confirmed campaign bonuses (D19).",
             "The payout amount equals the sum of the cashback and bonuses it covers, computed by the server.",
             "A payout is never made to a customer without a bank account.",
-            "A guest order is never covered by a payout (D5)."
+            "A guest order is never covered by a payout (D5).",
+            "A payout claim is kept (OPEN, CONFIRMED, ABANDONED); confirm is idempotent by claim id and succeeds on an abandoned claim whose orders are unchanged (D39).",
+            "A void returns each covered order to the state its latest report row gives and reverses the payout's netting entries (D41).",
+            "A netting-only payout (transfer 0) is allowed when open clawbacks cover the gross payable; it sends no message (D42)."
           ],
           "buildingBlockIds": [
             "bb.payouts.payout-root",
@@ -1697,7 +1781,8 @@
           "aggregateRoot": "campaigns.campaign",
           "consistencyBoundary": "Part of the Campaign aggregate.",
           "invariants": [
-            "One order holds at most one award per campaign."
+            "One order holds at most one award per campaign.",
+            "An award is voided only when its order is REJECTED or REVERSED; while the order is FROZEN it is suspended and not payable (D55)."
           ],
           "fields": [
             {
@@ -2699,6 +2784,186 @@
       "sources": [
         ".context/decisions/2026-10-30-D37-dev-environment-first.md"
       ]
+    },
+    {
+      "id": "d38-shopee-unpaid-not-cancel",
+      "decision": "Every network adapter reads statuses through an explicit status map (raw value to AWAITING, APPROVED or CANCELLED; anything else is unknown and freezes the order), golden-tested on real report rows. Shopee UNPAID means the buyer has not paid yet and maps to AWAITING. Staff can move a wrongly REJECTED order back to AWAITING_APPROVAL through a review case when the latest report row shows no cancel signal.",
+      "rationale": "In the Shopee report UNPAID describes the buyer's payment, and the live reader maps it to awaiting; listing it as a cancel signal would reject normal and COD orders permanently (review C1). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D38-shopee-unpaid-not-cancel.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d39-payout-claim-kept",
+      "decision": "Payout claims are kept with status OPEN, CONFIRMED or ABANDONED and a qr_shown_at time. Orders covered by an OPEN claim are not reversed: the cancel is recorded and applied by the first run after the claim ends. Confirm is idempotent by claim id and succeeds on an abandoned claim when no other claim is open and every covered order is unchanged. Each claim has its own transfer reference (customer code plus a short claim id), and opening a customer whose last claim was abandoned after the QR was shown warns that a transfer may already have been made.",
+      "rationale": "The operator transfers before confirming; refusing to record a transfer that already left the bank invites a second transfer (review C2). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D39-payout-claim-kept.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d40-cutover-go-no-go-window",
+      "decision": "For 72 hours after the tunnel switch the new system records no payouts. Rollback to the live system is allowed only inside that window; after it the new system is final.",
+      "rationale": "Payouts, customers and share codes recorded only in the new system would be missing after a rollback, which reopens double payment; a no-payout window is simpler than a write-back tool for one operator (review C3). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D40-cutover-go-no-go-window.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d41-void-restores-observed-state",
+      "decision": "Voiding a payout sets each covered order to the state transition() gives from its latest report row (REVERSED if a cancel was seen, else APPROVED), closes that order's clawback with an offsetting entry, reverses the netting entries the payout wrote, and returns bonuses to CONFIRMED, or VOID when their order is now REVERSED. All four combinations are golden-tested.",
+      "rationale": "Returning every covered order to APPROVED would make an order the network cancelled payable again (review H2). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D41-void-restores-observed-state.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d42-clawback-entry-sum",
+      "decision": "A clawback's open amount is the sum of its insert-only ledger entries: the negative original (stored cashback plus any paid bonus, D35) and positive netting and write-off entries. A payout nets open clawbacks up to the gross payable and carries the rest forward; when the clawbacks cover the whole gross, a netting-only payout (transfer 0, no QR, no message) marks the orders paid. A merge moves no ledger entry; balances resolve through aliases. The payable balance is defined as the net figure and the deduction is shown to the customer.",
+      "rationale": "Ledger entries are insert-only, partial netting was undefined, and with a 0 floor a customer whose clawbacks exceeded the cashback could never be paid or cleared (review H3, M17). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D42-clawback-entry-sum.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d43-reconciliation-read-window",
+      "decision": "The hourly reconciliation reads the last 7 days by purchase time. A nightly paced sweep reads, one day at a time with a page cap per slice, every day that still holds an awaiting or approved unpaid order; each order stores last_seen_in_report_at for aging. A read that hits a page cap fails the run and alerts the owner but freezes no order, which replaces the page-cap part of D31.",
+      "rationale": "Shopee approves 30 to 70 days after purchase; reading 90 days every hour exceeds the page cap or pages the report into captcha (review H4, M4). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D43-reconciliation-read-window.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d44-cutover-shadow-parity",
+      "decision": "At cutover, paid totals per customer must match the live system to the dong. Payable and waiting amounts are checked by a shadow run of the new reconciliation on the rehearsal copy over the full report window, producing a per-order diff the owner signs off. Live payable is one named SQL in the cutover tool. An unresolved order older than the report can verify becomes FROZEN with a review case.",
+      "rationale": "The live payable figures carry known defects (three definitions of ready, the first-item-only status bug); parity with them would import cancelled orders as payable (review H5). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D44-cutover-shadow-parity.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d45-cutover-time-provenance",
+      "decision": "The cutover import converts timestamps with a per-column table (column, source zone, fallback), each entry fixture-tested: CURRENT_TIMESTAMP columns are UTC, campaign windows are Vietnam time, dates synthesized from the order SN prefix are flagged approximate. A value that fits no rule is reported, never guessed.",
+      "rationale": "Live naive timestamps differ by column; one rule would move campaign windows, and so bonus slots, by 7 hours without an error (review H6). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D45-cutover-time-provenance.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d46-cutover-quiet-first-run",
+      "decision": "The import seeds a dedup key as already sent for every event the live system already notified. The first reconciliation after import runs with messaging silent and reports the would-be sends. Proactive Zalo sends have a hard daily cap (default 150) with an owner alert when reached.",
+      "rationale": "New dedup keys and the stricter cancel rules would otherwise fire every notification at once on the personal Zalo account, which risks a lock on day one (review H7). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D46-cutover-quiet-first-run.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d47-one-link-per-submission",
+      "decision": "The bridge submits one link per Shopee custom-link submission, with sub_id1 = customer id and sub_id2 = request id. One bridge job never holds two customers. The server checks the returned link's host against an allow-list and resolves its redirect to check the sub_ids before attaching it.",
+      "rationale": "sub_id cannot vary within a submission and links come back matched by position, so batches lose sub_id2 and can hand a link to the wrong request; the live code chose one link per submission for this reason (review H1, M16). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D47-one-link-per-submission.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d48-admin-host-only-staff-api",
+      "decision": "The staff route group is registered only for the admin host, and every staff route verifies the Cloudflare Access JWT in addition to the staff session. Sign-in failures use a doubling delay per code instead of a fixed lock, Cloudflare rate-limit rules guard sign-in and link endpoints, and CF-Connecting-IP is only a rate-limit key.",
+      "rationale": "Both hostnames reach one public listener, so without a host check Access is bypassed through hoantiendp.com/api/admin (review H8, M10). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D48-admin-host-only-staff-api.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d49-receipt-facts-only",
+      "decision": "The public receipt page shows customer code, last four digits, amount, date and voided state, never the proof image. Proof images are JPEG or PNG only, re-encoded with EXIF stripped, stored in a backed-up files directory, and served only to staff and the signed-in customer with a fixed content type, nosniff and a strict CSP.",
+      "rationale": "A proof is a bank screenshot with the full account number and holder, and an uploaded file on the customer origin is a stored-XSS vector (review H9, M12). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D49-receipt-facts-only.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d50-external-heartbeat",
+      "decision": "The server pings an external heartbeat checker (healthchecks.io free tier or a Cloudflare Worker cron) that alerts the owner on Telegram when pings stop. The Mac never sleeps and restarts after power failure (pmset), sits on a UPS if possible, starts Chrome as a LaunchAgent, and the runbook covers the FileVault reboot.",
+      "rationale": "Every alert is sent by the same Mac, so power loss, sleep, an ISP outage or the FileVault pre-boot screen means total silence (review H10). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D50-external-heartbeat.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d51-rotate-live-secrets-now",
+      "decision": "The owner rotates the two secrets committed on main now, in the live environment and in Cloudflare, without any code change on main, and makes the GitHub repository private. History scrubbing is left to the owner. The new platform never reuses those values.",
+      "rationale": "If the repository is public the secrets are exposed today, not at cutover; main is not touched by the re-plan (review H11, OQ8, D16). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D51-rotate-live-secrets-now.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d52-fewer-moving-parts",
+      "decision": "Modules have a pure domain folder plus plain module files and http routes, without separate application and infrastructure layers; packages/time, packages/text and packages/domain merge into packages/core, and packages/money stays separate. An OS lock file and in-memory running flags replace job_leases and job_runs. The assistant pulls notifications from the internal listener and keeps a local sent-ids file instead of serving a loopback listener. Each backup is restore-checked automatically; a manual drill runs at cutover and quarterly.",
+      "rationale": "For about 30 orders a day and one developer, four layers, a PID lease, a second token boundary and a monthly manual drill add work without protecting against the real hazards (review S1 to S4). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D52-fewer-moving-parts.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d53-v1-cutover-scope",
+      "decision": "The v1 cutover scope is what paying, attributing and reconciling depend on. Deferred until after cutover, without deleting the FRs: FR-27 metrics beyond the Overview line, FR-31 flags except the shared bank account, the FR-19 settlement screen, the FR-23 campaign creation UI, the FR-11 merge UI, the FR-24 staff UI, the FR-29 audit screen and the Guide redesign. Merge, campaign and staff work is done by admin command until then. The build follows a walking skeleton starting with money, the cutover import and shadow reconciliation.",
+      "rationale": "Cutover is big-bang, so the minimum cutover set bounds v1; none of the deferred items is on the pay, attribute or reconcile path (review section 6). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D53-v1-cutover-scope.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d54-shopee-withheld-by-default",
+      "decision": "A Shopee settlement period counts as withheld (10% tax) unless staff unmark it. Unmarking affects only approvals after it; stored cashback is never recomputed.",
+      "rationale": "At 30 orders a day almost every Shopee period reaches the 2,000,000 dong withholding threshold, but staff learn it only after approval, so a not-withheld default makes the operator absorb the tax (review M1). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D54-shopee-withheld-by-default.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
+    },
+    {
+      "id": "d55-frozen-is-a-hold",
+      "decision": "A FROZEN order suspends its campaign award instead of voiding it; only REJECTED or REVERSED voids an award. An approved commission that drops but stays above 0 freezes an approved unpaid order for review and creates a partial clawback for a paid one.",
+      "rationale": "A transient unknown status should not cost the customer the bonus, and a partial refund after approval had no defined transition (review M2, M3). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the independent architecture review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D55-frozen-is-a-hold.md",
+        "_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/review-independent.md"
+      ]
     }
   ],
   "openQuestions": [
@@ -2754,7 +3019,7 @@
     {
       "id": "oq8-hardcoded-secrets",
       "question": "When are the hard-coded deploy webhook secret and the third-party lookup key on main moved into the environment?",
-      "impact": "The repository is public; both values are exposed.",
+      "impact": "The repository may be public; both values are exposed now. Owner action now (D51): rotate both values in the live environment and in Cloudflare without code changes on main, and make the repository private.",
       "owner": "Project owner",
       "status": "open"
     }
