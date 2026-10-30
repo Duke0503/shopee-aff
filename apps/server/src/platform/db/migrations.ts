@@ -12,9 +12,13 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Clock } from "@cashback/core";
 
 import type { Ledger } from "./ledger";
+
+/** The server's own migrations, `apps/server/migrations/`, found from this file's location. */
+export const MIGRATIONS_DIR = fileURLToPath(new URL("../../../migrations", import.meta.url));
 
 const MIGRATION_FILE = /^(\d{4})_([a-z0-9_]+)\.sql$/;
 const DOWN_FILE = /(^|[._-])down([._-]|$)/i;
@@ -29,9 +33,20 @@ export interface Migration {
 }
 
 export class MigrationError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "MigrationError";
+  }
+}
+
+/** One migration failed while it ran; everything it did was rolled back. */
+export class MigrationFailedError extends MigrationError {
+  constructor(
+    readonly migration: string,
+    cause: unknown,
+  ) {
+    super(`migration ${migration} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = "MigrationFailedError";
   }
 }
 
@@ -85,17 +100,21 @@ function applyOne(ledger: Ledger, m: Migration, appliedAt: string): void {
   }
 }
 
-/** Applies the migrations not yet recorded and returns their file names. */
-export function runMigrations(ledger: Ledger, migrations: readonly Migration[], clock: Clock): string[] {
-  if (ledger.sqlite.inTransaction) throw new MigrationError("migrations run outside any transaction");
-  ledger.sqlite.exec(
-    "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)",
-  );
-  const applied = new Map(
-    (ledger.sqlite.prepare("SELECT id, checksum FROM schema_migrations").all() as AppliedRow[]).map((r) => [r.id, r.checksum]),
-  );
+function appliedMigrations(ledger: Ledger): Map<number, string> {
+  const table = ledger.sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get();
+  if (!table) return new Map();
+  return new Map((ledger.sqlite.prepare("SELECT id, checksum FROM schema_migrations").all() as AppliedRow[]).map((r) => [r.id, r.checksum]));
+}
+
+/**
+ * The migrations not yet recorded, in order, without writing anything; the startup gate
+ * backs up only when this is not empty. Throws when an applied file changed or a new one
+ * is numbered below the last applied one.
+ */
+export function pendingMigrations(ledger: Ledger, migrations: readonly Migration[]): Migration[] {
+  const applied = appliedMigrations(ledger);
   const lastApplied = Math.max(0, ...applied.keys());
-  const done: string[] = [];
+  const pending: Migration[] = [];
   for (const m of migrations) {
     const checksum = applied.get(m.id);
     if (checksum !== undefined) {
@@ -103,7 +122,38 @@ export function runMigrations(ledger: Ledger, migrations: readonly Migration[], 
       continue;
     }
     if (m.id < lastApplied) throw new MigrationError(`migration is older than the last applied one: ${m.name}`);
-    applyOne(ledger, m, clock.now());
+    pending.push(m);
+  }
+  return pending;
+}
+
+/**
+ * Applies the migrations not yet recorded and returns their file names. A migration that
+ * fails throws `MigrationFailedError` naming it; the ones before it stay applied, which
+ * is why startup runs this only behind a checked backup (migration-gate.ts). The gate
+ * passes the `pending` list it computed (and backed up for), so the two cannot drift; a
+ * listed migration that is already recorded is refused.
+ */
+export function runMigrations(
+  ledger: Ledger,
+  migrations: readonly Migration[],
+  clock: Clock,
+  pending: readonly Migration[] = pendingMigrations(ledger, migrations),
+): string[] {
+  if (ledger.sqlite.inTransaction) throw new MigrationError("migrations run outside any transaction");
+  const applied = appliedMigrations(ledger);
+  const repeated = pending.find((m) => applied.has(m.id));
+  if (repeated) throw new MigrationError(`migration already applied: ${repeated.name}`);
+  ledger.sqlite.exec(
+    "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)",
+  );
+  const done: string[] = [];
+  for (const m of pending) {
+    try {
+      applyOne(ledger, m, clock.now());
+    } catch (error) {
+      throw new MigrationFailedError(m.name, error);
+    }
     done.push(m.name);
   }
   return done;

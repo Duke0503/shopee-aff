@@ -1,0 +1,1709 @@
+{
+  "rule": "shopeeConversion",
+  "network": "shopee",
+  "source": "src/cashback/shopee/report_reader.py (_row_to_report_row field shapes, MONEY_SCALE 100,000) and tests/test_report_reader.py figures",
+  "cases": [
+    {
+      "name": "UNPAID order with a Pending item is AWAITING (buyer has not paid yet, D38)",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000001",
+            "order_status": "UNPAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000001",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UNPAID order whose item has no status falls back to UNPAID: AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000002",
+            "order_status": "UNPAID",
+            "items": [
+              {
+                "display_item_status": "",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000002",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order with a Pending item is AWAITING, not approved",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNPAID01",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNPAID01",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "COMPLETED order with a Pending item is AWAITING, not approved",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNCOMPLETED01",
+            "order_status": "COMPLETED",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNCOMPLETED01",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DELIVERED order with a Pending item is AWAITING, not approved",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNDELIVERED01",
+            "order_status": "DELIVERED",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNDELIVERED01",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "COMPLETED order whose item has no status falls back to COMPLETED: AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000003",
+            "order_status": "COMPLETED",
+            "items": [
+              {
+                "display_item_status": null,
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000003",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order with a Validated item is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000004",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Validated",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000004",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "order-level CANCELLED overrides a Validated item (D31)",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000005",
+            "order_status": "CANCELLED",
+            "items": [
+              {
+                "display_item_status": "Validated",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000005",
+            "orderStatus": "CANCELLED",
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "order_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "order-level CANCELLED overrides an unknown item status",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000006",
+            "order_status": "CANCELLED",
+            "items": [
+              {
+                "display_item_status": "Something New",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000006",
+            "orderStatus": "CANCELLED",
+            "items": [
+              {
+                "status": "UNKNOWN",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "order_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order whose only item is Cancelled is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNCANCELLED1",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Cancelled",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNCANCELLED1",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order whose only item is Invalid is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNINVALID1",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Invalid",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNINVALID1",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order whose only item is Fraud is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNFRAUD1",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Fraud",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNFRAUD1",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PAID order whose only item is Closed is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYNCLOSED1",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Closed",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYNCLOSED1",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multi-item order with one Cancelled item: the item drops out, the order stays AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000007",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Cancelled",
+                "actual_amount": 4000000000,
+                "item_price": 10152000000,
+                "item_commission": 100000000,
+                "capped_brand_commission": 0,
+                "item_name": "Sample item",
+                "item_id": 11
+              },
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 2000000000,
+                "item_price": 10152000000,
+                "item_commission": 50050000,
+                "capped_brand_commission": 25000000,
+                "item_name": "Sample item",
+                "item_id": 12
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000007",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1000,
+                  0
+                ],
+                "value": 40000
+              },
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  501,
+                  250
+                ],
+                "value": 20000
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multi-item order with one Cancelled and one Validated item is APPROVED on the live item",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000008",
+            "order_status": "COMPLETED",
+            "items": [
+              {
+                "display_item_status": "Validated",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item",
+                "item_id": 21
+              },
+              {
+                "display_item_status": "Cancelled",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item",
+                "item_id": 22
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000008",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              },
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown item status freezes the order, even beside a known order status",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000009",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Something New",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000009",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "UNKNOWN",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "unknown_status"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown order status freezes the order",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000010",
+            "order_status": "TO_RECEIVE",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000010",
+            "orderStatus": "UNKNOWN",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "unknown_status"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "commission 0 on every part is a cancel signal (D31)",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000011",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 0,
+                "capped_brand_commission": 0,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000011",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  0,
+                  0
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "commission_zero"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a commission below half a dong rounds to 0 and is a cancel signal",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000012",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 49999,
+                "capped_brand_commission": 0,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000012",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  0,
+                  0
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "commission_zero"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "one checkout holding two orders gives two rows, each with its own status",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000013",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          },
+          {
+            "order_sn": "SYN0000000014",
+            "order_status": "CANCELLED",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000013",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          },
+          {
+            "orderId": "SYN0000000014",
+            "orderStatus": "CANCELLED",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "order_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a conversion with no order freezes; the checkout id is never used as the order id",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "utm_content": "C1-R1---",
+        "checkout_id": "999"
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "",
+            "orderStatus": null,
+            "items": [],
+            "subIds": [
+              "C1",
+              "R1",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "missing_order_id"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a malformed amount freezes only its own order; the other order of the checkout is read normally",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000020",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": "1,234",
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          },
+          {
+            "order_sn": "SYN0000000021",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000020",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          },
+          {
+            "orderId": "SYN0000000021",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed actual_amount N/A freezes the order instead of failing the read",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000030",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": "N/A",
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000030",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": null
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed actual_amount 1e5 freezes the order instead of failing the read",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000031",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": "1e5",
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000031",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": null
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed actual_amount -- freezes the order instead of failing the read",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "utm_content": "C0003-R26091441451---",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000032",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": "--",
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000032",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": null
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R26091441451",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "utm_content with two sub_ids is padded to five",
+      "provenance": "synthetic-from-code",
+      "story": "review 4",
+      "input": {
+        "utm_content": "C0003-R1",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000023",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000023",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R1",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "utm_content with more than five pieces freezes (ambiguous attribution)",
+      "provenance": "synthetic-from-code",
+      "story": "review 4",
+      "input": {
+        "utm_content": "C0003-R1-a-b-c-d",
+        "purchase_time": 1789441044,
+        "checkout_id": "243000000000001",
+        "conversion_status": 1,
+        "estimated_total_commission": 552232500,
+        "orders": [
+          {
+            "order_sn": "SYN0000000024",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000024",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "C0003",
+              "R1",
+              "a",
+              "b",
+              "c"
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "ambiguous_sub_ids"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing utm_content gives five empty sub_ids",
+      "provenance": "synthetic-from-code",
+      "story": "review 4",
+      "input": {
+        "orders": [
+          {
+            "order_sn": "SYN0000000025",
+            "order_status": "PAID",
+            "items": [
+              {
+                "display_item_status": "Pending",
+                "actual_amount": 7363100000,
+                "item_price": 10152000000,
+                "item_commission": 184077500,
+                "capped_brand_commission": 368155000,
+                "item_name": "Sample item"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "SYN0000000025",
+            "orderStatus": "AWAITING",
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  1841,
+                  3682
+                ],
+                "value": 73631
+              }
+            ],
+            "subIds": [
+              "",
+              "",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,1640 @@
+{
+  "rule": "accesstradeTransactions",
+  "network": "accesstrade",
+  "source": "src/cashback/providers/accesstrade_reconciler.py (fetch_accesstrade_transactions line shape, normalize_transactions grouping per transaction_id)",
+  "cases": [
+    {
+      "name": "one pending line is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T1",
+            "status": 0,
+            "is_confirmed": 0,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T1",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "one approved and confirmed line is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T2",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T2",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "an approved line AccessTrade has not confirmed is still AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T3",
+            "status": 1,
+            "is_confirmed": 0,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T3",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "one rejected line is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T4",
+            "status": 2,
+            "is_confirmed": 0,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T4",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed lines: confirmed product line and rejected bonus line is APPROVED on the live line",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T5",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T5",
+            "status": 2,
+            "is_confirmed": 0,
+            "commission": 3000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T5",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  3000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed lines: one confirmed and one pending is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T6",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T6",
+            "status": 0,
+            "is_confirmed": 0,
+            "commission": 3000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T6",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  3000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0,
+                1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed lines: one confirmed and one approved but unconfirmed is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T7",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T7",
+            "status": 1,
+            "is_confirmed": 0,
+            "commission": 3000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T7",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  3000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0,
+                1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed lines: every line rejected is a cancel",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T8",
+            "status": 2,
+            "is_confirmed": 0,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T8",
+            "status": 2,
+            "is_confirmed": 1,
+            "commission": 3000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T8",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "CANCELLED",
+                "commissionParts": [
+                  3000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "all_items_cancelled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed lines: an unknown code beside a confirmed line freezes the order",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T9",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 12000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T9",
+            "status": 5,
+            "is_confirmed": 0,
+            "commission": 3000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T9",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "UNKNOWN",
+                "commissionParts": [
+                  3000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "unknown_status"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "commission 0 on a pending line is a cancel signal",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T10",
+            "status": 0,
+            "is_confirmed": 0,
+            "commission": "0",
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T10",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  0
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "CANCEL",
+              "reason": "commission_zero"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "decimal commissions go through fromNetworkUnits, half-up",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T11",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": "12345.5",
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T11",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 99.49,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T11",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  12346
+                ],
+                "value": 150000
+              },
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  99
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0,
+                1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "interleaved lines of two transactions become two orders, in first-seen order",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T12",
+            "status": 0,
+            "is_confirmed": 0,
+            "commission": 5000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T13",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 7000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0008",
+                "sub2": "R26091400001"
+              }
+            }
+          },
+          {
+            "id": "L3",
+            "transaction_id": "T12",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T12",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  5000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "AWAITING",
+              "liveItems": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "orderId": "T13",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  7000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0008",
+              "R26091400001",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a malformed commission freezes only its own transaction",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T20",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": "N/A",
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T21",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 7000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T20",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          },
+          {
+            "orderId": "T21",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  7000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "commission text 1e5 is malformed, not 100000",
+      "provenance": "synthetic-from-code",
+      "story": "review 1",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T22",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": "1e5",
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T22",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_amount"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "item value is product_price x product_quantity, rounded once",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T23",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": "1000.5",
+            "product_quantity": 3,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T23",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 3002
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "quantity as text 2 counts as 2",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T24",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": "2",
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T24",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 300000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing quantity counts as 1 (Python falls back to 1)",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T25",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T25",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "quantity 0 counts as 1 (Python falls back to 1)",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T26",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 0,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T26",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "negative quantity freezes the transaction",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T27",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": -1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T27",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": null
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_quantity"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fractional quantity freezes the transaction",
+      "provenance": "synthetic-from-code",
+      "story": "review 2",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T28",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 2.5,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R26091412345"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T28",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": null
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R26091412345",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "invalid_quantity"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "lines without any id are never grouped: each is its own frozen row, customers kept apart (D7)",
+      "provenance": "synthetic-from-code",
+      "story": "review 5",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0001",
+                "sub2": "R1"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": null,
+            "status": 0,
+            "is_confirmed": 0,
+            "commission": 2000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0002",
+                "sub2": "R2"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0001",
+              "R1",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "missing_order_id"
+            }
+          },
+          {
+            "orderId": "",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "AWAITING",
+                "commissionParts": [
+                  2000
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0002",
+              "R2",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "missing_order_id"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sub_ids come from the last line with non-empty sub_params, as the live reconciler keeps them",
+      "provenance": "synthetic-from-code",
+      "story": "review 6",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T29",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R1"
+              }
+            }
+          },
+          {
+            "id": "L3",
+            "transaction_id": "T29",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 200,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R2"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T29",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 500,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {}
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T29",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  200
+                ],
+                "value": 150000
+              },
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  500
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0007",
+              "R2",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "APPROVED",
+              "liveItems": [
+                0,
+                1,
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "lines of one transaction naming two customers freeze (D7)",
+      "provenance": "synthetic-from-code",
+      "story": "review 5",
+      "input": {
+        "lines": [
+          {
+            "id": "L1",
+            "transaction_id": "T30",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 1000,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0007",
+                "sub2": "R1"
+              }
+            }
+          },
+          {
+            "id": "L2",
+            "transaction_id": "T30",
+            "status": 1,
+            "is_confirmed": 1,
+            "commission": 500,
+            "product_price": 150000,
+            "product_quantity": 1,
+            "merchant": "tiktokshop",
+            "transaction_time": "2026-09-20T10:00:00",
+            "_extra": {
+              "sub_params": {
+                "sub1": "C0009",
+                "sub2": "R1"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "rows": [
+          {
+            "orderId": "T30",
+            "orderStatus": null,
+            "items": [
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  1000
+                ],
+                "value": 150000
+              },
+              {
+                "status": "APPROVED",
+                "commissionParts": [
+                  500
+                ],
+                "value": 150000
+              }
+            ],
+            "subIds": [
+              "C0009",
+              "R1",
+              "",
+              "",
+              ""
+            ],
+            "signal": {
+              "kind": "FREEZE",
+              "reason": "conflicting_sub_ids"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

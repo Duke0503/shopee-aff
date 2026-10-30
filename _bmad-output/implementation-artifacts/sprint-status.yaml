@@ -42,11 +42,11 @@ development_status:
   1-4-server-walking-skeleton-answers-its-health-route-through-the: done
   1-5-config-single-instance-lock-and-redacted-logs: done
   1-6-ledger-database-with-the-synchronous-transaction-helper: done
-  1-7-migrations-run-only-after-a-checked-local-backup: backlog
+  1-7-migrations-run-only-after-a-checked-local-backup: done
   1-8-status-registry-tested-against-status-flows-md: done
   1-9-text-normalisation-builds-search-text-and-vietnamese-sort-ke: done
-  1-10-seven-module-skeleton-with-enforced-boundaries: backlog
-  1-11-network-catalog-and-status-maps-golden-tested-on-real-report: backlog
+  1-10-seven-module-skeleton-with-enforced-boundaries: done
+  1-11-network-catalog-and-status-maps-golden-tested-on-real-report: review
   epic-1-retrospective: optional
 
   epic-2: backlog

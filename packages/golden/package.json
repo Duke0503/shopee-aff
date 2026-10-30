@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Golden fixtures (JSON, computed with exact fractions) that the money package must reproduce to the dong.",
+  "description": "Golden fixtures: money cases the money package must reproduce to the dong, and network report rows the status maps and report readers must reproduce.",
   "main": "./src/runner.ts",
   "types": "./src/runner.ts",
   "exports": {
-    ".": "./src/runner.ts"
+    ".": "./src/runner.ts",
+    "./networks": "./src/network-fixtures.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -1,0 +1,10 @@
+{
+  "$comment": "The module edges of the spine's dependency diagram (AD-1): each module and the modules it may import, only through their index.ts. .dependency-cruiser.cjs builds its rules from this file, and tests/module-boundaries.test.ts checks it against the diagram in ARCHITECTURE-SPINE.md.",
+  "identity": [],
+  "linking": ["identity"],
+  "orders": ["identity", "linking"],
+  "campaigns": ["orders"],
+  "payouts": ["campaigns", "identity", "orders"],
+  "messaging": ["campaigns", "identity", "linking", "orders", "payouts"],
+  "operations": ["identity", "linking", "orders", "payouts"]
+}

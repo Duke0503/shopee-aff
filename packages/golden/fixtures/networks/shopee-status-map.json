@@ -1,0 +1,268 @@
+{
+  "rule": "statusMap",
+  "network": "shopee",
+  "source": "src/cashback/shopee/report_reader.py STATUS_MAP and map_status; docs/operations/status-flows.md (closed, D38)",
+  "cases": [
+    {
+      "name": "order_status UNPAID is AWAITING, never CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "UNPAID"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "order_status PAID is AWAITING, never CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "PAID"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "order_status COMPLETED is AWAITING, never CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "COMPLETED"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "order_status DELIVERED is AWAITING, never CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "DELIVERED"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'Pending' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "Pending"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'Completed' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "Completed"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'Delivered' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "Delivered"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'SHIPPING' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "SHIPPING"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'TO_SHIP' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "TO_SHIP"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 'PROCESSING' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "PROCESSING"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status '  pENDing ' is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC1",
+      "input": {
+        "raw": "  pENDing "
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status Validated is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Validated"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "status VALIDATED is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "VALIDATED"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "status Approved is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Approved"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "status Cancelled is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Cancelled"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status CANCELLED is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "CANCELLED"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status Canceled is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Canceled"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status Invalid is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Invalid"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status Rejected is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Rejected"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status Fraud is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Fraud"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status Closed is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "Closed"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status CLOSED is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC2",
+      "input": {
+        "raw": "CLOSED"
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "unlisted status 'Something New' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "Something New"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status 'Returned' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "Returned"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status 'Refunded' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "Refunded"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status 'Pending Validation' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "Pending Validation"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status 'TO_RECEIVE' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "TO_RECEIVE"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status '4' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": "4"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "unlisted status '' is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "raw": ""
+      },
+      "expected": "UNKNOWN"
+    }
+  ]
+}

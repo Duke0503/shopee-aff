@@ -1,0 +1,215 @@
+{
+  "rule": "accesstradeLine",
+  "network": "accesstrade",
+  "source": "src/cashback/providers/accesstrade_reconciler.py normalize_transactions (status 0/1/2, is_confirmed)",
+  "cases": [
+    {
+      "name": "status 0 (pending) is AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 0,
+        "is_confirmed": 0
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 0 stays AWAITING even when confirmed",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 0,
+        "is_confirmed": 1
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 1 confirmed is APPROVED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 1,
+        "is_confirmed": 1
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "status 1 not yet confirmed is still AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 1,
+        "is_confirmed": 0
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status 1 with no is_confirmed is still AWAITING",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 1
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "status and is_confirmed sent as strings",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": "1",
+        "is_confirmed": "1"
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "status 2 (rejected) is CANCELLED",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 2,
+        "is_confirmed": 0
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "status 2 is CANCELLED even when confirmed",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC3",
+      "input": {
+        "status": 2,
+        "is_confirmed": 1
+      },
+      "expected": "CANCELLED"
+    },
+    {
+      "name": "unlisted status code 3 is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "status": 3,
+        "is_confirmed": 1
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "a line with no status is UNKNOWN, not pending",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "is_confirmed": 0
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "a word instead of a code is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "1.11 AC4",
+      "input": {
+        "status": "approved",
+        "is_confirmed": 1
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "is_confirmed true (Python int(True) is 1) confirms an approved line",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": true
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "is_confirmed false (Python int(False) is 0) leaves it awaiting",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": false
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "is_confirmed text with spaces (Python int strips them) confirms",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": " 1 "
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "is_confirmed text 0 leaves it awaiting",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": "0"
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "is_confirmed null (Python falls back to 0) leaves it awaiting",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": null
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "is_confirmed empty text (Python falls back to 0) leaves it awaiting",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": ""
+      },
+      "expected": "AWAITING"
+    },
+    {
+      "name": "is_confirmed number 1.0 (Python int(1.0) is 1) confirms",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": 1.0
+      },
+      "expected": "APPROVED"
+    },
+    {
+      "name": "is_confirmed text 1.0 (Python int raises) is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": "1.0"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "is_confirmed text yes (Python int raises) is UNKNOWN",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": 1,
+        "is_confirmed": "yes"
+      },
+      "expected": "UNKNOWN"
+    },
+    {
+      "name": "status text with spaces (Python int strips them) is approved when confirmed",
+      "provenance": "synthetic-from-code",
+      "story": "review 3",
+      "input": {
+        "status": " 1 ",
+        "is_confirmed": 1
+      },
+      "expected": "APPROVED"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ See `docs/architecture-v2/05-migration/02-golden-tests.md`.
 ```
 packages/golden/
 ├── fixtures/money/*.json      the money cases
+├── fixtures/networks/*.json   network report rows and status maps (see its README)
 └── src/runner.ts              reads a fixture and calls the matching @mmo/money function
 ```
 

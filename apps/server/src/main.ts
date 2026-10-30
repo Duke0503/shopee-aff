@@ -1,6 +1,6 @@
 /**
- * Composition root: config, logger, the single-instance lock, the ledger, then the two
- * listeners. A config error names the keys and exits before anything else runs; a held
+ * Composition root: config, logger, the single-instance lock, the ledger (migrated behind a
+ * checked local backup, AD-26), then the two listeners. A config error names the keys and exits before anything else runs; a held
  * lock exits before the ledger is opened, so a second instance never touches the data.
  * Any failure after the lock is taken is logged, and whatever was started is closed and
  * the lock released before the process exits.
@@ -9,7 +9,9 @@ import { join } from "node:path";
 import { systemClock } from "@cashback/core";
 
 import { ConfigError, loadConfig, type ServerConfig } from "./platform/config/env.config";
-import { LEDGER_FILE, openLedger, type Ledger } from "./platform/db/ledger";
+import { LEDGER_FILE, type Ledger } from "./platform/db/ledger";
+import { openMigratedLedger } from "./platform/db/migration-gate";
+import { MIGRATIONS_DIR } from "./platform/db/migrations";
 import { buildServers, close, listen, type Servers } from "./platform/http/servers";
 import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
@@ -30,7 +32,13 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Pr
   let servers: Servers | null = null;
   const parts = (): RunningParts => ({ closeServers: async () => (servers ? close(servers) : undefined), ledger, lock, logger });
   try {
-    ledger = openLedger(join(config.dataDir, LEDGER_FILE));
+    ledger = await openMigratedLedger({
+      ledgerPath: join(config.dataDir, LEDGER_FILE),
+      migrationsDir: MIGRATIONS_DIR,
+      backupsDir: join(config.dataDir, "backups"),
+      clock: systemClock,
+      logger,
+    });
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort }, "platform.server.started");

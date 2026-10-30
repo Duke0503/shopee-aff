@@ -9,4 +9,4 @@ export {
 } from "./network-rules";
 export { isWithheld, splitCommission, type Split, type SplitInput } from "./split";
 export { cappedCommission, shopeeCommission, type CommissionParts } from "./commission";
-export { fromNetworkUnits } from "./network-units";
+export { fromNetworkUnits, fromNetworkUnitsTimes } from "./network-units";
