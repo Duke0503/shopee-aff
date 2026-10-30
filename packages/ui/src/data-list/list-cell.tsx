@@ -37,6 +37,7 @@ function ProductCell<R>({ column, row }: { column: ListColumn<R>; row: R }) {
 }
 
 export function ListCell<R>({ column, row, clock = systemClock }: ListCellProps<R>) {
+  if (column.render !== undefined) return <>{column.render(row)}</>;
   if (column.kind === "product") return <ProductCell column={column} row={row} />;
   const value: unknown = row[column.key];
   if (value === null || value === undefined || value === "") return <MissingValue />;

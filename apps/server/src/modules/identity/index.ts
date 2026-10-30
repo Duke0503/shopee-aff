@@ -4,8 +4,10 @@
  * §1).
  */
 export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-fingerprint";
+export { accountNumberOf, bankAccountsOf, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
+export { distinctiveBankText, findVietQrBank, plainBankText, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
-export { customerCodeOf, customerKeys, resolveCustomer, type CustomerKeys, type ResolvedCustomer } from "./customer.query";
+export { customerCardOf, customerCodeOf, customerKeys, resolveCustomer, type CustomerKeys, type ResolvedCustomer } from "./customer.query";
 export { counterAbove, customerCodeNumber, CUSTOMER_CODE_PREFIX, formatCustomerCode } from "./domain/customer-code";
 export {
   IdentityImportError,
@@ -22,6 +24,6 @@ export { signInDelayMs } from "./domain/sign-in-delay";
 export { DEFAULT_ARGON2, hashPassword, MAX_PASSWORD_LENGTH, verifyPassword, type Argon2Params } from "./password-hash";
 export { newSessionToken, SESSION_TOKEN_BYTES, sessionTokenHash, type SessionToken } from "./session-token";
 export { endSession, openSession, STAFF_SESSION_MS, type OpenedSession, type SessionOwner } from "./session.command";
-export { staffSessionOf, staffSessionsFor } from "./staff-session.query";
+export { staffNamesOf, staffSessionOf, staffSessionsFor } from "./staff-session.query";
 export { DUMMY_HASH, signInStaff, type StaffSignIn, type StaffSignInDeps, type StaffSignInInput } from "./staff-sign-in.command";
 export { staffSessionRoutes, type StaffSessionRouteDeps } from "./http/staff-session.routes";

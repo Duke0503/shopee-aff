@@ -25,6 +25,7 @@ export {
   ReceiptIcon,
   RefreshCwIcon,
   ScrollTextIcon,
+  TriangleAlertIcon,
   SearchIcon,
   SettingsIcon,
   SlidersHorizontalIcon,

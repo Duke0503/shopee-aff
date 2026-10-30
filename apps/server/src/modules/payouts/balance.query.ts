@@ -64,7 +64,7 @@ function clawbackRows(db: LedgerDb, ids: readonly string[] | null) {
 }
 
 /** The survivor a stored customer id belongs to, resolved once per id; null for nobody, an erased customer or HOUSE (D5). */
-function survivors(db: LedgerDb): (stored: string) => string | null {
+export function survivorResolver(db: LedgerDb): (stored: string) => string | null {
   const known = new Map<string, string | null>();
   return (stored) => {
     if (!known.has(stored)) {
@@ -77,7 +77,7 @@ function survivors(db: LedgerDb): (stored: string) => string | null {
 
 /** Every balance part over the stored ids (null: all), credited to survivors; `seed` survivors start at 0. */
 function collect(db: LedgerDb, ids: readonly string[] | null, seed: readonly string[]): Map<string, Parts> {
-  const owner = survivors(db);
+  const owner = survivorResolver(db);
   const parts = new Map<string, Parts>(seed.map((id) => [id, { gross: [], waiting: [], paid: [], clawbacks: new Map() }]));
   const of = (stored: string): Parts | undefined => {
     const id = owner(stored);

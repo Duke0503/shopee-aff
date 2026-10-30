@@ -79,8 +79,8 @@ development_status:
   4-3-list-contract-on-the-server-with-definelist: review
   4-4-admin-desk-shell-on-the-design-tokens: review
   4-5-datalist-renders-every-list-with-url-state: review
-  4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action: backlog
-  4-7-payout-claim-and-preview-with-vietqr: backlog
+  4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action: review
+  4-7-payout-claim-and-preview-with-vietqr: review
   4-8-confirm-a-payout-once-idempotently: backlog
   4-9-proof-image-upload-and-the-facts-only-receipt-page: backlog
   4-10-void-a-mistaken-payout: backlog

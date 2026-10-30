@@ -55,7 +55,7 @@ export {
   type OrdersImportResult,
 } from "./order-import.command";
 export { openOrRefreshCase, resolveOpenCase, type CaseEvidence, type CaseReason, type CaseWrite } from "./review-case.command";
-export { orderBalanceRows, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows } from "./order-balance.query";
+export { orderBalanceRows, payableOrderLines, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows, type PayableOrderLine } from "./order-balance.query";
 export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
 export { reviewCaseRoutes, type ReviewCaseRouteDeps } from "./http/review-case.routes";
 export { previewReviewApply, ReviewCaseError, type ReviewReadDeps, type ReviewApplyInput, type ReviewCaseErrorCode, type ReviewPreview } from "./review-plan.query";

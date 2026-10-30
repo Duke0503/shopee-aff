@@ -75,6 +75,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       payouts: "payouts",
       payout_items: "payouts",
       ledger_entries: "payouts",
+      payout_claims: "payouts",
     });
   });
 });

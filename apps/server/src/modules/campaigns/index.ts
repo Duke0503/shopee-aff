@@ -10,6 +10,6 @@ export {
   type ImportedAward,
   type ImportedCampaign,
 } from "./campaign-import.command";
-export { confirmedBonusByCustomer } from "./award-balance.query";
+export { confirmedBonusByCustomer, confirmedBonusLines, type BonusLine } from "./award-balance.query";
 export { moveAwards, orderAwardsFor, paidBonusOn } from "./order-award.command";
 export { CAMPAIGN_AWARD_STATUSES } from "./schema";

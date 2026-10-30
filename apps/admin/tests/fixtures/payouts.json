@@ -1,0 +1,9 @@
+{
+  "$comment": "Fake Payouts rows and a preview for the admin tests (Stories 4.6, 4.7) and the screenshots. No real person; account digits are made up. The QR payload is a VietQR built by the server's vietQrPayload for these figures.",
+  "names": ["Nguyễn Thị Lan", "Trần Minh Khoa", "Phạm Thu Hà", "Lê Hoàng Yến", "Võ Thị Thu Trang Nguyễn Hoàng Anh", "Đỗ Văn Tùng"],
+  "banks": ["Vietcombank", "MBBank", "Techcombank", "ACB", "VietinBank", "BIDV"],
+  "holder": "NGUYEN THI LAN",
+  "campaign": "Trung thu",
+  "products": ["Nồi cơm điện 1.8L", "Máy xay sinh tố 600W", "Bình giữ nhiệt inox 500ml có quai xách và nắp chống tràn"],
+  "qrPayload": "00020101021238570010A00000072701270006970436011300710001234560208QRIBFTTA530370454061352165802VN62200816DP00012 K7Q2M9XA63049F81"
+}

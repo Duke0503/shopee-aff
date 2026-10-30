@@ -1,4 +1,4 @@
-// Screenshots of the admin desk shell and the Orders DataList at phone, tablet and desktop
+// Screenshots of the admin desk shell, the Orders DataList, the Payouts list and the payout panel at phone, tablet and desktop
 // widths, for the design review. Starts the Vite dev server, answers /api/admin from fixtures
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
 // sideways scrolling. Usage: node scripts/take-screenshots.mjs <output folder>
@@ -43,6 +43,41 @@ function orders(url) {
   return { rows: rows.slice(0, 25), total: rows.length + 1261, page: 1, pageSize: 25, facets, summary, asOf: "2026-10-30T12:42:00.000Z" };
 }
 
+const payoutFixtures = JSON.parse(readFileSync(join(root, "tests/fixtures/payouts.json"), "utf8"));
+const PAYABLE = [135216, 24860, 9263, 31008, 0, 58400];
+const SETTLED = [["PARTLY_SETTLED", 1, 3], ["SETTLED", 2, 2], ["UNSETTLED", 0, 1], ["SETTLED", 3, 3], ["UNSETTLED", 0, 1], ["PARTLY_SETTLED", 2, 4]];
+
+function payoutRows(url) {
+  const action = url.searchParams.get("filter[queue]") === "ACTION";
+  const rows = payoutFixtures.names.map((name, i) => ({ name, i })).filter(({ i }) => action || i !== 4).map(({ name, i }) => {
+    const [settlement, settledCount, orderCount] = SETTLED[i];
+    const flags = action ? ["NO_BANK", "BANK_HELD", "BANK_CHANGED,SHARED_BANK", "SHARED_BANK", "NETTING_ONLY", "NO_BANK"][i] : "";
+    const noBank = flags.includes("NO_BANK");
+    return {
+      customerId: `P${i}`, customerCode: `DP${String(12 + i * 19).padStart(5, "0")}`, customerName: name,
+      bankName: noBank ? null : payoutFixtures.banks[i], accountLastFour: noBank ? null : String(6789 - i * 1201).padStart(4, "0"),
+      orderCount, settledCount, settlement, flags, bankChangedAt: flags.includes("BANK_CHANGED") ? "2026-10-29T05:10:00.000Z" : null,
+      payable: action && i === 4 ? 0 : PAYABLE[i], queue: action ? "ACTION" : "PAYABLE",
+      claimStaffId: !action && i === 2 ? "stf_2" : null, claimStaffName: !action && i === 2 ? "tuan" : null,
+    };
+  });
+  return { rows, total: rows.length, page: 1, pageSize: 25, facets: {}, summary: { payable: rows.reduce((sum, r) => sum + r.payable, 0) }, asOf: "2026-10-30T12:42:00.000Z", queues: { payable: 5, action: 6 } };
+}
+
+const PREVIEW = {
+  outcome: "claimed", claimId: "K7Q2M9XA", transferReference: "DP00012 K7Q2M9XA", openedAt: "2026-10-30T12:42:00.000Z",
+  customerId: "P0", customerCode: "DP00012", customerName: payoutFixtures.names[0], amount: 135216, gross: 135216, deductedNext: 0,
+  bankName: "Vietcombank", holderName: payoutFixtures.holder, accountLastFour: "3456", qrPayload: payoutFixtures.qrPayload, qrMissing: null,
+  flags: ["BANK_CHANGED"],
+  orders: [
+    { orderId: "261001A0001", productName: payoutFixtures.products[0], productImageUrl: "https://cf.example.test/file/deal_home_1.jpg", cashback: 79216, settled: true },
+    { orderId: "261001A0002", productName: payoutFixtures.products[2], productImageUrl: "https://cf.example.test/file/deal_home_4.jpg", cashback: 36000, settled: false },
+  ],
+  bonuses: [{ awardId: 1, orderId: "261001A0001", campaignName: payoutFixtures.campaign, amount: 20000 }],
+  clawbacks: [],
+  warning: { amount: 79216, at: "2026-10-30T12:21:00.000Z" },
+};
+
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5174, strictPort: true }, logLevel: "error" });
 await server.listen();
 const browser = await chromium.launch();
@@ -55,6 +90,9 @@ async function shoot(name, width, height, path, after) {
     const url = new URL(route.request().url());
     if (url.pathname === "/api/admin/session") return route.fulfill({ json: { staffId: "stf_1", username: "minh", role: "ADMIN" } });
     if (url.pathname === "/api/admin/orders") return route.fulfill({ json: orders(url) });
+    if (url.pathname === "/api/admin/payouts") return route.fulfill({ json: payoutRows(url) });
+    if (url.pathname.endsWith("/claim")) return route.fulfill({ json: PREVIEW });
+    if (url.pathname.endsWith("/release")) return route.fulfill({ json: { claimId: "K7Q2M9XA", status: "ABANDONED" } });
     return route.fulfill({ status: 404, json: { error: { code: "not_found", messageKey: "error.not_found" } } });
   });
   await page.goto(`http://localhost:5174${path}`);
@@ -92,7 +130,12 @@ const WIDTHS = [
 for (const [label, width, height] of WIDTHS) {
   await shoot(`shell-${label}`, width, height, "/admin/");
   await shoot(`orders-${label}`, width, height, "/admin/orders?filter[status]=APPROVED,PAID");
+  await shoot(`payouts-${label}`, width, height, "/admin/payouts");
+  await shoot(`payouts-action-${label}`, width, height, "/admin/payouts?filter[queue]=ACTION");
+  await shoot(`payout-panel-${label}-sheet`, width, height, "/admin/payouts", (page) => page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })));
 }
+await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
+  page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
 await shoot("orders-phone-390-filter-sheet", 390, 844, "/admin/orders", (page) => page.getByRole("button", { name: /^B/ }).first().click());
 await shoot("shell-phone-390-more-sheet", 390, 844, "/admin/", (page) => page.locator("nav button").last().click());
 await shoot("orders-desktop-1440-error", 1440, 960, "/admin/orders?q=x", (page) => page.route("**/api/admin/orders**", (route) => route.fulfill({ status: 500, json: { error: { code: "internal", messageKey: "error.internal" } } })).then(() => page.reload()).then(() => page.getByRole("alert").waitFor({ timeout: 10_000 })));

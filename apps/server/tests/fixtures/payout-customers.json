@@ -1,0 +1,14 @@
+{
+  "$comment": "Fake customers for the Payouts tests (Stories 4.6, 4.7): id, code, display name. Names carry Vietnamese diacritics so search folding is exercised; no real person.",
+  "customers": [
+    ["P1", "DP00012", "Nguyễn Thị Lan"],
+    ["P2", "DP00031", "Trần Minh Khoa"],
+    ["P3", "DP00044", "Phạm Thu Hà"],
+    ["P4", "DP00052", "Lê Hoàng Yến"],
+    ["P5", "DP00067", "Đỗ Văn Tùng"],
+    ["P6", "DP00071", "Vũ Ngọc Ánh"],
+    ["P7", "DP00083", "Bùi Quang Huy"]
+  ],
+  "holder": "NGUYEN THI LAN",
+  "foldedQuery": "nguyen thi"
+}

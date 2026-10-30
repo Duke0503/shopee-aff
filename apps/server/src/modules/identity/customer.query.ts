@@ -99,3 +99,8 @@ export function customerKeys(db: LedgerDb, key: string): CustomerKeys | null {
   }
   return { customer, keys: [...keys].sort() };
 }
+
+/** The code and the display name a staff screen shows for one customer, or null for an unknown id. */
+export function customerCardOf(db: LedgerDb, customerId: string): { customerCode: string | null; displayName: string | null } | null {
+  return db.select({ customerCode: customers.customerCode, displayName: customers.displayName }).from(customers).where(eq(customers.customerId, customerId)).get() ?? null;
+}

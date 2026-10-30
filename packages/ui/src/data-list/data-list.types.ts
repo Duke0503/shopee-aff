@@ -6,6 +6,7 @@
  */
 import type { ListResponse, ListSearch, ListSearchState } from "@cashback/contracts";
 import type { EntityName } from "@cashback/core";
+import type { ReactNode } from "react";
 
 export type ColumnKind = "text" | "code" | "name" | "money" | "instant" | "status" | "integer" | "product";
 
@@ -34,6 +35,11 @@ export interface ListColumn<R> {
   readonly width?: number;
   /** Dropped from the tablet table (the same figure stays on desktop and in the phone card). */
   readonly desktopOnly?: boolean;
+  /**
+   * Draws the cell from the row when no kind fits (a set of flag badges, a row action). It shows
+   * the field `key` names and nothing else, so a column still holds one value (LC-2).
+   */
+  readonly render?: (row: R) => ReactNode;
 }
 
 /** The part of a TanStack Query result DataList reads; `useListQuery` returns a superset. */
@@ -77,6 +83,11 @@ export interface DataListProps<R> {
   readonly emptyText: string;
   readonly statusFilter?: StatusFilter;
   readonly summary?: readonly SummaryField[];
+  /**
+   * The phone card of one row, for a list whose card is composed differently from the order
+   * card (the payout card). It is built from the same row the table shows, so the figures match.
+   */
+  readonly card?: (row: R) => ReactNode;
 }
 
 /** A list fetch that failed with an HTTP status, or null status for no answer at all. */

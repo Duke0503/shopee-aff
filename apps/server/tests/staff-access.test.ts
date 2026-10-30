@@ -24,9 +24,8 @@ afterEach(async () => {
   closeLedgers();
 });
 
-/** Stand-ins for routes later stories add (Stories 4.6, 4.10, 6.x), on the real gate and policy. */
+/** Stand-ins for routes later stories add (Stories 4.10, 6.x), on the real gate and policy; GET /api/admin/payouts is the real list (Story 4.6). */
 const LATER_ROUTES: StaffRoutes = (add) => {
-  add({ method: "GET", url: "/api/admin/payouts", handler: async () => ({ rows: [] }) });
   add({ method: "POST", url: "/api/admin/payouts/:payoutId/void", adminOnly: true, handler: async () => ({ voided: true }) });
   add({ method: "POST", url: "/api/admin/customers/:customerId/force-erase", adminOnly: true, handler: async () => ({ erased: true }) });
 };

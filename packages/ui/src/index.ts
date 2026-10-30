@@ -9,6 +9,7 @@ export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./comp
 export { CodeChip, COPIED_FOR_MS, type CodeChipProps } from "./brand/code-chip";
 export { FilterChip, type FilterChipProps } from "./brand/filter-chip";
 export { MissingValue, MoneyFigure, type MoneyFigureProps } from "./brand/money-figure";
+export { ProductThumb, type ProductThumbProps } from "./brand/product-thumb";
 export { StatusBadge, type StatusBadgeProps } from "./brand/status-badge";
 export { formatAmountDigits, formatCount, formatMoney, moneyAriaLabel } from "./format/format-money";
 export { DESKTOP_QUERY, TABLET_QUERY, useLayout, useMediaQuery, type Layout } from "./hooks/use-media-query";

@@ -3,8 +3,8 @@
  * module's `OrderPayoutsPort`, bound to the apply's transaction. A clawback is a series of
  * insert-only `ledger_entries` sharing one clawback id; this writes only its negative original
  * (`<orderId>-<n>`, the n-th clawback of the order). What the order's originals already took is
- * read back so `transition` never claws back the same cashback twice. Payout claims arrive with
- * Story 4.7 (`payout_claims`); until then no claim exists, so none can be open.
+ * read back so `transition` never claws back the same cashback twice. Whether an OPEN payout claim
+ * covers the order is read from `payout_claims` (Story 4.7, D39).
  *
  * Opening a clawback tells the customer once, in the same transaction: the outbox row is keyed
  * `clawback:<id>:opened`, so a retried or repeated apply never tells twice, and its sentence
@@ -19,6 +19,7 @@ import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import { dedupKey, type OutboxPort } from "../../platform/ports/outbox.port";
 import type { ClawbackRequest, OrderPayoutsPort } from "../orders/index";
+import { coveredByOpenClaim } from "./payout-claim.command";
 import { ledgerEntries } from "./schema";
 
 function originals(db: LedgerDb, orderId: string): { clawbackId: string; amount: number }[] {
@@ -63,7 +64,7 @@ export function openClawback(db: LedgerDb, request: ClawbackRequest, w: Clawback
 
 /** The read half of the orders port: what a preview needs, with no writer reachable. */
 export function orderPayoutReadsFor(db: LedgerDb): Pick<OrderPayoutsPort, "coveredByOpenClaim" | "clawedBack"> {
-  return { coveredByOpenClaim: () => false, clawedBack: (orderId) => clawedBackOn(db, orderId) };
+  return { coveredByOpenClaim: (orderId) => coveredByOpenClaim(db, orderId), clawedBack: (orderId) => clawedBackOn(db, orderId) };
 }
 
 /** The orders port bound to one transaction's handle. */

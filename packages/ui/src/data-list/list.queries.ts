@@ -10,18 +10,19 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 export const LIST_REFETCH_MS = 60_000;
 
-export type ListFetcher<R> = (query: string, signal: AbortSignal) => Promise<ListResponse<R>>;
+/** Fetches one list query; a list may answer with more than the contract (`D`), such as tab totals. */
+export type ListFetcher<R, D extends ListResponse<R> = ListResponse<R>> = (query: string, signal: AbortSignal) => Promise<D>;
 
-export interface UseListQueryOptions<R> {
+export interface UseListQueryOptions<R, D extends ListResponse<R> = ListResponse<R>> {
   /** The list's own key, e.g. `["admin", "orders"]`; mutations invalidate by this prefix (LC-10). */
   readonly key: readonly unknown[];
   readonly search: ListSearch;
   readonly state: ListSearchState;
-  readonly fetchList: ListFetcher<R>;
+  readonly fetchList: ListFetcher<R, D>;
   readonly paused?: boolean;
 }
 
-export function useListQuery<R>({ key, search, state, fetchList, paused = false }: UseListQueryOptions<R>) {
+export function useListQuery<R, D extends ListResponse<R> = ListResponse<R>>({ key, search, state, fetchList, paused = false }: UseListQueryOptions<R, D>) {
   const query = listQueryString(search, state);
   return useQuery({
     queryKey: [...key, query],

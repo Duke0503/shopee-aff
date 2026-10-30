@@ -9,5 +9,15 @@
   "error.internal": "Máy chủ gặp lỗi. Thử lại sau.",
   "error.staff_sign_in_refused": "Tên đăng nhập hoặc mật khẩu không đúng.",
   "error.staff_sign_in_waiting": "Sai mật khẩu nhiều lần. Thử lại sau {time}.",
-  "error.network": "Không kết nối được máy chủ."
+  "error.network": "Không kết nối được máy chủ.",
+  "error.payout.no_bank": "Khách chưa có số tài khoản nên chưa chuyển được.",
+  "error.payout.bank_held": "Khách vừa đổi số tài khoản trên web và chưa xác nhận trong Zalo. Chưa chuyển được.",
+  "error.payout.nothing_to_pay": "Khách này không còn khoản nào để chuyển.",
+  "error.payout.customer_not_found": "Không tìm thấy khách này.",
+  "error.payout.claim_not_found": "Lần chuyển này đã đóng. Mở lại khách để xem số mới.",
+  "error.payout.not_your_claim": "Lần chuyển này do nhân viên khác mở.",
+  "error.payout.staff_only": "Chỉ nhân viên làm được việc này.",
+  "error.payout.netting_only": "Khoản trừ nợ đã bằng số khách được nhận nên không có gì để chuyển. Lần trừ nợ này sẽ ghi nhận ở bước trừ nợ riêng.",
+  "error.payout.account_changed": "Số tài khoản của khách vừa thay đổi. Bảng đã lấy lại số mới, kiểm tra lại trước khi chuyển.",
+  "error.payout.snapshot_mismatch": "Số liệu của khách đang không khớp nhau nên chưa mở được. Báo quản trị viên kiểm tra."
 }

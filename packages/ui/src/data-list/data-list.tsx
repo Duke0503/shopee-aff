@@ -50,7 +50,7 @@ interface ListBodyProps<R> extends DataListProps<R> {
 }
 
 /** Rows or the one state that replaces them; an error never falls through to an empty text. */
-function bodyContent<R extends RowData>({ query, shown, layout, filtered, columns, rowKey, state, emptyText, onClear, onSort }: ListBodyProps<R>): ReactNode {
+function bodyContent<R extends RowData>({ query, shown, layout, filtered, columns, rowKey, state, emptyText, onClear, onSort, card }: ListBodyProps<R>): ReactNode {
   if (shown === undefined) return query.isError ? null : <ListSkeleton />;
   if (shown.rows.length === 0) {
     if (query.isError) return null;
@@ -59,7 +59,15 @@ function bodyContent<R extends RowData>({ query, shown, layout, filtered, column
   const dimmed = query.isFetching || query.isError;
   return (
     <div data-stale={query.isError ? "true" : undefined} className={cn("min-w-0 transition-opacity", dimmed && "opacity-55")}>
-      {layout === "phone" ? (
+      {layout === "phone" && card !== undefined ? (
+        <ul className="flex min-w-0 flex-col gap-2">
+          {shown.rows.map((row) => (
+            <li key={rowKey(row)} className="min-w-0">
+              {card(row)}
+            </li>
+          ))}
+        </ul>
+      ) : layout === "phone" ? (
         <ListCards columns={columns} rows={shown.rows} rowKey={rowKey} />
       ) : (
         <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">

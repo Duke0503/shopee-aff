@@ -85,7 +85,8 @@ describe("review item 6: sign-out leaves the desk first and reports a failure in
     const user = userEvent.setup();
     const { history } = renderDesk("/admin/payouts");
     await user.click(await screen.findByRole("button", { name: adminText("sign_out") }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(adminText("sign_out_failed"));
+    // The Payouts page has its own list alert (no list endpoint here); the sign-out one is found by its text.
+    expect((await screen.findByText(adminText("sign_out_failed"))).closest("[role=alert]")).not.toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: adminText("nav_payouts") })).toBeInTheDocument();
     expect(history.location.pathname).toBe("/admin/payouts");
   });

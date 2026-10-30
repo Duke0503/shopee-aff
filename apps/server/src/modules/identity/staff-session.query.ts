@@ -5,7 +5,7 @@
  * arrives in.
  */
 import type { Clock } from "@cashback/core";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { StaffPrincipal, StaffSessionPort } from "../../platform/ports/staff-session.port";
@@ -27,4 +27,11 @@ export function staffSessionOf(db: LedgerDb, token: string | null, clock: Clock)
 /** The staff session port over the ledger (platform/ports/staff-session.port.ts). */
 export function staffSessionsFor(db: LedgerDb, clock: Clock): StaffSessionPort {
   return { resolve: (token) => staffSessionOf(db, token, clock) };
+}
+
+/** Each staff member's sign-in name by staff id, for "<name> is paying" on a claimed payout (Story 4.6). */
+export function staffNamesOf(db: LedgerDb, staffIds: readonly string[]): Map<string, string> {
+  if (staffIds.length === 0) return new Map();
+  const rows = db.select({ staffId: staff.staffId, username: staff.username }).from(staff).where(inArray(staff.staffId, [...new Set(staffIds)])).all();
+  return new Map(rows.map((r) => [r.staffId, r.username]));
 }

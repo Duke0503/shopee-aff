@@ -11,11 +11,14 @@ import { join } from "node:path";
 import { systemClock } from "@cashback/core";
 
 import { adminDesk } from "./admin/admin-desk";
+import { commandAudit } from "./modules/operations/index";
+import { runClaimExpiry } from "./modules/payouts/index";
 import { ConfigError, loadConfig, type ServerConfig } from "./platform/config/env.config";
 import { LEDGER_FILE, type Ledger } from "./platform/db/ledger";
 import { openMigratedLedger } from "./platform/db/migration-gate";
 import { MIGRATIONS_DIR } from "./platform/db/migrations";
 import { buildServers, close, listen, type Servers } from "./platform/http/servers";
+import { JOB_SCHEDULES } from "./platform/jobs/job-schedules";
 import { createScheduler, systemTimer, type Job, type Scheduler } from "./platform/jobs/scheduler";
 import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
@@ -32,9 +35,10 @@ function readConfig(): ServerConfig | null {
   }
 }
 
-/** The module jobs; Stories 5.1, 4.7, 8.2 and 8.3 add theirs here. */
+/** The module jobs; Stories 5.1, 8.2 and 8.3 add theirs here. */
 function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger): Job[] {
-  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger })];
+  const claimExpiry: Job = { name: "claimExpiry", ...JOB_SCHEDULES.claimExpiry, run: () => void runClaimExpiry({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }) };
+  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger }), claimExpiry];
 }
 
 async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Promise<RunningParts | null> {

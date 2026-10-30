@@ -4,12 +4,15 @@
  * customer id each order is stored under, for some customers or for all. SQL only SUMs the stored
  * cashback; the waiting estimate is computed in `packages/money` from each awaiting order's stored
  * estimate. FROZEN and REVERSED orders count nowhere; the FROZEN ids are returned so their awards
- * stay suspended (D55).
+ * stay suspended (D55). `payableOrderLines` lists the same payable orders one by one, under the
+ * same condition, for the payout list's counts and the payout preview's covered orders (Stories
+ * 4.6, 4.7): the lines of a customer always add up to the approved part of its gross.
  */
 import type { AffiliateNetwork } from "@cashback/money";
 import { and, eq, gt, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
+import { productSnapshotsOf } from "../linking/index";
 import { orders } from "./schema";
 
 export interface CustomerTotal {
@@ -49,4 +52,36 @@ export function orderBalanceRows(db: LedgerDb, customerIds: readonly string[] | 
     .all();
   const frozen = db.select({ orderId: orders.orderId }).from(orders).where(and(mine, eq(orders.status, "FROZEN"))).all();
   return { approvedUnpaid, awaiting, frozenOrderIds: frozen.map((o) => o.orderId) };
+}
+
+export interface PayableOrderLine {
+  readonly orderId: string;
+  /** The customer id the order is stored under (a merged id resolves to its survivor). */
+  readonly customerId: string;
+  /** The stored cashback, whole dong. */
+  readonly cashback: number;
+  /** The network paid the batch covering the order (D27: information only, never a status). */
+  readonly settled: boolean;
+  readonly productName: string | null;
+  readonly productImageUrl: string | null;
+}
+
+/**
+ * Every payable order of the customer ids named (null: all), one line each, oldest approval
+ * first; with `products`, each line carries its link's product snapshot (D56).
+ */
+export function payableOrderLines(db: LedgerDb, customerIds: readonly string[] | null, products = false): PayableOrderLine[] {
+  if (customerIds !== null && customerIds.length === 0) return [];
+  const mine: SQL = customerIds === null ? isNotNull(orders.customerId) : inArray(orders.customerId, [...customerIds]);
+  const rows = db
+    .select({ orderId: orders.orderId, customerId: sql<string>`${orders.customerId}`, cashback: sql<number>`coalesce(${orders.cashback}, 0)`, settledAt: orders.settledAt, requestId: orders.requestId })
+    .from(orders)
+    .where(and(mine, payable))
+    .orderBy(orders.approvedAt, orders.orderId)
+    .all();
+  const snapshots = products ? productSnapshotsOf(db, rows.flatMap((r) => (r.requestId === null ? [] : [r.requestId]))) : new Map();
+  return rows.map((r) => {
+    const product = r.requestId === null ? undefined : snapshots.get(r.requestId);
+    return { orderId: r.orderId, customerId: r.customerId, cashback: r.cashback, settled: r.settledAt !== null, productName: product?.productName ?? null, productImageUrl: product?.productImageUrl ?? null };
+  });
 }

@@ -15,6 +15,8 @@ import { AdminOnly } from "./pages/admin-only";
 import { DeskLayout } from "./pages/desk-layout";
 import { NotFoundPage } from "./pages/not-found.page";
 import { PendingPage } from "./pages/pending.page";
+import { PayoutsPage } from "./payouts/payouts.page";
+import { PAYOUTS_SEARCH } from "./payouts/payouts.queries";
 import { SignInRoute } from "./pages/sign-in-route";
 import { parseSearch, stringifySearch } from "./search-params";
 
@@ -57,11 +59,23 @@ export const ordersRoute = createRoute({
   },
 });
 
+export const payoutsRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "payouts",
+  validateSearch: (raw: Record<string, unknown>) => PAYOUTS_SEARCH.validate(raw),
+  component: function PayoutsScreen() {
+    const search = payoutsRoute.useSearch();
+    const navigate = useNavigate({ from: payoutsRoute.fullPath });
+    const state = useMemo(() => PAYOUTS_SEARCH.parse(search), [search]);
+    return <PayoutsPage state={state} onStateChange={(next, options) => void navigate({ search: PAYOUTS_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   signInRoute,
   deskRoute.addChildren([
     pendingRoute("/", "nav_overview"),
-    pendingRoute("payouts", "nav_payouts"),
+    payoutsRoute,
     pendingRoute("review", "nav_review"),
     ordersRoute,
     pendingRoute("customers", "nav_customers"),
