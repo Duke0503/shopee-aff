@@ -1190,9 +1190,9 @@
           "rules": [
             {
               "id": "orders.order.attribution-order",
-              "description": "Reconciliation attributes an order by sub_id1, then by customer alias, then by the owner of the sub_id2 request. Anything else goes to manual review.",
+              "description": "Reconciliation attributes an order by sub_id1 resolved through customer aliases. When sub_id1 is empty (legacy links) the owner of the sub_id2 request is used. When sub_id1 is present but resolves to nobody, a review case opens with the sub_id2 owner only as the suggested candidate (D58). Disagreeing owners, an erased or unknown customer, or nothing resolving also open a review case.",
               "kind": "workflow",
-              "status": "observed"
+              "status": "target"
             },
             {
               "id": "orders.order.approval-needs-commission",
@@ -3003,6 +3003,15 @@
       "status": "accepted",
       "sources": [
         ".context/decisions/2026-10-30-D57-own-label-files.md"
+      ]
+    },
+    {
+      "id": "d58-unresolved-sub-id1-review",
+      "decision": "When a report row carries a sub_id1 that resolves to no known, non-erased customer, the order is not credited to the sub_id2 request's owner automatically: a review case \"unattributed_sub_id1\" opens with that owner as the suggested candidate. When sub_id1 is empty (legacy links), the sub_id2 owner may still be used, as the live system does. A raw id that resolves to no known, non-erased customer is never credited, and the DEV guard applies to the sub_id2 owner as well.",
+      "rationale": "A present but unknown sub_id1 means the link's customer is not who the request says, or the data is damaged; crediting the request owner silently could pay the wrong person (INV-1). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the Sprint 4 code review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D58-unresolved-sub-id1-review.md"
       ]
     }
   ],

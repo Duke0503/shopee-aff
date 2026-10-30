@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Golden fixtures: money cases the money package must reproduce to the dong, and network report rows the status maps and report readers must reproduce.",
+  "description": "Golden fixtures: money cases the money package must reproduce to the dong, network report rows the status maps and report readers must reproduce, and attribution cases the orders module must reproduce.",
   "main": "./src/runner.ts",
   "types": "./src/runner.ts",
   "exports": {
     ".": "./src/runner.ts",
-    "./networks": "./src/network-fixtures.ts"
+    "./networks": "./src/network-fixtures.ts",
+    "./attribution": "./src/attribution-fixtures.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

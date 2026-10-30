@@ -49,14 +49,14 @@ development_status:
   1-11-network-catalog-and-status-maps-golden-tested-on-real-report: review
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-cutover-time-conversion-table-with-per-column-fixtures: backlog
-  2-2-import-customers-aliases-codes-and-bank-accounts-unchanged: backlog
+  epic-2: in-progress
+  2-1-cutover-time-conversion-table-with-per-column-fixtures: done
+  2-2-import-customers-aliases-codes-and-bank-accounts-unchanged: done
   2-3-import-orders-with-their-stored-amounts-and-paid-times: backlog
   2-4-import-payouts-receipts-and-campaign-awards-with-paid-parity: backlog
   2-5-import-link-requests-and-share-codes-and-seed-the-already-se: backlog
   2-6-order-transition-function-in-the-pure-domain: backlog
-  2-7-attribution-rule-resolves-the-owner-of-a-report-row: backlog
+  2-7-attribution-rule-resolves-the-owner-of-a-report-row: done
   2-8-report-sources-for-the-shadow-run-read-accesstrade-and-a-sho: backlog
   2-9-shadow-reconciliation-produces-a-per-order-parity-report-for: backlog
   epic-2-retrospective: optional

@@ -258,7 +258,7 @@ Commands that emit no event (nothing elsewhere can react): `resolve`, `resolve_a
 
 | Rule | Declared on | Status |
 |---|---|---|
-| Reconciliation attributes an order by sub_id1, then by customer alias, then by the owner of the sub_id2 request. Anything else goes to manual review. | Order | observed · exists in code |
+| Reconciliation attributes an order by sub_id1 resolved through customer aliases. When sub_id1 is empty (legacy links) the owner of the sub_id2 request is used. When sub_id1 is present but resolves to nobody, a review case opens with the sub_id2 owner only as the suggested candidate (D58: When a report row carries a sub_id1 that resolves to no known, non-erased customer, the order is not credited to the…). Disagreeing owners, an erased or unknown customer, or nothing resolving also open a review case. | Order | target · agreed goal |
 
 ## Integration & hotspots
 

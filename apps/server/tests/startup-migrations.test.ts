@@ -3,7 +3,7 @@
  * the rehearse command runs on a backup file without a config or a live ledger.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -21,14 +21,22 @@ describe("Story 1.7 at server start", () => {
   });
 
   it("AC3: with no pending migration the server starts and takes no backup", async () => {
-    expect(readMigrations(MIGRATIONS_DIR)).toEqual([]);
     const box = sandbox([`INTERNAL_TOKEN=${TOKEN}`, `PUBLIC_PORT=${randomPort()}`, `INTERNAL_PORT=${randomPort()}`]);
-    const server = startServer(box);
-    running.push(server);
-    await waitFor(server, "platform.server.started");
+    // The first start applies the server's migrations behind a backup.
+    const first = startServer(box);
+    running.push(first);
+    await waitFor(first, "platform.server.started");
+    expect(first.output()).toContain("platform.migration.applied");
+    first.child.kill("SIGTERM");
+    await new Promise((done) => first.child.once("exit", done));
+    const backups = readdirSync(join(box.dataDir, "backups"));
+    // The second start finds nothing pending: no new backup.
+    const second = startServer(box);
+    running.push(second);
+    await waitFor(second, "platform.server.started");
     expect(existsSync(join(box.dataDir, "ledger.sqlite"))).toBe(true);
-    expect(existsSync(join(box.dataDir, "backups"))).toBe(false);
-    expect(server.output()).not.toContain("platform.backup.written");
+    expect(readdirSync(join(box.dataDir, "backups"))).toEqual(backups);
+    expect(second.output()).not.toContain("platform.backup.written");
   }, 60_000);
 });
 
@@ -41,7 +49,7 @@ describe("Story 1.7 AC5: the rehearse command", () => {
     db.close();
     const before = readFileSync(backupFile);
     const out = execFileSync(process.execPath, ["--import", "tsx", join(SERVER_DIR, "src", "rehearse-migration.ts"), backupFile], { cwd: SERVER_DIR, encoding: "utf8" });
-    expect(JSON.parse(out.trim())).toEqual({ ok: true, applied: [] });
+    expect(JSON.parse(out.trim())).toEqual({ ok: true, applied: readMigrations(MIGRATIONS_DIR).map((m) => m.name) });
     expect(readFileSync(backupFile).equals(before)).toBe(true);
   }, 60_000);
 });

@@ -16,6 +16,7 @@ export {
 } from "./time/instant";
 export { campaignWindow, contains, parseStaffVnTime, vnDateRange, type InstantRange } from "./time/range";
 export { formatVnDate, formatVnDateTime } from "./time/format";
+export { parseLegacyTime, type LegacyTime, type NaiveZone } from "./time/legacy";
 export { LIKE_ESCAPE, matchesSearch, searchPattern, searchText, type SearchText } from "./text/search-text";
 export { sortKey, type SortKey } from "./text/sort-key";
 export {

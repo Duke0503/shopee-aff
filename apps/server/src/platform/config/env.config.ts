@@ -35,6 +35,14 @@ export interface ServerConfig {
   /** `<repository>/data/<env>` unless the env file sets an absolute DATA_DIR; holds the ledger and the lock file. */
   dataDir: string;
   logLevel: LogLevel;
+  /**
+   * HMAC key for bank account fingerprints (AD-17), as written in the env file. Not validated
+   * here, so a command that does not use it never fails over it; each command that does checks
+   * it (the cutover import: fingerprint_key_missing, fingerprint_key_too_short).
+   */
+  fingerprintKey: string | null;
+  /** The live production ledger; the cutover import refuses to run without it, and refuses to read or write it (AD-24). */
+  liveLedgerPath: string | null;
 }
 
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace"] as const;
@@ -62,6 +70,8 @@ function fileSchema(env: Environment) {
     INTERNAL_PORT: port.default(DEFAULT_PORTS[env].internal),
     DATA_DIR: z.string().refine(isAbsolute).optional(),
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
+    FINGERPRINT_KEY: z.string().optional(),
+    LIVE_LEDGER_PATH: z.string().optional(),
   });
 }
 
@@ -84,6 +94,8 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     internalToken: file.INTERNAL_TOKEN,
     dataDir: file.DATA_DIR ?? join(REPOSITORY_ROOT, "data", env),
     logLevel: file.LOG_LEVEL,
+    fingerprintKey: file.FINGERPRINT_KEY || null,
+    liveLedgerPath: file.LIVE_LEDGER_PATH || null,
   };
 }
 

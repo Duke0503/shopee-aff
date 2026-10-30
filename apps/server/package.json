@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "rehearse:migration": "tsx src/rehearse-migration.ts",
+    "cutover:import": "tsx src/cutover/run-import.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

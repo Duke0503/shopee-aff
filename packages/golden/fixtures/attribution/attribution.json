@@ -1,0 +1,420 @@
+{
+  "rule": "attribute",
+  "source": "src/cashback/shopee/reconciliation.py:60-80 (live: sub_id1 through find_customer_id and aliases, else the sub_id2 request owner); target rule AD-8, D5, D6, D7, D58, AD-25",
+  "directory": {
+    "customers": [
+      "CUSTA",
+      "CUSTB",
+      "HOUSE",
+      "DEVCUSTD",
+      "CUSTE"
+    ],
+    "guests": [
+      "HOUSE"
+    ],
+    "erased": [
+      "CUSTE"
+    ],
+    "aliases": {
+      "OLDZALOA": "CUSTA",
+      "DP00002": "CUSTA",
+      "OLDZALOB": "CUSTB"
+    },
+    "requests": {
+      "REQA1": "CUSTA",
+      "REQB1": "CUSTB",
+      "REQH1": "HOUSE",
+      "REQOLDA": "OLDZALOA",
+      "REQGONE": "GONE",
+      "REQE": "CUSTE",
+      "REQDEV": "DEVCUSTD"
+    }
+  },
+  "cases": [
+    {
+      "name": "sub_id1 is the customer id",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "sub_id1",
+        "guest": false
+      }
+    },
+    {
+      "name": "retired customer id resolves to the survivor through its alias",
+      "story": "2.7 AC1",
+      "input": {
+        "subIds": [
+          "OLDZALOA",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "sub_id1",
+        "guest": false
+      }
+    },
+    {
+      "name": "no sub_id1, sub_id2 names a link request of customer A",
+      "story": "2.7 AC2",
+      "input": {
+        "subIds": [
+          "",
+          "REQA1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "sub_id2",
+        "guest": false
+      }
+    },
+    {
+      "name": "sub_id1 and sub_id2 agree",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "REQA1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "both",
+        "guest": false
+      }
+    },
+    {
+      "name": "request owned by a merged id agrees with the survivor",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "REQOLDA",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "both",
+        "guest": false
+      }
+    },
+    {
+      "name": "sub_id1 resolves to A, sub_id2 request belongs to B: owner disagreement",
+      "story": "2.7 AC3",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "REQB1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "owner_disagreement",
+        "candidates": [
+          "CUSTA",
+          "CUSTB"
+        ]
+      }
+    },
+    {
+      "name": "unknown sub_id1 with a resolving sub_id2 is a review case suggesting the sub_id2 owner",
+      "story": "D58",
+      "input": {
+        "subIds": [
+          "C0003",
+          "REQB1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed_sub_id1",
+        "candidates": [
+          "CUSTB"
+        ]
+      }
+    },
+    {
+      "name": "neither sub_id resolves",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "NOBODY",
+          "NOREQ",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "no sub_ids at all",
+      "story": "2.7",
+      "input": {
+        "subIds": [],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "DEV sub_id1 in production is a review case even when sub_id2 resolves",
+      "story": "2.7 AC4",
+      "input": {
+        "subIds": [
+          "DEVCUSTD",
+          "REQA1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "dev_link_in_production",
+        "candidates": []
+      }
+    },
+    {
+      "name": "DEV sub_id1 in development is resolved like any id",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "DEVCUSTD",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "production": false
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "DEVCUSTD",
+        "source": "sub_id1",
+        "guest": false
+      }
+    },
+    {
+      "name": "guest link stays HOUSE with cashback 0",
+      "story": "2.7 AC5",
+      "input": {
+        "subIds": [
+          "HOUSE",
+          "REQH1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "HOUSE",
+        "source": "both",
+        "guest": true
+      }
+    },
+    {
+      "name": "a HOUSE request carrying a customer's sub_id1 is never moved to the customer",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "REQH1",
+          "",
+          "",
+          ""
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "owner_disagreement",
+        "candidates": [
+          "CUSTA",
+          "HOUSE"
+        ]
+      }
+    },
+    {
+      "name": "empty sub_id1 on a legacy link uses the sub_id2 owner",
+      "story": "D58",
+      "input": {
+        "subIds": [
+          "",
+          "REQB1"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTB",
+        "source": "sub_id2",
+        "guest": false
+      }
+    },
+    {
+      "name": "unknown sub_id1 and no sub_id2",
+      "story": "D58",
+      "input": {
+        "subIds": [
+          "C0003"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "a request owner that resolves to no customer is never credited",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "",
+          "REQGONE"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "a request owned by an erased customer is never credited",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "",
+          "REQE"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "an erased customer in sub_id1 is never credited",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTE"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "unattributed",
+        "candidates": []
+      }
+    },
+    {
+      "name": "sub_id1 resolves and the sub_id2 owner resolves to nobody: sub_id1 is credited",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "CUSTA",
+          "REQGONE"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "CUSTA",
+        "source": "sub_id1",
+        "guest": false
+      }
+    },
+    {
+      "name": "a DEV request owner in production is a review case",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "",
+          "REQDEV"
+        ],
+        "production": true
+      },
+      "expected": {
+        "kind": "review",
+        "reason": "dev_link_in_production",
+        "candidates": []
+      }
+    },
+    {
+      "name": "a DEV request owner in development is credited",
+      "story": "2.7",
+      "input": {
+        "subIds": [
+          "",
+          "REQDEV"
+        ],
+        "production": false
+      },
+      "expected": {
+        "kind": "customer",
+        "customerId": "DEVCUSTD",
+        "source": "sub_id2",
+        "guest": false
+      }
+    }
+  ]
+}

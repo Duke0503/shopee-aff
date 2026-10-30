@@ -25,6 +25,13 @@ describe("config (Story 1.5, AD-19)", () => {
     expect(parseConfig("prod", { INTERNAL_TOKEN: TOKEN }).publicPort).toBe(8080);
   });
 
+  it("Story 2.2 review item 10: FINGERPRINT_KEY and LIVE_LEDGER_PATH are read but left to the commands that need them", () => {
+    expect(parseConfig("dev", { INTERNAL_TOKEN: TOKEN })).toMatchObject({ fingerprintKey: null, liveLedgerPath: null });
+    // A short key does not stop the server: only the cutover import checks it (fingerprint_key_too_short).
+    expect(parseConfig("prod", { INTERNAL_TOKEN: TOKEN, FINGERPRINT_KEY: "short", LIVE_LEDGER_PATH: "relative.sqlite" })).toMatchObject({ fingerprintKey: "short", liveLedgerPath: "relative.sqlite" });
+    expect(parseConfig("dev", { INTERNAL_TOKEN: TOKEN, FINGERPRINT_KEY: "", LIVE_LEDGER_PATH: "" })).toMatchObject({ fingerprintKey: null, liveLedgerPath: null });
+  });
+
   it("review item 2: resolves the same data directory whatever the start directory", () => {
     const configModule = pathToFileURL(join(SERVER_DIR, "src", "platform", "config", "env.config.ts")).href;
     const script = `const m = await import(${JSON.stringify(configModule)}); console.log(m.parseConfig("dev", { INTERNAL_TOKEN: "${TOKEN}" }).dataDir);`;
