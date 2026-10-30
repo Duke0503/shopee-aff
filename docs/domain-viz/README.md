@@ -24,3 +24,11 @@ can answer.
 
 | Context | Type | Aggregates | Page |
 |---|---|---|---|
+| Customer Identity | `supporting` | 2 | [contexts/identity.md](contexts/identity.md) |
+| Link Issuing | `core` | 3 | [contexts/linking.md](contexts/linking.md) |
+| Order Tracking | `core` | 2 | [contexts/orders.md](contexts/orders.md) |
+| Cashback Payouts | `core` | 2 | [contexts/payouts.md](contexts/payouts.md) |
+| Campaigns | `supporting` | 2 | [contexts/campaigns.md](contexts/campaigns.md) |
+| Customer Conversation | `supporting` | 1 | [contexts/messaging.md](contexts/messaging.md) |
+| Deals | `generic` | 2 | [contexts/catalog.md](contexts/catalog.md) |
+| Operations | `generic` | 1 | [contexts/operations.md](contexts/operations.md) |

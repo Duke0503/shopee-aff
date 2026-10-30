@@ -35,7 +35,7 @@ next one reads it. Record every approved decision in `.context/decisions/` and i
 
 | Artifact | Location | Status |
 |---|---|---|
-| Domain model | [domain-model.json](domain-model.json) | Seed: D1 to D16, OQ1 to OQ6, no contexts yet |
+| Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.2.0: 8 contexts, D1 to D23 accepted, OQ1, OQ2, OQ5, OQ7, OQ8 open |
 | PRD | `_bmad-output/planning-artifacts/prds/` | Not started |
 | UX workspace | `_bmad-output/planning-artifacts/ux-designs/` | Not started |
 | Architecture spine | `_bmad-output/planning-artifacts/architecture/` | Not started |
