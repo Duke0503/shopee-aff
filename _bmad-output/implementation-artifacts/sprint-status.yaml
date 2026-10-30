@@ -1,0 +1,394 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 10-30-2026 12:33
+last_updated: 10-30-2026 12:33
+project: cashback
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-workspace-on-the-pinned-stack-with-required-checks-in-ci: backlog
+  1-2-money-package-computes-the-fr-13-split-with-golden-tests: backlog
+  1-3-time-module-stores-utc-instants-and-computes-vietnam-busines: backlog
+  1-4-server-walking-skeleton-answers-its-health-route-through-the: backlog
+  1-5-config-single-instance-lock-and-redacted-logs: backlog
+  1-6-ledger-database-with-the-synchronous-transaction-helper: backlog
+  1-7-migrations-run-only-after-a-checked-local-backup: backlog
+  1-8-status-registry-tested-against-status-flows-md: backlog
+  1-9-text-normalisation-builds-search-text-and-vietnamese-sort-ke: backlog
+  1-10-seven-module-skeleton-with-enforced-boundaries: backlog
+  1-11-network-catalog-and-status-maps-golden-tested-on-real-report: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-cutover-time-conversion-table-with-per-column-fixtures: backlog
+  2-2-import-customers-aliases-codes-and-bank-accounts-unchanged: backlog
+  2-3-import-orders-with-their-stored-amounts-and-paid-times: backlog
+  2-4-import-payouts-receipts-and-campaign-awards-with-paid-parity: backlog
+  2-5-import-link-requests-and-share-codes-and-seed-the-already-se: backlog
+  2-6-order-transition-function-in-the-pure-domain: backlog
+  2-7-attribution-rule-resolves-the-owner-of-a-report-row: backlog
+  2-8-report-sources-for-the-shadow-run-read-accesstrade-and-a-sho: backlog
+  2-9-shadow-reconciliation-produces-a-per-order-parity-report-for: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-in-process-job-scheduler-that-never-overlaps-a-run: backlog
+  3-2-audit-trail-and-owner-alert-ports-written-by-every-command: backlog
+  3-3-apply-one-report-row-to-one-order-idempotently: backlog
+  3-4-cashback-stored-at-approval-with-withheld-settlement-periods: backlog
+  3-5-review-cases-opened-by-the-reconciliation-rules: backlog
+  3-6-clawback-entries-for-a-cancel-after-payout: backlog
+  3-7-hourly-reconciliation-over-the-last-7-days-with-run-records: backlog
+  3-8-nightly-sweep-reads-every-day-that-still-holds-an-open-order: backlog
+  3-9-review-case-apply-and-dismiss-commands: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-one-payable-definition-returns-balances-for-any-customer: backlog
+  4-2-staff-sign-in-on-the-admin-host-behind-cloudflare-access: backlog
+  4-3-list-contract-on-the-server-with-definelist: backlog
+  4-4-admin-desk-shell-on-the-design-tokens: backlog
+  4-5-datalist-renders-every-list-with-url-state: backlog
+  4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action: backlog
+  4-7-payout-claim-and-preview-with-vietqr: backlog
+  4-8-confirm-a-payout-once-idempotently: backlog
+  4-9-proof-image-upload-and-the-facts-only-receipt-page: backlog
+  4-10-void-a-mistaken-payout: backlog
+  4-11-netting-only-payout-and-clawback-write-off: backlog
+  4-12-payout-history-lists-every-payout-including-voided-ones: backlog
+  4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac: backlog
+  4-14-customers-list-and-one-customer-s-page: backlog
+  4-15-review-cases-screen-with-apply-and-dismiss: backlog
+  4-16-erase-a-customer-s-personal-data: backlog
+  4-17-overview-shows-what-needs-the-operator-now: backlog
+  4-18-settings-mark-a-shopee-settlement-period-withheld-or-not: backlog
+  4-19-customer-merge-by-admin-command-with-preview-and-apply: backlog
+  4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-link-request-to-share-link-through-the-fake-bridge-tracer-bu: backlog
+  5-2-link-reuse-only-for-the-same-customer-and-one-guest-link-per: backlog
+  5-3-browser-bridge-extension-takes-one-job-at-a-time-over-the-in: backlog
+  5-4-returned-links-are-checked-before-they-are-attached: backlog
+  5-5-captcha-page-errors-and-a-lost-login-pause-or-fail-requests: backlog
+  5-6-product-lookup-reads-page-1-and-shows-the-estimated-cashback: backlog
+  5-7-tiktok-shop-links-through-accesstrade-and-a-polite-lazada-re: backlog
+  5-8-share-page-opens-a-real-browser-and-records-clicks: backlog
+  5-9-shopee-report-pages-through-the-bridge-feed-reconciliation: backlog
+  5-10-basic-link-requests-list-for-staff: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace: backlog
+  6-2-registration-from-zalo-assigns-a-customer-code: backlog
+  6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: backlog
+  6-4-notification-outbox-delivered-by-pull-and-acknowledgement: backlog
+  6-5-link-delivered-once-by-chat-or-by-notification: backlog
+  6-6-order-clawback-and-payout-notifications-told-once: backlog
+  6-7-chat-commands-for-balance-orders-code-bank-and-help: backlog
+  6-8-matkhau-issues-a-new-password-and-ends-other-sessions: backlog
+  6-9-bank-account-saved-or-changed-from-the-zalo-private-chat: backlog
+  6-10-quiet-first-run-after-cutover-reports-would-be-sends: backlog
+  6-11-zalo-account-loss-keeps-customers-served-and-alerts-the-owne: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-customer-website-shell-with-the-zalo-down-banner: backlog
+  7-2-customer-sign-in-with-code-and-password: backlog
+  7-3-my-money-shows-payable-waiting-and-paid-amounts: backlog
+  7-4-my-orders-list-with-states-in-words: backlog
+  7-5-account-page-manages-the-bank-account-and-password: backlog
+  7-6-home-link-converter-with-a-customer-code-or-as-a-guest: backlog
+  7-7-basic-guide-page-with-the-money-rules-stated-correctly: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-dev-environment-separated-from-production-in-every-resource: backlog
+  8-2-daily-and-off-site-encrypted-backups-that-check-their-own-re: backlog
+  8-3-telegram-owner-alerts-and-one-health-model: backlog
+  8-4-external-heartbeat-alerts-when-the-mac-goes-silent: backlog
+  8-5-production-host-services-on-the-mac-behind-the-tunnel: backlog
+  8-6-restore-drill-procedure: backlog
+  8-7-cutover-rehearsal-on-a-copy-of-the-live-database: backlog
+  8-8-go-live-runbook-with-the-72-hour-no-payout-window: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-business-metrics-screen: backlog
+  9-2-fraud-flags-beyond-the-shared-bank-account: backlog
+  9-3-network-settlement-screen: backlog
+  9-4-campaign-creation-screen-and-slot-mechanics: backlog
+  9-5-merge-proposal-screen: backlog
+  9-6-staff-management-screen: backlog
+  9-7-audit-trail-screen: backlog
+  9-8-guide-page-redesign: backlog
+  9-9-product-and-link-request-lists-beyond-the-basic-list: backlog
+  epic-9-retrospective: optional
+
+# Sprint plan (custom key, kept by sprint_plan.py): one developer assisted by Claude,
+# ~1 week per sprint, capacity 5 points (S=1, M=2, L=3). Blocked-by edges checked.
+sprint_plan:
+  - sprint: 1
+    goal: "Walking skeleton: workspace, CI, money and time golden tests, server health route"
+    points: 5
+    stories:
+      - 1-1-workspace-on-the-pinned-stack-with-required-checks-in-ci
+      - 1-2-money-package-computes-the-fr-13-split-with-golden-tests
+      - 1-3-time-module-stores-utc-instants-and-computes-vietnam-busines
+      - 1-4-server-walking-skeleton-answers-its-health-route-through-the
+  - sprint: 2
+    goal: "Server platform: config, lock, ledger database, status registry, text"
+    points: 5
+    stories:
+      - 1-5-config-single-instance-lock-and-redacted-logs
+      - 1-6-ledger-database-with-the-synchronous-transaction-helper
+      - 1-8-status-registry-tested-against-status-flows-md
+      - 1-9-text-normalisation-builds-search-text-and-vietnamese-sort-ke
+  - sprint: 3
+    goal: "Backup-first migrations, module boundaries, network status maps"
+    points: 5
+    stories:
+      - 1-7-migrations-run-only-after-a-checked-local-backup
+      - 1-10-seven-module-skeleton-with-enforced-boundaries
+      - 1-11-network-catalog-and-status-maps-golden-tested-on-real-report
+  - sprint: 4
+    goal: "Cutover import starts: time table, customers, attribution rule"
+    points: 5
+    stories:
+      - 2-1-cutover-time-conversion-table-with-per-column-fixtures
+      - 2-2-import-customers-aliases-codes-and-bank-accounts-unchanged
+      - 2-7-attribution-rule-resolves-the-owner-of-a-report-row
+  - sprint: 5
+    goal: "Import orders, links and seeded notifications; job scheduler"
+    points: 5
+    stories:
+      - 2-3-import-orders-with-their-stored-amounts-and-paid-times
+      - 2-5-import-link-requests-and-share-codes-and-seed-the-already-se
+      - 3-1-in-process-job-scheduler-that-never-overlaps-a-run
+  - sprint: 6
+    goal: "Import payouts with paid parity; pure transition; audit and alert ports"
+    points: 5
+    stories:
+      - 2-4-import-payouts-receipts-and-campaign-awards-with-paid-parity
+      - 2-6-order-transition-function-in-the-pure-domain
+      - 3-2-audit-trail-and-owner-alert-ports-written-by-every-command
+  - sprint: 7
+    goal: "Shadow reconciliation parity report for owner sign-off"
+    points: 4
+    stories:
+      - 2-8-report-sources-for-the-shadow-run-read-accesstrade-and-a-sho
+      - 2-9-shadow-reconciliation-produces-a-per-order-parity-report-for
+  - sprint: 8
+    goal: "Apply report rows idempotently; cashback stored at approval"
+    points: 4
+    stories:
+      - 3-3-apply-one-report-row-to-one-order-idempotently
+      - 3-4-cashback-stored-at-approval-with-withheld-settlement-periods
+  - sprint: 9
+    goal: "Review cases and clawbacks"
+    points: 4
+    stories:
+      - 3-5-review-cases-opened-by-the-reconciliation-rules
+      - 3-6-clawback-entries-for-a-cancel-after-payout
+  - sprint: 10
+    goal: "Hourly run and nightly sweep"
+    points: 4
+    stories:
+      - 3-7-hourly-reconciliation-over-the-last-7-days-with-run-records
+      - 3-8-nightly-sweep-reads-every-day-that-still-holds-an-open-order
+  - sprint: 11
+    goal: "Review apply commands; one payable definition"
+    points: 4
+    stories:
+      - 3-9-review-case-apply-and-dismiss-commands
+      - 4-1-one-payable-definition-returns-balances-for-any-customer
+  - sprint: 12
+    goal: "Staff sign-in behind Access; server list contract"
+    points: 4
+    stories:
+      - 4-2-staff-sign-in-on-the-admin-host-behind-cloudflare-access
+      - 4-3-list-contract-on-the-server-with-definelist
+  - sprint: 13
+    goal: "Admin shell and DataList"
+    points: 4
+    stories:
+      - 4-4-admin-desk-shell-on-the-design-tokens
+      - 4-5-datalist-renders-every-list-with-url-state
+  - sprint: 14
+    goal: "Payouts list and payout claim with VietQR"
+    points: 4
+    stories:
+      - 4-6-payouts-list-shows-who-can-be-paid-and-who-needs-action
+      - 4-7-payout-claim-and-preview-with-vietqr
+  - sprint: 15
+    goal: "Idempotent confirm, netting-only, staff seed and campaign command"
+    points: 4
+    stories:
+      - 4-8-confirm-a-payout-once-idempotently
+      - 4-11-netting-only-payout-and-clawback-write-off
+      - 4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command
+  - sprint: 16
+    goal: "Receipt page and payout void"
+    points: 4
+    stories:
+      - 4-9-proof-image-upload-and-the-facts-only-receipt-page
+      - 4-10-void-a-mistaken-payout
+  - sprint: 17
+    goal: "Payout history, orders list, withheld settings"
+    points: 4
+    stories:
+      - 4-12-payout-history-lists-every-payout-including-voided-ones
+      - 4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac
+      - 4-18-settings-mark-a-shopee-settlement-period-withheld-or-not
+  - sprint: 18
+    goal: "Customers, customer page, review queue screen"
+    points: 4
+    stories:
+      - 4-14-customers-list-and-one-customer-s-page
+      - 4-15-review-cases-screen-with-apply-and-dismiss
+  - sprint: 19
+    goal: "Erase, Overview, merge command"
+    points: 5
+    stories:
+      - 4-16-erase-a-customer-s-personal-data
+      - 4-17-overview-shows-what-needs-the-operator-now
+      - 4-19-customer-merge-by-admin-command-with-preview-and-apply
+  - sprint: 20
+    goal: "Dev environment; link tracer bullet with the fake bridge"
+    points: 4
+    stories:
+      - 8-1-dev-environment-separated-from-production-in-every-resource
+      - 5-1-link-request-to-share-link-through-the-fake-bridge-tracer-bu
+  - sprint: 21
+    goal: "Link reuse policy; browser bridge extension"
+    points: 4
+    stories:
+      - 5-2-link-reuse-only-for-the-same-customer-and-one-guest-link-per
+      - 5-3-browser-bridge-extension-takes-one-job-at-a-time-over-the-in
+  - sprint: 22
+    goal: "Returned-link checks, failure handling, AccessTrade links"
+    points: 4
+    stories:
+      - 5-4-returned-links-are-checked-before-they-are-attached
+      - 5-5-captcha-page-errors-and-a-lost-login-pause-or-fail-requests
+      - 5-7-tiktok-shop-links-through-accesstrade-and-a-polite-lazada-re
+  - sprint: 23
+    goal: "Product lookup estimate; share page"
+    points: 4
+    stories:
+      - 5-6-product-lookup-reads-page-1-and-shows-the-estimated-cashback
+      - 5-8-share-page-opens-a-real-browser-and-records-clicks
+  - sprint: 24
+    goal: "Shopee report via bridge; link requests list; assistant process"
+    points: 5
+    stories:
+      - 5-9-shopee-report-pages-through-the-bridge-feed-reconciliation
+      - 5-10-basic-link-requests-list-for-staff
+      - 6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace
+  - sprint: 25
+    goal: "Zalo registration; link reply in chat"
+    points: 4
+    stories:
+      - 6-2-registration-from-zalo-assigns-a-customer-code
+      - 6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply
+  - sprint: 26
+    goal: "Notification outbox; delivered once; quiet first run"
+    points: 4
+    stories:
+      - 6-4-notification-outbox-delivered-by-pull-and-acknowledgement
+      - 6-5-link-delivered-once-by-chat-or-by-notification
+      - 6-10-quiet-first-run-after-cutover-reports-would-be-sends
+  - sprint: 27
+    goal: "Order and payout notifications; chat commands"
+    points: 4
+    stories:
+      - 6-6-order-clawback-and-payout-notifications-told-once
+      - 6-7-chat-commands-for-balance-orders-code-bank-and-help
+  - sprint: 28
+    goal: "/matkhau, bank from chat, Zalo account loss"
+    points: 4
+    stories:
+      - 6-8-matkhau-issues-a-new-password-and-ends-other-sessions
+      - 6-9-bank-account-saved-or-changed-from-the-zalo-private-chat
+      - 6-11-zalo-account-loss-keeps-customers-served-and-alerts-the-owne
+  - sprint: 29
+    goal: "Customer website shell and sign-in"
+    points: 4
+    stories:
+      - 7-1-customer-website-shell-with-the-zalo-down-banner
+      - 7-2-customer-sign-in-with-code-and-password
+  - sprint: 30
+    goal: "My money balance and my orders"
+    points: 4
+    stories:
+      - 7-3-my-money-shows-payable-waiting-and-paid-amounts
+      - 7-4-my-orders-list-with-states-in-words
+  - sprint: 31
+    goal: "Account page, home link converter, basic guide"
+    points: 5
+    stories:
+      - 7-5-account-page-manages-the-bank-account-and-password
+      - 7-6-home-link-converter-with-a-customer-code-or-as-a-guest
+      - 7-7-basic-guide-page-with-the-money-rules-stated-correctly
+  - sprint: 32
+    goal: "Daily off-site backups; Telegram alerts and health model"
+    points: 4
+    stories:
+      - 8-2-daily-and-off-site-encrypted-backups-that-check-their-own-re
+      - 8-3-telegram-owner-alerts-and-one-health-model
+  - sprint: 33
+    goal: "Heartbeat, production host services, restore drill"
+    points: 4
+    stories:
+      - 8-4-external-heartbeat-alerts-when-the-mac-goes-silent
+      - 8-5-production-host-services-on-the-mac-behind-the-tunnel
+      - 8-6-restore-drill-procedure
+  - sprint: 34
+    goal: "Cutover rehearsal and go-live with the 72-hour window"
+    points: 4
+    stories:
+      - 8-7-cutover-rehearsal-on-a-copy-of-the-live-database
+      - 8-8-go-live-runbook-with-the-72-hour-no-payout-window
+  - sprint: after-cutover
+    goal: "Epic 9, detailed after go-live"
+    stories:
+      - 9-1-business-metrics-screen
+      - 9-2-fraud-flags-beyond-the-shared-bank-account
+      - 9-3-network-settlement-screen
+      - 9-4-campaign-creation-screen-and-slot-mechanics
+      - 9-5-merge-proposal-screen
+      - 9-6-staff-management-screen
+      - 9-7-audit-trail-screen
+      - 9-8-guide-page-redesign
+      - 9-9-product-and-link-request-lists-beyond-the-basic-list

@@ -40,6 +40,8 @@ next one reads it. Record every approved decision in `.context/decisions/` and i
 | UX workspace | [ux-cashback-2026-10-30/](../_bmad-output/planning-artifacts/ux-designs/ux-cashback-2026-10-30/) (`DESIGN.md`, `EXPERIENCE.md`, `.memlog.md`, `mockups/`) | Final: both spines, List Contract for FR-37/FR-38, 3 key-screen mocks |
 | Architecture spine | [architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md](../_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md) (C4 diagrams in `diagrams/`, STRIDE in `stride.md`, independent review and its resolution in `review-independent.md`, `.memlog.md`) | Final, revised after the independent review: AD-1 to AD-29 (AD-28 v1 cutover scope and build order, AD-29 external liveness); OQ1 (SQLite) and OQ2 (TypeScript monorepo, Fastify) resolved; code rules in [rules/code.md](rules/code.md) |
 | Security model | [../SECURITY_MODEL.md](../SECURITY_MODEL.md) | Draft: INV-1 to INV-13, all planned enforcement; accepted risks from D37; owner review pending |
+| Epics and stories | [epics-cashback-2026-10-30/epics.md](../_bmad-output/planning-artifacts/epics/epics-cashback-2026-10-30/epics.md) | Final (headless run, choices logged in the file): 9 epics, 85 v1 stories (S 25, M 60, 145 points) plus 9 sketched "After cutover" stories; follows the spine build order (AD-28) with adjustments A1 to A4 |
+| Sprint plan | [sprint-status.yaml](../_bmad-output/implementation-artifacts/sprint-status.yaml) (`sprint_plan` key) | 34 one-week sprints for one developer at 5 points (S=1, M=2); Sprint 1 is the walking skeleton with money and time golden tests; all stories `backlog` |
 
 Update this table when an artifact is created, so every skill can find the current one.
 
