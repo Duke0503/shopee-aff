@@ -4,7 +4,9 @@
  * every share code with its request, read back from the new ledger. The live side is written in
  * the form the import keeps: a guest order's cashback is 0 (D5), with the guest decided by the
  * import's own rule (the mapped role HOUSE, the owner read through aliases), and a blank link is
- * none. Rows the report already names (COMPARISON_SKIPS) are not compared again.
+ * none. Payouts are compared by their live id with amount, owner and bill token, and campaign
+ * awards by their live id with campaign, order, owner, amount and state (Story 2.4). Rows the
+ * report already names (COMPARISON_SKIPS) are not compared again.
  */
 import type BetterSqlite3 from "better-sqlite3";
 
@@ -48,6 +50,25 @@ export function compareOrdersAndLinks(source: BetterSqlite3.Database, target: Be
       "request_id",
       ["code"],
       skippedKeys(notes, "share_codes"),
+    ),
+  };
+}
+
+export function comparePayoutsAndAwards(source: BetterSqlite3.Database, target: BetterSqlite3.Database, notes: readonly ReportNote[]): Record<string, TableComparison> {
+  return {
+    payouts: compareRows(
+      all(source, "SELECT id AS payout_id, customer_id, amount AS transfer_amount, NULLIF(TRIM(COALESCE(bill_token, '')), '') AS receipt_token FROM payment_transfers ORDER BY id"),
+      all(target, "SELECT payout_id, customer_id, transfer_amount, receipt_token FROM payouts ORDER BY payout_id"),
+      "payout_id",
+      ["customer_id", "transfer_amount", "receipt_token"],
+      skippedKeys(notes, "payouts"),
+    ),
+    campaign_awards: compareRows(
+      all(source, "SELECT id AS award_id, campaign_id, customer_id, order_id, amount, UPPER(status) AS status FROM campaign_awards ORDER BY id"),
+      all(target, "SELECT award_id, campaign_id, customer_id, order_id, amount, status FROM campaign_awards ORDER BY award_id"),
+      "award_id",
+      ["campaign_id", "customer_id", "order_id", "amount", "status"],
+      skippedKeys(notes, "campaign_awards"),
     ),
   };
 }

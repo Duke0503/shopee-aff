@@ -222,6 +222,6 @@ describe("Story 2.3: the rest of each order and the report", () => {
 
   it("logs counts and the parity result, never an amount per customer", () => {
     const line = JSON.parse(run.lines.find((l) => l.includes("cutover.import.finished")) ?? "{}") as Record<string, unknown>;
-    expect(line).toMatchObject({ orders: 10, linkRequests: 8, shareCodes: 3, seededNotifications: 10, paidParity: "pass" });
+    expect(line).toMatchObject({ orders: 10, linkRequests: 8, shareCodes: 3, seededNotifications: 16, payouts: 3, campaignAwards: 4, paidParity: "pass" });
   });
 });

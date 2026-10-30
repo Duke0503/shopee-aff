@@ -12,7 +12,7 @@ import { percentToBps } from "../src/cutover/product-snapshot";
 import { findShareCode, isShareCode } from "../src/modules/linking/index";
 import { dedupKey, dedupKeyParts, enqueue, outboxFor } from "../src/modules/messaging/index";
 import { openLedger } from "../src/platform/db/ledger";
-import { buildLiveCopy, importOnce, rows, TEST_CLOCK } from "./helpers/live-fixture";
+import { auditBy, buildLiveCopy, importOnce, rows, TEST_CLOCK } from "./helpers/live-fixture";
 
 type Row = Record<string, string | number | null>;
 
@@ -51,7 +51,8 @@ describe("Story 2.5 acceptance criteria", () => {
   });
 
   it("AC2: every (entity, event) the live system told has an outbox row with that key marked sent; enqueueing it again is a no-op", () => {
-    const seeded = rows(run.targetPath, "SELECT dedup_key, customer_id, message_key, due_at, sent_at, origin FROM outbox ORDER BY dedup_key") as Row[];
+    // Payout and campaign award keys are Story 2.4's (tests/cutover-payouts.test.ts).
+    const seeded = rows(run.targetPath, "SELECT dedup_key, customer_id, message_key, due_at, sent_at, origin FROM outbox WHERE dedup_key LIKE 'order:%' OR dedup_key LIKE 'link_request:%' ORDER BY dedup_key") as Row[];
     expect(seeded.map((r) => r["dedup_key"])).toEqual([
       "link_request:26081700007:delivered",
       "link_request:26091100001:delivered",
@@ -67,15 +68,15 @@ describe("Story 2.5 acceptance criteria", () => {
     for (const row of seeded) expect(row).toMatchObject({ due_at: null, origin: "CUTOVER_SEED" });
     expect(seeded.find((r) => r["dedup_key"] === "link_request:26091100001:delivered")).toMatchObject({ sent_at: "2026-09-11T06:00:20.000Z", message_key: "link_ready", customer_id: "1000000000000000001" });
     expect(seeded.find((r) => r["dedup_key"] === "order:260912BBBB0002:recorded")).toMatchObject({ sent_at: TEST_CLOCK.now(), message_key: "order_recorded", customer_id: "1000000000000000002" });
-    expect(run.report.notifications).toMatchObject({ seeded: 10, seededByEvent: { "order:paid": 3, "order:recorded": 1, "order:rejected": 1, "order:approved": 1, "link_request:delivered": 3, "link_request:failed": 1 } });
+    expect(run.report.notifications).toMatchObject({ seeded: 16, seededByEvent: { "order:paid": 3, "order:recorded": 1, "order:rejected": 1, "order:approved": 1, "link_request:delivered": 3, "link_request:failed": 1 } });
 
     withLedger((ledger) => {
-      const results = ledger.tx((db) => [enqueue(db, LATER, message("order:260911AAAA0001:paid")), outboxFor(db, LATER).enqueue(message("link_request:26091100001:delivered"))]);
+      const results = ledger.tx((db) => [enqueue(db, LATER, message("order:260911AAAA0001:paid"), auditBy(db, LATER)), outboxFor(db, LATER, auditBy(db, LATER)).enqueue(message("link_request:26091100001:delivered"))]);
       expect(results).toEqual(["duplicate", "duplicate"]);
       expect(ledger.sqlite.prepare("SELECT count(*) AS n FROM outbox WHERE due_at IS NOT NULL").get()).toEqual({ n: 0 });
       // A new event is enqueued and due; the same key again is a no-op.
-      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002")))).toBe("enqueued");
-      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002")))).toBe("duplicate");
+      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002"), auditBy(db, LATER)))).toBe("enqueued");
+      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002"), auditBy(db, LATER)))).toBe("duplicate");
       expect(ledger.sqlite.prepare("SELECT dedup_key, due_at, sent_at, origin, params FROM outbox WHERE due_at IS NOT NULL").all()).toEqual([
         { dedup_key: "order:260912BBBB0002:approved", due_at: "2026-10-31T07:00:00.000Z", sent_at: null, origin: "EVENT", params: '{"cashback":6228}' },
       ]);
@@ -97,20 +98,20 @@ describe("Story 2.5 acceptance criteria", () => {
       orders: ["order_customer_missing", "order_customer_via_alias", "amount_not_whole_dong"],
       link_requests: ["link_customer_missing", "link_customer_via_alias"],
       share_codes: ["link_customer_missing", "share_code_invalid"],
+      payouts: ["payout_customer_missing", "payout_customer_via_alias", "payout_to_guest", "payout_amount_not_whole_dong"],
+      campaign_awards: ["duplicate_live_award", "award_campaign_missing", "award_customer_missing", "award_customer_via_alias", "award_to_guest", "award_order_missing", "unknown_award_status", "award_amount_not_whole_dong"],
     });
   });
 
   it("AC4: unsent live notifications are listed (none imported as due) and the report counts both", () => {
-    expect(run.report.notifications).toMatchObject({
-      importedAsDue: 0,
-      listed: [
+    expect(run.report.notifications?.importedAsDue).toBe(0);
+    expect(run.report.notifications?.listed.filter((k) => k.startsWith("order:") || k.startsWith("link_request:"))).toEqual([
         "link_request:26081600006:failed",
         "link_request:26091200002:delivered",
         "order:260912BBBB0002:approved",
         "order:260913CCCC0003:recorded",
         "order:260919IIII0009:paid",
-      ],
-    });
+    ]);
     expect(rows(run.targetPath, "SELECT count(*) AS n FROM outbox WHERE origin = 'EVENT'")).toEqual([{ n: 0 }]);
   });
 
@@ -119,8 +120,8 @@ describe("Story 2.5 acceptance criteria", () => {
     expect(rows(run.targetPath, "SELECT count(*) AS n FROM outbox WHERE customer_id = 'HOUSE' OR dedup_key LIKE '%26091400004%' OR dedup_key LIKE '%260914DDDD0004%'")).toEqual([{ n: 0 }]);
     expect(run.report.notifications?.listed.filter((k) => k.includes("26091400004") || k.includes("260914DDDD0004"))).toEqual([]);
     withLedger((ledger) => {
-      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260914DDDD0004:approved", "HOUSE")))).toBe("refused_guest");
-      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260918HHHH0008:recorded", "ghost")))).toBe("refused_unknown_customer");
+      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260914DDDD0004:approved", "HOUSE"), auditBy(db, LATER)))).toBe("refused_guest");
+      expect(ledger.tx((db) => enqueue(db, LATER, message("order:260918HHHH0008:recorded", "ghost"), auditBy(db, LATER)))).toBe("refused_unknown_customer");
       expect(ledger.sqlite.prepare("SELECT count(*) AS n FROM outbox WHERE origin = 'EVENT'").get()).toEqual({ n: 0 });
     });
   });
@@ -190,7 +191,7 @@ describe("Story 2.5: link states, owners and the product snapshot (D56)", () => 
     expect(dedupKey("order", "x%3A1", "paid")).not.toBe(dedupKey("order", "x:1", "paid"));
     expect(() => dedupKey("order", "", "paid")).toThrow(RangeError);
     expect(() => dedupKey("Order", "1", "paid")).toThrow(RangeError);
-    withLedger((ledger) => expect(() => ledger.tx((db) => enqueue(db, LATER, message("not a key")))).toThrow(RangeError));
+    withLedger((ledger) => expect(() => ledger.tx((db) => enqueue(db, LATER, message("not a key"), auditBy(db, LATER)))).toThrow(RangeError));
   });
 
   it("an order id with a space or a colon gets an encoded key and never stops the import", () => {

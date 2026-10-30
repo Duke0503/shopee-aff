@@ -53,9 +53,9 @@ development_status:
   2-1-cutover-time-conversion-table-with-per-column-fixtures: done
   2-2-import-customers-aliases-codes-and-bank-accounts-unchanged: done
   2-3-import-orders-with-their-stored-amounts-and-paid-times: done
-  2-4-import-payouts-receipts-and-campaign-awards-with-paid-parity: backlog
+  2-4-import-payouts-receipts-and-campaign-awards-with-paid-parity: done
   2-5-import-link-requests-and-share-codes-and-seed-the-already-se: done
-  2-6-order-transition-function-in-the-pure-domain: backlog
+  2-6-order-transition-function-in-the-pure-domain: done
   2-7-attribution-rule-resolves-the-owner-of-a-report-row: done
   2-8-report-sources-for-the-shadow-run-read-accesstrade-and-a-sho: backlog
   2-9-shadow-reconciliation-produces-a-per-order-parity-report-for: backlog
@@ -63,7 +63,7 @@ development_status:
 
   epic-3: in-progress
   3-1-in-process-job-scheduler-that-never-overlaps-a-run: done
-  3-2-audit-trail-and-owner-alert-ports-written-by-every-command: backlog
+  3-2-audit-trail-and-owner-alert-ports-written-by-every-command: done
   3-3-apply-one-report-row-to-one-order-idempotently: backlog
   3-4-cashback-stored-at-approval-with-withheld-settlement-periods: backlog
   3-5-review-cases-opened-by-the-reconciliation-rules: backlog

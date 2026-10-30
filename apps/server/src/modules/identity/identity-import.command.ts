@@ -3,12 +3,14 @@
  * counter and bank accounts exactly as given, into empty tables, inside the caller's `tx`.
  * It derives only what identity owns: `search_text` and `sort_key` from the name, the bank
  * fingerprint, and a counter that sits above every code already seen. Rows are written in
- * key order so two imports of one source give identical ledgers.
+ * key order so two imports of one source give identical ledgers. The import is one command: it
+ * writes one audit entry with its counts, in the same transaction (AD-17).
  */
 import { searchText, sortKey } from "@cashback/core";
 
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
+import type { CommandAudit } from "../../platform/ports/audit.port";
 import { bankFingerprint } from "./bank-fingerprint";
 import { counterAbove } from "./domain/customer-code";
 import { bankAccounts, customerAliases, customerCodeCounter, customers, type CustomerRole } from "./schema";
@@ -75,7 +77,7 @@ function refuseUnlessEmpty(db: LedgerDb): void {
 }
 
 /** Imports identity into empty tables; call inside `tx`. The holder name is stored upper case (FR-10). */
-export function importIdentity(db: LedgerDb, data: IdentityImport, fingerprintKey: string): IdentityImportResult {
+export function importIdentity(db: LedgerDb, data: IdentityImport, fingerprintKey: string, by: CommandAudit): IdentityImportResult {
   refuseUnlessEmpty(db);
   for (const c of sortByKey(data.customers, (r) => r.customerId)) {
     db.insert(customers)
@@ -91,5 +93,7 @@ export function importIdentity(db: LedgerDb, data: IdentityImport, fingerprintKe
   const codes = [...data.customers.map((c) => c.customerCode ?? ""), ...data.retiredAliases];
   const counterLast = counterAbove(data.counterLast, codes);
   db.insert(customerCodeCounter).values({ id: 1, last: counterLast }).run();
-  return { customers: data.customers.length, aliases: data.aliases.length, bankAccounts: data.bankAccounts.length, counterLast };
+  const result = { customers: data.customers.length, aliases: data.aliases.length, bankAccounts: data.bankAccounts.length, counterLast };
+  by.audit.record({ actor: by.actor, event: "identity.customers.imported", entityId: by.actor.id, payload: result });
+  return result;
 }

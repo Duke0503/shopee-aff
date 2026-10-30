@@ -1,0 +1,36 @@
+{
+  "rule": "clawbackAmount",
+  "source": "status-flows.md section 2, D30, D35, D42, D55",
+  "cases": [
+    {
+      "name": "cancel after payout: stored cashback only",
+      "input": { "kind": "cancel", "storedCashback": 9263, "paidBonus": 0, "alreadyClawedBack": 0 },
+      "expected": 9263
+    },
+    {
+      "name": "cancel after payout: the paid campaign bonus is taken back too (D35)",
+      "input": { "kind": "cancel", "storedCashback": 9263, "paidBonus": 20000, "alreadyClawedBack": 0 },
+      "expected": 29263
+    },
+    {
+      "name": "the same cancel seen again takes nothing more",
+      "input": { "kind": "cancel", "storedCashback": 9263, "paidBonus": 20000, "alreadyClawedBack": 29263 },
+      "expected": 0
+    },
+    {
+      "name": "cancel after a partial clawback takes the rest",
+      "input": { "kind": "cancel", "storedCashback": 7000, "paidBonus": 0, "alreadyClawedBack": 3000 },
+      "expected": 4000
+    },
+    {
+      "name": "commission drop after payout: the cashback above what the new commission earns (D55)",
+      "input": { "kind": "partial", "storedCashback": 7000, "newCashback": 4000, "alreadyClawedBack": 0 },
+      "expected": 3000
+    },
+    {
+      "name": "commission drop that the stored cashback still covers takes nothing",
+      "input": { "kind": "partial", "storedCashback": 7000, "newCashback": 7000, "alreadyClawedBack": 0 },
+      "expected": 0
+    }
+  ]
+}

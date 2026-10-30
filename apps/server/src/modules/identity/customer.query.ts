@@ -58,3 +58,8 @@ export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | n
   if (!row || row.status === "MERGED" || row.status === "ERASED") return null;
   return { customerId: row.customerId, role: row.role, status: row.status };
 }
+
+/** A customer's code by its permanent id, or null (staff, HOUSE and unknown ids have none). */
+export function customerCodeOf(db: LedgerDb, customerId: string): string | null {
+  return db.select({ code: customers.customerCode }).from(customers).where(eq(customers.customerId, customerId)).get()?.code ?? null;
+}

@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { fromNetworkUnits, shopeeCommission, splitCommission, type AffiliateNetwork } from "@cashback/money";
+import { clawbackAmount, fromNetworkUnits, partialClawbackAmount, shopeeCommission, splitCommission, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount";
   source?: string;
   cases: GoldenCase[];
 }
@@ -54,5 +54,9 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
       if (typeof value !== "number" && typeof value !== "string") throw new Error("value must be a number or string");
       return fromNetworkUnits(value, num(input, "scale"));
     }
+    case "clawbackAmount":
+      return input["kind"] === "partial"
+        ? partialClawbackAmount({ storedCashback: num(input, "storedCashback"), newCashback: num(input, "newCashback"), alreadyClawedBack: num(input, "alreadyClawedBack") })
+        : clawbackAmount({ storedCashback: num(input, "storedCashback"), paidBonus: num(input, "paidBonus"), alreadyClawedBack: num(input, "alreadyClawedBack") });
   }
 }

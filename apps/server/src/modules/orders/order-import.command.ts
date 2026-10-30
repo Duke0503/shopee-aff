@@ -5,12 +5,14 @@
  * guest order's, which is 0 (D5) and decided by the caller. Each order gets exactly one item
  * carrying its own amounts and one history row by the actor `cutover`; reconciliation stores
  * the real items later without touching the stored amounts. Rows are written in key order so
- * two imports of one source give identical ledgers.
+ * two imports of one source give identical ledgers. The import writes one audit entry with its
+ * counts in the same transaction (AD-17).
  */
 import { vnDateOf, type Instant, type OrderStatus } from "@cashback/core";
 
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
+import type { CommandAudit } from "../../platform/ports/audit.port";
 import { orderItems, orders, orderStatusHistory, settlementPeriods, type OrderNetwork } from "./schema";
 
 export const CUTOVER_ACTOR = "cutover";
@@ -76,7 +78,7 @@ function periodsOf(rows: readonly ImportedOrder[]): { network: OrderNetwork; per
 }
 
 /** Imports orders into empty tables; call inside `tx`. */
-export function importOrders(db: LedgerDb, data: OrdersImport): OrdersImportResult {
+export function importOrders(db: LedgerDb, data: OrdersImport, by: CommandAudit): OrdersImportResult {
   refuseUnlessEmpty(db);
   const sorted = sortByKey(data.orders, (o) => o.orderId);
   for (const o of sorted) {
@@ -100,5 +102,7 @@ export function importOrders(db: LedgerDb, data: OrdersImport): OrdersImportResu
   }
   const periods = periodsOf(sorted);
   for (const p of periods) db.insert(settlementPeriods).values({ ...p, withheld: true, origin: "CUTOVER" }).run();
-  return { orders: sorted.length, items: sorted.length, history: sorted.length, settlementPeriods: periods.length };
+  const result = { orders: sorted.length, items: sorted.length, history: sorted.length, settlementPeriods: periods.length };
+  by.audit.record({ actor: by.actor, event: "orders.orders.imported", entityId: by.actor.id, payload: result });
+  return result;
 }

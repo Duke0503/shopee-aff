@@ -11,9 +11,10 @@
  * The new ledger is built in `<target>.partial` and renamed into place only when everything
  * succeeded; on any failure the partial files are deleted, so a retry starts clean. From the
  * moment the source is opened, `<target>.import-report.json` is written whatever the outcome,
- * with the reason on failure. The run imports identity (Story 2.2), orders (Story 2.3), and link
+ * with the reason on failure. The run imports identity (Story 2.2), orders (Story 2.3), link
  * requests, share codes and products with the keys of notifications the live system already
- * sent (Story 2.5), all in one transaction; Story 2.4 adds payouts and campaigns to it.
+ * sent (Story 2.5), and campaigns, awards and payouts with their paid parity (Story 2.4), all in
+ * one transaction, each module's import writing its audit entry (Story 3.2).
  */
 import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";

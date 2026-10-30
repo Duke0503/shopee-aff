@@ -1,4 +1,4 @@
--- Representative live rows for the cutover import tests (Stories 2.1, 2.2, 2.3, 2.5), applied on top of
+-- Representative live rows for the cutover import tests (Stories 2.1 to 2.5), applied on top of
 -- live-schema.sql. Every person, id, phone and bank number here is fake.
 -- Time values use the three forms the live writers produce (see apps/server/src/cutover/time-table.ts):
 --   ISO +07:00 from repository.py now(), ISO +00:00 from accounts.py _stamp(), naive UTC from datetime('now').
@@ -79,3 +79,28 @@ INSERT INTO state_history (order_id, from_status, to_status, changed_at, note) V
   ('260911AAAA0001', NULL, 'awaiting_approval', '2026-09-11T13:15:00+07:00', 'recorded by Shopee'),
   ('260911AAAA0001', 'awaiting_approval', 'approved', '2026-10-01T10:00:00+07:00', 'approved commission 8745 VND -> cashback 6232 VND'),
   ('260911AAAA0001', 'approved', 'paid', '2026-10-05T10:00:00+07:00', 'transferred');
+
+-- Campaigns and awards (Story 2.4). Windows are staff-typed Vietnam time from a datetime-local
+-- input (CampaignsView.tsx:510). Edge cases: a campaign staff stopped; a paid award told "held";
+-- a held award on the FROZEN order (suspended, D55); a lost slot told "void"; a confirmed award
+-- under the merged customer's old Zalo id never told; an award of a gone customer; a guest award.
+INSERT INTO campaigns (campaign_id, name, starts_at, ends_at, slots, bonus_vnd, min_order_value, platforms, excluded_customers, per_customer, status, created_at) VALUES
+  ('trungthu2026', 'Trung thu 2026', '2026-09-15T00:00', '2026-10-01T00:00', 20, 20000, 0, 'shopee,shopeefood,tiktok', '', 0, 'active', '2026-09-14T10:00:00+07:00'),
+  ('flash2026', 'Flash sale', '2026-10-20 00:00', '2026-10-27 00:00', 5, 10000, 100000, 'shopee', 'nv01', 1, 'stopped', '2026-10-19T10:00:00+07:00');
+
+INSERT INTO campaign_awards (id, campaign_id, customer_id, order_id, amount, status, created_at, confirmed_at, paid_at, voided_at, notified_status) VALUES
+  (1, 'trungthu2026', '1000000000000000002', '260919IIII0009', 20000, 'paid', '2026-09-19T09:05:00+07:00', '2026-10-03T09:05:00+07:00', '2026-10-07 02:00:00', NULL, 'held'),
+  (2, 'trungthu2026', '1000000000000000001', '260916FFFF0006', 20000, 'held', '2026-09-16T09:05:00+07:00', NULL, NULL, NULL, 'held'),
+  (3, 'trungthu2026', '1000000000000000009', '261001JJJJ0010', 20000, 'void', '2026-10-01T09:05:00+07:00', NULL, NULL, '2026-10-02T09:00:00+07:00', 'void'),
+  (4, 'trungthu2026', '9000000000000000002', '260912BBBB0002', 20000, 'confirmed', '2026-09-12T10:35:00+07:00', '2026-10-02T09:05:00+07:00', NULL, NULL, NULL),
+  (5, 'trungthu2026', 'ghost', '260918HHHH0008', 20000, 'held', '2026-09-18T09:05:00+07:00', NULL, NULL, NULL, NULL),
+  (6, 'trungthu2026', 'HOUSE', '260914DDDD0004', 20000, 'held', '2026-09-14T08:15:00+07:00', NULL, NULL, NULL, NULL);
+
+-- Payment transfers (Story 2.4), as the two live admin screens wrote them (dashboard.py:2565,
+-- 2878): created_at naive UTC, bill tokens of 32 URL-safe characters. Edge cases: a transfer
+-- naming an order that does not exist; one under the merged customer's old Zalo id paying an
+-- order with its campaign bonus, never told; one from the confirm screen that named no order.
+INSERT INTO payment_transfers (id, customer_id, amount, transfer_code, note, proof_image, order_ids, notify_mode, notified_at, target_group, created_at, created_by, bill_token) VALUES
+  (1, '1000000000000000001', 6232, 'DP00001', 'Chuyển khoản tháng 10', 'https://drive.google.com/file/d/fakeproof1/view', '260911AAAA0001,NOPE00000001', 'both', '2026-10-05 03:00:05', 'main', '2026-10-05 03:00:05', 'admin', 'Rk3vQ9xZtYw2mN8pL4sH6dF1gJ0aBcDe'),
+  (2, '9000000000000000002', 30000, NULL, NULL, NULL, '260919IIII0009', NULL, NULL, NULL, '2026-10-07 02:00:00', 'nv01', 'Zq8wE7rT6yU5iO4p-3sD2fG1hJ0kL9m_'),
+  (3, '1000000000000000009', 7000, 'DP00010', NULL, NULL, '', 'none', '2026-10-08 02:00:00', 'test', '2026-10-08 02:00:00', 'admin', 'Mn0bV9cX8zL7kJ6hG5fD4sA3qW2eR1tY');

@@ -7,12 +7,15 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fixedClock } from "@cashback/core";
+import { fixedClock, type Clock } from "@cashback/core";
 import Database from "better-sqlite3";
 
 import type { ImportReport } from "../../src/cutover/import-report";
 import { runCutoverImport, type CutoverImportOptions } from "../../src/cutover/import-run";
+import { commandAudit } from "../../src/modules/operations/index";
+import type { LedgerDb } from "../../src/platform/db/ledger";
 import { createLogger } from "../../src/platform/log/logger";
+import type { Actor, CommandAudit } from "../../src/platform/ports/audit.port";
 
 const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url));
 export const LIVE_SCHEMA_SQL = readFileSync(join(FIXTURES, "live-schema.sql"), "utf8");
@@ -41,6 +44,12 @@ export function buildLiveCopy(options: { rows?: boolean; extraSql?: string } = {
 export const LIVE_LEDGER_PATH = join(tmpdir(), "cashback-live-production", "ledger.sqlite");
 
 export const TEST_CLOCK = fixedClock("2026-10-30T07:00:00.000Z");
+
+/** The staff actor of commands tests run by hand. */
+export const TEST_ACTOR: Actor = { kind: "staff", id: "admin" };
+
+/** A command's actor and audit port, bound to the test's transaction handle. */
+export const auditBy = (db: LedgerDb, clock: Clock = TEST_CLOCK): CommandAudit => commandAudit(db, clock, TEST_ACTOR);
 
 export interface ImportRun {
   report: ImportReport;

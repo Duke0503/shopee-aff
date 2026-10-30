@@ -1,0 +1,158 @@
+{
+  "rule": "transition",
+  "source": "docs/operations/status-flows.md section 1; AD-7; D4, D5, D30, D31, D35, D38, D39, D41, D55. Cashback amounts are the FR-13 split (packages/golden/fixtures/money/split-commission.json).",
+  "cases": [
+    {
+      "name": "awaiting order approved with commission above 0 stores its cashback",
+      "story": "2.6 AC1",
+      "order": { "status": "AWAITING_APPROVAL", "paidAt": null, "approvedCommission": null, "cashback": null, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260911AAAA0001", "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "commissionParts": [5565, 3180] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "APPROVED",
+        "steps": [["AWAITING_APPROVAL", "APPROVED"]],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "store_cashback", "approvedCommission": 8745, "cashback": 6228 },
+          { "kind": "awards", "to": "CONFIRMED" }
+        ]
+      }
+    },
+    {
+      "name": "order status CANCELLED wins over an APPROVED item",
+      "story": "2.6 AC1",
+      "order": { "status": "AWAITING_APPROVAL", "paidAt": null, "approvedCommission": null, "cashback": null, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260911AAAA0001", "orderStatus": "CANCELLED", "items": [{ "status": "APPROVED", "commissionParts": [8745] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "REJECTED",
+        "steps": [["AWAITING_APPROVAL", "REJECTED"]],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "record_rejection", "reason": "order_cancelled" },
+          { "kind": "awards", "to": "VOID" }
+        ]
+      }
+    },
+    {
+      "name": "Shopee UNPAID (mapped to AWAITING) keeps the order awaiting",
+      "story": "D38",
+      "order": { "status": "AWAITING_APPROVAL", "paidAt": null, "approvedCommission": null, "cashback": null, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260913CCCC0003", "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "commissionParts": [5000] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": { "next": "AWAITING_APPROVAL", "steps": [], "effects": [{ "kind": "store_observation", "applied": true }] }
+    },
+    {
+      "name": "cancel after payout keeps PAID and claws back the cashback and the paid bonus",
+      "story": "2.6 AC2",
+      "order": { "status": "PAID", "paidAt": "2026-10-05T03:00:00.000Z", "approvedCommission": 8745, "cashback": 6232, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260911AAAA0001", "orderStatus": "CANCELLED", "items": [{ "status": "CANCELLED", "commissionParts": [0] }] } },
+      "context": { "network": "shopee", "withheld": true, "paidBonus": 20000, "alreadyClawedBack": 0 },
+      "expected": {
+        "next": "PAID",
+        "steps": [],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "clawback", "amount": 26232, "partial": false },
+          { "kind": "open_review_case", "reason": "cancel_after_payout" }
+        ]
+      }
+    },
+    {
+      "name": "cancel on an approved order under an OPEN payout claim is stored and applied after the claim",
+      "story": "2.6 AC3",
+      "order": { "status": "APPROVED", "paidAt": null, "approvedCommission": 20000, "cashback": 14243, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260912BBBB0002", "orderStatus": "CANCELLED", "items": [{ "status": "CANCELLED", "commissionParts": [0] }] } },
+      "context": { "network": "shopee", "withheld": true, "coveredByOpenClaim": true },
+      "expected": { "next": "APPROVED", "steps": [], "effects": [{ "kind": "store_observation", "applied": false, "reason": "open_payout_claim" }] }
+    },
+    {
+      "name": "commission drop on an approved unpaid order freezes it for review and suspends its awards",
+      "story": "2.6 AC4",
+      "order": { "status": "APPROVED", "paidAt": null, "approvedCommission": 20000, "cashback": 14243, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "260912BBBB0002", "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "commissionParts": [12000] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "FROZEN",
+        "steps": [["APPROVED", "FROZEN"]],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "open_review_case", "reason": "commission_drop" },
+          { "kind": "awards", "to": "SUSPENDED" }
+        ]
+      }
+    },
+    {
+      "name": "commission drop after payout claws back the difference only",
+      "story": "2.6 AC4",
+      "order": { "status": "PAID", "paidAt": "2026-10-08T02:00:00.000Z", "approvedCommission": 20000, "cashback": 14243, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "261001JJJJ0010", "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "commissionParts": [12000] }] } },
+      "context": { "network": "shopee", "withheld": true, "alreadyClawedBack": 0 },
+      "expected": {
+        "next": "PAID",
+        "steps": [],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "clawback", "amount": 5697, "partial": true },
+          { "kind": "open_review_case", "reason": "commission_drop_after_payout" }
+        ]
+      }
+    },
+    {
+      "name": "void of a payout whose order the report cancelled returns it REVERSED and voids its bonus",
+      "story": "D41",
+      "order": { "status": "PAID", "paidAt": "2026-10-05T03:00:00.000Z", "approvedCommission": 8745, "cashback": 6232, "guest": false },
+      "observation": { "kind": "payout_voided", "latest": { "orderId": "260911AAAA0001", "orderStatus": "CANCELLED", "items": [{ "status": "CANCELLED", "commissionParts": [0] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "REVERSED",
+        "steps": [["PAID", "REVERSED"]],
+        "effects": [{ "kind": "clear_paid_at" }, { "kind": "close_clawback" }, { "kind": "awards", "to": "VOID" }]
+      }
+    },
+    {
+      "name": "void of a payout whose order was never seen cancelled returns it APPROVED and its bonus CONFIRMED",
+      "story": "D41",
+      "order": { "status": "PAID", "paidAt": "2026-10-05T03:00:00.000Z", "approvedCommission": 8745, "cashback": 6232, "guest": false },
+      "observation": { "kind": "payout_voided", "latest": null },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "APPROVED",
+        "steps": [["PAID", "APPROVED"]],
+        "effects": [{ "kind": "clear_paid_at" }, { "kind": "close_clawback" }, { "kind": "awards", "to": "CONFIRMED" }]
+      }
+    },
+    {
+      "name": "a guest (HOUSE) order is approved with cashback 0",
+      "story": "D5",
+      "order": { "status": "AWAITING_APPROVAL", "paidAt": null, "approvedCommission": null, "cashback": null, "guest": true },
+      "observation": { "kind": "report", "row": { "orderId": "260914DDDD0004", "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "commissionParts": [12000] }] } },
+      "context": { "network": "shopee", "withheld": true },
+      "expected": {
+        "next": "APPROVED",
+        "steps": [["AWAITING_APPROVAL", "APPROVED"]],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "store_cashback", "approvedCommission": 12000, "cashback": 0 },
+          { "kind": "awards", "to": "CONFIRMED" }
+        ]
+      }
+    },
+    {
+      "name": "AccessTrade order approved: always withheld",
+      "story": "D20",
+      "order": { "status": "AWAITING_APPROVAL", "paidAt": null, "approvedCommission": null, "cashback": null, "guest": false },
+      "observation": { "kind": "report", "row": { "orderId": "TT0000000000000007", "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "commissionParts": [15000] }] } },
+      "context": { "network": "accesstrade", "withheld": false },
+      "expected": {
+        "next": "APPROVED",
+        "steps": [["AWAITING_APPROVAL", "APPROVED"]],
+        "effects": [
+          { "kind": "store_observation", "applied": true },
+          { "kind": "store_cashback", "approvedCommission": 15000, "cashback": 10800 },
+          { "kind": "awards", "to": "CONFIRMED" }
+        ]
+      }
+    }
+  ]
+}

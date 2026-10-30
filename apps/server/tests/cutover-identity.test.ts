@@ -15,7 +15,7 @@ import { CutoverRefusedError } from "../src/cutover/live-time";
 import { issueCustomerCode } from "../src/modules/identity/index";
 import { openLedger } from "../src/platform/db/ledger";
 import { createLogger } from "../src/platform/log/logger";
-import { buildLiveCopy, FINGERPRINT_KEY, importOnce, rows, tempDir, TEST_CLOCK } from "./helpers/live-fixture";
+import { auditBy, buildLiveCopy, FINGERPRINT_KEY, importOnce, rows, tempDir, TEST_CLOCK } from "./helpers/live-fixture";
 
 const IDENTITY_TABLES = ["customers", "customer_aliases", "customer_code_counter", "bank_accounts"] as const;
 const silent = { warn: () => undefined };
@@ -66,8 +66,8 @@ describe("Story 2.2 acceptance criteria", () => {
     const { targetPath } = importOnce(source);
     const ledger = openLedger(targetPath);
     try {
-      expect(ledger.tx((db) => issueCustomerCode(db, silent))).toBe("DP00413");
-      expect(ledger.tx((db) => issueCustomerCode(db, silent))).toBe("DP00414");
+      expect(ledger.tx((db) => issueCustomerCode(db, silent, auditBy(db)))).toBe("DP00413");
+      expect(ledger.tx((db) => issueCustomerCode(db, silent, auditBy(db)))).toBe("DP00414");
       expect(() => ledger.sqlite.exec("UPDATE customer_code_counter SET last = 1")).toThrow("never goes down");
       expect(() => ledger.sqlite.exec("DELETE FROM customer_code_counter")).toThrow("never deleted");
       const insert = (id: string, code: string) => ledger.sqlite.prepare("INSERT INTO customers (customer_id, customer_code, role, status) VALUES (?, ?, 'USER', 'ACTIVE')").run(id, code);

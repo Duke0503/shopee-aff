@@ -8,6 +8,7 @@ import type BetterSqlite3 from "better-sqlite3";
 import { CUSTOMER_ROLES, lastFour, type CustomerRole, type IdentityImport, type ImportedAlias, type ImportedBankAccount, type ImportedCustomer, type ImportedCustomerStatus } from "../modules/identity/index";
 import type { ImportReport } from "./import-report";
 import { convertLiveTime } from "./live-time";
+import { blank } from "./live-values";
 
 interface LiveCustomer {
   customer_id: string;
@@ -37,7 +38,8 @@ interface LiveAlias {
 }
 
 const STATUSES: Record<string, ImportedCustomerStatus> = { active: "ACTIVE", disabled: "DISABLED" };
-const blank = (value: string | null | undefined): string | null => (value === null || value === undefined || value.trim() === "" ? null : value);
+/** Identity keeps live text as it is; codes and Zalo ids are normalised on their own. */
+const kept = (value: string | null | undefined): string | null => blank(value, { trim: false });
 
 /**
  * The live guest account's id (repository.py:554; is_house at 642-645 also accepts role
@@ -56,10 +58,10 @@ function mapRole(row: LiveCustomer, report: ImportReport): CustomerRole {
 
 /** Codes trimmed and upper case, Zalo ids trimmed; every change is recorded (values only for codes). */
 function normalised(row: LiveCustomer, report: ImportReport): { code: string | null; zalo: string | null } {
-  const rawCode = blank(row.customer_code);
+  const rawCode = kept(row.customer_code);
   const code = rawCode === null ? null : rawCode.trim().toUpperCase();
   if (rawCode !== null && code !== rawCode) report.normalised.push({ table: "customers", key: row.customer_id, column: "customer_code", from: rawCode, to: code ?? "" });
-  const rawZalo = blank(row.zalo_user_id);
+  const rawZalo = kept(row.zalo_user_id);
   const zalo = rawZalo === null ? null : rawZalo.trim();
   if (rawZalo !== null && zalo !== rawZalo) report.normalised.push({ table: "customers", key: row.customer_id, column: "zalo_user_id" });
   return { code, zalo };
@@ -95,9 +97,9 @@ function customerOf(row: LiveCustomer, report: ImportReport): ImportedCustomer {
     role: mapRole(row, report),
     status: mapStatus(row, report),
     zaloUserId: zalo,
-    privateChatId: blank(row.private_chat_id),
-    displayName: blank(row.display_name),
-    passwordHash: blank(row.password_hash),
+    privateChatId: kept(row.private_chat_id),
+    displayName: kept(row.display_name),
+    passwordHash: kept(row.password_hash),
     passwordSetAt: time("password_set_at", row.password_set_at),
     failedSignIns: row.failed_logins ?? 0,
     lockedUntil: time("locked_until", row.locked_until),
@@ -107,21 +109,21 @@ function customerOf(row: LiveCustomer, report: ImportReport): ImportedCustomer {
 }
 
 function bankAccountOf(row: LiveCustomer, report: ImportReport): ImportedBankAccount | null {
-  const number = blank(row.bank_account);
+  const number = kept(row.bank_account);
   if (number === null) {
     // A bank or holder without a number is not an account: nothing to pay to, listed for the owner.
-    if (blank(row.bank_name) !== null || blank(row.account_holder) !== null) {
+    if (kept(row.bank_name) !== null || kept(row.account_holder) !== null) {
       report.notes.push({ kind: "bank_account_incomplete", table: "customers", key: row.customer_id, detail: "no account number" });
     }
     return null;
   }
   const four = lastFour(number);
-  if (blank(row.bank_name) === null || blank(row.account_holder) === null) {
+  if (kept(row.bank_name) === null || kept(row.account_holder) === null) {
     report.notes.push({ kind: "bank_account_incomplete", table: "customers", key: row.customer_id, detail: `...${four}` });
   }
   const consentAt = convertLiveTime(row.consent_at, { table: "customers", column: "consent_at", key: row.customer_id }, report).instant;
   if (consentAt === null) report.notes.push({ kind: "bank_consent_missing", table: "customers", key: row.customer_id, detail: `...${four}` });
-  return { customerId: row.customer_id, bankName: blank(row.bank_name), accountNumber: number, holderName: blank(row.account_holder), consentAt };
+  return { customerId: row.customer_id, bankName: kept(row.bank_name), accountNumber: number, holderName: kept(row.account_holder), consentAt };
 }
 
 /** Reads every live alias once: the ones whose customer exists are imported, all count for the counter. */

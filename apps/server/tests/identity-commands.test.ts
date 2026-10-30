@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { issueCustomerCode, resolveCustomer } from "../src/modules/identity/index";
 import { openLedger, type Ledger } from "../src/platform/db/ledger";
 import { MIGRATIONS_DIR, readMigrations, runMigrations } from "../src/platform/db/migrations";
-import { tempDir, TEST_CLOCK } from "./helpers/live-fixture";
+import { auditBy, tempDir, TEST_CLOCK } from "./helpers/live-fixture";
 
 function freshLedger(seed: string): Ledger {
   const ledger = openLedger(join(tempDir("cashback-identity-"), "ledger.sqlite"));
@@ -75,7 +75,7 @@ describe("issueCustomerCode (review item 6)", () => {
     const ledger = freshLedger(seed);
     const warnings: unknown[] = [];
     const logger = { warn: (fields: unknown) => void warnings.push(fields) };
-    return { ledger, warnings, issue: () => ledger.tx((db) => issueCustomerCode(db, logger)) };
+    return { ledger, warnings, issue: () => ledger.tx((db) => issueCustomerCode(db, logger, auditBy(db))) };
   }
 
   it("issues the next free code without a warning", () => {

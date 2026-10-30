@@ -24,6 +24,20 @@ export {
   type ReviewReason,
 } from "./domain/attribution";
 export {
+  transition,
+  TransitionError,
+  type AwardMove,
+  type Effect,
+  type Observation,
+  type ReviewCaseReason,
+  type ReviewContext,
+  type Step,
+  type TransitionContext,
+  type TransitionErrorCode,
+  type TransitionOrder,
+  type TransitionResult,
+} from "./domain/transition";
+export {
   CUTOVER_ACTOR,
   importOrders,
   OrdersImportError,

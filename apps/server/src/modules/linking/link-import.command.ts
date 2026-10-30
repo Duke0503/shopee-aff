@@ -3,11 +3,13 @@
  * their product snapshot (D56), and share codes, written exactly as given into empty tables
  * inside the caller's `tx`. Request ids and share codes pass through unchanged, so every old
  * `/s/<code>` link still opens its own customer's affiliate link. Rows are written in key order
- * so two imports of one source give identical ledgers.
+ * so two imports of one source give identical ledgers. The import writes one audit entry with its
+ * counts in the same transaction (AD-17).
  */
 
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
+import type { CommandAudit } from "../../platform/ports/audit.port";
 import { linkRequests, productOffers, shareCodes, type LinkRequestRow, type ProductOfferRow } from "./schema";
 
 export type ImportedProductOffer = Omit<ProductOfferRow, "origin">;
@@ -48,7 +50,7 @@ function refuseUnlessEmpty(db: LedgerDb): void {
 }
 
 /** Imports links into empty tables; call inside `tx`. */
-export function importLinks(db: LedgerDb, data: LinksImport): LinksImportResult {
+export function importLinks(db: LedgerDb, data: LinksImport, by: CommandAudit): LinksImportResult {
   refuseUnlessEmpty(db);
   for (const p of sortByKey(data.productOffers, (r) => r.productOfferId)) db.insert(productOffers).values({ ...p, origin: "CUTOVER" }).run();
   for (const r of sortByKey(data.linkRequests, (r) => r.requestId)) db.insert(linkRequests).values({ ...r, origin: "CUTOVER" }).run();
@@ -56,5 +58,7 @@ export function importLinks(db: LedgerDb, data: LinksImport): LinksImportResult 
     if (!isShareCode(s.code)) throw new LinksImportError(`not a share code: ${s.code}`);
     db.insert(shareCodes).values(s).run();
   }
-  return { productOffers: data.productOffers.length, linkRequests: data.linkRequests.length, shareCodes: data.shareCodes.length };
+  const result = { productOffers: data.productOffers.length, linkRequests: data.linkRequests.length, shareCodes: data.shareCodes.length };
+  by.audit.record({ actor: by.actor, event: "linking.link_requests.imported", entityId: by.actor.id, payload: result });
+  return result;
 }

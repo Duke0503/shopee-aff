@@ -8,8 +8,9 @@
  * event owed is the one of the order's imported status, so a live order forced to PAID owes
  * `paid`. Ids are percent-encoded in keys (encodeDedupKeyId); an id that cannot make a key is
  * noted, never thrown out of the import. A
- * guest (HOUSE) is never told anything (D5), so no key is seeded or listed for one. Payouts and
- * campaign awards are imported, and their keys seeded, with Story 2.4.
+ * guest (HOUSE) is never told anything (D5), so no key is seeded or listed for one. The keys of
+ * payouts and campaign awards come from payout-source.ts and campaign-source.ts (Story 2.4) and
+ * join these through `withMoreNotifications`.
  */
 import type { Instant, OrderStatus } from "@cashback/core";
 
@@ -96,15 +97,25 @@ function linkNotifications(rows: readonly LiveLinkRequest[], imported: Imported,
   }
 }
 
-export function readLiveNotifications(live: { orders: readonly LiveOrder[]; linkRequests: readonly LiveLinkRequest[] }, imported: Imported, report: ImportReport): LiveNotifications {
-  const out: Out = { seeds: [], listed: [], report };
-  orderNotifications(live.orders, imported, out);
-  linkNotifications(live.linkRequests, imported, out);
+function sectionOf(seeds: readonly SeededNotification[], listed: readonly string[]): NotificationsSection {
   const seededByEvent: Record<string, number> = {};
-  for (const seed of out.seeds) {
+  for (const seed of seeds) {
     const [entity, , event] = seed.dedupKey.split(":");
     const id = `${entity}:${event}`;
     seededByEvent[id] = (seededByEvent[id] ?? 0) + 1;
   }
-  return { seeds: out.seeds, section: { seeded: out.seeds.length, seededByEvent, importedAsDue: 0, listed: out.listed.sort() } };
+  return { seeded: seeds.length, seededByEvent, importedAsDue: 0, listed: [...listed].sort() };
+}
+
+export function readLiveNotifications(live: { orders: readonly LiveOrder[]; linkRequests: readonly LiveLinkRequest[] }, imported: Imported, report: ImportReport): LiveNotifications {
+  const out: Out = { seeds: [], listed: [], report };
+  orderNotifications(live.orders, imported, out);
+  linkNotifications(live.linkRequests, imported, out);
+  return { seeds: out.seeds, section: sectionOf(out.seeds, out.listed) };
+}
+
+/** Adds the told and owed events of payouts and campaign awards (Story 2.4) to those of orders and links. */
+export function withMoreNotifications(base: LiveNotifications, more: readonly { seeds: readonly SeededNotification[]; listed: readonly string[] }[]): LiveNotifications {
+  const seeds = [...base.seeds, ...more.flatMap((m) => m.seeds)];
+  return { seeds, section: sectionOf(seeds, [...base.section.listed, ...more.flatMap((m) => m.listed)]) };
 }

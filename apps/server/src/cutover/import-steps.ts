@@ -2,25 +2,34 @@
  * The steps of the cutover import between opening the copy and closing the new ledger: read
  * everything from the live copy, write it in one transaction, then fill the report from what was
  * written and from both databases. The run (import-run.ts) owns the refusals and the files.
+ * Every module import is a command by the system actor `cutover` and writes its audit entry in
+ * the same transaction (AD-17).
  */
 import type { Clock } from "@cashback/core";
 import type BetterSqlite3 from "better-sqlite3";
 
+import { importCampaigns, type CampaignsImportResult } from "../modules/campaigns/index";
 import { customerCodeNumber, formatCustomerCode, importIdentity, lastFour, type IdentityImport, type IdentityImportResult } from "../modules/identity/index";
 import { importLinks, type LinksImportResult } from "../modules/linking/index";
 import { seedSentNotifications } from "../modules/messaging/index";
+import { commandAudit } from "../modules/operations/index";
 import { importOrders, type ImportedOrder, type OrdersImportResult } from "../modules/orders/index";
+import { importPayouts, type PayoutsImportResult } from "../modules/payouts/index";
 import type { Ledger } from "../platform/db/ledger";
+import { CUTOVER_SYSTEM_ACTOR } from "../platform/ports/audit.port";
+import { readLiveCampaigns, type LiveCampaigns } from "./campaign-source";
 import { contextOf, type CutoverContext } from "./cutover-context";
 import { compareIdentity } from "./identity-compare";
 import { readLiveIdentity } from "./identity-source";
 import type { ImportReport } from "./import-report";
-import { compareOrdersAndLinks } from "./ledger-compare";
+import { compareOrdersAndLinks, comparePayoutsAndAwards } from "./ledger-compare";
 import { readLiveLinkRows, readLiveLinks, type LiveLinks } from "./link-source";
 import { CutoverRefusedError } from "./live-time";
-import { readLiveNotifications, type LiveNotifications } from "./notification-source";
+import { readLiveNotifications, withMoreNotifications, type LiveNotifications } from "./notification-source";
 import { cashbackDifferences, countBy, paidParity, paidStatusConflicts } from "./order-checks";
 import { readLiveOrderRows, readLiveOrders } from "./order-source";
+import { fullPaidParity } from "./paid-parity";
+import { readLivePayouts, type LivePayouts } from "./payout-source";
 
 /** Everything read from the live copy, ready to write. */
 export interface LiveData {
@@ -28,6 +37,8 @@ export interface LiveData {
   context: CutoverContext;
   orders: ImportedOrder[];
   links: LiveLinks;
+  campaigns: LiveCampaigns;
+  payouts: LivePayouts;
   notifications: LiveNotifications;
 }
 
@@ -35,6 +46,8 @@ export interface Written {
   identity: IdentityImportResult;
   links: LinksImportResult;
   orders: OrdersImportResult;
+  campaigns: CampaignsImportResult;
+  payouts: PayoutsImportResult;
   seeded: number;
 }
 
@@ -55,19 +68,27 @@ export function readLive(source: BetterSqlite3.Database, report: ImportReport): 
     linkRequests: new Map(links.links.linkRequests.map((r) => [r.requestId, r])),
     houseIds: context.houseIds,
   };
-  const notifications = readLiveNotifications({ orders: liveOrders, linkRequests: liveLinks }, imported, report);
-  return { identity, context, orders, links, notifications };
+  const campaigns = readLiveCampaigns(source, context, imported.orders, report);
+  const bankAccounts = new Map(identity.bankAccounts.map((b) => [b.customerId, b.accountNumber]));
+  const payouts = readLivePayouts(source, { context, orders, awards: campaigns.awards, bankAccounts }, report);
+  const base = readLiveNotifications({ orders: liveOrders, linkRequests: liveLinks }, imported, report);
+  return { identity, context, orders, links, campaigns, payouts, notifications: withMoreNotifications(base, [payouts, campaigns]) };
 }
 
 /** Writes every imported row in one `tx`: one import is one command. */
 export function writeLive(ledger: Ledger, live: LiveData, fingerprintKey: string, clock: Clock): Written {
   const importedAt = clock.now();
-  return ledger.tx((db) => ({
-    identity: importIdentity(db, live.identity, fingerprintKey),
-    links: importLinks(db, live.links.links),
-    orders: importOrders(db, { orders: live.orders, importedAt }),
-    seeded: seedSentNotifications(db, live.notifications.seeds, importedAt),
-  }));
+  return ledger.tx((db) => {
+    const by = commandAudit(db, clock, CUTOVER_SYSTEM_ACTOR);
+    return {
+      identity: importIdentity(db, live.identity, fingerprintKey, by),
+      links: importLinks(db, live.links.links, by),
+      orders: importOrders(db, { orders: live.orders, importedAt }, by),
+      campaigns: importCampaigns(db, { campaigns: live.campaigns.campaigns, awards: live.campaigns.awards }, by),
+      payouts: importPayouts(db, { payouts: live.payouts.payouts, items: live.payouts.items }, by),
+      seeded: seedSentNotifications(db, live.notifications.seeds, importedAt, by),
+    };
+  });
 }
 
 function highestAliasCode(identity: IdentityImport): string | null {
@@ -77,7 +98,12 @@ function highestAliasCode(identity: IdentityImport): string | null {
 
 export function fillReport(report: ImportReport, live: LiveData, written: Written, source: BetterSqlite3.Database, target: BetterSqlite3.Database): void {
   const { identity, links } = live;
-  report.comparison = { ...compareIdentity(source, target, report.notes), ...compareOrdersAndLinks(source, target, report.notes, live.context) };
+  report.comparison = {
+    ...compareIdentity(source, target, report.notes),
+    ...compareOrdersAndLinks(source, target, report.notes, live.context),
+    ...comparePayoutsAndAwards(source, target, report.notes),
+  };
+  report.paidParity = fullPaidParity(source, target, live.context.houseIds);
   report.counter = {
     liveCounterLast: identity.counterLast,
     highestAliasCode: highestAliasCode(identity),
@@ -105,6 +131,15 @@ export function fillReport(report: ImportReport, live: LiveData, written: Writte
     snapshots: links.snapshots,
   };
   report.notifications = live.notifications.section;
+  report.payouts = live.payouts.section;
+  const frozen = new Set(live.orders.filter((o) => o.status === "FROZEN").map((o) => o.orderId));
+  report.campaigns = {
+    imported: written.campaigns.campaigns,
+    awards: written.campaigns.awards,
+    awardsByStatus: countBy(live.campaigns.awards, (a) => a.status),
+    suspendedAwards: live.campaigns.awards.filter((a) => frozen.has(a.orderId) && a.status !== "VOID").map((a) => a.awardId),
+    stopped: live.campaigns.stopped,
+  };
 }
 
 /** The one log line of a finished import: counts only, never personal data. */
@@ -116,8 +151,10 @@ export function finishedLine(report: ImportReport, written: Written): Record<str
     orders: written.orders.orders,
     linkRequests: written.links.linkRequests,
     shareCodes: written.links.shareCodes,
+    payouts: written.payouts.payouts,
+    campaignAwards: written.campaigns.awards,
     seededNotifications: written.seeded,
-    paidParity: report.orders?.paidParity.result ?? null,
+    paidParity: report.paidParity?.result ?? null,
     timeProblems: report.timeProblems.length,
     notes: report.notes.length,
   };

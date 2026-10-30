@@ -5,7 +5,7 @@
  */
 export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-fingerprint";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
-export { resolveCustomer, type ResolvedCustomer } from "./customer.query";
+export { customerCodeOf, resolveCustomer, type ResolvedCustomer } from "./customer.query";
 export { counterAbove, customerCodeNumber, CUSTOMER_CODE_PREFIX, formatCustomerCode } from "./domain/customer-code";
 export {
   IdentityImportError,

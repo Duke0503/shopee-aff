@@ -44,7 +44,7 @@ SELECT customer_id, COALESCE(SUM(COALESCE(cashback, 0)), 0) AS paid
 
 type Totals = Map<string, number>;
 
-const totals = (db: BetterSqlite3.Database, query: string): Totals =>
+export const totals = (db: BetterSqlite3.Database, query: string): Totals =>
   new Map((db.prepare(query).all() as { customer_id: string | null; paid: number }[]).map((r) => [r.customer_id ?? "", r.paid]));
 
 export function paidParity(source: BetterSqlite3.Database, target: BetterSqlite3.Database, houseIds: ReadonlySet<string>): PaidParity {
