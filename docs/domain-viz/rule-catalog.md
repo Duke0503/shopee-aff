@@ -5,7 +5,7 @@ the context link for the rule's neighbours (invariants, policies, who it binds).
 
 | Context | Aggregate | Rule | Kind | Description | Status |
 |---|---|---|---|---|---|
-| [Customer Identity](contexts/identity.md#rules-policies) | `Customer` | `identity.customer.created-from-zalo` | `authorization` | A customer is created only from Zalo evidence: a private chat with the assistant or membership of the community group. The public web never creates a customer. | `observed` |
+| [Customer Identity](contexts/identity.md#rules-policies) | `Customer` | `identity.customer.created-from-zalo` | `authorization` | A customer is created only from Zalo intent: the first private message or the first product link pasted in the group (D25: The assistant registers a person on the first private message or the first product link pasted in the community group). The public web never creates a customer. | `observed` |
 | [Customer Identity](contexts/identity.md#rules-policies) | `Customer` | `identity.customer.unknown-code-not-found` | `policy` | An unknown customer code on the web is answered as not found. It never becomes a guest link. | `observed` |
 | [Customer Identity](contexts/identity.md#rules-policies) | `Customer` | `identity.customer.lookup-any-form` | `specification` | A customer is found by customer code, customer id or alias, ignoring case and spaces. | `observed` |
 | [Customer Identity](contexts/identity.md#rules-policies) | `Customer` | `identity.customer.merge-same-bank` | `invariant` | Two customers with different bank accounts are never merged. | `observed` |

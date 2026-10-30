@@ -3,14 +3,13 @@
 Open questions are grouped by who must answer. Decisions are newest first. `proposed` means not yet signed off by the project owner.
 Decide in the meeting, then record the result in `.context/decisions/` and `docs/domain-model.json`. This file is generated only.
 
-## Open questions (5)
+## Open questions (4)
 
-### Project owner (3)
+### Project owner (2)
 
 | Code | Question | Impact | Context | Who answers | Status |
 |---|---|---|---|---|---|
 | `OQ8` | When are the hard-coded deploy webhook secret and the third-party lookup key on main moved into the environment? | The repository is public; both values are exposed. |  | Project owner | `open` |
-| `OQ7` | Should group membership sync keep creating a customer for every group member, or only people who write to the assistant? | Today every group member becomes a customer row; most never request a link. |  | Project owner | `open` |
 | `OQ5` | Does a copy of the earlier docs/architecture-v2 folder exist on another machine? | It would be useful reference input for the re-plan. |  | Project owner | `open` |
 
 ### Architect, confirmed by the project owner (2)
@@ -20,20 +19,26 @@ Decide in the meeting, then record the result in `.context/decisions/` and `docs
 | `OQ2` | Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)? | Decides how much of the main-v2 code can be reused. |  | Architect, confirmed by the project owner | `open` |
 | `OQ1` | Does the re-planned platform keep SQLite, or move to PostgreSQL? | Decides the migration path, backups and how many writers can run at once. |  | Architect, confirmed by the project owner | `open` |
 
-## Answered (3)
+## Answered (4)
 
 | Code | Question | Answer | Context | Who answers | Status |
 |---|---|---|---|---|---|
+| `OQ7` | Should group membership sync keep creating a customer for every group member, or only people who write to the assistant? | Today every group member becomes a customer row; most never request a link. Answered by D25 (The assistant registers a person on the first private message or the first product link pasted in the community group). |  | Project owner | `resolved` |
 | `OQ6` | Does the owner confirm D1 (Every amount is a whole number of dong. Money rounds half-up through one shared helper) to D13 (A customer who is still owed money is never deleted, except by an explicit forced action of the operator), the rules carried over from the live system, as accepted for the new platform? | Until confirmed they stay proposed and the model treats them as candidates. |  | Project owner | `resolved` |
 | `OQ4` | Who owns the network list when a new affiliate network is added? | Decides which context holds network rules such as caps, sub_id format and report shape. Answered by D18 (The Link Issuing context owns the affiliate network catalog: caps, sub_id format, link creation and report shape per…). |  | Architect | `resolved` |
 | `OQ3` | Which affiliate networks are in the first release: Shopee only, or also TikTok Shop through AccessTrade and Lazada? | Decides whether the Affiliate Network port needs more than one adapter at launch. Answered by D17 (The first release supports Shopee and TikTok Shop through AccessTrade). |  | Project owner | `resolved` |
 
-## Decisions (23)
+## Decisions (28)
 
-### Accepted (23)
+### Accepted (28)
 
 | Code | Date | Decision | Why | Context | Status |
 |---|---|---|---|---|---|
+| `D28` | 2026-10-30 | Every instant is stored as UTC in one format. Business days, weeks, months and campaign windows are computed in Asia/Ho_Chi_Minh, and a date range includes its whole end day. | Three stored time formats compared as text make date filters return nothing and campaigns open 7 hours late. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). |  | `accepted` |
+| `D27` | 2026-10-30 | Payable means approved and not paid, whether or not the network has settled it. Settlement is separate information. Every screen, chat reply and export uses this one definition. | Today 'ready' has three definitions and the customer page, the customer list and the payments queue disagree. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). |  | `accepted` |
+| `D26` | 2026-10-30 | Erasing a customer removes the personal data and keeps the orders, payouts and audit entries under the permanent customer id. | Deleting ledger rows breaks D4 (An order with a payout time (paid_at) is never changed or paid again) and the append-only audit trail; the privacy law needs the personal data gone, not the money record. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). |  | `accepted` |
+| `D25` | 2026-10-30 | The assistant registers a person on the first private message or the first product link pasted in the community group. Group membership alone registers no one. | Most group members never request a link; registering them creates empty rows and noise in merges. Answers OQ7 (Should group membership sync keep creating a customer for every group member, or only people who write to the assistant?). Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). |  | `accepted` |
+| `D24` | 2026-10-30 | An admin can void a payout recorded by mistake. The covered orders return to approved and their bonuses to confirmed, with history and audit. Reconciliation still never changes a paid order. | A mistaken payout otherwise has no correction path; a compensating command keeps D4 (An order with a payout time (paid_at) is never changed or paid again) intact for every automatic path. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). |  | `accepted` |
 | `D23` | 2026-10-30 | A link request has no expired state. Being outside the attribution window is derived from the request time. | The expired state was bookkeeping only, misled readers into thinking the link stopped working, and its job ran only in one entry point. Delegated to Claude by the project owner on 2026-10-30 (recommended option). |  | `accepted` |
 | `D22` | 2026-10-30 | A campaign closes automatically at the end of its window, and the window end is exclusive everywhere. | Today nothing closes a campaign and the v2 code disagreed with Python on the window end. Delegated to Claude by the project owner on 2026-10-30 (recommended option). |  | `accepted` |
 | `D21` | 2026-10-30 | Issuing a new password ends every other session of that customer. | A customer who asks for a new password expects the old access to stop. Delegated to Claude by the project owner on 2026-10-30 (recommended option). |  | `accepted` |

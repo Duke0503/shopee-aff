@@ -196,7 +196,7 @@ Commands that emit no event (nothing elsewhere can react): `unlock`, `disable`
 
 | Rule | Declared on | Status |
 |---|---|---|
-| A customer is created only from Zalo evidence: a private chat with the assistant or membership of the community group. The public web never creates a customer. | Customer | observed · exists in code |
+| A customer is created only from Zalo intent: the first private message or the first product link pasted in the group (D25: The assistant registers a person on the first private message or the first product link pasted in the community group). The public web never creates a customer. | Customer | observed · exists in code |
 | The root admin account cannot be demoted or disabled. | Customer | observed · exists in code |
 
 ## Integration & hotspots

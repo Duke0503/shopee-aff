@@ -178,8 +178,9 @@ Commands that emit no event (nothing elsewhere can react): `open`, `confirm`, `p
 | used by | Cashback Payouts | port | ConfirmedBonuses | customer–supplier | observed · exists in code |
 
 
-**Related decisions** (1)
+**Related decisions** (2)
 
 | Decision | Why | Status |
 |---|---|---|
 | A campaign closes automatically at the end of its window, and the window end is exclusive everywhere. | Today nothing closes a campaign and the v2 code disagreed with Python on the window end. Delegated to Claude by the project owner on 2026-10-30 (recommended option). | accepted · approved |
+| Every instant is stored as UTC in one format. Business days, weeks, months and campaign windows are computed in Asia/Ho_Chi_Minh, and a date range includes its whole end day. | Three stored time formats compared as text make date filters return nothing and campaigns open 7 hours late. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review). | accepted · approved |

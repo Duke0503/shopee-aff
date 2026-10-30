@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -220,7 +220,7 @@
           "rules": [
             {
               "id": "identity.customer.created-from-zalo",
-              "description": "A customer is created only from Zalo evidence: a private chat with the assistant or membership of the community group. The public web never creates a customer.",
+              "description": "A customer is created only from Zalo intent: the first private message or the first product link pasted in the group (D25). The public web never creates a customer.",
               "kind": "authorization",
               "status": "observed",
               "sources": [
@@ -2546,6 +2546,51 @@
       "sources": [
         ".context/decisions/2026-10-30-D23-no-expired-state.md"
       ]
+    },
+    {
+      "id": "d24-payout-void",
+      "decision": "An admin can void a payout recorded by mistake. The covered orders return to approved and their bonuses to confirmed, with history and audit. Reconciliation still never changes a paid order.",
+      "rationale": "A mistaken payout otherwise has no correction path; a compensating command keeps D4 intact for every automatic path. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D24-payout-void.md"
+      ]
+    },
+    {
+      "id": "d25-registration-on-intent",
+      "decision": "The assistant registers a person on the first private message or the first product link pasted in the community group. Group membership alone registers no one.",
+      "rationale": "Most group members never request a link; registering them creates empty rows and noise in merges. Answers OQ7. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D25-registration-on-intent.md"
+      ]
+    },
+    {
+      "id": "d26-erasure-keeps-ledger",
+      "decision": "Erasing a customer removes the personal data and keeps the orders, payouts and audit entries under the permanent customer id.",
+      "rationale": "Deleting ledger rows breaks D4 and the append-only audit trail; the privacy law needs the personal data gone, not the money record. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D26-erasure-keeps-ledger.md"
+      ]
+    },
+    {
+      "id": "d27-one-payable-definition",
+      "decision": "Payable means approved and not paid, whether or not the network has settled it. Settlement is separate information. Every screen, chat reply and export uses this one definition.",
+      "rationale": "Today 'ready' has three definitions and the customer page, the customer list and the payments queue disagree. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D27-one-payable-definition.md"
+      ]
+    },
+    {
+      "id": "d28-utc-storage-vietnam-days",
+      "decision": "Every instant is stored as UTC in one format. Business days, weeks, months and campaign windows are computed in Asia/Ho_Chi_Minh, and a date range includes its whole end day.",
+      "rationale": "Three stored time formats compared as text make date filters return nothing and campaigns open 7 hours late. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the PRD review).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D28-utc-storage-vietnam-days.md"
+      ]
     }
   ],
   "openQuestions": [
@@ -2594,9 +2639,9 @@
     {
       "id": "oq7-group-sync-creates-customers",
       "question": "Should group membership sync keep creating a customer for every group member, or only people who write to the assistant?",
-      "impact": "Today every group member becomes a customer row; most never request a link.",
+      "impact": "Today every group member becomes a customer row; most never request a link. Answered by D25.",
       "owner": "Project owner",
-      "status": "open"
+      "status": "resolved"
     },
     {
       "id": "oq8-hardcoded-secrets",
