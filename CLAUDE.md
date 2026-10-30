@@ -19,7 +19,8 @@ One monorepo. Start Claude Code at the repository root so every skill and rule l
 | `_bmad/`, `_bmad-output/` | BMAD Method config, and the PRD, UX, architecture, epics and stories it produces |
 | `.claude/skills/` | BMAD Method skills, `bmad-domain-driven`, and the project skills `cashback-shadcn`, `cashback-ui-review` (design), `cashback-security-model`, `cashback-infra` (architecture), adapted from MIT and Apache-2.0 sources listed in each `UPSTREAM.md`. The C4 guide for `bmad-architecture` and the story guide are in `_bmad/custom/` |
 | `src/cashback/`, `zalo_assistant/`, `web/`, `extension/` | The live system: Python backend, Zalo assistant, React web, Chrome browser bridge |
-| `apps/`, `packages/` | The earlier v2 TypeScript attempt. Reference only (D14) |
+| `apps/`, `packages/` | The new platform (pnpm workspace): `apps/server`, `packages/money`, `packages/core`, `packages/contracts`, `packages/golden` |
+| `reference/v2/` | The earlier v2 TypeScript attempt. Read-only reference, outside the workspace (D14) |
 | `resources/` | Customer messages and web labels (Vietnamese) |
 
 Git rules are in `docs/rules/git.md`.

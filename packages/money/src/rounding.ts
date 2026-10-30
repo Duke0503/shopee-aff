@@ -21,7 +21,11 @@ export function assertNonNegativeDong(value: number, label = "amount"): number {
   return value;
 }
 
-/** Round the exact fraction `numerator / denominator` to whole dong, halves upward. */
+/**
+ * Round the exact fraction `numerator / denominator` to whole dong, halves away
+ * from zero: 2.5 becomes 3 and -2.5 becomes -3, so a clawback mirrors the
+ * cashback it reverses to the dong.
+ */
 export function roundHalfUp(numerator: bigint, denominator: bigint): number {
   if (denominator <= 0n) throw new RangeError("denominator must be positive");
   const negative = numerator < 0n;

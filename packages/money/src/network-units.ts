@@ -26,6 +26,7 @@ export function fromNetworkUnits(value: number | string, scale: number): number 
 function numberText(value: number): string {
   if (!Number.isFinite(value)) throw new RangeError(`not a finite amount: ${value}`);
   if (Number.isSafeInteger(value)) return String(value);
+  if (Number.isInteger(value)) throw new RangeError(`amount beyond exact integer range, pass it as a string: ${value}`);
   const text = String(value);
   if (/e/i.test(text)) throw new RangeError(`amount out of exact range: ${value}`);
   return text;

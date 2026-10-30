@@ -46,6 +46,24 @@ describe("public listener", () => {
   });
 });
 
+describe("client errors keep their status", () => {
+  it("answers malformed JSON with 400 invalid_request, not 500", async () => {
+    const app = make().publicApp;
+    app.post("/api/echo", async (request) => request.body as object);
+    const res = await app.inject({ method: "POST", url: "/api/echo", headers: { "content-type": "application/json" }, payload: "{bad" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: { code: "invalid_request", messageKey: "error.invalid_request" } });
+  });
+
+  it("answers a body over the limit with 413 in the envelope", async () => {
+    const app = make().publicApp;
+    app.post("/api/echo", async (request) => request.body as object);
+    const res = await app.inject({ method: "POST", url: "/api/echo", headers: { "content-type": "application/json" }, payload: JSON.stringify({ a: "x".repeat(70_000) }) });
+    expect(res.statusCode).toBe(413);
+    expect(res.json().error.code).toBe("invalid_request");
+  });
+});
+
 describe("internal listener", () => {
   it("rejects a request without the token in the error envelope", async () => {
     const res = await make().internalApp.inject({ method: "GET", url: "/internal/ping" });

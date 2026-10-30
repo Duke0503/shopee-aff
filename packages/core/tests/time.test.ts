@@ -33,6 +33,7 @@ describe("Vietnam business days (FR-38, D28)", () => {
   it("rejects an inverted range and impossible dates", () => {
     expect(() => vnDateRange("2026-10-31", "2026-10-01")).toThrow(RangeError);
     expect(() => vnDateRange("2026-02-30", "2026-03-01")).toThrow(RangeError);
+    expect(() => vnDateRange("0050-01-01", "0050-01-02")).toThrow(RangeError);
   });
 });
 
@@ -60,6 +61,8 @@ describe("display formats", () => {
     expect(formatVnDateTime(parseInstant("2026-10-30T12:42:00.000Z"), clock)).toBe("30/10 19:42");
   });
   it("rejects naive or offset timestamps instead of guessing", () => {
+    expect(() => parseInstant("2025-02-30T00:00:00.000Z")).toThrow(RangeError);
+    expect(() => parseInstant("2026-10-30T24:00:00.000Z")).toThrow(RangeError);
     expect(() => parseInstant("2026-09-16 16:27:51")).toThrow(RangeError);
     expect(() => parseInstant("2026-09-16T16:27:51+07:00")).toThrow(RangeError);
   });

@@ -43,5 +43,7 @@ describe("fromNetworkUnits", () => {
     expect(() => fromNetworkUnits("12,000", 1)).toThrow(RangeError);
     expect(() => fromNetworkUnits(1e21, 1)).toThrow(RangeError);
     expect(() => fromNetworkUnits(100, 0)).toThrow(RangeError);
+    expect(() => fromNetworkUnits(2 ** 53 + 2, 100_000)).toThrow(RangeError);
+    expect(fromNetworkUnits("10000000000000001", 100_000)).toBe(100_000_000_000);
   });
 });

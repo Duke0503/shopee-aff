@@ -33,6 +33,13 @@ export function installErrorEnvelope(app: FastifyInstance): void {
       void reply.status(ERROR_STATUS.invalid_request).send(envelope("invalid_request", "error.invalid_request"));
       return;
     }
+    const status = typeof error.statusCode === "number" ? error.statusCode : 500;
+    if (status >= 400 && status < 500) {
+      const code: ErrorCode = status === 404 ? "not_found" : status === 429 ? "rate_limited" : "invalid_request";
+      request.log.warn({ code: error.code, status }, "http.request.rejected");
+      void reply.status(status).send(envelope(code, `error.${code}`));
+      return;
+    }
     request.log.error({ err: error }, "http.request.failed");
     void reply.status(ERROR_STATUS.internal).send(envelope("internal", "error.internal"));
   });

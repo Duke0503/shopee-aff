@@ -13,7 +13,9 @@ export type VnDate = string & { readonly __brand: "VnDate" };
 
 export const VN_OFFSET_MINUTES = 7 * 60;
 const VN_OFFSET_MS = VN_OFFSET_MINUTES * 60_000;
-const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+/** The stored instant format. Contracts reuse it; nothing else may define its own. */
+export const INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const INSTANT = INSTANT_PATTERN;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export interface Clock {
@@ -40,17 +42,24 @@ export function toMs(instant: Instant): number {
 
 /** Parse stored instant text; anything else is rejected rather than guessed. */
 export function parseInstant(text: string): Instant {
-  if (!INSTANT.test(text) || Number.isNaN(Date.parse(text))) {
+  const ms = Date.parse(text);
+  if (!INSTANT.test(text) || Number.isNaN(ms) || new Date(ms).toISOString() !== text) {
     throw new RangeError(`not a UTC instant (YYYY-MM-DDTHH:mm:ss.sssZ): ${text}`);
   }
   return text as Instant;
 }
 
+/** Years outside this range are typing mistakes, not business dates. */
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2099;
+
 export function parseVnDate(text: string): VnDate {
   const m = DATE.exec(text);
   if (!m) throw new RangeError(`not a date (YYYY-MM-DD): ${text}`);
   const [, y, mo, d] = m;
-  const back = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
+  const year = Number(y);
+  if (year < MIN_YEAR || year > MAX_YEAR) throw new RangeError(`year out of range ${MIN_YEAR}-${MAX_YEAR}: ${text}`);
+  const back = new Date(Date.UTC(year, Number(mo) - 1, Number(d)));
   if (back.getUTCMonth() !== Number(mo) - 1 || back.getUTCDate() !== Number(d)) {
     throw new RangeError(`not a calendar date: ${text}`);
   }

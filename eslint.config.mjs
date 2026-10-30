@@ -49,10 +49,10 @@ export default tseslint.config(
     plugins: { "check-file": checkFile },
     rules: {
       "check-file/filename-naming-convention": ["error", { "**/*.{ts,tsx}": FILE_NAME_PATTERN }, { ignoreMiddleExtensions: false }],
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "max-lines-per-function": FN_60,
       "max-lines": SIZE_400,
-      "no-restricted-syntax": ["error", ...NO_CLOCK],
+      "no-restricted-syntax": ["error", ...NO_CLOCK, ...NO_ROUNDING],
       "no-restricted-properties": ["error", { object: "process", property: "env", message: "Read configuration through platform/config (code.md §9)." }],
     },
   },
@@ -61,12 +61,8 @@ export default tseslint.config(
     rules: { "max-lines": SIZE_300 },
   },
   {
-    files: ["packages/money/**/*.ts"],
-    rules: { "no-restricted-syntax": ["error", ...NO_CLOCK, ...NO_ROUNDING] },
-  },
-  {
     files: ["packages/core/src/time/**/*.ts"],
-    rules: { "no-restricted-syntax": "off" },
+    rules: { "no-restricted-syntax": ["error", ...NO_ROUNDING] },
   },
   {
     files: ["apps/server/src/platform/config/**/*.ts"],

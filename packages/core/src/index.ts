@@ -1,6 +1,7 @@
 export {
   addVnDays,
   fixedClock,
+  INSTANT_PATTERN,
   instantFromMs,
   parseInstant,
   parseVnDate,

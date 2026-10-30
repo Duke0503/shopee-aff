@@ -7,7 +7,8 @@ const base = process.argv[2] ?? process.env.GUARD_BASE ?? "origin/main-v2";
 
 let files;
 try {
-  files = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" }).split("\n").filter(Boolean);
+  // --no-renames: a moved protected file must show up as a deletion of its old path.
+  files = execFileSync("git", ["diff", "--name-only", "--no-renames", `${base}...HEAD`], { encoding: "utf8" }).split("\n").filter(Boolean);
 } catch {
   console.error(`path-guard: cannot diff against ${base}`);
   process.exit(2);
