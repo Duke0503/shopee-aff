@@ -16,3 +16,43 @@ export {
 } from "./time/instant";
 export { campaignWindow, contains, parseStaffVnTime, vnDateRange, type InstantRange } from "./time/range";
 export { formatVnDate, formatVnDateTime } from "./time/format";
+export { LIKE_ESCAPE, matchesSearch, searchPattern, searchText, type SearchText } from "./text/search-text";
+export { sortKey, type SortKey } from "./text/sort-key";
+export {
+  STATUS_REGISTRY,
+  TONES,
+  type CampaignAwardStatus,
+  type CustomerStatus,
+  type EntityDefinition,
+  type EntityName,
+  type LinkRequestStatus,
+  type NetworkSettlementStatus,
+  type OrderStatus,
+  type PayoutClaimStatus,
+  type PayoutStatus,
+  type ReviewCaseStatus,
+  type StatusDefinition,
+  type StatusOf,
+  type Tone,
+} from "./status/registry";
+export {
+  canTransition,
+  compareByLifecycle,
+  registryKeys,
+  sortByLifecycle,
+  statusDefinition,
+  statusesOf,
+  storedValues,
+} from "./status/lifecycle";
+export {
+  hasBankAccount,
+  isPaidOrder,
+  isPayableAward,
+  isPayableOrder,
+  isSettled,
+  isWaitingForApproval,
+  ORDER_STATUSES_IN_NO_TOTAL,
+  settlementOf,
+  type PayableOrderFacts,
+  type SettlementFact,
+} from "./status/shared-definitions";

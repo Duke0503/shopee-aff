@@ -40,11 +40,11 @@ development_status:
   1-2-money-package-computes-the-fr-13-split-with-golden-tests: done
   1-3-time-module-stores-utc-instants-and-computes-vietnam-busines: done
   1-4-server-walking-skeleton-answers-its-health-route-through-the: done
-  1-5-config-single-instance-lock-and-redacted-logs: backlog
-  1-6-ledger-database-with-the-synchronous-transaction-helper: backlog
+  1-5-config-single-instance-lock-and-redacted-logs: done
+  1-6-ledger-database-with-the-synchronous-transaction-helper: done
   1-7-migrations-run-only-after-a-checked-local-backup: backlog
-  1-8-status-registry-tested-against-status-flows-md: backlog
-  1-9-text-normalisation-builds-search-text-and-vietnamese-sort-ke: backlog
+  1-8-status-registry-tested-against-status-flows-md: done
+  1-9-text-normalisation-builds-search-text-and-vietnamese-sort-ke: done
   1-10-seven-module-skeleton-with-enforced-boundaries: backlog
   1-11-network-catalog-and-status-maps-golden-tested-on-real-report: backlog
   epic-1-retrospective: optional

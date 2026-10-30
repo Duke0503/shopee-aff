@@ -4,6 +4,7 @@
 //   - money: no Math.round / toFixed / legacy rounding in packages/money (§4)
 //   - time: no Date.now() or new Date() outside packages/core/src/time (§7)
 //   - config: no process.env outside apps/server/src/platform/config (§9)
+//   - transactions: no async callback passed to tx (§5)
 import js from "@eslint/js";
 import checkFile from "eslint-plugin-check-file";
 import tseslint from "typescript-eslint";
@@ -22,6 +23,10 @@ const FN_60 = ["error", { max: 60, skipBlankLines: true, skipComments: true }];
 const NO_CLOCK = [
   { selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']", message: "Use a Clock from @cashback/core (code.md §7)." },
   { selector: "NewExpression[callee.name='Date']", message: "Only packages/core/src/time creates dates (code.md §7)." },
+];
+const NO_ASYNC_TX = [
+  { selector: "CallExpression[callee.name='tx'] > :function[async=true]", message: "tx(fn) is synchronous; an async callback runs outside the transaction (code.md §5)." },
+  { selector: "CallExpression[callee.property.name='tx'] > :function[async=true]", message: "tx(fn) is synchronous; an async callback runs outside the transaction (code.md §5)." },
 ];
 const NO_ROUNDING = [
   { selector: "CallExpression[callee.object.name='Math'][callee.property.name='round']", message: "Money rounds only with roundHalfUp (code.md §4)." },
@@ -52,7 +57,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "max-lines-per-function": FN_60,
       "max-lines": SIZE_400,
-      "no-restricted-syntax": ["error", ...NO_CLOCK, ...NO_ROUNDING],
+      "no-restricted-syntax": ["error", ...NO_CLOCK, ...NO_ROUNDING, ...NO_ASYNC_TX],
       "no-restricted-properties": ["error", { object: "process", property: "env", message: "Read configuration through platform/config (code.md §9)." }],
     },
   },
@@ -62,7 +67,7 @@ export default tseslint.config(
   },
   {
     files: ["packages/core/src/time/**/*.ts"],
-    rules: { "no-restricted-syntax": ["error", ...NO_ROUNDING] },
+    rules: { "no-restricted-syntax": ["error", ...NO_ROUNDING, ...NO_ASYNC_TX] },
   },
   {
     files: ["apps/server/src/platform/config/**/*.ts"],

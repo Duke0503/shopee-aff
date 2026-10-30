@@ -3,7 +3,7 @@
  * (token only, for the assistant and the bridge). Both bind to 127.0.0.1 and
  * `trustProxy` stays off, so a forwarded header never changes who the caller is.
  */
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import type { Clock } from "@cashback/core";
 
 import { installErrorEnvelope } from "./error-envelope";
@@ -15,7 +15,8 @@ export const LOOPBACK = "127.0.0.1";
 export interface ServerDeps {
   clock: Clock;
   internalToken: string;
-  logger?: boolean;
+  /** The shared redacting logger (AD-27); tests leave it out and log nothing. */
+  logger?: FastifyBaseLogger;
 }
 
 export interface Servers {
@@ -23,17 +24,18 @@ export interface Servers {
   internalApp: FastifyInstance;
 }
 
-function baseApp(logger: boolean): FastifyInstance {
-  const app = Fastify({ trustProxy: false, logger, bodyLimit: 64 * 1024 });
+function baseApp(logger: FastifyBaseLogger | undefined): FastifyInstance {
+  const options = { trustProxy: false, bodyLimit: 64 * 1024 };
+  const app: FastifyInstance = logger ? Fastify({ ...options, loggerInstance: logger }) : Fastify({ ...options, logger: false });
   installErrorEnvelope(app);
   return app;
 }
 
 export function buildServers(deps: ServerDeps): Servers {
-  const publicApp = baseApp(deps.logger ?? false);
+  const publicApp = baseApp(deps.logger);
   registerHealthRoutes(publicApp, deps.clock);
 
-  const internalApp = baseApp(deps.logger ?? false);
+  const internalApp = baseApp(deps.logger);
   requireInternalToken(internalApp, deps.internalToken);
   internalApp.get("/internal/ping", async () => ({ status: "ok" }));
 

@@ -6,6 +6,8 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { ERROR_STATUS, type ErrorCode, type ErrorEnvelope } from "@cashback/contracts";
 
+import { LedgerBusyError } from "../db/transaction";
+
 export class HttpError extends Error {
   constructor(
     readonly code: ErrorCode,
@@ -24,9 +26,14 @@ export function installErrorEnvelope(app: FastifyInstance): void {
   app.setNotFoundHandler((_request, reply) => {
     void reply.status(ERROR_STATUS.not_found).send(envelope("not_found", "error.not_found"));
   });
-  app.setErrorHandler((error: FastifyError | HttpError, request, reply) => {
+  app.setErrorHandler((error: FastifyError | HttpError | LedgerBusyError, request, reply) => {
     if (error instanceof HttpError) {
       void reply.status(ERROR_STATUS[error.code]).send(envelope(error.code, error.messageKey, error.fields));
+      return;
+    }
+    if (error instanceof LedgerBusyError) {
+      request.log.warn({ code: error.code }, "http.request.busy");
+      void reply.status(ERROR_STATUS.busy).send(envelope("busy", "error.busy"));
       return;
     }
     if (error.validation) {

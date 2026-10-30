@@ -36,7 +36,7 @@ pnpm typecheck        # tsc per package
 pnpm lint             # code.md guardrails: names, sizes, money rounding, clock, process.env
 pnpm depcruise        # module boundaries
 pnpm guard:paths      # fails if production paths owned by main changed
-cd apps/server && INTERNAL_TOKEN=<32+ chars> pnpm dev   # public :9080, internal :9081 (dev ports)
+cd apps/server && pnpm dev   # reads ~/.config/cashback/dev.env (INTERNAL_TOKEN required); public :9080, internal :9081
 ```
 
 `reference/v2/` holds the earlier v2 attempt, read-only and outside the workspace.

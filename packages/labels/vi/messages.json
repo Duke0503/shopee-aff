@@ -1,0 +1,8 @@
+{
+  "order_recorded": "Đơn đã ghi nhận, chờ sàn duyệt",
+  "order_frozen": "Đơn đang được mình kiểm tra lại",
+  "order_approved": "Sàn đã duyệt, chờ mình chuyển tiền",
+  "order_reversed": "Đơn bị huỷ sau khi duyệt, không được hoàn",
+  "order_paid": "Đã chuyển tiền",
+  "order_rejected": "Không được duyệt: {reason}"
+}

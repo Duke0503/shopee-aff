@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -2994,6 +2994,15 @@
       "status": "accepted",
       "sources": [
         ".context/decisions/2026-10-30-D56-product-snapshot.md"
+      ]
+    },
+    {
+      "id": "d57-own-label-files",
+      "decision": "The new platform keeps its own label and message files in packages/labels and never edits resources/, which the live system reads at runtime. Live labels are copied into packages/labels at cutover.",
+      "rationale": "Editing resources/ changes the live website immediately and the path guard forbids it. Delegated to Claude by the project owner on 2026-10-30 (recommended option).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D57-own-label-files.md"
       ]
     }
   ],

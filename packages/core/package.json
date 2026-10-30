@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared rules with no I/O: time (UTC instants, Vietnam business days), later text search keys and the status registry.",
+  "description": "Shared rules with no I/O: time (UTC instants, Vietnam business days), text search and sort keys, and the status registry.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

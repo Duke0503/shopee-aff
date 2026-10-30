@@ -1,8 +1,9 @@
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { errorEnvelopeSchema, healthResponseSchema } from "@cashback/contracts";
+import { ERROR_CODES, ERROR_STATUS, errorEnvelopeSchema, healthResponseSchema } from "@cashback/contracts";
 import { fixedClock } from "@cashback/core";
 
+import { LedgerBusyError } from "../src/platform/db/transaction";
 import { INTERNAL_TOKEN_HEADER } from "../src/platform/http/internal-token.guard";
 import { buildServers, close, listen, LOOPBACK, type Servers } from "../src/platform/http/servers";
 
@@ -93,5 +94,22 @@ describe("listening", () => {
     await close(s);
     servers = undefined;
     expect(s.publicApp.server.listening).toBe(false);
+  });
+});
+
+describe("busy ledger in the error envelope (review item 9)", () => {
+  it("answers 503 with code busy when a command meets a busy ledger", async () => {
+    const app = make().publicApp;
+    app.get("/api/busy", async () => {
+      throw new LedgerBusyError();
+    });
+    const res = await app.inject({ method: "GET", url: "/api/busy" });
+    expect(res.statusCode).toBe(503);
+    expect(errorEnvelopeSchema.parse(res.json())).toEqual({ error: { code: "busy", messageKey: "error.busy" } });
+  });
+
+  it("maps the busy code to 503 in the shared contract", () => {
+    expect(ERROR_CODES).toContain("busy");
+    expect(ERROR_STATUS.busy).toBe(503);
   });
 });

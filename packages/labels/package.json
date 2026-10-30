@@ -1,0 +1,10 @@
+{
+  "name": "@cashback/labels",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The new platform's own Vietnamese label files (D57). resources/ belongs to the live system on main and is never edited from here; live labels are copied in at cutover.",
+  "exports": {
+    "./vi/status.json": "./vi/status.json",
+    "./vi/messages.json": "./vi/messages.json"
+  }
+}

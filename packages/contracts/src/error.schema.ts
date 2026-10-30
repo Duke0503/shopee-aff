@@ -12,6 +12,7 @@ export const ERROR_CODES = [
   "invalid_request",
   "conflict",
   "rate_limited",
+  "busy",
   "internal",
 ] as const;
 
@@ -34,5 +35,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   invalid_request: 400,
   conflict: 409,
   rate_limited: 429,
+  /** The ledger stayed locked past the busy timeout and one retry; the caller may try again. */
+  busy: 503,
   internal: 500,
 };
