@@ -64,8 +64,8 @@ development_status:
   epic-3: in-progress
   3-1-in-process-job-scheduler-that-never-overlaps-a-run: done
   3-2-audit-trail-and-owner-alert-ports-written-by-every-command: done
-  3-3-apply-one-report-row-to-one-order-idempotently: backlog
-  3-4-cashback-stored-at-approval-with-withheld-settlement-periods: backlog
+  3-3-apply-one-report-row-to-one-order-idempotently: done
+  3-4-cashback-stored-at-approval-with-withheld-settlement-periods: done
   3-5-review-cases-opened-by-the-reconciliation-rules: backlog
   3-6-clawback-entries-for-a-cancel-after-payout: backlog
   3-7-hourly-reconciliation-over-the-last-7-days-with-run-records: backlog

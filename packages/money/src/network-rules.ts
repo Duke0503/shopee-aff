@@ -14,6 +14,9 @@ export const CASHBACK_SHARE_BPS = 8_000n;
 
 export const WITHHOLDING_TAX_BPS = 1_000n;
 
+/** A settlement period staff have not marked counts as withheld (D54): the tax is known only after approval. */
+export const PERIOD_WITHHELD_BY_DEFAULT = true;
+
 export interface NetworkMoneyRules {
   feeBps: bigint;
   alwaysWithheld: boolean;

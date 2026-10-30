@@ -10,4 +10,5 @@ export {
   type ImportedAward,
   type ImportedCampaign,
 } from "./campaign-import.command";
+export { moveAwards, orderAwardsFor, paidBonusOn } from "./order-award.command";
 export { CAMPAIGN_AWARD_STATUSES } from "./schema";

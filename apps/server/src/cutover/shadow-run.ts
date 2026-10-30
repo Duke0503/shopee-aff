@@ -42,6 +42,8 @@ export interface ShadowRunOptions {
   /** Overrides the report window's last instant; by default each network's latest purchase in its report. */
   windowTo?: Instant;
   migrationsDir?: string;
+  /** Staff marks per `<network>|<YYYY-MM>` to judge approvals under; none by default (D54). */
+  periodMarks?: ReadonlyMap<string, boolean>;
 }
 
 export type ShadowRefusal = "live_ledger_path_missing" | "signed_off" | "duplicate_source" | "live_copy_changed" | "name_missing" | "report_missing";
@@ -102,7 +104,7 @@ export async function runShadow(options: ShadowRunOptions): Promise<ShadowReport
   const ledger = readShadowLedger({ sourcePath: options.sourcePath, liveLedgerPath: options.liveLedgerPath, clock: options.clock, migrationsDir: options.migrationsDir });
   const rows = new Map<AffiliateNetwork, readonly SourcedRow[]>(read.map((r) => [r.report.network, r.report.rows]));
   const window = new Map<AffiliateNetwork, ReportWindow>(read.map((r) => [r.report.network, r.window]));
-  const orders = evaluateShadow({ live: ledger.live, rows, window, liveOrphans: orphanIds(ledger) });
+  const orders = evaluateShadow({ live: ledger.live, rows, window, liveOrphans: orphanIds(ledger), approvedAt: options.clock.now(), periodMarks: options.periodMarks });
   const reports: ReportInput[] = read
     .map((r) => ({ network: r.report.network, source: r.report.source, sha256: r.report.sha256, rows: r.report.rows.length, skippedLines: r.report.skippedLines, windowFrom: r.window.from, windowTo: r.window.to }))
     .sort((a, b) => (a.network < b.network ? -1 : 1));

@@ -1,9 +1,10 @@
 /**
- * The orders module's tables (AD-4), as created by migrations/0002_orders.sql. Only this module
+ * The orders module's tables (AD-4), as created by migrations/0002_orders.sql and
+ * 0008_reconciliation.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
-import type { OrderStatus } from "@cashback/core";
+import type { OrderStatus, ReviewCaseStatus } from "@cashback/core";
 import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const ORDER_STATUSES = ["AWAITING_APPROVAL", "FROZEN", "APPROVED", "REVERSED", "PAID", "REJECTED"] as const satisfies readonly OrderStatus[];
@@ -33,6 +34,10 @@ export const orders = sqliteTable("orders", {
   lastSeenInReportAt: text("last_seen_in_report_at"),
   origin: text("origin", { enum: ORIGINS }).notNull(),
   updatedAt: text("updated_at"),
+  cashbackFee: integer("cashback_fee"),
+  cashbackTax: integer("cashback_tax"),
+  cashbackWithheld: integer("cashback_withheld", { mode: "boolean" }),
+  settlementPeriod: text("settlement_period"),
 });
 
 export const orderItems = sqliteTable(
@@ -88,5 +93,24 @@ export const settlementPeriods = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.network, t.periodMonth] })],
 );
+
+export const REVIEW_CASE_STATUSES = ["OPEN", "RESOLVED"] as const satisfies readonly ReviewCaseStatus[];
+
+export const reviewCases = sqliteTable("review_cases", {
+  caseId: integer("case_id").primaryKey({ autoIncrement: true }),
+  network: text("network", { enum: ORDER_NETWORKS }).notNull(),
+  subject: text("subject").notNull(),
+  orderId: text("order_id").references(() => orders.orderId),
+  reason: text("reason").notNull(),
+  status: text("status", { enum: REVIEW_CASE_STATUSES }).notNull(),
+  resolution: text("resolution", { enum: ["APPLIED", "DISMISSED"] }),
+  candidates: text("candidates").notNull().default("[]"),
+  observation: text("observation").notNull(),
+  openedAt: text("opened_at").notNull(),
+  openedBy: text("opened_by").notNull(),
+  resolvedAt: text("resolved_at"),
+  resolvedBy: text("resolved_by"),
+  resolutionReason: text("resolution_reason"),
+});
 
 export type OrderRow = typeof orders.$inferInsert;

@@ -48,7 +48,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "sub_id1",
-        "guest": false
+        "guest": false,
+        "requestId": null,
+        "unmatchedRequest": null
       }
     },
     {
@@ -68,7 +70,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "sub_id1",
-        "guest": false
+        "guest": false,
+        "requestId": null,
+        "unmatchedRequest": null
       }
     },
     {
@@ -88,7 +92,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "sub_id2",
-        "guest": false
+        "guest": false,
+        "requestId": "REQA1",
+        "unmatchedRequest": null
       }
     },
     {
@@ -108,7 +114,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "both",
-        "guest": false
+        "guest": false,
+        "requestId": "REQA1",
+        "unmatchedRequest": null
       }
     },
     {
@@ -128,7 +136,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "both",
-        "guest": false
+        "guest": false,
+        "requestId": "REQOLDA",
+        "unmatchedRequest": null
       }
     },
     {
@@ -242,7 +252,9 @@
         "kind": "customer",
         "customerId": "DEVCUSTD",
         "source": "sub_id1",
-        "guest": false
+        "guest": false,
+        "requestId": null,
+        "unmatchedRequest": null
       }
     },
     {
@@ -262,7 +274,9 @@
         "kind": "customer",
         "customerId": "HOUSE",
         "source": "both",
-        "guest": true
+        "guest": true,
+        "requestId": "REQH1",
+        "unmatchedRequest": null
       }
     },
     {
@@ -301,7 +315,9 @@
         "kind": "customer",
         "customerId": "CUSTB",
         "source": "sub_id2",
-        "guest": false
+        "guest": false,
+        "requestId": "REQB1",
+        "unmatchedRequest": null
       }
     },
     {
@@ -380,7 +396,9 @@
         "kind": "customer",
         "customerId": "CUSTA",
         "source": "sub_id1",
-        "guest": false
+        "guest": false,
+        "requestId": null,
+        "unmatchedRequest": "REQGONE"
       }
     },
     {
@@ -413,7 +431,9 @@
         "kind": "customer",
         "customerId": "DEVCUSTD",
         "source": "sub_id2",
-        "guest": false
+        "guest": false,
+        "requestId": "REQDEV",
+        "unmatchedRequest": null
       }
     }
   ]

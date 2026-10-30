@@ -48,6 +48,10 @@ export type Attribution =
       readonly source: AttributionSource;
       /** True for HOUSE: the effect carries cashback 0 (`splitCommission({ guest })`, D5). */
       readonly guest: boolean;
+      /** The sub_id2 link request whose owner was credited; null when sub_id1 alone decided. */
+      readonly requestId: string | null;
+      /** A sub_id2 the row carried that was not credited (no such request, or its owner resolves to nobody). */
+      readonly unmatchedRequest: string | null;
     }
   | {
       readonly kind: "review";
@@ -61,7 +65,10 @@ const blankToNull = (value: string | undefined): string | null => {
   return trimmed === "" ? null : trimmed;
 };
 
-const customer = (found: DirectoryCustomer, source: AttributionSource): Attribution => ({ kind: "customer", customerId: found.customerId, source, guest: found.guest });
+function customer(found: DirectoryCustomer, source: AttributionSource, subId2: string | null): Attribution {
+  const used = source === "sub_id1" ? null : subId2;
+  return { kind: "customer", customerId: found.customerId, source, guest: found.guest, requestId: used, unmatchedRequest: used === null ? subId2 : null };
+}
 
 function review(reason: ReviewReason, candidates: readonly (DirectoryCustomer | null)[]): Attribution {
   const ids = candidates.filter((c): c is DirectoryCustomer => c !== null).map((c) => c.customerId);
@@ -77,9 +84,9 @@ export function attribute(input: AttributionInput, directory: AttributionDirecto
   const byRequest = owner === null ? null : directory.resolveCustomer(owner);
   if (production && (isDev(subId1) || isDev(owner) || isDev(byRequest?.customerId))) return review("dev_link_in_production", []);
 
-  if (subId1 === null) return byRequest !== null ? customer(byRequest, "sub_id2") : review("unattributed", []);
+  if (subId1 === null) return byRequest !== null ? customer(byRequest, "sub_id2", subId2) : review("unattributed", []);
   const byCustomer = directory.resolveCustomer(subId1);
   if (byCustomer === null) return review(byRequest !== null ? "unattributed_sub_id1" : "unattributed", [byRequest]);
-  if (byRequest === null) return customer(byCustomer, "sub_id1");
-  return byCustomer.customerId === byRequest.customerId ? customer(byCustomer, "both") : review("owner_disagreement", [byCustomer, byRequest]);
+  if (byRequest === null) return customer(byCustomer, "sub_id1", subId2);
+  return byCustomer.customerId === byRequest.customerId ? customer(byCustomer, "both", subId2) : review("owner_disagreement", [byCustomer, byRequest]);
 }

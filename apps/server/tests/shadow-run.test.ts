@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { fixedClock, parseInstant } from "@cashback/core";
 import { splitCommission } from "@cashback/money";
 import Database from "better-sqlite3";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { LIVE_PAYABLE_SQL } from "../src/cutover/shadow-ledger";
 import type { ShadowOrder } from "../src/cutover/shadow-evaluate";
@@ -19,8 +19,11 @@ import type { ShadowReport } from "../src/cutover/shadow-report";
 import { runShadow, sha256File, SHADOW_JSON, SHADOW_MARKDOWN, SHADOW_SIGN_OFF, signShadowReport, windowOf, type ShadowRunOptions } from "../src/cutover/shadow-run";
 import { SHADOW_REASONS } from "../src/cutover/shadow-reasons";
 import { accessTradeFileSource, ReportSourceError, shopeeFileSource } from "../src/modules/linking/index";
+import { commandAudit } from "../src/modules/operations/index";
+import { markSettlementPeriod } from "../src/modules/orders/index";
 import { createLogger } from "../src/platform/log/logger";
-import { buildLiveCopy, LIVE_LEDGER_PATH, TEST_CLOCK, tempDir } from "./helpers/live-fixture";
+import { buildLiveCopy, LIVE_LEDGER_PATH, TEST_ACTOR, TEST_CLOCK, tempDir } from "./helpers/live-fixture";
+import { apply, approved, awaiting, closeLedgers, freshLedger } from "./helpers/order-ledger";
 
 const SHADOW = fileURLToPath(new URL("./fixtures/shadow", import.meta.url));
 const fixture = (name: string) => join(SHADOW, name);
@@ -234,5 +237,25 @@ describe("shadow run refusals", () => {
     const source = buildLiveCopy();
     const s = { source: shopeeFileSource({ path: fixture("shopee-report.json") }) };
     await expect(runShadow(options(source, join(tempDir("cashback-shadow-"), "run"), { sources: [s, s] }))).rejects.toMatchObject({ code: "duplicate_source" });
+  });
+});
+
+describe("the shadow run and the ledger apply read one withheld setting (D54, D44)", () => {
+  afterEach(closeLedgers);
+
+  it("with the approval month unmarked, the shadow stores what the ledger apply stores; AccessTrade stays withheld", async () => {
+    const source = buildLiveCopy({ extraSql: INCIDENTS });
+    const marks = new Map([["shopee|2026-10", false], ["accesstrade|2026-10", false]]);
+    const report = await runShadow(options(source, join(tempDir("cashback-shadow-"), "run"), { periodMarks: marks }));
+    const shadowOf = (id: string) => report.orders.find((o) => o.orderId === id);
+    const notWithheld = splitCommission({ approvedCommission: 5000, network: "shopee", withheld: false }).cashback;
+    expect(shadowOf("260913CCCC0003")).toMatchObject({ steps: ["AWAITING_APPROVAL->APPROVED"], shadow: { status: "APPROVED", cashback: notWithheld } });
+    expect(shadowOf("TT0000000000000020")).toMatchObject({ shadow: { status: "APPROVED", payable: cashbackOf(12000, "accesstrade") } });
+
+    const ledger = freshLedger();
+    ledger.tx((db) => markSettlementPeriod(db, { network: "shopee", periodMonth: "2026-10", withheld: false }, commandAudit(db, TEST_CLOCK, TEST_ACTOR)));
+    apply(ledger, awaiting("261020SHDW0001", [5000]));
+    apply(ledger, approved("261020SHDW0001", [5000]));
+    expect(ledger.sqlite.prepare("SELECT cashback FROM orders WHERE order_id = '261020SHDW0001'").get()).toEqual({ cashback: notWithheld });
   });
 });

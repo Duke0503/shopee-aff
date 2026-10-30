@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fromNetworkUnits, shopeeCommission, splitCommission } from "../src/index";
+import { fromNetworkUnits, isWithheld, PERIOD_WITHHELD_BY_DEFAULT, shopeeCommission, splitCommission } from "../src/index";
 
 describe("splitCommission invariants", () => {
   it("keeps operatorShare = commission - fee - tax - cashback for many amounts", () => {
@@ -45,5 +45,14 @@ describe("fromNetworkUnits", () => {
     expect(() => fromNetworkUnits(100, 0)).toThrow(RangeError);
     expect(() => fromNetworkUnits(2 ** 53 + 2, 100_000)).toThrow(RangeError);
     expect(fromNetworkUnits("10000000000000001", 100_000)).toBe(100_000_000_000);
+  });
+});
+
+describe("isWithheld (D54)", () => {
+  it("a period with no staff mark is withheld; AccessTrade is withheld whatever the mark", () => {
+    expect(PERIOD_WITHHELD_BY_DEFAULT).toBe(true);
+    expect(isWithheld("shopee", PERIOD_WITHHELD_BY_DEFAULT)).toBe(true);
+    expect(isWithheld("shopee", false)).toBe(false);
+    expect(isWithheld("accesstrade", false)).toBe(true);
   });
 });

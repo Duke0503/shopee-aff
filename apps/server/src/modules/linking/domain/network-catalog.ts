@@ -5,7 +5,7 @@
  * `packages/money`), published here so no module keeps a second copy. Shopee and
  * AccessTrade only; Lazada is out of the first release (D17).
  */
-import { NETWORK_MONEY_RULES, SHOPEE_COMMISSION_CAP_DONG, type AffiliateNetwork } from "@cashback/money";
+import { NETWORK_MONEY_RULES, PERIOD_WITHHELD_BY_DEFAULT, SHOPEE_COMMISSION_CAP_DONG, type AffiliateNetwork } from "@cashback/money";
 
 import { ACCESSTRADE_AMOUNT_SCALE, ACCESSTRADE_STATUS_MAP } from "./accesstrade-report";
 import type { StatusMap } from "./network-status";
@@ -13,7 +13,8 @@ import { SHOPEE_AMOUNT_SCALE, SHOPEE_STATUS_MAP } from "./shopee-report";
 
 /**
  * `per_period`: withheld only in a withheld settlement period, which is the default until
- * staff unmark it (D54). `always`: the network always withholds 10%.
+ * staff unmark it (D54). `always`: the network always withholds 10%. Both are read from
+ * `@cashback/money` (`NETWORK_MONEY_RULES`, `PERIOD_WITHHELD_BY_DEFAULT`), never kept here.
  */
 export type TaxRule = { kind: "per_period"; withheldByDefault: boolean } | { kind: "always" };
 
@@ -44,7 +45,7 @@ export interface NetworkDefinition {
 const SUB_ID = /^[a-zA-Z0-9]*$/;
 
 function taxRuleOf(network: AffiliateNetwork): TaxRule {
-  return NETWORK_MONEY_RULES[network].alwaysWithheld ? { kind: "always" } : { kind: "per_period", withheldByDefault: true };
+  return NETWORK_MONEY_RULES[network].alwaysWithheld ? { kind: "always" } : { kind: "per_period", withheldByDefault: PERIOD_WITHHELD_BY_DEFAULT };
 }
 
 export const NETWORK_CATALOG: Readonly<Record<AffiliateNetwork, NetworkDefinition>> = Object.freeze({

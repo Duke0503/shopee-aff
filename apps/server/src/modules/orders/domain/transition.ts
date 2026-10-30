@@ -19,7 +19,7 @@
  * to status-flows.md; any other step throws. A guest (HOUSE) order never carries cashback (D5).
  */
 import { canTransition, STATUS_REGISTRY, type OrderStatus } from "@cashback/core";
-import { clawbackAmount, partialClawbackAmount, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { clawbackAmount, isWithheld, partialClawbackAmount, splitCommission, sumDong, type AffiliateNetwork, type Split } from "@cashback/money";
 
 import type { Attribution, ReviewReason } from "./attribution";
 import { reportSignal, type CancelReason, type FreezeReason, type ReportObservation, type ReportSignal } from "./report-signal";
@@ -67,7 +67,8 @@ export type AwardMove = "CONFIRMED" | "PAID" | "VOID" | "SUSPENDED" | "RESUMED";
 export type Effect =
   | { readonly kind: "create_order"; readonly customerId: string; readonly guest: boolean }
   | { readonly kind: "store_observation"; readonly applied: boolean; readonly reason?: "open_payout_claim" }
-  | { readonly kind: "store_cashback"; readonly approvedCommission: number; readonly cashback: number }
+  /** The split at approval (AD-5): stored with its inputs and never recomputed. */
+  | { readonly kind: "store_cashback"; readonly approvedCommission: number; readonly cashback: number; readonly fee: number; readonly tax: number; readonly withheld: boolean }
   | { readonly kind: "record_rejection"; readonly reason: CancelReason }
   | { readonly kind: "open_review_case"; readonly reason: ReviewCaseReason }
   | { readonly kind: "alert"; readonly alert: "order_reversed" }
@@ -118,8 +119,21 @@ function commissionOf(row: ReportObservation, signal: ReportSignal): number {
   return sumDong(signal.liveItems.flatMap((i) => row.items[i]?.commissionParts ?? []), "commission part");
 }
 
-const cashbackFor = (commission: number, order: TransitionOrder, ctx: TransitionContext): number =>
-  splitCommission({ approvedCommission: commission, network: ctx.network, withheld: ctx.withheld, guest: order.guest }).cashback;
+/** What a row says the order earns while it stays awaiting or approved (R3, R4); null after a cancel or freeze signal. */
+export function rowCommission(row: ReportObservation): number | null {
+  const signal = reportSignal(row);
+  return signal.kind === "APPROVED" || signal.kind === "AWAITING" ? commissionOf(row, signal) : null;
+}
+
+const splitFor = (commission: number, order: TransitionOrder, ctx: TransitionContext): Split =>
+  splitCommission({ approvedCommission: commission, network: ctx.network, withheld: ctx.withheld, guest: order.guest });
+
+const cashbackFor = (commission: number, order: TransitionOrder, ctx: TransitionContext): number => splitFor(commission, order, ctx).cashback;
+
+function storeCashback(commission: number, order: TransitionOrder, ctx: TransitionContext): Effect {
+  const split = splitFor(commission, order, ctx);
+  return { kind: "store_cashback", approvedCommission: commission, cashback: split.cashback, fee: split.fee, tax: split.tax, withheld: isWithheld(ctx.network, ctx.withheld) };
+}
 
 function freeze(out: Out, order: TransitionOrder, reason: ReviewCaseReason): OrderStatus {
   const next = move(out, order.status, "FROZEN");
@@ -138,7 +152,7 @@ function fromAwaiting(out: Out, order: TransitionOrder, row: ReportObservation, 
       return order.status;
     case "APPROVED": {
       const commission = commissionOf(row, signal);
-      out.effects.push({ kind: "store_cashback", approvedCommission: commission, cashback: cashbackFor(commission, order, ctx) }, { kind: "awards", to: "CONFIRMED" });
+      out.effects.push(storeCashback(commission, order, ctx), { kind: "awards", to: "CONFIRMED" });
       return move(out, order.status, "APPROVED");
     }
   }
@@ -186,7 +200,7 @@ function resolveFrozen(out: Out, order: TransitionOrder, row: ReportObservation,
   }
   const commission = commissionOf(row, signal);
   if (review.previous === "APPROVED" && signal.kind === "APPROVED" && commission > 0 && commission !== order.approvedCommission) {
-    out.effects.push({ kind: "store_cashback", approvedCommission: commission, cashback: cashbackFor(commission, order, ctx) });
+    out.effects.push(storeCashback(commission, order, ctx));
   }
   out.effects.push({ kind: "awards", to: "RESUMED" });
   return move(out, order.status, review.previous);

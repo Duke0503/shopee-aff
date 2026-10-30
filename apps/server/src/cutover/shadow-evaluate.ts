@@ -13,13 +13,14 @@
  * Every order is valued the same way on both sides: payable is the stored cashback of an
  * APPROVED unpaid order plus the bonus riding on it (D27, D35); waiting is an AWAITING_APPROVAL
  * order's estimate through the FR-13 split with the live 10% withholding. The guest account
- * (HOUSE) gets 0 on both sides (D5).
+ * (HOUSE) gets 0 on both sides (D5). An approval the run makes reads the withheld setting exactly
+ * as the ledger apply does (orders/domain/settlement.ts): the run's month, with any staff marks.
  */
 import { canTransition, type Instant, type OrderStatus } from "@cashback/core";
 import { differenceDong, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 import type { SourcedRow } from "../modules/linking/index";
-import { attribute, reportSignal, transition, type AttributionDirectory, type ImportedOrder, type TransitionOrder } from "../modules/orders/index";
+import { applyResult, attribute, periodIsWithheld, rowCommission, settlementPeriodOf, splitWithheld, transition, type AttributionDirectory, type ImportedOrder, type TransitionOrder } from "../modules/orders/index";
 import type { LiveData } from "./import-steps";
 import { classify, type Classified, type ShadowReason } from "./shadow-reasons";
 
@@ -56,6 +57,10 @@ export interface ShadowInputs {
   window: ReadonlyMap<AffiliateNetwork, ReportWindow>;
   /** Approved unpaid live orders whose live customer id is no customer: live payouts never list them. */
   liveOrphans: ReadonlySet<string>;
+  /** When the run approves what it approves: the approval month's period decides the withheld setting (D54). */
+  approvedAt: Instant;
+  /** Staff marks per `<network>|<YYYY-MM>`; a period without one counts as withheld. The cutover imports none. */
+  periodMarks?: ReadonlyMap<string, boolean>;
 }
 
 export interface ReportWindow {
@@ -72,6 +77,8 @@ interface Applied {
   steps: string[];
   reviewCases: string[];
   clawback: number;
+  /** The withheld setting stored with the order's approval; null before one or for an imported approval. */
+  withheld: boolean | null;
 }
 
 interface Bonus {
@@ -111,31 +118,26 @@ function sideOf(status: OrderStatus | null, paidAt: string | null, cashback: num
   return { status, cashback, payable, waiting };
 }
 
-/** What the row says the order would earn, when it leaves the order awaiting or approved. */
-function reportEstimate(row: SourcedRow): number | null {
-  const signal = reportSignal(row);
-  if (signal.kind !== "AWAITING" && signal.kind !== "APPROVED") return null;
-  return sumDong(signal.liveItems.flatMap((i) => row.items[i]?.commissionParts ?? []), "estimate");
+/** The withheld setting of a new approval in this run, read as the ledger apply reads it (orders/domain/settlement.ts). */
+function periodNow(inputs: ShadowInputs, network: AffiliateNetwork): boolean {
+  return periodIsWithheld(network, inputs.periodMarks?.get(`${network}|${settlementPeriodOf(inputs.approvedAt)}`) ?? null);
 }
 
 /** One row through attribution (for an order not recorded yet) and `transition`; effects only noted. */
-function applyRow(applied: Applied, row: SourcedRow, network: AffiliateNetwork, ctx: { paidBonus: number; directory: AttributionDirectory }): void {
-  const attribution = applied.order === null ? attribute(row, ctx.directory, true) : undefined;
-  const result = transition(applied.order, { kind: "report", row }, { network, withheld: true, paidBonus: ctx.paidBonus, alreadyClawedBack: applied.clawback, attribution });
-  let order = applied.order;
-  for (const e of result.effects) {
-    if (e.kind === "create_order") {
-      applied.customerId = e.customerId;
-      order = { status: "AWAITING_APPROVAL", paidAt: null, approvedCommission: null, cashback: null, guest: e.guest };
-    }
-    if (e.kind === "store_cashback" && order !== null) order = { ...order, approvedCommission: e.approvedCommission, cashback: e.cashback };
-    if (e.kind === "clawback") applied.clawback = sumDong([applied.clawback, e.amount], "clawback");
-    if (e.kind === "open_review_case") applied.reviewCases.push(e.reason);
-  }
+function applyRow(applied: Applied, row: SourcedRow, network: AffiliateNetwork, ctx: { paidBonus: number; ev: Evaluation }): void {
+  const attribution = applied.order === null ? attribute(row, ctx.ev.directory, true) : undefined;
+  const holder = applied.order === null ? null : { status: applied.order.status, cashbackWithheld: applied.withheld };
+  const withheld = splitWithheld(holder, () => periodNow(ctx.ev.inputs, network));
+  const result = transition(applied.order, { kind: "report", row }, { network, withheld, paidBonus: ctx.paidBonus, alreadyClawedBack: applied.clawback, attribution });
+  const step = applyResult(applied.order, result);
+  if (step.approval !== null) applied.withheld = step.approval.withheld;
+  if (step.createdFor !== null) applied.customerId = step.createdFor;
+  applied.clawback = sumDong([applied.clawback, step.clawback], "clawback");
+  applied.reviewCases.push(...step.reviewCases);
   applied.steps.push(...result.steps.map(([from, to]) => `${from ?? "NEW"}->${to}`));
-  if (order !== null && result.next !== null) {
-    applied.order = { ...order, status: result.next };
-    applied.estimate = reportEstimate(row) ?? applied.estimate;
+  if (step.applied) {
+    applied.order = step.order;
+    applied.estimate = rowCommission(row) ?? applied.estimate;
   }
 }
 
@@ -206,8 +208,8 @@ function evaluateImported(o: ImportedOrder, rows: readonly SourcedRow[] | undefi
     return finish({ ...base, shadow: { ...sideOf(u.status, o.paidAt, o.cashback, o.estimatedCommission, facts), clawback: 0 }, steps: u.steps, reviewCases: u.reviewCases }, () => orphaned({ reason: u.reason, detail: null }));
   }
   const start: TransitionOrder = { status: o.status, paidAt: o.paidAt, approvedCommission: o.approvedCommission, cashback: o.cashback, guest };
-  const applied: Applied = { order: start, customerId: o.customerId, estimate: o.estimatedCommission, steps: [], reviewCases: [], clawback: 0 };
-  for (const row of rows) applyRow(applied, row, o.network, { paidBonus: guest ? 0 : bonus.paid, directory: ev.directory });
+  const applied: Applied = { order: start, customerId: o.customerId, estimate: o.estimatedCommission, steps: [], reviewCases: [], clawback: 0, withheld: null };
+  for (const row of rows) applyRow(applied, row, o.network, { paidBonus: guest ? 0 : bonus.paid, ev });
   const order = applied.order ?? start;
   const shadow = { ...sideOf(order.status, o.paidAt, order.cashback, applied.estimate, facts), clawback: applied.clawback };
   const network = o.network;
@@ -217,8 +219,8 @@ function evaluateImported(o: ImportedOrder, rows: readonly SourcedRow[] | undefi
 }
 
 function evaluateNew(orderId: string, network: AffiliateNetwork, rows: readonly SourcedRow[], ev: Evaluation): ShadowOrder {
-  const applied: Applied = { order: null, customerId: null, estimate: null, steps: [], reviewCases: [], clawback: 0 };
-  for (const row of rows) applyRow(applied, row, network, { paidBonus: 0, directory: ev.directory });
+  const applied: Applied = { order: null, customerId: null, estimate: null, steps: [], reviewCases: [], clawback: 0, withheld: null };
+  for (const row of rows) applyRow(applied, row, network, { paidBonus: 0, ev });
   const guest = applied.order?.guest ?? false;
   const live: ShadowSide = { status: null, cashback: null, payable: 0, waiting: 0 };
   const order = applied.order;

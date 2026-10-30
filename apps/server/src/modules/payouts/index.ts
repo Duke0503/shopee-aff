@@ -11,5 +11,6 @@ export {
   type PayoutsImport,
   type PayoutsImportResult,
 } from "./payout-import.command";
+export { clawedBackOn, openClawback, orderPayoutsFor } from "./order-clawback.command";
 export { findReceipt, isReceiptToken, type Receipt } from "./receipt.query";
 export { LEDGER_ENTRY_KINDS, PAYOUT_STATUSES } from "./schema";

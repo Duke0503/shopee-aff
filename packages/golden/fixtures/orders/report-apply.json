@@ -1,0 +1,117 @@
+{
+  "rule": "applyReportRow",
+  "source": "PRD FR-12, FR-13; AD-5, AD-8; D3, D4, D5, D12, D20, D54; Stories 3.3 and 3.4. Amounts follow the splitCommission golden cases (fixtures/money/split-commission.json).",
+  "approvals": [
+    {
+      "name": "Shopee 100,000 approved in a period with no mark is withheld by default",
+      "story": "3.4 AC1",
+      "network": "shopee",
+      "estimatedCommission": 100000,
+      "approvedParts": [100000],
+      "periodMark": null,
+      "guest": false,
+      "expected": { "approvedCommission": 100000, "fee": 980, "tax": 10000, "withheld": true, "cashback": 71216 }
+    },
+    {
+      "name": "Shopee 100,000 approved after staff unmarked the period",
+      "story": "3.4 AC2",
+      "network": "shopee",
+      "estimatedCommission": 100000,
+      "approvedParts": [100000],
+      "periodMark": false,
+      "guest": false,
+      "expected": { "approvedCommission": 100000, "fee": 980, "tax": 0, "withheld": false, "cashback": 79216 }
+    },
+    {
+      "name": "Shopee 100,000 approved in a period staff marked withheld",
+      "story": "3.4 AC1",
+      "network": "shopee",
+      "estimatedCommission": 100000,
+      "approvedParts": [100000],
+      "periodMark": true,
+      "guest": false,
+      "expected": { "approvedCommission": 100000, "fee": 980, "tax": 10000, "withheld": true, "cashback": 71216 }
+    },
+    {
+      "name": "AccessTrade 50,000 is always withheld",
+      "story": "3.4 AC3",
+      "network": "accesstrade",
+      "estimatedCommission": 50000,
+      "approvedParts": [50000],
+      "periodMark": null,
+      "guest": false,
+      "expected": { "approvedCommission": 50000, "fee": 0, "tax": 5000, "withheld": true, "cashback": 36000 }
+    },
+    {
+      "name": "an estimate of 150,000 approved at 100,000 earns from the approved commission only",
+      "story": "3.4 AC5",
+      "network": "shopee",
+      "estimatedCommission": 150000,
+      "approvedParts": [100000],
+      "periodMark": null,
+      "guest": false,
+      "expected": { "approvedCommission": 100000, "fee": 980, "tax": 10000, "withheld": true, "cashback": 71216 }
+    },
+    {
+      "name": "Shopee approved as a Shopee part and an XTRA part sums both",
+      "story": "3.4 AC5",
+      "network": "shopee",
+      "estimatedCommission": 12000,
+      "approvedParts": [8000, 4000],
+      "periodMark": false,
+      "guest": false,
+      "expected": { "approvedCommission": 12000, "fee": 118, "tax": 0, "withheld": false, "cashback": 9506 }
+    },
+    {
+      "name": "a guest (HOUSE) order approved at 100,000 stores cashback 0",
+      "story": "3.3 AC5",
+      "network": "shopee",
+      "estimatedCommission": 100000,
+      "approvedParts": [100000],
+      "periodMark": null,
+      "guest": true,
+      "expected": { "approvedCommission": 100000, "fee": 980, "tax": 10000, "withheld": true, "cashback": 0 }
+    }
+  ],
+  "repeats": [
+    {
+      "name": "an awaiting row applied twice records once and then only moves the last-seen time",
+      "story": "3.3 AC2",
+      "rows": [
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] },
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] }
+      ],
+      "expected": { "outcomes": ["recorded", "skipped"], "status": "AWAITING_APPROVAL", "observations": 1, "history": 1, "outbox": 1 }
+    },
+    {
+      "name": "an approved row applied twice approves once",
+      "story": "3.4 AC4",
+      "rows": [
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] },
+        { "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "parts": [20000] }] },
+        { "orderStatus": "APPROVED", "items": [{ "status": "APPROVED", "parts": [20000] }] }
+      ],
+      "expected": { "outcomes": ["recorded", "changed", "skipped"], "status": "APPROVED", "observations": 2, "history": 2, "outbox": 2 }
+    },
+    {
+      "name": "a cancel applied twice rejects once",
+      "story": "3.3 AC2",
+      "rows": [
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] },
+        { "orderStatus": "CANCELLED", "items": [{ "status": "CANCELLED", "parts": [0] }] },
+        { "orderStatus": "CANCELLED", "items": [{ "status": "CANCELLED", "parts": [0] }] }
+      ],
+      "expected": { "outcomes": ["recorded", "changed", "skipped"], "status": "REJECTED", "observations": 2, "history": 2, "outbox": 2 }
+    },
+    {
+      "name": "a row that differs from the last applied one is applied again",
+      "story": "3.3 AC2",
+      "rows": [
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] },
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [18000] }] },
+        { "orderStatus": "AWAITING", "items": [{ "status": "AWAITING", "parts": [20000] }] }
+      ],
+      "expected": { "outcomes": ["recorded", "observed", "observed"], "status": "AWAITING_APPROVAL", "observations": 3, "history": 1, "outbox": 1 }
+    }
+  ]
+}

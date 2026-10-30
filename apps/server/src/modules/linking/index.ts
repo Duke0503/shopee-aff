@@ -66,5 +66,6 @@ export {
   type LinksImport,
   type LinksImportResult,
 } from "./link-import.command";
+export { findLinkRequestOwner, type LinkRequestOwner } from "./link-request.query";
 export { findShareCode, type SharedLink } from "./share-code.query";
 export { LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";

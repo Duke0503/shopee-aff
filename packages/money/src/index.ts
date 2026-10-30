@@ -2,6 +2,7 @@ export { assertDong, assertNonNegativeDong, roundHalfUp } from "./rounding";
 export {
   CASHBACK_SHARE_BPS,
   NETWORK_MONEY_RULES,
+  PERIOD_WITHHELD_BY_DEFAULT,
   SHOPEE_COMMISSION_CAP_DONG,
   WITHHOLDING_TAX_BPS,
   type AffiliateNetwork,

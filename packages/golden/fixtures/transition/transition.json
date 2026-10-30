@@ -13,7 +13,7 @@
         "steps": [["AWAITING_APPROVAL", "APPROVED"]],
         "effects": [
           { "kind": "store_observation", "applied": true },
-          { "kind": "store_cashback", "approvedCommission": 8745, "cashback": 6228 },
+          { "kind": "store_cashback", "approvedCommission": 8745, "cashback": 6228, "fee": 86, "tax": 875, "withheld": true },
           { "kind": "awards", "to": "CONFIRMED" }
         ]
       }
@@ -133,7 +133,7 @@
         "steps": [["AWAITING_APPROVAL", "APPROVED"]],
         "effects": [
           { "kind": "store_observation", "applied": true },
-          { "kind": "store_cashback", "approvedCommission": 12000, "cashback": 0 },
+          { "kind": "store_cashback", "approvedCommission": 12000, "cashback": 0, "fee": 118, "tax": 1200, "withheld": true },
           { "kind": "awards", "to": "CONFIRMED" }
         ]
       }
@@ -149,7 +149,7 @@
         "steps": [["AWAITING_APPROVAL", "APPROVED"]],
         "effects": [
           { "kind": "store_observation", "applied": true },
-          { "kind": "store_cashback", "approvedCommission": 15000, "cashback": 10800 },
+          { "kind": "store_cashback", "approvedCommission": 15000, "cashback": 10800, "fee": 0, "tax": 1500, "withheld": true },
           { "kind": "awards", "to": "CONFIRMED" }
         ]
       }

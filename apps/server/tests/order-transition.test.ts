@@ -22,7 +22,7 @@ import {
 } from "../src/modules/orders/index";
 
 const SHOPEE: TransitionContext = { network: "shopee", withheld: true };
-const CUSTOMER = { kind: "customer", customerId: "1000000000000000001", source: "both", guest: false } as const;
+const CUSTOMER = { kind: "customer", customerId: "1000000000000000001", source: "both", guest: false, requestId: "26091200001", unmatchedRequest: null } as const;
 
 const order = (status: OrderStatus, extra: Partial<TransitionOrder> = {}): TransitionOrder => ({
   status,
@@ -121,7 +121,7 @@ describe("Story 2.6 acceptance criteria", () => {
   it("AC1: AWAITING_APPROVAL with order status APPROVED and commission above 0 is APPROVED with store cashback; order CANCELLED with an APPROVED item is REJECTED", () => {
     const approved = transition(order("AWAITING_APPROVAL"), report(APPROVED_ROW), SHOPEE);
     expect(approved.next).toBe("APPROVED");
-    expect(approved.effects).toContainEqual({ kind: "store_cashback", approvedCommission: 20000, cashback: 14243 });
+    expect(approved.effects).toContainEqual({ kind: "store_cashback", approvedCommission: 20000, cashback: 14243, fee: 196, tax: 2000, withheld: true });
     expect(transition(order("AWAITING_APPROVAL"), report(row("CANCELLED", [item("APPROVED", 20000)])), SHOPEE).next).toBe("REJECTED");
   });
 
