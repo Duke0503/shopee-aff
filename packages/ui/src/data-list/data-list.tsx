@@ -5,7 +5,8 @@
  * (LC-7); when the server clamps the page, the URL is corrected in place. Previous rows stay,
  * dimmed under the progress line, while the next query loads (LC-8). Loading, empty, no
  * matches, error and stale are separate states (LC-9). A polite live region announces the
- * count after each query (UX-DR13). Table on tablet and desktop, cards on phone (LC-12).
+ * count after each query (UX-DR13). Table on tablet and desktop, cards on phone (LC-12). On a
+ * tablet the secondary columns start hidden and the columns menu shows any of them again.
  */
 import type { ListResponse, ListSearchState, ListSort } from "@cashback/contracts";
 import type { RowData } from "@tanstack/react-table";
@@ -17,6 +18,7 @@ import { uiText } from "../labels";
 import { cn } from "../lib/utils";
 import type { DataListProps, ListColumn } from "./data-list.types";
 import { FilterSheet } from "./filter-sheet";
+import { ColumnsMenu } from "./columns-menu";
 import { ListCards } from "./list-cards";
 import { ListPagination } from "./list-pagination";
 import { ListEmpty, ListError, ListNoMatches, ListSkeleton, ProgressLine } from "./list-states";
@@ -56,10 +58,12 @@ interface ListBodyProps<R> extends DataListProps<R> {
   readonly filtered: boolean;
   readonly onClear: () => void;
   readonly onSort: (column: ListColumn<R>) => void;
+  /** The secondary columns the tablet shows anyway, chosen in the columns menu. */
+  readonly extraColumns: readonly string[];
 }
 
 /** Rows or the one state that replaces them; an error never falls through to an empty text. */
-function bodyContent<R extends RowData>({ query, shown, layout, filtered, columns, rowKey, state, emptyText, onClear, onSort, card }: ListBodyProps<R>): ReactNode {
+function bodyContent<R extends RowData>({ query, shown, layout, filtered, columns, rowKey, state, emptyText, onClear, onSort, card, extraColumns }: ListBodyProps<R>): ReactNode {
   if (shown === undefined) return query.isError ? null : <ListSkeleton />;
   if (shown.rows.length === 0) {
     if (query.isError) return null;
@@ -80,7 +84,7 @@ function bodyContent<R extends RowData>({ query, shown, layout, filtered, column
         <ListCards columns={columns} rows={shown.rows} rowKey={rowKey} />
       ) : (
         <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-          <ListTable columns={layout === "tablet" ? columns.filter((c) => c.desktopOnly !== true) : columns} rows={shown.rows} rowKey={rowKey} sort={state.sort} onSort={onSort} />
+          <ListTable columns={layout === "tablet" ? columns.filter((c) => c.desktopOnly !== true || extraColumns.includes(c.key)) : columns} rows={shown.rows} rowKey={rowKey} sort={state.sort} onSort={onSort} />
         </div>
       )}
     </div>
@@ -127,7 +131,7 @@ function filterControls<R>({ statusFilter, filters, state, shown, change }: Filt
     statusFilter === undefined ? null : (
       <StatusChips entity={statusFilter.entity} facets={shown?.facets[statusFilter.field]} total={shown?.total} overall={shown?.overall} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
     );
-  const extra = filters?.({ state, setFilters: (patch) => change({ filters: withFilters(state, patch) }) });
+  const extra = filters?.({ state, setFilters: (patch) => change({ filters: withFilters(state, patch) }), facets: shown?.facets, total: shown?.total, overall: shown?.overall });
   if (statusChips === null && extra === undefined) return null;
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -142,6 +146,8 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
   const layout = useLayout();
   const shown = useShownData(query.data);
   const [announcement, setAnnouncement] = useState("");
+  const [extraColumns, setExtraColumns] = useState<readonly string[]>([]);
+  const secondary = columns.filter((c) => c.desktopOnly === true);
   const settled = query.data !== undefined && !query.isPlaceholderData ? query.data : undefined;
 
   useEffect(() => {
@@ -163,6 +169,7 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
       <div className="flex min-w-0 items-center gap-2">
         <SearchBox committed={state.q} placeholder={props.searchPlaceholder} onCommit={(q) => change({ q })} />
         <RefreshButton asOf={shown?.asOf} onRefresh={() => void query.refetch()} />
+        {layout === "tablet" && secondary.length > 0 && <ColumnsMenu columns={secondary} shown={extraColumns} onChange={setExtraColumns} />}
       </div>
       {layout === "phone" ? (
         <div className="flex min-w-0 items-end gap-2">
@@ -181,7 +188,7 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
         {announcement}
       </div>
       {query.isError && <ListError error={query.error} staleAsOf={shown?.asOf ?? null} onRetry={() => void query.refetch()} onClear={filtered ? () => change({ q: "", filters: {} }) : undefined} />}
-      <ListBody {...props} shown={shown} layout={layout} filtered={filtered} onClear={() => change({ q: "", filters: {} })} onSort={(column) => change({ sort: nextSort(state.sort, column) })} />
+      <ListBody {...props} shown={shown} layout={layout} filtered={filtered} extraColumns={extraColumns} onClear={() => change({ q: "", filters: {} })} onSort={(column) => change({ sort: nextSort(state.sort, column) })} />
       {shown !== undefined && shown.total > 0 && (
         <ListPagination
           facts={{ page: shown.page, pageSize: shown.pageSize, total: shown.total }}

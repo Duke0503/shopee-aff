@@ -3,7 +3,8 @@
 // the network payouts tab with one payout's orders, and Settings with the withheld periods, at phone, tablet and desktop
 // widths, for the design review. Starts the Vite dev server, answers /api/admin from fixtures
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
-// sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too.
+// sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too, and
+// Customers with one customer's page and the review queue with a case's panel (Stories 4.14, 4.15).
 // Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -138,6 +139,58 @@ const PERIODS = { currentMonth: "2026-10", periods: [
   { network: "accesstrade", periodMonth: "2026-09", withheld: true, editable: false, origin: "CUTOVER", basedOn: null },
 ] };
 
+const CUSTOMER_FLAGS = ["", "BANK_CHANGED", "NO_BANK", "SHARED_BANK", "", "BANK_HELD"];
+function customerRows() {
+  const rows = payoutFixtures.names.map((name, i) => {
+    const flags = CUSTOMER_FLAGS[i];
+    const noBank = flags === "NO_BANK";
+    return {
+      customerId: `P${i}`, customerCode: `DP${String(12 + i * 19).padStart(5, "0")}`, customerName: name,
+      bankName: noBank ? null : payoutFixtures.banks[i], accountLastFour: noBank ? null : String(6789 - i * 1201).padStart(4, "0"),
+      orderCount: [18, 7, 3, 1, 26, 4][i], payable: [79216, 24860, 9263, 0, 135216, 31008][i], paid: [212400, 61300, 0, 0, 1204500, 58000][i],
+      flags, bankChangedAt: flags === "BANK_CHANGED" ? "2026-10-29T05:10:00.000Z" : null,
+      owed: i === 3 ? "NO" : "YES", flagged: flags === "" ? "NO" : "YES", bank: noBank ? "NONE" : flags === "BANK_HELD" ? "HELD" : "SAVED",
+    };
+  });
+  const facets = { owed: [{ value: "NO", count: 45 }, { value: "YES", count: 12 }], flagged: [{ value: "NO", count: 53 }, { value: "YES", count: 4 }], bank: [] };
+  return { rows, total: 57, page: 1, pageSize: 25, facets, summary: { payable: 279563, paid: 1536200 }, asOf: "2026-10-30T12:42:00.000Z", overall: 57 };
+}
+const CUSTOMER_PAGE = {
+  customerId: "P0", customerCode: "DP00012", customerName: payoutFixtures.names[0], status: "ACTIVE", zaloUserId: "8812447100930012", joinedAt: "2026-09-12T03:00:00.000Z",
+  balance: { payable: 79216, gross: 88479, waiting: 15880, paid: 212400, deductedNext: 9263 },
+  flags: ["BANK_CHANGED"],
+  bank: { bankName: "Vietcombank", holderName: payoutFixtures.holder, lastFour: "6789", changedAt: "2026-10-29T05:10:00.000Z", held: false, changedRecently: true },
+  clawbacks: [{ clawbackId: "260901PAID07-1", orderId: "260901PAID07", open: 9263 }],
+  counts: { orders: 18, linkRequests: 41, payouts: 3 },
+};
+const linkRows = () => ({ rows: fixtures.products.map((productName, i) => ({ requestId: `R2610${String(2714023 + i * 97)}`, productName, productImageUrl: i === 3 ? null : `https://cf.example.test/file/${PHOTOS[i % PHOTOS.length]}`, network: i === 2 ? "accesstrade" : "shopee", status: ["DELIVERED", "CONVERTED", "DELIVERED", "FAILED", "CONVERTED"][i], createdAt: `2026-10-${String(28 - i * 3).padStart(2, "0")}T03:00:00.000Z` })), total: 41, page: 1, pageSize: 25, facets: { status: [] }, summary: {}, asOf: "2026-10-30T12:42:00.000Z" });
+
+const REVIEW_ROWS = [
+  { caseId: 7, network: "shopee", subject: "241027F3HQ", orderId: null, reason: "unattributed_sub_id1", status: "OPEN", resolution: null, openedAt: "2026-10-27T03:10:00.000Z", resolvedAt: null },
+  { caseId: 9, network: "accesstrade", subject: "AT8812300417", orderId: "AT8812300417", reason: "unknown_status", status: "OPEN", resolution: null, openedAt: "2026-10-28T08:40:00.000Z", resolvedAt: null },
+  { caseId: 12, network: "shopee", subject: "251019ZT45LB", orderId: "251019ZT45LB", reason: "cancel_after_payout", status: "OPEN", resolution: null, openedAt: "2026-10-29T02:00:00.000Z", resolvedAt: null },
+  { caseId: 14, network: "shopee", subject: "payout:1033120", orderId: null, reason: "settlement_mismatch", status: "OPEN", resolution: null, openedAt: "2026-10-30T03:00:00.000Z", resolvedAt: null },
+];
+function reviewRows(url) {
+  const reason = url.searchParams.get("filter[reason]")?.split(",") ?? [];
+  const rows = reason.length === 0 ? REVIEW_ROWS : REVIEW_ROWS.filter((r) => reason.includes(r.reason));
+  const facets = { reason: [...new Set(rows.map((r) => r.reason))].map((value) => ({ value, count: rows.filter((r) => r.reason === value).length })) };
+  return { rows, total: rows.length, page: 1, pageSize: 25, facets, summary: {}, asOf: "2026-10-30T12:42:00.000Z", counts: { open: 4, resolved: 41 } };
+}
+const REVIEW_DETAIL = {
+  ...REVIEW_ROWS[0], resolutionReason: null, order: null, applicable: true, frozen: false,
+  facts: [
+    { key: "orderId", kind: "code", value: "241027F3HQ", detail: null }, { key: "networkStatus", kind: "orderStatus", value: "APPROVED", detail: "completed" }, { key: "purchasedAt", kind: "instant", value: "2026-10-26T13:20:00.000Z", detail: null },
+    { key: "subId1", kind: "code", value: "C0042", detail: null }, { key: "subId2", kind: "code", value: "R26102714023", detail: null }, { key: "itemCount", kind: "text", value: 1, detail: null },
+    { key: "orderValue", kind: "money", value: 389000, detail: null }, { key: "reportedCommission", kind: "money", value: 8210, detail: null },
+  ],
+  candidates: [{ customerId: "P1", customerCode: "DP00031", customerName: payoutFixtures.names[1], recentOrders: [
+    { orderId: "261020A0031", productName: fixtures.products[1], productImageUrl: "https://cf.example.test/file/deal_tech_2.jpg", status: "APPROVED", cashback: 9263, recordedAt: "2026-10-20T03:00:00.000Z" },
+    { orderId: "261002A0031", productName: fixtures.products[3], productImageUrl: null, status: "PAID", cashback: 12640, recordedAt: "2026-10-02T03:00:00.000Z" },
+  ] }],
+};
+const REVIEW_PREVIEW = { caseId: 7, orderId: "241027F3HQ", customerId: "P1", customerCode: "DP00031", from: null, to: "AWAITING_APPROVAL", cashback: null };
+
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5174, strictPort: true }, logLevel: "error" });
 await server.listen();
 const browser = await chromium.launch();
@@ -151,7 +204,14 @@ async function shoot(name, width, height, path, after, answers = {}) {
   await page.route("**/api/admin/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === "/api/admin/session") return route.fulfill({ json: { staffId: "stf_1", username: "minh", role: "ADMIN" } });
-    if (url.pathname === "/api/admin/orders") return route.fulfill({ json: orders(url) });
+    if (url.pathname === "/api/admin/orders" || /^\/api\/admin\/customers\/[^/]+\/orders$/.test(url.pathname)) return route.fulfill({ json: orders(url) });
+    if (url.pathname === "/api/admin/customers") return route.fulfill({ json: customerRows() });
+    if (url.pathname.endsWith("/link-requests")) return route.fulfill({ json: linkRows() });
+    if (/^\/api\/admin\/customers\/[^/]+\/payouts$/.test(url.pathname)) return route.fulfill({ json: historyRows() });
+    if (/^\/api\/admin\/customers\/[^/]+$/.test(url.pathname)) return route.fulfill({ json: CUSTOMER_PAGE });
+    if (url.pathname === "/api/admin/review-cases") return route.fulfill({ json: reviewRows(url) });
+    if (/^\/api\/admin\/review-cases\/\d+$/.test(url.pathname)) return route.fulfill({ json: REVIEW_DETAIL });
+    if (url.pathname.endsWith("/preview")) return route.fulfill({ json: REVIEW_PREVIEW });
     if (url.pathname === "/api/admin/payouts") return route.fulfill({ json: payoutRows(url) });
     if (url.pathname === "/api/admin/payout-history") return route.fulfill({ json: historyRows() });
     if (url.pathname === "/api/admin/network-settlements") return route.fulfill({ json: networkRows() });
@@ -235,6 +295,21 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`settings-${label}`, width, height, "/admin/settings");
   await shoot(`settings-confirm-${label}-sheet`, width, height, "/admin/settings", (page) => page.getByRole("switch").first().click().then(() => page.locator("[data-affected]").waitFor({ timeout: 10_000 })));
 }
+const reviewPreview = (page) =>
+  page.getByRole("button", { name: /^Xem ca 241027F3HQ/ }).click()
+    .then(() => page.locator("[data-review-facts]").waitFor({ timeout: 10_000 }))
+    .then(() => page.getByRole("dialog").getByRole("button", { name: /^\u00c1p d\u1ee5ng$/ }).click())
+    .then(() => page.getByRole("dialog").locator("textarea").fill("Link R26102714023 l\u00e0 c\u1ee7a DP00031"))
+    .then(() => page.getByRole("dialog").getByRole("button", { name: /^Xem k\u1ebft qu\u1ea3$/ }).click())
+    .then(() => page.locator("[data-review-preview]").waitFor({ timeout: 10_000 }));
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`customers-${label}`, width, height, "/admin/customers");
+  await shoot(`customer-${label}`, width, height, "/admin/customers/DP00012");
+  await shoot(`review-${label}`, width, height, "/admin/review");
+  await shoot(`review-case-${label}-sheet`, width, height, "/admin/review", reviewPreview);
+}
+await shoot("review-case-phone-390-candidates-sheet", 390, 844, "/admin/review", (page) => reviewPreview(page).then(() => page.locator("[data-review-body]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
+await shoot("customer-tablet-768-columns", 768, 1024, "/admin/customers/DP00012", (page) => page.getByRole("button", { name: /^C\u1ed9t$/ }).click());
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
 await shoot("orders-phone-390-filter-sheet", 390, 844, "/admin/orders", (page) => page.getByRole("button", { name: /^B/ }).first().click());

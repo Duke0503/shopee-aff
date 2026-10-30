@@ -73,8 +73,13 @@ function addEntry(into: Map<string, number[]>, clawbackId: string, total: number
   else entries.push(total);
 }
 
+export type Owner = (stored: string) => string | null;
+
+/** A balance of nothing at all: every figure 0. */
+export const NO_BALANCE: Omit<Balance, "customerId"> = { gross: 0, payable: 0, waiting: 0, paid: 0, deductedNext: 0 };
+
 /** The survivor a stored customer id belongs to, resolved once per id; null for nobody, an erased customer or HOUSE (D5). */
-export function survivorResolver(db: LedgerDb): (stored: string) => string | null {
+export function survivorResolver(db: LedgerDb): Owner {
   const known = new Map<string, string | null>();
   return (stored) => {
     if (!known.has(stored)) {
@@ -86,8 +91,7 @@ export function survivorResolver(db: LedgerDb): (stored: string) => string | nul
 }
 
 /** Every balance part over the stored ids (null: all), credited to survivors; `seed` survivors start at 0. */
-function collect(db: LedgerDb, ids: readonly string[] | null, seed: readonly string[]): Map<string, Parts> {
-  const owner = survivorResolver(db);
+function collect(db: LedgerDb, ids: readonly string[] | null, seed: readonly string[], owner: Owner = survivorResolver(db)): Map<string, Parts> {
   const empty = (): Parts => ({ gross: [], waiting: [], paid: [], clawbacks: new Map(), credits: new Map() });
   const parts = new Map<string, Parts>(seed.map((id) => [id, empty()]));
   const of = (stored: string): Parts | undefined => {
@@ -137,12 +141,22 @@ export function getBalances(db: LedgerDb, customerIds: readonly string[]): Balan
 }
 
 /**
+ * The balance of every survivor any record is credited to, by survivor id, read in one pass with
+ * the same parts and the same arithmetic as `getBalances`: the Customers list shows exactly the
+ * figures of the customer page and the Payouts row. A customer absent from the map has nothing
+ * anywhere (`NO_BALANCE`). A caller that also credits other records may pass its own `owner`, so
+ * one request resolves each stored id once.
+ */
+export function allBalances(db: LedgerDb, owner?: Owner): Map<string, Balance> {
+  return new Map([...collect(db, null, [], owner)].map(([id, p]) => [id, balanceOf(id, p)]));
+}
+
+/**
  * Every customer with something to pay or to net (gross above 0), by survivor id. One whose open
  * clawbacks reach the gross stays in the list with payable 0: a netting-only payout clears it (D42).
  */
 export function payableBalances(db: LedgerDb): Balance[] {
-  return [...collect(db, null, [])]
-    .map(([id, p]) => balanceOf(id, p))
+  return [...allBalances(db).values()]
     .filter((b) => b.gross > 0)
     .sort((a, b) => (a.customerId < b.customerId ? -1 : a.customerId > b.customerId ? 1 : 0));
 }

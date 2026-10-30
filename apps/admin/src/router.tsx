@@ -8,6 +8,9 @@
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, type RouterHistory } from "@tanstack/react-router";
 import { useMemo } from "react";
 
+import { CustomerPage } from "./customers/customer.page";
+import { CustomersPage } from "./customers/customers.page";
+import { CUSTOMERS_SEARCH, TAB_SEARCH, tabOf } from "./customers/customers.queries";
 import { adminText, type AdminKey } from "./labels";
 import { OrdersPage } from "./orders/orders.page";
 import { ORDERS_SEARCH } from "./orders/orders.queries";
@@ -21,6 +24,8 @@ import { PayoutHistoryPage } from "./payouts/payout-history.page";
 import { PAYOUT_HISTORY_SEARCH } from "./payouts/payout-history.queries";
 import { PayoutsPage } from "./payouts/payouts.page";
 import { PAYOUTS_SEARCH } from "./payouts/payouts.queries";
+import { ReviewPage } from "./review/review.page";
+import { REVIEW_SEARCH } from "./review/review.queries";
 import { SettingsPage } from "./settings/settings.page";
 import { SignInRoute } from "./pages/sign-in-route";
 import { parseSearch, stringifySearch } from "./search-params";
@@ -100,6 +105,56 @@ export const networkSettlementsRoute = createRoute({
   },
 });
 
+export const customersRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "customers",
+  validateSearch: (raw: Record<string, unknown>) => CUSTOMERS_SEARCH.validate(raw),
+  component: function CustomersScreen() {
+    const search = customersRoute.useSearch();
+    const navigate = useNavigate({ from: customersRoute.fullPath });
+    const state = useMemo(() => CUSTOMERS_SEARCH.parse(search), [search]);
+    return <CustomersPage state={state} onStateChange={(next, options) => void navigate({ search: CUSTOMERS_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
+/** One customer's page: the tab (absent for the first) and that tab's own list state, in the URL. */
+export const customerRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "customers/$customerKey",
+  validateSearch: (raw: Record<string, unknown>): Record<string, string> => {
+    const tab = tabOf(raw["tab"]);
+    return { ...(tab === "orders" ? {} : { tab }), ...TAB_SEARCH[tab].validate(raw) };
+  },
+  component: function CustomerScreen() {
+    const { customerKey } = customerRoute.useParams();
+    const search = customerRoute.useSearch();
+    const navigate = useNavigate({ from: customerRoute.fullPath });
+    const tab = tabOf(search["tab"]);
+    const state = useMemo(() => TAB_SEARCH[tab].parse(search), [search, tab]);
+    return (
+      <CustomerPage
+        key={customerKey}
+        customerKey={customerKey}
+        tab={tab}
+        state={state}
+        onChange={(nextTab, next, options) => void navigate({ search: { ...(nextTab === "orders" ? {} : { tab: nextTab }), ...TAB_SEARCH[nextTab].toParams(next) }, replace: options?.replace === true })}
+      />
+    );
+  },
+});
+
+export const reviewRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "review",
+  validateSearch: (raw: Record<string, unknown>) => REVIEW_SEARCH.validate(raw),
+  component: function ReviewScreen() {
+    const search = reviewRoute.useSearch();
+    const navigate = useNavigate({ from: reviewRoute.fullPath });
+    const state = useMemo(() => REVIEW_SEARCH.parse(search), [search]);
+    return <ReviewPage state={state} onStateChange={(next, options) => void navigate({ search: REVIEW_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
 const settingsRoute = createRoute({ getParentRoute: () => deskRoute, path: "settings", component: SettingsPage });
 
 const routeTree = rootRoute.addChildren([
@@ -109,9 +164,10 @@ const routeTree = rootRoute.addChildren([
     payoutsRoute,
     payoutHistoryRoute,
     networkSettlementsRoute,
-    pendingRoute("review", "nav_review"),
+    reviewRoute,
     ordersRoute,
-    pendingRoute("customers", "nav_customers"),
+    customersRoute,
+    customerRoute,
     pendingRoute("links", "nav_links"),
     pendingRoute("campaigns", "nav_campaigns", true),
     pendingRoute("staff", "nav_staff", true),

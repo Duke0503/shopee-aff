@@ -62,6 +62,9 @@ export function bankAccountsOf(db: LedgerDb, customerIds: readonly string[]): Ma
   );
 }
 
+/** The bank name a desk screen shows: the matched VietQR bank's short name, else the name as written. */
+export const bankDisplayName = (bank: BankAccountFacts): string | null => bank.vietQrBank?.shortName ?? bank.bankName;
+
 /** The full account number, for the VietQR payload and the audited copy only (never a list or a log). */
 export function accountNumberOf(db: LedgerDb, customerId: string): string | null {
   return db.select({ number: bankAccounts.accountNumber }).from(bankAccounts).where(eq(bankAccounts.customerId, customerId)).get()?.number ?? null;

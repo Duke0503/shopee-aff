@@ -17,6 +17,7 @@ import type { Logger } from "../platform/log/logger";
 import { cloudflareAccessKeys, type AccessKeySource } from "../platform/http/access-jwt.guard";
 import type { StaffGate, StaffRoutes } from "../platform/http/staff-routes";
 import { applyDepsFor, reviewReadDepsFor } from "../reconcile/apply-deps";
+import { customerDeskRoutes } from "./customer-desk.routes";
 
 export interface AdminDeskDeps {
   readonly access: StaffAccessConfig;
@@ -48,6 +49,7 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     staffSessionRoutes({ ledger, clock, auditFor: (db) => auditFor(db, clock) }),
     reviewCaseRoutes({
       ledger,
+      clock,
       applyDeps: (db, actor) => applyDepsFor(db, clock, { production: deps.production, actor }),
       readDeps: (actor) => reviewReadDepsFor(ledger.db, clock, actor, deps.production),
     }),
@@ -55,6 +57,7 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     payoutRecordRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), lookup: (db) => ({ told: (key) => wasTold(db, key) }), proofs: deps.proofs }),
     orderDeskRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
     networkSettlementRoutes({ ledger, clock }),
+    customerDeskRoutes({ ledger, clock }),
   ];
   return { gate, routes };
 }

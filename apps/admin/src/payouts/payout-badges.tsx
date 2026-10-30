@@ -45,7 +45,7 @@ export function FlagBadge({ flag, changedAt = null }: { readonly flag: PayoutFla
 export function FlagBadges({ flags, changedAt }: { readonly flags: readonly PayoutFlag[]; readonly changedAt: string | null }) {
   if (flags.length === 0) return <MissingValue />;
   return (
-    <span className="flex min-w-0 flex-wrap gap-1">
+    <span className="flex min-w-0 flex-wrap gap-1 whitespace-normal">
       {flags.map((flag) => (
         <FlagBadge key={flag} flag={flag} changedAt={changedAt} />
       ))}

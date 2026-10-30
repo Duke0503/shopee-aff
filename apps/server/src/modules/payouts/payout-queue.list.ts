@@ -6,24 +6,22 @@
  * nowhere, awaiting money never appears, and there is no option that widens this. A customer with
  * only awaiting orders is in no row.
  *
- * A balance is not a stored column, so each request builds the rows once, in memory, and copies
- * them into a temporary table of its own connection (`temp.payout_queue`); the `defineList()` spec
- * runs over it joined to the customers table, so search, sort, the page, the count and the summary
- * all come from the same filtered set as the rows (LC-6). The temporary table lives in SQLite's
- * per-connection temp database, never the ledger file: writing it takes no ledger write lock, so
- * a refresh never holds the one writer (AD-2), and it is emptied before the request returns. All
- * of it runs synchronously on the one connection, so no ledger write can land between the reads.
+ * A balance is not a stored column, so each request builds the rows once, in memory, and lists
+ * them from `temp.payout_queue` (platform/list/temp-rows.ts) joined to the customers table, so
+ * search, sort, the page, the count and the summary all come from the same filtered set as the
+ * rows (LC-6), without taking the ledger's write lock (AD-2).
  * The tab totals come from the same build and travel with the list response. Settlement is a
  * separate fact on the row (D27), and a partly settled customer is listed like any other.
  */
 import type { PayoutListResponse, PayoutQueueCounts, PayoutQueueRow } from "@cashback/contracts";
 import { settlementOf, type Clock } from "@cashback/core";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import { defineList } from "../../platform/list/define-list";
 import { answerList } from "../../platform/list/list-request";
-import { bankAccountsOf, sharedBankFingerprints, staffNamesOf } from "../identity/index";
+import { withTempRows, type TempTable } from "../../platform/list/temp-rows";
+import { bankAccountsOf, bankDisplayName, sharedBankFingerprints, staffNamesOf } from "../identity/index";
 import { payableOrderLines } from "../orders/index";
 import { payableBalances, survivorResolver } from "./balance.query";
 import { payoutFlags, queueOf } from "./payout-flags";
@@ -52,10 +50,12 @@ export const PAYOUT_QUEUE_LIST = defineList({
   defaultSort: { field: "payable", direction: "desc" },
 });
 
-const TEMP_TABLE = sql.raw(`CREATE TEMP TABLE IF NOT EXISTS payout_queue (
-  customer_id TEXT PRIMARY KEY NOT NULL, queue TEXT NOT NULL, payable INTEGER NOT NULL, bank_name TEXT, account_last_four TEXT,
+const TEMP_TABLE: TempTable = {
+  name: "payout_queue",
+  columns: `customer_id TEXT PRIMARY KEY NOT NULL, queue TEXT NOT NULL, payable INTEGER NOT NULL, bank_name TEXT, account_last_four TEXT,
   order_count INTEGER NOT NULL, settled_count INTEGER NOT NULL, settlement TEXT, flags TEXT NOT NULL, bank_changed_at TEXT,
-  claim_staff_id TEXT, claim_staff_name TEXT)`);
+  claim_staff_id TEXT, claim_staff_name TEXT`,
+};
 
 type QueueRow = Omit<PayoutQueueRow, "customerCode" | "customerName">;
 
@@ -96,7 +96,7 @@ export function payoutQueueRows(db: LedgerDb, clock: Clock): QueueRow[] {
       customerId: b.customerId,
       queue: queueOf(flags),
       payable: b.payable,
-      bankName: bank === null ? null : (bank.vietQrBank?.shortName ?? bank.bankName),
+      bankName: bank === null ? null : bankDisplayName(bank),
       accountLastFour: bank?.lastFour ?? null,
       orderCount: settled.length,
       settledCount: settled.filter(Boolean).length,
@@ -109,22 +109,7 @@ export function payoutQueueRows(db: LedgerDb, clock: Clock): QueueRow[] {
   });
 }
 
-function fill(db: LedgerDb, rows: readonly QueueRow[]): void {
-  db.run(TEMP_TABLE);
-  // One savepoint around the temp-only writes, so the rows go in as one batch; it touches no ledger table.
-  db.run(sql`SAVEPOINT payout_queue_fill`);
-  try {
-    db.run(sql`DELETE FROM temp.payout_queue`);
-    for (const r of rows) {
-      db.run(sql`INSERT INTO temp.payout_queue VALUES (${r.customerId}, ${r.queue}, ${r.payable}, ${r.bankName}, ${r.accountLastFour}, ${r.orderCount}, ${r.settledCount}, ${r.settlement}, ${r.flags}, ${r.bankChangedAt}, ${r.claimStaffId}, ${r.claimStaffName})`);
-    }
-    db.run(sql`RELEASE payout_queue_fill`);
-  } catch (error) {
-    db.run(sql`ROLLBACK TO payout_queue_fill`);
-    db.run(sql`RELEASE payout_queue_fill`);
-    throw error;
-  }
-}
+const queueValues = (r: QueueRow): readonly unknown[] => [r.customerId, r.queue, r.payable, r.bankName, r.accountLastFour, r.orderCount, r.settledCount, r.settlement, r.flags, r.bankChangedAt, r.claimStaffId, r.claimStaffName];
 
 const countsOf = (rows: readonly QueueRow[]): PayoutQueueCounts => ({ payable: rows.filter((r) => r.queue === "PAYABLE").length, action: rows.filter((r) => r.queue === "ACTION").length });
 
@@ -132,12 +117,7 @@ const countsOf = (rows: readonly QueueRow[]): PayoutQueueCounts => ({ payable: r
 export function answerPayoutQueue(ledger: Ledger, raw: unknown, clock: Clock): PayoutListResponse {
   const db = ledger.db;
   const rows = payoutQueueRows(db, clock);
-  fill(db, rows);
-  try {
-    return { ...answerList<typeof PAYOUT_QUEUE_LIST.fields, PayoutQueueRow>(db, PAYOUT_QUEUE_LIST, raw, clock), queues: countsOf(rows) };
-  } finally {
-    db.run(sql`DELETE FROM temp.payout_queue`);
-  }
+  return withTempRows(db, TEMP_TABLE, rows, queueValues, () => ({ ...answerList<typeof PAYOUT_QUEUE_LIST.fields, PayoutQueueRow>(db, PAYOUT_QUEUE_LIST, raw, clock), queues: countsOf(rows) }));
 }
 
 /** How many customers each tab holds, over the whole queue (the tabs' own totals, not a search). */

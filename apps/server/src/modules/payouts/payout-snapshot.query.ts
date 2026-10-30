@@ -86,7 +86,8 @@ function openRefunds(db: LedgerDb, keys: readonly string[]): RefundLine[] {
     .filter((r) => r.amount > 0);
 }
 
-function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
+/** The open clawbacks under the stored ids, each with what it still owes back (AD-6, D42). */
+export function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
   const rows = entrySums(db, keys, CLAWBACK_KINDS, "CLAWBACK");
   return rows.map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, open: openClawbackTotal([clawbackOpenAmount([r.total])]) })).filter((c) => c.open > 0);
 }

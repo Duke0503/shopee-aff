@@ -19,6 +19,8 @@ export { fillLabel, statusLabel, uiText, type UiKey } from "./labels";
 export { cn } from "./lib/utils";
 export * from "./icons";
 export { DataList, nextSort } from "./data-list/data-list";
+export { ColumnsMenu, type ColumnsMenuProps } from "./data-list/columns-menu";
+export { FacetChips, type FacetChipsProps, type FacetChoice } from "./data-list/facet-chips";
 export { DateFilter, ListSelect, OptionFilter, presetRange, type DateFilterProps, type FilterApi, type ListSelectProps, type SelectOption } from "./data-list/list-filters";
 export {
   ListFetchError,

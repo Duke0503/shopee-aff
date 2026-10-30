@@ -76,3 +76,8 @@ export { findLinkRequestOwner, type LinkRequestOwner } from "./link-request.quer
 export { httpsImageUrl, productSnapshotsOf, type ProductSnapshot } from "./product-snapshot.query";
 export { findShareCode, type SharedLink } from "./share-code.query";
 export { LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";
+export {
+  answerCustomerLinkRequests,
+  LINK_REQUESTS_LIST,
+  linkRequestCountOf,
+} from "./link-requests.list";

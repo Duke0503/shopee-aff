@@ -31,11 +31,12 @@ export function StatusBadge({ entity, value, className }: StatusBadgeProps) {
   return (
     <span
       data-tone={tone}
-      className={cn("inline-flex h-[22px] max-w-full items-center gap-1 rounded-full px-2 text-caption font-medium", TONE_CLASSES[tone], className)}
+      className={cn("inline-flex min-h-[22px] max-w-full items-center gap-1 rounded-[11px] px-2 py-0.5 text-caption leading-tight font-medium whitespace-normal", TONE_CLASSES[tone], className)}
     >
       {tone === "done" && <CheckIcon aria-hidden className="size-3 shrink-0" />}
       {tone === "rejected" && <XIcon aria-hidden className="size-3 shrink-0" />}
-      <span className="truncate">{label}</span>
+      {/* Never cut off: a label wider than its column wraps to a second line (owner request, Sprint 18). */}
+      <span className="min-w-0 break-words">{label}</span>
     </span>
   );
 }

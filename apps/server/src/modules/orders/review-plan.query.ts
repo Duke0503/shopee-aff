@@ -110,11 +110,28 @@ export function openCaseOf(db: LedgerDb, caseId: number): ReviewCaseRow {
   return found;
 }
 
-const candidatesOf = (c: ReviewCaseRow): string[] => JSON.parse(c.candidates) as string[];
+/** Stored JSON read without throwing: a damaged value is read as nothing, so a case can always be dismissed. */
+export function parseStored(json: string): unknown {
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** The customer ids the rules stored on the case; damaged or non-text entries are left out. */
+export function caseCandidates(json: string): string[] {
+  const stored = parseStored(json);
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+}
+
+const candidatesOf = (c: ReviewCaseRow): string[] => caseCandidates(c.candidates);
 
 /** A stored row (a case's or an observation's JSON, as reconciliation wrote it) as the row it was; null when it holds none. */
 export function storedRow(json: string, network: SourcedRow["network"]): SourcedRow | null {
-  const o = JSON.parse(json) as Partial<SourcedRow>;
+  const parsed = parseStored(json);
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const o = parsed as Partial<SourcedRow>;
   if (typeof o.orderId !== "string" || !Array.isArray(o.items) || !Array.isArray(o.subIds)) return null;
   const { orderId, rawOrderStatus = null, orderStatus = null, items, subIds, problems = [] } = o;
   return sourced({ network: o.network ?? network, orderId, rawOrderStatus, orderStatus, items, subIds, problems }, (o.purchasedAt ?? null) as Instant | null);
@@ -142,6 +159,8 @@ function planAttribution(db: LedgerDb, c: ReviewCaseRow, input: ReviewApplyInput
   const guestRow = byRequest?.guest === true || candidates.some((id) => directory.resolveCustomer(id)?.guest === true);
   if (guestRow && resolved?.guest !== true) refuse("guest_order", "a guest order is never attributed to a customer (D5)");
   if (!candidates.includes(target) || resolved === null) return refuse("not_a_candidate", `${target} is not a candidate of review case ${c.caseId}`);
+  // The guest account is never a review candidate (D5): its orders earn nothing, so staff dismiss such a case.
+  if (resolved.guest) refuse("guest_order", "a review case is never applied to the guest account (D5)");
   const credited = byRequest?.customerId === resolved.customerId ? subId2 : null;
   const attribution = {
     kind: "customer",

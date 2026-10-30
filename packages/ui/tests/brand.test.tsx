@@ -72,3 +72,14 @@ describe("Code chip: one component, copy on tap, confirmed for two seconds", () 
     expect(screen.getByRole("button")).toHaveClass("max-w-full", "min-w-0");
   });
 });
+
+describe("status badge never cuts its label (Sprint 18 review)", () => {
+  it("a long label wraps to another line inside a narrow column instead of an ellipsis", () => {
+    const { container } = render(<StatusBadge entity="order" value="REJECTED" />);
+    const badge = container.firstElementChild as HTMLElement;
+    expect(badge.className).toContain("whitespace-normal");
+    expect(badge.className).not.toMatch(/(^|\s)h-\[22px\]/);
+    expect(container.querySelector(".truncate")).toBeNull();
+    expect(badge).toHaveTextContent(statusLabel("status_rejected"));
+  });
+});

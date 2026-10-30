@@ -13,6 +13,7 @@ export {
   ChevronRightIcon,
   ChevronUpIcon,
   ClipboardCheckIcon,
+  Columns3Icon,
   CopyIcon,
   EllipsisIcon,
   EyeIcon,

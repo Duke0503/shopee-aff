@@ -9,7 +9,8 @@
  * missing values sort last either way and the spec's key breaks ties, so pages never overlap.
  *
  * A spec may also ask for `overall`, the unfiltered count, which a screen shows labelled as the
- * overall total, never as the filtered one.
+ * overall total, never as the filtered one. A scoped list (filters the server sets, such as one
+ * customer's orders) counts its overall total inside that scope only.
  *
  * The statements run back to back on the one synchronous connection of the one writer
  * process (AD-2), so no write can land between them.
@@ -107,13 +108,14 @@ function summaryOf<F extends FieldSpecs>(db: LedgerDb, list: ListDefinition<F>, 
 }
 
 /** One page of the list, with its total, facets and summary over the same filtered set. */
-export function runList<F extends FieldSpecs, R = Record<keyof F, unknown>>(db: LedgerDb, list: ListDefinition<F>, query: ListQuery<F>, clock: Clock): ListResponse<R> {
+export function runList<F extends FieldSpecs, R = Record<keyof F, unknown>>(db: LedgerDb, list: ListDefinition<F>, query: ListQuery<F>, clock: Clock, scope: readonly ListFilter[] = []): ListResponse<R> {
   const from = raw(list.from);
-  const where = whereSql(list, query);
+  const where = whereSql(list, { ...query, filters: [...query.filters, ...scope] });
   const total = db.get<{ total: number }>(sql`SELECT COUNT(*) AS total FROM ${from} WHERE ${where}`)?.total ?? 0;
   const page = clampPage(query.page, query.pageSize, total);
   const rows = db.all<R>(sql`SELECT ${selectList(list.fields)} FROM ${from} WHERE ${where} ORDER BY ${orderSql(list, query)} LIMIT ${query.pageSize} OFFSET ${(page - 1) * query.pageSize}`);
   const response: ListResponse<R> = { rows, total, page, pageSize: query.pageSize, facets: facetsOf(db, list, from, where), summary: summaryOf(db, list, from, where), asOf: clock.now() };
-  if (list.overallTotal === true) response.overall = db.get<{ total: number }>(sql`SELECT COUNT(*) AS total FROM ${from}`)?.total ?? 0;
+  // The overall total of a scoped list is the scope's own (one customer's orders), never the whole table.
+  if (list.overallTotal === true) response.overall = db.get<{ total: number }>(sql`SELECT COUNT(*) AS total FROM ${from} WHERE ${whereSql(list, { ...query, q: null, filters: scope })}`)?.total ?? 0;
   return response;
 }

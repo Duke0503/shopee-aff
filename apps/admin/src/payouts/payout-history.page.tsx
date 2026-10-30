@@ -20,7 +20,7 @@ import { VoidDialog } from "./void-dialog";
 
 const nameOf = (row: PayoutHistoryRow): string => row.customerName ?? row.customerCode ?? row.customerId;
 
-function ReceiptLink({ row }: { readonly row: PayoutHistoryRow }) {
+export function ReceiptLink({ row }: { readonly row: PayoutHistoryRow }) {
   if (row.receiptToken === null) return <span className="text-meta text-muted-foreground">{adminText("history_netting")}</span>;
   return (
     <a href={receiptPath(row.receiptToken)} target="_blank" rel="noopener noreferrer" aria-label={adminText("history_receipt_aria", { payout: row.payoutId })} className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline md:min-h-0">

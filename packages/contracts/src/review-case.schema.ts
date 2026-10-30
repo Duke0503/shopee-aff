@@ -21,13 +21,17 @@ export const reviewPreviewResponseSchema = z.object({
   caseId: z.number().int(),
   orderId: z.string(),
   customerId: z.string().nullable(),
+  /** The code of that customer, for "the order will belong to DP00031". */
+  customerCode: z.string().nullable(),
   from: z.string().nullable(),
   to: z.string(),
   cashback: z.number().int().nullable(),
 });
+export type ReviewPreviewResponse = z.infer<typeof reviewPreviewResponseSchema>;
 
 export const reviewOutcomeResponseSchema = z.object({
   caseId: z.number().int(),
   orderId: z.string().nullable(),
   resolution: z.enum(["APPLIED", "DISMISSED"]),
 });
+export type ReviewOutcomeResponse = z.infer<typeof reviewOutcomeResponseSchema>;

@@ -44,5 +44,8 @@
   "list_date_last7": "7 ngày qua",
   "list_date_this_month": "Tháng này",
   "list_date_last_month": "Tháng trước",
-  "list_date_range": "{from} – {to}"
+  "list_date_range": "{from} – {to}",
+  "list_columns": "Cột",
+  "list_columns_title": "Hiện thêm cột",
+  "list_chip_group": "Lọc nhanh"
 }

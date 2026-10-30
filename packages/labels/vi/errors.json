@@ -42,5 +42,18 @@
   "error.settlement_period.always_withheld": "Sàn này luôn khấu trừ thuế, không đổi được.",
   "error.settlement_period.invalid_period": "Kỳ không hợp lệ. Chọn lại tháng.",
   "error.network_payout.not_found": "Không tìm thấy lần sàn thanh toán này.",
-  "error.network_payout.status_not_allowed": "Trạng thái thanh toán của sàn không được lùi lại."
+  "error.network_payout.status_not_allowed": "Trạng thái thanh toán của sàn không được lùi lại.",
+  "error.customer.not_found": "Không tìm thấy khách này.",
+  "error.review_case.staff_only": "Chỉ nhân viên xử lý được ca này.",
+  "error.review_case.reason_missing": "Cần ghi lý do.",
+  "error.review_case.case_not_found": "Không tìm thấy ca này.",
+  "error.review_case.case_resolved": "Ca này đã được xử lý rồi.",
+  "error.review_case.order_paid": "Đơn này đã chuyển tiền cho khách nên không đổi được nữa.",
+  "error.review_case.guest_order": "Đơn từ link không hoàn tiền không được tính cho khách nào.",
+  "error.review_case.candidate_required": "Chọn một khách trong danh sách khách có thể đúng.",
+  "error.review_case.not_a_candidate": "Khách này không có trong danh sách khách có thể đúng.",
+  "error.review_case.cancel_signal_seen": "Báo cáo mới nhất của sàn vẫn ghi đơn bị huỷ nên chưa khôi phục được.",
+  "error.review_case.no_observation": "Chưa có dòng báo cáo nào của đơn này để đối chiếu.",
+  "error.review_case.evidence_changed": "Dòng báo cáo của ca này vừa thay đổi. Đóng rồi mở lại ca để xem số mới.",
+  "error.review_case.review_not_applicable": "Ca này không áp dụng được. Kiểm tra rồi bỏ qua với lý do."
 }

@@ -6,7 +6,8 @@
  * open (LC-11). Closing the panel releases the claim and refreshes the list (LC-10); a claim whose
  * answer arrives after the panel was closed is released at once, so no OPEN claim is left behind.
  * Confirm sends only the snapshot hash of the preview shown; once it is recorded, the payouts and
- * orders lists refresh (LC-10).
+ * orders lists and the customers with their pages refresh (LC-10, list-defects "after a transfer,
+ * Payments and metrics are not refreshed").
  */
 import {
   listSearch,
@@ -26,6 +27,7 @@ import { useListQuery } from "@cashback/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "../api/api.queries";
+import { CUSTOMERS_KEY } from "../customers/customers.queries";
 import { ORDERS_KEY } from "../orders/orders.queries";
 
 export const PAYOUTS_KEY = ["admin", "payouts"] as const;
@@ -91,6 +93,6 @@ export function useConfirmPayout() {
   return useMutation({
     mutationFn: async ({ claimId, snapshotHash }: ConfirmRequest): Promise<PayoutConfirmResponse> =>
       payoutConfirmResponseSchema.parse(await apiRequest(`/api/admin/payout-claims/${encodeURIComponent(claimId)}/confirm`, { method: "POST", body: { snapshotHash } })),
-    onSuccess: () => Promise.all([client.invalidateQueries({ queryKey: PAYOUTS_KEY }), client.invalidateQueries({ queryKey: ORDERS_KEY })]),
+    onSuccess: () => Promise.all([PAYOUTS_KEY, ORDERS_KEY, CUSTOMERS_KEY].map((queryKey) => client.invalidateQueries({ queryKey }))),
   });
 }

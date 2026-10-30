@@ -7,7 +7,7 @@
  * row, or a merged row with no survivor, resolves to null. Attribution, balances and lists
  * resolve through it.
  */
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { customerAliases, customers, type CustomerRole } from "./schema";
@@ -116,4 +116,71 @@ export function customerCardsOf(db: LedgerDb, customerIds: readonly string[]): M
 /** The ids of the guest accounts (role HOUSE, D5): their orders earn no cashback. */
 export function guestCustomerIds(db: LedgerDb): string[] {
   return db.select({ customerId: customers.customerId }).from(customers).where(eq(customers.role, "HOUSE")).all().map((r) => r.customerId);
+}
+
+/**
+ * The one rule for who the desk lists and opens as a customer (Story 4.14): a person who uses the
+ * service (role USER). The guest account (HOUSE, D5) and the customer records of staff accounts
+ * (ADMIN, EMPLOYEE) are not customers on any desk screen.
+ */
+export const DESK_CUSTOMER_ROLES: readonly CustomerRole[] = ["USER"];
+export const isDeskCustomer = (role: CustomerRole): boolean => DESK_CUSTOMER_ROLES.includes(role);
+
+export interface DeskCustomer {
+  readonly customerId: string;
+  readonly status: "ACTIVE" | "DISABLED" | "ERASED";
+}
+
+/**
+ * The desk customer behind a key of any kind (id, code, alias, Zalo id), merges followed, an erased
+ * customer included (FR-35: its page stays); null for nobody, a merged record without a survivor,
+ * or someone who is not a desk customer.
+ */
+export function deskCustomerOf(db: LedgerDb, key: string): DeskCustomer | null {
+  const compact = key.replace(/\s+/g, "");
+  if (compact === "") return null;
+  const row = followMerges(db, firstMatch(db, compact, compact.toUpperCase()));
+  if (!row || row.status === "MERGED" || !isDeskCustomer(row.role)) return null;
+  return { customerId: row.customerId, status: row.status };
+}
+
+/**
+ * The customers the desk lists (Story 4.14): every desk customer (`isDeskCustomer`) but a merged
+ * record, which lives on as an alias of its survivor. An erased customer stays listed under its id
+ * (FR-35).
+ */
+export function deskCustomers(db: LedgerDb): DeskCustomer[] {
+  return db
+    .select({ customerId: customers.customerId, status: customers.status })
+    .from(customers)
+    .where(and(inArray(customers.role, [...DESK_CUSTOMER_ROLES]), ne(customers.status, "MERGED")))
+    .all()
+    .flatMap((r) => (r.status === "MERGED" ? [] : [{ customerId: r.customerId, status: r.status }]));
+}
+
+export interface CustomerProfile {
+  readonly customerId: string;
+  readonly customerCode: string | null;
+  readonly displayName: string | null;
+  readonly status: "ACTIVE" | "DISABLED" | "ERASED";
+  readonly zaloUserId: string | null;
+  readonly createdAt: string | null;
+}
+
+/** What a staff customer page shows of one surviving customer (never a password or session fact). */
+export function customerProfileOf(db: LedgerDb, customerId: string): CustomerProfile | null {
+  const row = db
+    .select({
+      customerId: customers.customerId,
+      customerCode: customers.customerCode,
+      displayName: customers.displayName,
+      status: customers.status,
+      zaloUserId: customers.zaloUserId,
+      createdAt: customers.createdAt,
+    })
+    .from(customers)
+    .where(eq(customers.customerId, customerId))
+    .get();
+  if (row === undefined || row.status === "MERGED") return null;
+  return { ...row, status: row.status };
 }

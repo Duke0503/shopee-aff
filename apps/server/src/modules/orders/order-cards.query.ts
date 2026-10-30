@@ -2,9 +2,10 @@
  * What a screen shows of an order it names by id (Story 4.21: a network payout's orders): the
  * customer's code and name, the product snapshot of its link (D56, https images only), its
  * status, its stored approved commission and the network payout that settled it; and the open
- * review cases of one network payout. Read only.
+ * review cases of one network payout; how many orders each stored customer id holds; and a
+ * customer's latest orders for a review case's candidate (Story 4.15). Read only.
  */
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { customerCardsOf } from "../identity/index";
@@ -54,4 +55,70 @@ export function openSettlementCaseIds(db: LedgerDb, network: "shopee" | "accesst
     .orderBy(reviewCases.caseId)
     .all()
     .map((r) => r.caseId);
+}
+
+/** How many orders (any status) each stored customer id holds; the caller credits merged ids to their survivor. */
+export function orderCountsByCustomer(db: LedgerDb): { customerId: string; count: number }[] {
+  return db
+    .select({ customerId: orders.customerId, count: sql<number>`count(*)` })
+    .from(orders)
+    .where(sql`${orders.customerId} IS NOT NULL`)
+    .groupBy(orders.customerId)
+    .all()
+    .flatMap((r) => (r.customerId === null ? [] : [{ customerId: r.customerId, count: r.count }]));
+}
+
+/** How many orders the stored ids hold together (a survivor's id and its aliases). */
+export function orderCountOf(db: LedgerDb, customerIds: readonly string[]): number {
+  if (customerIds.length === 0) return 0;
+  return (
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(orders)
+      .where(inArray(orders.customerId, [...customerIds]))
+      .get()?.count ?? 0
+  );
+}
+
+export interface RecentOrder {
+  readonly orderId: string;
+  readonly productName: string | null;
+  readonly productImageUrl: string | null;
+  readonly status: string;
+  readonly cashback: number | null;
+  readonly recordedAt: string | null;
+}
+
+/** The latest orders under the stored ids, newest first, with their product snapshot (D56). */
+export function recentOrdersOf(
+  db: LedgerDb,
+  customerIds: readonly string[],
+  limit: number,
+): RecentOrder[] {
+  if (customerIds.length === 0) return [];
+  const rows = db
+    .select({
+      orderId: orders.orderId,
+      requestId: orders.requestId,
+      status: orders.status,
+      cashback: orders.cashback,
+      recordedAt: orders.recordedAt,
+    })
+    .from(orders)
+    .where(inArray(orders.customerId, [...customerIds]))
+    .orderBy(sql`${orders.recordedAt} DESC NULLS LAST`, desc(orders.orderId))
+    .limit(limit)
+    .all();
+  const products = productSnapshotsOf(
+    db,
+    rows.flatMap((r) => (r.requestId === null ? [] : [r.requestId])),
+  );
+  return rows.map(({ requestId, ...r }) => {
+    const product = requestId === null ? undefined : products.get(requestId);
+    return {
+      ...r,
+      productName: product?.productName ?? null,
+      productImageUrl: product?.productImageUrl ?? null,
+    };
+  });
 }

@@ -7,7 +7,7 @@
  * packages/core from the Vietnam day; a range in the URL that is no quick choice is shown as its
  * own option, so a shared link never loses its filter.
  */
-import type { ListSearchState } from "@cashback/contracts";
+import type { FacetCount, ListSearchState } from "@cashback/contracts";
 import { formatVnDate, systemClock, vnDatePreset, vnDayStart, VN_DATE_PRESETS, type Clock, type VnDate, type VnDatePreset } from "@cashback/core";
 import { useState } from "react";
 
@@ -17,6 +17,10 @@ export interface FilterApi {
   readonly state: ListSearchState;
   /** Sets the values of the fields named (none clears one), in one change, and goes back to page 1. */
   readonly setFilters: (patch: Readonly<Record<string, readonly string[]>>) => void;
+  /** The shown response's facets, total and overall total, for chips that count the filtered set (LC-6). */
+  readonly facets?: Readonly<Record<string, readonly FacetCount[]>> | undefined;
+  readonly total?: number | undefined;
+  readonly overall?: number | undefined;
 }
 
 export interface SelectOption {

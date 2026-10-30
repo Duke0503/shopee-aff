@@ -57,8 +57,10 @@ export {
 } from "./order-import.command";
 export { caseResolvedWith, openOrRefreshCase, resolveOpenCase, SETTLEMENT_CASE_REASONS, type CaseEvidence, type CaseReason, type CaseWrite, type SettlementCaseReason } from "./review-case.command";
 export { latestWithholding, observeWithholding, settleOrders, settlementCandidates, settlementOrdersOf, type SettleInput, type SettlementOrder, type SettlementWindow, type WithholdingObservation } from "./order-settlement.command";
-export { answerOrdersList, ORDERS_LIST } from "./orders.list";
-export { openSettlementCaseIds, orderCardsOf, type OrderCard } from "./order-cards.query";
+export { answerCustomerOrders, answerOrdersList, ORDERS_LIST } from "./orders.list";
+export { answerReviewCases, REVIEW_CASES_LIST } from "./review-cases.list";
+export { reviewCaseDetail } from "./review-case-detail.query";
+export { openSettlementCaseIds, orderCardsOf, orderCountOf, orderCountsByCustomer, recentOrdersOf, type OrderCard, type RecentOrder } from "./order-cards.query";
 export { orderBalanceRows, payableOrderLines, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows, type PayableOrderLine } from "./order-balance.query";
 export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
 export { reviewCaseRoutes, type ReviewCaseRouteDeps } from "./http/review-case.routes";

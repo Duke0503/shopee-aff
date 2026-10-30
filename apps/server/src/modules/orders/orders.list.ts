@@ -11,13 +11,17 @@
  * never the raw estimate or report JSON. The status chips' counts come from the same filtered set; the overall
  * total is answered separately and shown labelled as such. Nothing here writes: there is no
  * action on an order row, and the only way to PAID is a payout confirm.
+ *
+ * A customer's page lists the same rows scoped by the server to the customer's stored ids (the
+ * survivor and its aliases, Story 4.14); `customerId` is not a URL filter, so the scope cannot be
+ * widened or swapped from the browser.
  */
 import type { AdminOrderRow, ListResponse } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { defineList } from "../../platform/list/define-list";
-import { answerList } from "../../platform/list/list-request";
+import { answerList, answerScopedList } from "../../platform/list/list-request";
 import { httpsImageUrl } from "../linking/index";
 
 export const ORDERS_LIST = defineList({
@@ -25,6 +29,7 @@ export const ORDERS_LIST = defineList({
   key: "o.order_id",
   fields: {
     orderId: { kind: "text", column: "o.order_id", sortable: true },
+    customerId: { kind: "text", column: "o.customer_id" },
     customerCode: { kind: "text", column: "c.customer_code", sortable: true },
     customerName: { kind: "name", column: "c.display_name", sortKeyColumn: "c.sort_key", sortable: true },
     productName: { kind: "text", column: "l.product_name" },
@@ -46,9 +51,15 @@ export const ORDERS_LIST = defineList({
 
 type Row = Omit<AdminOrderRow, "productImageUrl"> & { productImageUrl: string | null };
 
+// The desk loads only https images (D56): any other snapshot URL is dropped, never shown.
+const httpsOnly = (page: ListResponse<Row>): ListResponse<AdminOrderRow> => ({ ...page, rows: page.rows.map((r) => ({ ...r, productImageUrl: httpsImageUrl(r.productImageUrl) })) });
+
 /** One page of the Orders list for a raw query; a refused query is the list error envelope. */
 export function answerOrdersList(db: LedgerDb, raw: unknown, clock: Clock): ListResponse<AdminOrderRow> {
-  const page = answerList<typeof ORDERS_LIST.fields, Row>(db, ORDERS_LIST, raw, clock);
-  // The desk loads only https images (D56): any other snapshot URL is dropped, never shown.
-  return { ...page, rows: page.rows.map((r) => ({ ...r, productImageUrl: httpsImageUrl(r.productImageUrl) })) };
+  return httpsOnly(answerList<typeof ORDERS_LIST.fields, Row>(db, ORDERS_LIST, raw, clock));
+}
+
+/** One customer's orders: the Orders list scoped to the stored ids the server resolved (Story 4.14). */
+export function answerCustomerOrders(db: LedgerDb, customerIds: readonly string[], raw: unknown, clock: Clock): ListResponse<AdminOrderRow> {
+  return httpsOnly(answerScopedList<typeof ORDERS_LIST.fields, Row>(db, ORDERS_LIST, raw, clock, [{ field: "customerId", kind: "in", values: customerIds }]));
 }
