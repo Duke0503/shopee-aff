@@ -29,12 +29,13 @@ export interface ApplyOptions {
 
 export function applyDepsFor(db: LedgerDb, clock: Clock, options: ApplyOptions): ApplyDeps {
   const by = commandAudit(db, clock, options.actor ?? RECONCILE_ACTOR);
+  const outbox = outboxFor(db, clock, by);
   return {
     clock,
     by,
-    outbox: outboxFor(db, clock, by),
+    outbox,
     alerts: alertsFor(db, clock),
-    payouts: orderPayoutsFor(db, clock, by),
+    payouts: orderPayoutsFor(db, { clock, by, outbox }),
     awards: orderAwardsFor(db, clock, by),
     events: options.events ?? NO_LISTENER,
     production: options.production,

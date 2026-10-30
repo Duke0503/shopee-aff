@@ -13,6 +13,12 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url)).replace(/[\\/]$
 const TOKEN = "s".repeat(40);
 
 describe("config (Story 1.5, AD-19)", () => {
+  it("review of Sprints 9-10 item 5: a blank value means unset for every optional key", () => {
+    const blank = { INTERNAL_TOKEN: TOKEN, SWEEP_PAUSE_MS: "", SHOPEE_REPORT_PATH: "  ", ACCESSTRADE_API_KEY: "", DATA_DIR: "", PUBLIC_PORT: "", LOG_LEVEL: "", FINGERPRINT_KEY: "", LIVE_LEDGER_PATH: "" };
+    expect(parseConfig("dev", blank)).toMatchObject({ sweepPauseMs: null, shopeeReportPath: null, accesstradeApiKey: null, publicPort: 9080, logLevel: "info", fingerprintKey: null, liveLedgerPath: null, dataDir: join(ROOT, "data", "dev") });
+    expect(() => parseConfig("dev", { INTERNAL_TOKEN: "" })).toThrow(/INTERNAL_TOKEN/);
+  });
+
   it("reads the per-environment file under ~/.config/cashback", () => {
     expect(configFilePath("prod", "/home/op")).toBe(join("/home/op", ".config", "cashback", "prod.env"));
   });

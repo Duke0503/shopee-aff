@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clawbackAmount, differenceDong, partialClawbackAmount, sumDong } from "../src/index";
+import { clawbackAmount, clawbackOpenAmount, differenceDong, partialClawbackAmount, sumDong } from "../src/index";
 
 describe("sumDong", () => {
   it("adds whole dong and refuses fractions, negatives and unsafe sums", () => {
@@ -31,5 +31,13 @@ describe("clawback amounts (D30, D35, D42, D55)", () => {
     expect(partialClawbackAmount({ storedCashback: 7000, newCashback: 4000, alreadyClawedBack: 0 })).toBe(3000);
     expect(partialClawbackAmount({ storedCashback: 7000, newCashback: 4000, alreadyClawedBack: 1000 })).toBe(2000);
     expect(partialClawbackAmount({ storedCashback: 7000, newCashback: 8000, alreadyClawedBack: 0 })).toBe(0);
+  });
+});
+
+describe("clawbackOpenAmount (D42)", () => {
+  it("is the signed sum of the clawback's entries and refuses fractions", () => {
+    expect(clawbackOpenAmount([-99216, 50000])).toBe(-49216);
+    expect(clawbackOpenAmount([])).toBe(0);
+    expect(() => clawbackOpenAmount([-1.5])).toThrow(RangeError);
   });
 });

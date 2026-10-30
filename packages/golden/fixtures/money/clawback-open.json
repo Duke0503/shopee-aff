@@ -1,0 +1,31 @@
+{
+  "rule": "clawbackOpenAmount",
+  "source": "status-flows.md section 2, D42, Story 3.6 AC4",
+  "cases": [
+    {
+      "name": "a new clawback is open at its negative original: cashback 79,216 plus a paid bonus of 20,000",
+      "input": { "entries": [-99216] },
+      "expected": -99216
+    },
+    {
+      "name": "netting 50,000 leaves -49,216 open",
+      "input": { "entries": [-99216, 50000] },
+      "expected": -49216
+    },
+    {
+      "name": "netting and a write-off close it",
+      "input": { "entries": [-99216, 50000, 49216] },
+      "expected": 0
+    },
+    {
+      "name": "a partial clawback after a commission drop from 100,000 to 60,000 (withheld): 71,216 less 42,730",
+      "input": { "entries": [-28486] },
+      "expected": -28486
+    },
+    {
+      "name": "no entries is nothing open",
+      "input": { "entries": [] },
+      "expected": 0
+    }
+  ]
+}

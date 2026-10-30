@@ -5,10 +5,15 @@
  * the same port. A read is all or nothing: a source that hits its page cap, or whose saved
  * pages say rows are missing, throws `report_page_cap` and hands the caller no partial set
  * (D43), so nothing is ever frozen or changed from half a report.
+ *
+ * Reconciliation (Stories 3.7, 3.8) reads through `WindowedReportSource`: the same all-or-nothing
+ * read, asked for one purchase-time window (the hourly 7 days, or one day of the nightly sweep).
+ * AccessTrade answers it from its API; Shopee, until the browser bridge of Story 5.9 answers it
+ * (shopee-bridge.adapter.ts), from a file the operator saved.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import type { Instant } from "@cashback/core";
+import { readFileSync, statSync } from "node:fs";
+import { instantFromMs, toMs, type Instant } from "@cashback/core";
 import type { AffiliateNetwork } from "@cashback/money";
 
 import type { ReportRow } from "./domain/report-row";
@@ -29,11 +34,59 @@ export interface SourcedReport {
   readonly skippedLines: number;
   /** sha256 of the exact bytes the rows were parsed from; null for a live API read. */
   readonly sha256: string | null;
+  /** A file source's modification time; absent or null for a live API read. */
+  readonly modifiedAt?: Instant | null;
 }
 
 export interface ReportSource {
   readonly network: AffiliateNetwork;
   read(): Promise<SourcedReport>;
+}
+
+/** A purchase-time window, half-open: `since` included, `until` excluded. */
+export interface ReportWindow {
+  readonly since: Instant;
+  readonly until: Instant;
+}
+
+export interface WindowedReportSource {
+  readonly network: AffiliateNetwork;
+  /** Reads every row purchased inside the window, or throws `ReportSourceError`; never a partial set. */
+  read(window: ReportWindow, signal?: AbortSignal): Promise<SourcedReport>;
+}
+
+/**
+ * The rows of a whole report that fall inside the window, for a source that cannot ask the network
+ * for a window (a saved file). A row without a purchase time is kept: it cannot be placed, and
+ * applying it again is a fingerprint skip.
+ */
+/**
+ * A saved file read, parsed and hashed once while it is unchanged (same modification time and
+ * size): every run and every day slice of the sweep cuts its window from the one parse in memory.
+ * The report carries the file's modification time, so a run can tell a stale file (D43).
+ */
+export function cachedFileReport(path: string, read: () => SourcedReport): () => SourcedReport {
+  let cached: { key: string; report: SourcedReport } | null = null;
+  return () => {
+    let key: string;
+    let modifiedAt: Instant;
+    try {
+      const stat = statSync(path);
+      key = `${stat.mtimeMs}:${stat.size}`;
+      modifiedAt = instantFromMs(Math.trunc(stat.mtimeMs));
+    } catch (error) {
+      throw new ReportSourceError("report_file_unreadable", `cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+    if (cached?.key !== key) cached = { key, report: { ...read(), modifiedAt } };
+    return cached.report;
+  };
+}
+
+export function withinWindow(report: SourcedReport, window: ReportWindow): SourcedReport {
+  const since = toMs(window.since);
+  const until = toMs(window.until);
+  const inside = (row: SourcedRow) => row.purchasedAt === null || (toMs(row.purchasedAt) >= since && toMs(row.purchasedAt) < until);
+  return { ...report, rows: report.rows.filter(inside) };
 }
 
 export type ReportSourceErrorCode =
@@ -43,7 +96,8 @@ export type ReportSourceErrorCode =
   | "report_file_unreadable"
   | "report_mapping_incomplete"
   | "report_fetch_failed"
-  | "report_window_too_long";
+  | "report_window_too_long"
+  | "report_source_unavailable";
 
 export class ReportSourceError extends Error {
   constructor(

@@ -32,23 +32,29 @@ export {
 } from "./domain/shopee-export";
 export {
   assertComplete,
+  cachedFileReport,
   fingerprintRow,
   readReportFile,
   ReportSourceError,
   sourced,
+  withinWindow,
   type ReportSource,
   type ReportSourceErrorCode,
+  type ReportWindow,
   type SourcedReport,
   type SourcedRow,
+  type WindowedReportSource,
 } from "./report-source.port";
-export { readShopeeFile, readShopeePages, SHOPEE_MAX_PAGES, SHOPEE_PAGE_SIZE, shopeeFileSource, type ShopeeFileOptions } from "./shopee-file.adapter";
-export { accessTradeFileSource, accessTradePages, readAccessTradeFile, readAccessTradePages, type AccessTradePage } from "./accesstrade-file.adapter";
+export { readShopeeFile, readShopeePages, SHOPEE_MAX_PAGES, SHOPEE_PAGE_SIZE, shopeeFileSource, shopeeFileWindowSource, type ShopeeFileOptions } from "./shopee-file.adapter";
+export { shopeeBridgeSource } from "./shopee-bridge.adapter";
+export { accessTradeFileSource, accessTradeFileWindowSource, accessTradePages, readAccessTradeFile, readAccessTradePages, type AccessTradePage } from "./accesstrade-file.adapter";
 export {
   ACCESSTRADE_MAX_PAGES,
   ACCESSTRADE_MAX_WINDOW_DAYS,
   ACCESSTRADE_PAGE_LIMIT,
   ACCESSTRADE_TIMEOUT_MS,
   accessTradeApiSource,
+  accessTradeWindowSource,
   fetchGet,
   readAccessTradeApi,
   type AccessTradeApiOptions,

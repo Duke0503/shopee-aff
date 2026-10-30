@@ -11,7 +11,7 @@
 import { toMs, type Instant } from "@cashback/core";
 
 import { readAccessTradePages, type AccessTradePage } from "./accesstrade-file.adapter";
-import { ReportSourceError, type ReportSource, type SourcedReport } from "./report-source.port";
+import { ReportSourceError, type ReportSource, type SourcedReport, type WindowedReportSource } from "./report-source.port";
 
 export const ACCESSTRADE_PAGE_LIMIT = 100;
 export const ACCESSTRADE_MAX_PAGES = 10;
@@ -37,6 +37,8 @@ export interface AccessTradeApiOptions {
   maxPages?: number;
   /** Per page, request and body together; 30 s by default. */
   timeoutMs?: number;
+  /** Aborts every page read, with the timeout; the scheduler's stop signal (AD-13). */
+  signal?: AbortSignal;
 }
 
 const DAY_MS = 86_400_000;
@@ -53,7 +55,8 @@ async function getPage(options: AccessTradeApiOptions, page: number): Promise<Ac
   const base = (options.baseUrl ?? "https://api.accesstrade.vn").replace(/\/+$/, "");
   const query = new URLSearchParams({ since: apiTime(options.since), until: apiTime(options.until), limit: String(ACCESSTRADE_PAGE_LIMIT), page: String(page) });
   const auth = options.apiKey.startsWith("Token ") ? options.apiKey : `Token ${options.apiKey}`;
-  const signal = AbortSignal.timeout(options.timeoutMs ?? ACCESSTRADE_TIMEOUT_MS);
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? ACCESSTRADE_TIMEOUT_MS);
+  const signal = options.signal === undefined ? timeout : AbortSignal.any([timeout, options.signal]);
   let body: unknown;
   try {
     const answer = await (options.get ?? fetchGet)(`${base}/v1/transactions?${query.toString()}`, { Authorization: auth }, signal);
@@ -90,4 +93,9 @@ export async function readAccessTradeApi(options: AccessTradeApiOptions): Promis
 
 export function accessTradeApiSource(options: AccessTradeApiOptions): ReportSource {
   return { network: "accesstrade", read: () => readAccessTradeApi(options) };
+}
+
+/** The reconciliation source (Stories 3.7, 3.8): the API asked for each run's window. */
+export function accessTradeWindowSource(options: Omit<AccessTradeApiOptions, "since" | "until">): WindowedReportSource {
+  return { network: "accesstrade", read: (window, signal) => readAccessTradeApi({ ...options, since: window.since, until: window.until, ...(signal === undefined ? {} : { signal }) }) };
 }

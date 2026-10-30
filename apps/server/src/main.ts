@@ -18,6 +18,7 @@ import { createScheduler, systemTimer, type Job, type Scheduler } from "./platfo
 import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
 import { createLogger, type Logger } from "./platform/log/logger";
+import { reconcileJobs } from "./reconcile/reconcile-jobs";
 
 function readConfig(): ServerConfig | null {
   try {
@@ -29,8 +30,10 @@ function readConfig(): ServerConfig | null {
   }
 }
 
-/** No module job exists yet; Stories 3.7, 3.8, 5.1, 4.7, 8.2 and 8.3 add theirs here. */
-const JOBS: readonly Job[] = [];
+/** The module jobs; Stories 5.1, 4.7, 8.2 and 8.3 add theirs here. */
+function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger): Job[] {
+  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger })];
+}
 
 async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Promise<RunningParts | null> {
   let ledger: Ledger | null = null;
@@ -47,7 +50,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock): Pr
     });
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, logger });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
-    jobs = createScheduler(JOBS, { clock: systemClock, timer: systemTimer, logger });
+    jobs = createScheduler(jobsFor(config, ledger, logger), { clock: systemClock, timer: systemTimer, logger });
     jobs.start();
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort }, "platform.server.started");
     return parts();

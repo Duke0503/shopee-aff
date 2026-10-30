@@ -54,4 +54,8 @@ export {
   type OrdersImport,
   type OrdersImportResult,
 } from "./order-import.command";
-export { ORDER_NETWORKS, ORDER_STATUSES, REVIEW_CASE_STATUSES, type OrderNetwork } from "./schema";
+export { openOrRefreshCase, resolveOpenCase, type CaseEvidence, type CaseReason, type CaseWrite } from "./review-case.command";
+export { openOrderDays, type OpenOrderDay, type OpenOrderDays } from "./open-order-days.query";
+export { AGED_AFTER_DAYS, FLAG_AFTER_DAYS, flagUnseenOrders, orderAging, resolveSeenAgain, type AgingCounts } from "./order-aging.command";
+export { lastSucceededRun, ReconciliationRunError, runReconciliation, SOURCE_STALE_AFTER_MS, type RunCounts, type RunDeps, type RunKind, type RunOutcome, type RunRecord } from "./reconciliation-run.command";
+export { ORDER_NETWORKS, ORDER_STATUSES, RECONCILIATION_RUN_KINDS, REVIEW_CASE_STATUSES, type OrderNetwork } from "./schema";

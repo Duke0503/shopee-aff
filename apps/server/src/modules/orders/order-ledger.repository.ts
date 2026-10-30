@@ -4,14 +4,13 @@
  * carried out by report-apply.command.ts and order-payout.command.ts.
  */
 import type { Instant } from "@cashback/core";
-import type { AffiliateNetwork } from "@cashback/money";
 import { and, desc, eq } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { resolveCustomer } from "../identity/index";
 import type { ObservedStatus } from "./domain/report-signal";
 import type { TransitionOrder } from "./domain/transition";
-import { orderItems, orderObservations, orders, reviewCases } from "./schema";
+import { orderItems, orderObservations, orders } from "./schema";
 
 export type StoredOrder = typeof orders.$inferSelect;
 
@@ -82,25 +81,4 @@ export function replaceItems(db: LedgerDb, orderId: string, items: readonly Item
       })
       .run();
   }
-}
-
-export interface ReviewCaseOpening {
-  readonly network: AffiliateNetwork;
-  readonly subject: string;
-  readonly orderId: string | null;
-  readonly reason: string;
-  readonly candidates: readonly string[];
-  readonly observation: string;
-  readonly openedAt: Instant;
-  readonly openedBy: string;
-}
-
-/** Opens a case unless one is already OPEN for the same network, subject and reason; returns its id when it opened one. */
-export function openReviewCase(db: LedgerDb, c: ReviewCaseOpening): number | null {
-  const result = db
-    .insert(reviewCases)
-    .values({ ...c, candidates: JSON.stringify(c.candidates), status: "OPEN" })
-    .onConflictDoNothing()
-    .run();
-  return result.changes === 1 ? Number(result.lastInsertRowid) : null;
 }

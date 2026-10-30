@@ -30,8 +30,8 @@ describe("insert-only tables (Story 1.6 AC4, AD-17)", () => {
     expect(sqlite.prepare("SELECT sum(amount) AS open FROM fixture_entries").get()).toEqual({ open: 0 });
   });
 
-  it("names the four tables of AD-17 and refuses an unsafe table name", () => {
-    expect(INSERT_ONLY_TABLES).toEqual(["audit_entries", "order_status_history", "order_observations", "ledger_entries"]);
+  it("names the four tables of AD-17 and the reconciliation runs, and refuses an unsafe table name", () => {
+    expect(INSERT_ONLY_TABLES).toEqual(["audit_entries", "order_status_history", "order_observations", "ledger_entries", "reconciliation_runs"]);
     expect(() => insertOnlyTriggersSql("x; DROP TABLE y")).toThrow(RangeError);
   });
 });

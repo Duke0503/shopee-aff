@@ -1,6 +1,6 @@
 /**
  * Stories 2.3, 2.4, 2.5 and 3.2: the orders, linking, messaging, operations, campaigns and
- * payouts Drizzle definitions match migrations 0002 to 0008 column by column, so a write through a module's schema.ts lands in the tables the
+ * payouts Drizzle definitions match migrations 0002 to 0010 column by column, so a write through a module's schema.ts lands in the tables the
  * migration made, and every table has exactly one owner (AD-4).
  */
 import { join } from "node:path";
@@ -63,6 +63,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       order_observations: "orders",
       settlement_periods: "orders",
       review_cases: "orders",
+      reconciliation_runs: "orders",
       product_offers: "linking",
       link_requests: "linking",
       share_codes: "linking",

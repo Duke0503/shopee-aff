@@ -1,10 +1,10 @@
 /**
  * Insert-only tables (AD-17, code.md §5). History and money entries are never
  * rewritten: code issues no UPDATE or DELETE on them, and these triggers reject one
- * that slips through. A migration that creates such a table adds the triggers with it.
+ * that slips through. `reconciliation_runs` joins the four tables of AD-17: a run is written once (AD-8). A migration that creates such a table adds the triggers with it.
  */
 
-export const INSERT_ONLY_TABLES = ["audit_entries", "order_status_history", "order_observations", "ledger_entries"] as const;
+export const INSERT_ONLY_TABLES = ["audit_entries", "order_status_history", "order_observations", "ledger_entries", "reconciliation_runs"] as const;
 
 const TABLE_NAME = /^[a-z][a-z0-9_]*$/;
 

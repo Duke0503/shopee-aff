@@ -1,6 +1,6 @@
 /**
- * The orders module's tables (AD-4), as created by migrations/0002_orders.sql and
- * 0008_reconciliation.sql. Only this module
+ * The orders module's tables (AD-4), as created by migrations/0002_orders.sql,
+ * 0008_reconciliation.sql, 0009_review_case_evidence.sql and 0010_reconciliation_runs.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -111,6 +111,36 @@ export const reviewCases = sqliteTable("review_cases", {
   resolvedAt: text("resolved_at"),
   resolvedBy: text("resolved_by"),
   resolutionReason: text("resolution_reason"),
+  fingerprint: text("fingerprint"),
+  refreshedAt: text("refreshed_at"),
+});
+
+export const RECONCILIATION_RUN_KINDS = ["HOURLY", "NIGHTLY"] as const;
+export const RUN_OUTCOMES = ["SUCCEEDED", "FAILED", "SOURCE_STALE"] as const;
+
+export const reconciliationRuns = sqliteTable("reconciliation_runs", {
+  runId: integer("run_id").primaryKey({ autoIncrement: true }),
+  kind: text("kind", { enum: RECONCILIATION_RUN_KINDS }).notNull(),
+  network: text("network", { enum: ORDER_NETWORKS }).notNull(),
+  source: text("source"),
+  sourceSha256: text("source_sha256"),
+  sourceModifiedAt: text("source_modified_at"),
+  windowFrom: text("window_from").notNull(),
+  windowTo: text("window_to").notNull(),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  clockStepped: integer("clock_stepped", { mode: "boolean" }).notNull().default(false),
+  outcome: text("outcome", { enum: RUN_OUTCOMES }).notNull(),
+  errorCode: text("error_code"),
+  rowsRead: integer("rows_read").notNull().default(0),
+  applied: integer("applied").notNull().default(0),
+  skipped: integer("skipped").notNull().default(0),
+  deferred: integer("deferred").notNull().default(0),
+  unrecorded: integer("unrecorded").notNull().default(0),
+  frozen: integer("frozen").notNull().default(0),
+  casesOpened: integer("cases_opened").notNull().default(0),
+  failedRows: integer("failed_rows").notNull().default(0),
 });
 
 export type OrderRow = typeof orders.$inferInsert;

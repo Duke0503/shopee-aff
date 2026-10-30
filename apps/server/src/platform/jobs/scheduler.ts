@@ -8,7 +8,9 @@
  * Outcomes are log lines (AD-27): `<context>.job.finished` or `<context>.job.failed`, and
  * `<context>.job.skipped` when a run is asked for while one is going. A failed run is
  * rescheduled like a finished one. The clock and the timer are injected so tests drive time.
- * On shutdown no new run starts; `stop` waits for the current runs or gives up at its timeout.
+ * On shutdown no new run starts, each current run's `AbortSignal` is aborted so a long job (the
+ * nightly sweep) stops at its next step, and `stop` waits for the current runs or gives up at its
+ * timeout.
  */
 import { nextVnTimeOfDay, toMs, type Clock, type VnTimeOfDay } from "@cashback/core";
 
@@ -22,8 +24,8 @@ export interface Job {
   /** The log context, `<context>.job.failed` (a module name or `platform`). */
   readonly context: string;
   readonly schedule: JobSchedule;
-  /** One run; may be synchronous. Its own transactions are its business. */
-  readonly run: () => void | Promise<void>;
+  /** One run; may be synchronous. Its own transactions are its business; `signal` aborts at shutdown. */
+  readonly run: (signal: AbortSignal) => void | Promise<void>;
 }
 
 export interface JobTimer {
@@ -63,6 +65,8 @@ export interface Scheduler {
 interface JobState {
   readonly job: Job;
   running: Promise<void> | null;
+  /** Aborted when the scheduler stops during this run. */
+  abort: AbortController | null;
   /** The one timer this job owns, or null. */
   pending: unknown;
   /** Bumped whenever the pending timer is replaced or cancelled; a callback from an older timer does nothing. */
@@ -120,14 +124,17 @@ function runOnce(ctx: Context, state: JobState): TriggerResult {
   cancelPending(ctx, state);
   const startedAt = toMs(ctx.clock.now());
   const elapsed = () => toMs(ctx.clock.now()) - startedAt;
+  const abort = new AbortController();
+  state.abort = abort;
   state.running = Promise.resolve()
-    .then(() => job.run())
+    .then(() => job.run(abort.signal))
     .then(
       () => ctx.logger.info({ job: job.name, durationMs: elapsed() }, `${job.context}.job.finished`),
       (error: unknown) => ctx.logger.error({ job: job.name, durationMs: elapsed(), err: error }, `${job.context}.job.failed`),
     )
     .finally(() => {
       state.running = null;
+      state.abort = null;
       scheduleNext(ctx, state);
     });
   return "started";
@@ -135,7 +142,10 @@ function runOnce(ctx: Context, state: JobState): TriggerResult {
 
 async function stopAll(ctx: Context, timeoutMs: number): Promise<StopResult> {
   ctx.stopping = true;
-  for (const state of ctx.states.values()) cancelPending(ctx, state);
+  for (const state of ctx.states.values()) {
+    cancelPending(ctx, state);
+    state.abort?.abort();
+  }
   const running = [...ctx.states.values()].filter((s) => s.running !== null);
   let timeoutHandle: unknown = null;
   const timedOut = new Promise<false>((resolve) => {
@@ -150,7 +160,7 @@ async function stopAll(ctx: Context, timeoutMs: number): Promise<StopResult> {
 
 export function createScheduler(jobs: readonly Job[], options: SchedulerOptions): Scheduler {
   assertJobs(jobs);
-  const ctx: Context = { ...options, states: new Map(jobs.map((job) => [job.name, { job, running: null, pending: null, generation: 0 }])), started: false, stopping: false };
+  const ctx: Context = { ...options, states: new Map(jobs.map((job) => [job.name, { job, running: null, abort: null, pending: null, generation: 0 }])), started: false, stopping: false };
   return {
     start() {
       if (ctx.started || ctx.stopping) return;

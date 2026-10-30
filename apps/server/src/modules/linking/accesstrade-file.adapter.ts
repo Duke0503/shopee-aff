@@ -12,7 +12,7 @@ import type { Instant } from "@cashback/core";
 
 import { readAccessTradeTransactions } from "./domain/accesstrade-report";
 import { asArray, asId, asObject, readPurchaseTime } from "./domain/report-row";
-import { assertComplete, readReportFile, ReportSourceError, sourced, type ReportSource, type SourcedReport, type SourcedRow } from "./report-source.port";
+import { assertComplete, cachedFileReport, readReportFile, ReportSourceError, sourced, withinWindow, type ReportSource, type SourcedReport, type SourcedRow, type WindowedReportSource } from "./report-source.port";
 
 export interface AccessTradePage {
   lines: unknown[];
@@ -62,4 +62,10 @@ export function readAccessTradeFile(path: string): SourcedReport {
 
 export function accessTradeFileSource(path: string): ReportSource {
   return { network: "accesstrade", read: () => Promise.resolve().then(() => readAccessTradeFile(path)) };
+}
+
+/** A saved answer read for reconciliation (dev and rehearsal): parsed once while unchanged, cut to each window. */
+export function accessTradeFileWindowSource(path: string): WindowedReportSource {
+  const report = cachedFileReport(path, () => readAccessTradeFile(path));
+  return { network: "accesstrade", read: (window) => Promise.resolve().then(() => withinWindow(report(), window)) };
 }

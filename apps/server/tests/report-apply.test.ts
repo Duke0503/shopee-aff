@@ -130,7 +130,8 @@ describe("Story 3.3 acceptance criteria", () => {
       { clawback_id: "260910PAID0001-1", customer_id: "C1", kind: "CLAWBACK", amount: -28486, order_id: "260910PAID0001", reason: "commission_drop_after_payout" },
     ]);
     expect(all(ledger, "SELECT order_id, reason, status FROM review_cases")).toEqual([{ order_id: "260910PAID0001", reason: "commission_drop_after_payout", status: "OPEN" }]);
-    expect(count(ledger, "outbox")).toBe(0);
+    // The only message is the clawback's (Story 3.6); the order itself is not told anything new.
+    expect(all(ledger, "SELECT dedup_key FROM outbox")).toEqual([{ dedup_key: "clawback:260910PAID0001-1:opened" }]);
   });
 
   it("AC3: a cancel after payout keeps the order PAID and claws back the stored cashback plus the paid bonus, once", () => {
@@ -257,12 +258,15 @@ describe("Story 3.3: attribution, claims, holds and notifications", () => {
     expect(all(ledger, "SELECT dedup_key, origin FROM outbox")).toEqual([{ dedup_key: "order:261020TOLD0001:approved", origin: "CUTOVER_SEED" }]);
   });
 
-  it("a row of another network for an existing order id is refused and writes nothing", () => {
+  it("a row of another network for an existing order id changes nothing on the order and opens one network_mismatch case", () => {
     const ledger = freshLedger();
     apply(ledger, awaiting("261020NETW0001"));
     const before = snapshot(ledger);
-    expect(() => apply(ledger, awaiting("261020NETW0001", [20000], { network: "accesstrade", subIds: ["C1", "REQT", "", "", ""] }))).toThrow(/shopee order/);
-    expect(snapshot(ledger)).toEqual(before);
+    const report = apply(ledger, awaiting("261020NETW0001", [20000], { network: "accesstrade", subIds: ["C1", "REQT", "", "", ""] }));
+    expect(report).toMatchObject({ outcome: "unrecorded", reviewCases: ["network_mismatch"] });
+    const after = snapshot(ledger);
+    for (const table of TABLES.filter((t) => t !== "review_cases" && t !== "audit_entries")) expect(after[table]).toEqual(before[table]);
+    expect(all(ledger, "SELECT network, subject, order_id, reason FROM review_cases")).toEqual([{ network: "accesstrade", subject: "261020NETW0001", order_id: "261020NETW0001", reason: "network_mismatch" }]);
   });
 
   it("AccessTrade orders take the platform of their link request", () => {
@@ -393,13 +397,14 @@ describe("review fixes: approvals, request links and networks", () => {
     expect(orderOf(ledger, "260910NONE0001")).toMatchObject({ status: "PAID", paid_at: TEST_CLOCK.now() });
   });
 
-  it("a PAID imported order of no network keeps it (D4); a real network mismatch is still refused", () => {
+  it("a PAID imported order of no network keeps it (D4); a real network mismatch is still not applied", () => {
     const ledger = freshLedger();
     importOrder(ledger, { id: "260910NONE0002", status: "PAID", approved: 20000, cashback: 14243, paidAt: "2026-10-05T03:00:00.000Z", network: null });
     apply(ledger, approved("260910NONE0002"));
     expect(orderOf(ledger, "260910NONE0002")).toMatchObject({ network: null, status: "PAID" });
     importOrder(ledger, { id: "260910SHOP0003", status: "APPROVED", approved: 20000, cashback: 14243 });
-    expect(() => apply(ledger, approved("260910SHOP0003", [20000], { network: "accesstrade" }))).toThrow(/shopee order/);
+    expect(apply(ledger, approved("260910SHOP0003", [20000], { network: "accesstrade" }))).toMatchObject({ outcome: "unrecorded", reviewCases: ["network_mismatch"] });
+    expect(orderOf(ledger, "260910SHOP0003")).toMatchObject({ network: "shopee", status: "APPROVED" });
   });
 
   it("claims are read only for an APPROVED order, paid bonus and earlier clawbacks only for a PAID one", () => {

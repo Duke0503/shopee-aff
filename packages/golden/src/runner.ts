@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { clawbackAmount, fromNetworkUnits, partialClawbackAmount, shopeeCommission, splitCommission, type AffiliateNetwork } from "@cashback/money";
+import { clawbackAmount, clawbackOpenAmount, fromNetworkUnits, partialClawbackAmount, shopeeCommission, splitCommission, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount";
   source?: string;
   cases: GoldenCase[];
 }
@@ -58,5 +58,10 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
       return input["kind"] === "partial"
         ? partialClawbackAmount({ storedCashback: num(input, "storedCashback"), newCashback: num(input, "newCashback"), alreadyClawedBack: num(input, "alreadyClawedBack") })
         : clawbackAmount({ storedCashback: num(input, "storedCashback"), paidBonus: num(input, "paidBonus"), alreadyClawedBack: num(input, "alreadyClawedBack") });
+    case "clawbackOpenAmount": {
+      const entries = input["entries"];
+      if (!Array.isArray(entries) || !entries.every((e) => typeof e === "number")) throw new Error("entries must be an array of numbers");
+      return clawbackOpenAmount(entries);
+    }
   }
 }

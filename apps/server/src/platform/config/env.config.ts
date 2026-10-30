@@ -43,8 +43,15 @@ export interface ServerConfig {
   fingerprintKey: string | null;
   /** The live production ledger; the cutover import refuses to run without it, and refuses to read or write it (AD-24). */
   liveLedgerPath: string | null;
-  /** AccessTrade API key, read only by the shadow run's optional live source (Story 2.8); never logged. */
+  /** AccessTrade API key: the shadow run's optional live source (Story 2.8) and the reconciliation source (Story 3.7); never logged. */
   accesstradeApiKey: string | null;
+  /**
+   * A saved Shopee report the reconciliation runs read until the browser bridge (Story 5.9) does;
+   * without it Shopee is not reconciled. Absolute.
+   */
+  shopeeReportPath: string | null;
+  /** The nightly sweep's pause between day slices (Story 3.8); the job's default when unset. */
+  sweepPauseMs: number | null;
 }
 
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace"] as const;
@@ -75,6 +82,8 @@ function fileSchema(env: Environment) {
     FINGERPRINT_KEY: z.string().optional(),
     LIVE_LEDGER_PATH: z.string().optional(),
     ACCESSTRADE_API_KEY: z.string().optional(),
+    SHOPEE_REPORT_PATH: z.string().refine(isAbsolute).optional(),
+    SWEEP_PAUSE_MS: z.coerce.number().int().min(0).max(600_000).optional(),
   });
 }
 
@@ -82,9 +91,13 @@ export function configFilePath(env: Environment, home: string = homedir()): stri
   return join(home, ".config", "cashback", `${env}.env`);
 }
 
+/** A blank value (`KEY=` or spaces) means the key is unset, so a default or null applies. */
+const withoutBlanks = (values: Record<string, string | undefined>): Record<string, string> =>
+  Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[1].trim() !== ""));
+
 /** Validates the parsed env file; the error lists key names only. */
 export function parseConfig(env: Environment, values: Record<string, string | undefined>): ServerConfig {
-  const parsed = fileSchema(env).safeParse(values);
+  const parsed = fileSchema(env).safeParse(withoutBlanks(values));
   if (!parsed.success) {
     const keys = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".")))];
     throw new ConfigError(`config: missing or invalid ${keys.join(", ")}`);
@@ -100,6 +113,8 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     fingerprintKey: file.FINGERPRINT_KEY || null,
     liveLedgerPath: file.LIVE_LEDGER_PATH || null,
     accesstradeApiKey: file.ACCESSTRADE_API_KEY || null,
+    shopeeReportPath: file.SHOPEE_REPORT_PATH || null,
+    sweepPauseMs: file.SWEEP_PAUSE_MS ?? null,
   };
 }
 

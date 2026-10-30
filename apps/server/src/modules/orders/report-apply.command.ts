@@ -21,6 +21,9 @@
  *   (clawback, review case) are written. The database triggers refuse anything else.
  * - An imported order seen for the first time gets its real items; its stored amounts stay. One
  *   of no network takes the row's network, recorded in its history and audit.
+ * - Every review reason opens or refreshes one case per (network, subject, reason) with the row,
+ *   its fingerprint and the candidates (review-case.command.ts). A row for an order of another
+ *   network changes nothing and opens a `network_mismatch` case.
  */
 import type { Clock, Instant } from "@cashback/core";
 import { sumDong } from "@cashback/money";
@@ -37,8 +40,10 @@ import { settlementPeriodOf, splitWithheld } from "./domain/settlement";
 import { rowCommission, transition, type Effect, type Step, type TransitionContext, type TransitionOrder, type TransitionResult } from "./domain/transition";
 import { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
 import type { OrderAwardsPort, OrderEventsPort, OrderPayoutsPort } from "./order-effects.port";
-import { findOrder, insertObservation, latestObservations, openReviewCase, replaceItems, touchLastSeen, transitionOrderOf, type LatestObservations, type StoredOrder } from "./order-ledger.repository";
+import { findOrder, insertObservation, latestObservations, replaceItems, touchLastSeen, transitionOrderOf, type LatestObservations, type StoredOrder } from "./order-ledger.repository";
+import { resolveSeenAgain } from "./order-aging.command";
 import { recordNetworkSet, recordSteps } from "./order-steps.command";
+import { openOrRefreshCase, type CaseReason } from "./review-case.command";
 import { orders, type OrderRow } from "./schema";
 import { periodWithheld } from "./settlement-period.command";
 
@@ -57,7 +62,8 @@ export interface ApplyDeps {
 /**
  * `recorded`: a new order; `changed`: its state moved; `observed`: stored and applied, state
  * unchanged; `skipped`: same fingerprint as the last applied row; `deferred`: held back by an
- * OPEN payout claim (D39); `unrecorded`: no order (a review case only).
+ * OPEN payout claim (D39); `unrecorded`: no order took the row (a review case only: an
+ * unattributed row, or an order id of another network's order).
  */
 export type ApplyOutcome = "recorded" | "changed" | "observed" | "skipped" | "deferred" | "unrecorded";
 
@@ -69,7 +75,7 @@ export interface ApplyReport {
 }
 
 export class ReportApplyError extends Error {
-  readonly code = "network_mismatch";
+  readonly code = "paid_without_customer";
   constructor(message: string) {
     super(message);
     this.name = "ReportApplyError";
@@ -115,15 +121,20 @@ interface Applying {
   readonly now: Instant;
 }
 
-function openCases(db: LedgerDb, a: Applying, orderId: string | null, deps: ApplyDeps): string[] {
-  const candidates = a.attribution?.kind === "review" ? a.attribution.candidates : [];
+/** The candidates a case carries: attribution's when it declined, else the order's own customer. */
+function candidatesOf(a: Applying, customerId: string | null): readonly string[] {
+  if (a.attribution?.kind === "review") return a.attribution.candidates;
+  return customerId === null ? [] : [customerId];
+}
+
+/** Opens or refreshes the row's cases; returns the reasons of the cases it opened. */
+function openCases(db: LedgerDb, a: Applying, orderId: string | null, reasons: readonly CaseReason[], deps: ApplyDeps): string[] {
   const unmatched = a.attribution?.kind === "customer" ? a.attribution.unmatchedRequest : null;
+  const customerId = a.stored?.customerId ?? a.step.createdFor;
   const opened: string[] = [];
-  for (const reason of a.step.reviewCases) {
-    const caseId = openReviewCase(db, { network: a.row.network, subject: subjectOf(a.row), orderId, reason, candidates, observation: observationJson(a.row, unmatched), openedAt: a.now, openedBy: deps.by.actor.id });
-    if (caseId === null) continue;
-    opened.push(reason);
-    deps.by.audit.record({ actor: deps.by.actor, event: "orders.review_case.opened", entityId: String(caseId), payload: { caseId, orderId, network: a.row.network, reason, candidates: candidates.length } });
+  for (const reason of reasons) {
+    const evidence = { network: a.row.network, subject: subjectOf(a.row), orderId, reason, candidates: candidatesOf(a, customerId), observation: observationJson(a.row, unmatched), fingerprint: a.row.fingerprint };
+    if (openOrRefreshCase(db, evidence, { by: deps.by, at: a.now }).write === "opened") opened.push(reason);
   }
   return opened;
 }
@@ -231,20 +242,26 @@ function applyToOrder(db: LedgerDb, a: Applying, deps: ApplyDeps): ApplyReport {
   storeObservation(db, a, orderId);
   db.update(orders).set(orderChanges(a, order)).where(eq(orders.orderId, orderId)).run();
   carryOut(a, orderId, customerId, deps);
-  const reviewCases = openCases(db, a, orderId, deps);
+  const reviewCases = openCases(db, a, orderId, a.step.reviewCases, deps);
   writeSteps(db, a, order, customerId, deps);
   if (a.step.createdFor !== null) deps.events.recorded({ orderId, network: a.row.network, customerId: a.step.createdFor, requestId });
   const outcome: ApplyOutcome = a.step.createdFor !== null ? "recorded" : a.step.deferred ? "deferred" : a.result.steps.length > 0 ? "changed" : "observed";
   return { outcome, orderId, steps: a.result.steps, reviewCases };
 }
 
+/** A row whose order id belongs to another network's order changes nothing; a case says so. */
+function networkMismatch(db: LedgerDb, row: SourcedRow, stored: StoredOrder, deps: ApplyDeps, now: Instant): ApplyReport {
+  const evidence = { network: row.network, subject: row.orderId, orderId: stored.orderId, reason: "network_mismatch" as const, candidates: [], observation: observationJson(row), fingerprint: row.fingerprint };
+  const opened = openOrRefreshCase(db, evidence, { by: deps.by, at: now }).write === "opened";
+  return { outcome: "unrecorded", orderId: row.orderId, steps: [], reviewCases: opened ? ["network_mismatch"] : [] };
+}
+
 /** Applies one report row; call inside `tx`, one transaction per order (AD-8). */
 export function applyReportRow(db: LedgerDb, row: SourcedRow, deps: ApplyDeps): ApplyReport {
   const now = deps.clock.now();
   const stored = row.orderId === "" ? null : findOrder(db, row.orderId);
-  if (stored !== null && stored.network !== null && stored.network !== row.network) {
-    throw new ReportApplyError(`order ${row.orderId} is a ${stored.network} order; a ${row.network} row cannot change it`);
-  }
+  if (stored !== null && stored.network !== null && stored.network !== row.network) return networkMismatch(db, row, stored, deps, now);
+  if (stored !== null) resolveSeenAgain(db, stored.orderId, { by: deps.by, at: now });
   const seen = stored === null ? null : latestObservations(db, stored.orderId);
   if (stored !== null && seen?.appliedFingerprint === row.fingerprint) {
     touchLastSeen(db, stored.orderId, now);
@@ -255,6 +272,6 @@ export function applyReportRow(db: LedgerDb, row: SourcedRow, deps: ApplyDeps): 
   const context = contextFor(db, row, stored, directory, deps, now);
   const result = transition(before, { kind: "report", row }, context);
   const a: Applying = { row, stored, seen, result, step: applyResult(before, result), attribution: context.attribution, directory, now };
-  if (a.step.order === null) return { outcome: "unrecorded", orderId: row.orderId, steps: [], reviewCases: openCases(db, a, null, deps) };
+  if (a.step.order === null) return { outcome: "unrecorded", orderId: row.orderId, steps: [], reviewCases: openCases(db, a, null, a.step.reviewCases, deps) };
   return applyToOrder(db, a, deps);
 }

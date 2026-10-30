@@ -31,6 +31,16 @@
       "name": "commission drop that the stored cashback still covers takes nothing",
       "input": { "kind": "partial", "storedCashback": 7000, "newCashback": 7000, "alreadyClawedBack": 0 },
       "expected": 0
+    },
+    {
+      "name": "Story 3.6 AC1: cashback 79,216 plus a paid bonus of 20,000 opens at 99,216",
+      "input": { "kind": "cancel", "storedCashback": 79216, "paidBonus": 20000, "alreadyClawedBack": 0 },
+      "expected": 99216
+    },
+    {
+      "name": "Story 3.6 AC3: commission 100,000 to 60,000 in a withheld period: 71,216 less 42,730",
+      "input": { "kind": "partial", "storedCashback": 71216, "newCashback": 42730, "alreadyClawedBack": 0 },
+      "expected": 28486
     }
   ]
 }

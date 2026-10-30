@@ -19,7 +19,7 @@ import { basename, extname } from "node:path";
 import { asArray, asId, asObject, readPurchaseTime } from "./domain/report-row";
 import { readShopeeExport, shopeeExportMapping, ShopeeExportMappingError, type ShopeeExportMapping } from "./domain/shopee-export";
 import { readShopeeConversion } from "./domain/shopee-report";
-import { assertComplete, readReportFile, ReportSourceError, sourced, type ReportSource, type SourcedReport, type SourcedRow } from "./report-source.port";
+import { assertComplete, cachedFileReport, readReportFile, ReportSourceError, sourced, withinWindow, type ReportSource, type SourcedReport, type SourcedRow, type WindowedReportSource } from "./report-source.port";
 
 /** report_reader.py PAGE_SIZE and MAX_PAGES. */
 export const SHOPEE_PAGE_SIZE = 50;
@@ -126,4 +126,10 @@ export function readShopeeFile(options: ShopeeFileOptions): SourcedReport {
 
 export function shopeeFileSource(options: ShopeeFileOptions): ReportSource {
   return { network: "shopee", read: () => Promise.resolve().then(() => readShopeeFile(options)) };
+}
+
+/** A saved report read for reconciliation (until the bridge of Story 5.9): parsed once while unchanged, cut to each window. */
+export function shopeeFileWindowSource(options: ShopeeFileOptions): WindowedReportSource {
+  const report = cachedFileReport(options.path, () => readShopeeFile(options));
+  return { network: "shopee", read: (window) => Promise.resolve().then(() => withinWindow(report(), window)) };
 }

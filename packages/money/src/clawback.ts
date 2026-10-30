@@ -3,7 +3,8 @@
  * order's stored cashback plus any campaign bonus already paid on it; a commission drop after
  * payout takes back only the difference between the stored cashback and the cashback the lower
  * commission gives. Both subtract what earlier clawback entries already took, so a second report
- * of the same cancel never claws back twice, and neither is ever negative.
+ * of the same cancel never claws back twice, and neither is ever negative. A clawback's open
+ * amount is the signed sum of its insert-only ledger entries (D42): negative while money is owed.
  */
 import { assertDong, assertNonNegativeDong } from "./rounding";
 
@@ -49,4 +50,16 @@ export function partialClawbackAmount(input: PartialClawbackInput): number {
   const stored = assertNonNegativeDong(input.storedCashback, "storedCashback");
   const lower = assertNonNegativeDong(input.newCashback, "newCashback");
   return Math.max(0, stored - lower - assertNonNegativeDong(input.alreadyClawedBack, "alreadyClawedBack"));
+}
+
+/**
+ * The open amount of one clawback (D42): the sum of its ledger entries, the negative original and
+ * the positive netting, write-off and offset entries. Negative while money is still owed back.
+ */
+export function clawbackOpenAmount(entries: readonly number[]): number {
+  let total = 0;
+  for (const entry of entries) {
+    total = assertDong(total + assertDong(entry, "ledger entry"), "clawback open amount");
+  }
+  return total;
 }
