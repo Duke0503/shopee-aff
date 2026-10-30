@@ -1,0 +1,78 @@
+/*
+ * DESIGN.md tokens (UX-DR1), written once from its front matter. tests/tokens.test.ts reads
+ * DESIGN.md and fails when a value here differs, so a token changes in DESIGN.md first.
+ * Light theme only in v1; the server pages read this same file.
+ */
+:root {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #047857;
+  --primary-foreground: #FFFFFF;
+  --primary-active: #065F46;
+  --secondary: #ECFDF5;
+  --secondary-foreground: #065F46;
+  --muted: #F1F5F9;
+  --muted-foreground: #5A6475;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
+  --border: #E2E8F0;
+  --input: #7B8798;
+  --ring: #10B981;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --brand-mark: #059669;
+  --money: #047857;
+  --money-soft: #ECFDF5;
+  --warning: #92400E;
+  --warning-soft: #FEF3C7;
+  --attention: #7C2D12;
+  --attention-soft: #FFF7ED;
+  --status-waiting: #92400E;
+  --status-waiting-soft: #FEF3C7;
+  --status-approved: #1D4E89;
+  --status-approved-soft: #E8EFF8;
+  --status-done: #334155;
+  --status-done-soft: #E2E8F0;
+  --status-rejected: #9F1239;
+  --status-rejected-soft: #FFE4E6;
+  --status-attention: #7C2D12;
+  --status-attention-soft: #FFF7ED;
+  --status-neutral: #5A6475;
+  --status-neutral-soft: #F1F5F9;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F172A;
+  --sidebar-accent: #ECFDF5;
+  --sidebar-accent-foreground: #065F46;
+  --sidebar-border: #E2E8F0;
+  --chart-1: #047857;
+  --chart-2: #7B8798;
+  --chart-3: #B45309;
+  --chart-4: #1D4E89;
+
+  --rounded-sm: 4px;
+  --rounded-md: 6px;
+  --rounded-lg: 8px;
+  --rounded-xl: 12px;
+  --rounded-full: 9999px;
+
+  --gutter-phone: 16px;
+  --gutter-tablet: 24px;
+  --gutter-desktop: 32px;
+  --touch-target: 44px;
+  --control-comfortable: 44px;
+  --control-dense: 36px;
+  --control-dense-sm: 32px;
+  --row-dense: 44px;
+  --row-comfortable: 56px;
+  --content-customer: 640px;
+  --content-admin: 1440px;
+  --sidebar-width: 240px;
+  --rail-width: 64px;
+
+  --font-family: 'Be Vietnam Pro', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

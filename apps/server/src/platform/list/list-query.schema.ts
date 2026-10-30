@@ -6,7 +6,7 @@
  * field: a status must be a stored registry value, a date range is Vietnam calendar days and
  * becomes the half-open instant range that includes the whole end day (AD-11).
  */
-import { LIST_DEFAULT_PAGE_SIZE, LIST_MAX_PAGE_SIZE, LIST_MAX_QUERY_LENGTH, SORT_DIRECTIONS, type SortDirection } from "@cashback/contracts";
+import { filterParam, LIST_DEFAULT_PAGE_SIZE, LIST_MAX_PAGE, LIST_MAX_PAGE_SIZE, LIST_MAX_QUERY_LENGTH, parseSortParam, splitFilterValues, type SortDirection } from "@cashback/contracts";
 import { storedValues, vnDateRange, type InstantRange } from "@cashback/core";
 import { z } from "zod";
 
@@ -39,7 +39,6 @@ export class ListQueryError extends Error {
   }
 }
 
-const filterKey = (field: string): string => `filter[${field}]`;
 const DATE_RANGE = /^(\d{4}-\d{2}-\d{2})(?:\.\.(\d{4}-\d{2}-\d{2}))?$/;
 const INTEGER = /^-?\d{1,15}$/;
 
@@ -50,11 +49,11 @@ function shapeOf<F extends FieldSpecs>(spec: ListSpec<F>) {
   const filterValue = z.union([text, z.array(text).max(50)]);
   const filters = Object.entries(spec.fields)
     .filter(([, field]) => isFilterable(field))
-    .map(([key]) => [filterKey(key), filterValue.optional()] as const);
+    .map(([key]) => [filterParam(key), filterValue.optional()] as const);
   return z.strictObject({
     q: text.optional(),
     sort: text.optional(),
-    page: z.coerce.number().int().min(1).max(1_000_000).default(1),
+    page: z.coerce.number().int().min(1).max(LIST_MAX_PAGE).default(1),
     pageSize: z.coerce.number().int().min(1).max(LIST_MAX_PAGE_SIZE).default(LIST_DEFAULT_PAGE_SIZE),
     ...Object.fromEntries(filters),
   });
@@ -62,26 +61,19 @@ function shapeOf<F extends FieldSpecs>(spec: ListSpec<F>) {
 
 function parseSort<F extends FieldSpecs>(spec: ListSpec<F>, raw: string | undefined): ListQuery<F>["sort"] {
   if (raw === undefined || raw.trim() === "") return spec.defaultSort;
-  const [field = "", direction = "", extra] = raw.split(":");
-  const declared = Object.hasOwn(spec.fields, field) ? spec.fields[field] : undefined;
-  if (extra !== undefined || declared === undefined || !declared.sortable || !(SORT_DIRECTIONS as readonly string[]).includes(direction)) {
-    throw new ListQueryError("invalid_sort", { sort: "invalid_sort" });
-  }
-  return { field: field as keyof F & string, direction: direction as SortDirection };
+  const sortable = Object.entries(spec.fields)
+    .filter(([, field]) => field.sortable === true)
+    .map(([key]) => key);
+  const sort = parseSortParam(raw, sortable);
+  if (sort === null) throw new ListQueryError("invalid_sort", { sort: "invalid_sort" });
+  return { field: sort.field as keyof F & string, direction: sort.direction };
 }
 
-/** Several values come as repeated keys or comma-separated; blanks are dropped. */
-const valuesOf = (raw: string | string[]): string[] =>
-  (Array.isArray(raw) ? raw : [raw])
-    .flatMap((v) => v.split(","))
-    .map((v) => v.trim())
-    .filter((v) => v !== "");
-
 function parseFilter(key: string, field: FieldSpec, raw: string | string[]): ListFilter | null {
-  const values = valuesOf(raw);
+  const values = splitFilterValues(raw);
   if (values.length === 0) return null;
   const refuse = (): never => {
-    throw new ListQueryError("invalid_request", { [filterKey(key)]: "invalid_filter" });
+    throw new ListQueryError("invalid_request", { [filterParam(key)]: "invalid_filter" });
   };
   if (field.kind === "instant") {
     const m = values.length === 1 ? DATE_RANGE.exec(values[0] ?? "") : null;
@@ -115,7 +107,7 @@ export function listQuerySchema<F extends FieldSpecs>(spec: ListSpec<F>): (raw: 
     }
     const data = parsed.data as Record<string, string | string[] | number | undefined>;
     const filters = Object.entries(spec.fields).flatMap(([key, field]) => {
-      const value = isFilterable(field) ? data[filterKey(key)] : undefined;
+      const value = isFilterable(field) ? data[filterParam(key)] : undefined;
       const filter = value === undefined || typeof value === "number" ? null : parseFilter(key, field, value);
       return filter === null ? [] : [filter];
     });

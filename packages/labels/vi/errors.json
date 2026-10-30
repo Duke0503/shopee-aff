@@ -1,0 +1,13 @@
+{
+  "error.unauthorized": "Phiên đăng nhập đã hết. Đăng nhập lại.",
+  "error.forbidden": "Tài khoản này không được làm việc này.",
+  "error.invalid_request": "Yêu cầu không hợp lệ.",
+  "error.invalid_sort": "Cột này không sắp xếp được.",
+  "error.not_found": "Không tìm thấy.",
+  "error.rate_limited": "Thử quá nhiều lần. Đợi ít phút rồi thử lại.",
+  "error.busy": "Máy chủ đang bận. Thử lại sau ít giây.",
+  "error.internal": "Máy chủ gặp lỗi. Thử lại sau.",
+  "error.staff_sign_in_refused": "Tên đăng nhập hoặc mật khẩu không đúng.",
+  "error.staff_sign_in_waiting": "Sai mật khẩu nhiều lần. Thử lại sau {time}.",
+  "error.network": "Không kết nối được máy chủ."
+}

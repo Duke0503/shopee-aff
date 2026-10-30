@@ -74,7 +74,7 @@ export default tseslint.config(
     rules: { "no-restricted-properties": "off" },
   },
   {
-    files: ["**/tests/**/*.ts", "**/*.test.ts"],
+    files: ["**/tests/**/*.{ts,tsx}", "**/*.test.{ts,tsx}"],
     rules: { "max-lines": "off", "max-lines-per-function": "off" },
   },
 );

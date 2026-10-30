@@ -1,0 +1,35 @@
+/**
+ * The one icon module (code.md §10, DESIGN.md): every icon on both surfaces is a Lucide icon
+ * re-exported here, so the set stays small and one stroke width.
+ */
+export {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowUpDownIcon,
+  BanknoteIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+  ClipboardCheckIcon,
+  CopyIcon,
+  EllipsisIcon,
+  EyeIcon,
+  EyeOffIcon,
+  GiftIcon,
+  LayoutDashboardIcon,
+  LinkIcon,
+  LogOutIcon,
+  PackageIcon,
+  ReceiptIcon,
+  RefreshCwIcon,
+  ScrollTextIcon,
+  SearchIcon,
+  SettingsIcon,
+  SlidersHorizontalIcon,
+  UserCogIcon,
+  UsersIcon,
+  XIcon,
+  type LucideIcon,
+} from "lucide-react";

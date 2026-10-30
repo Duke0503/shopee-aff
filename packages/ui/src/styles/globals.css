@@ -1,0 +1,99 @@
+/*
+ * The one theme (UX-DR1): Tailwind 4 with the DESIGN.md tokens mapped onto shadcn's roles.
+ * Breakpoints are the defaults that match DESIGN.md: md 768 px (tablet), xl 1280 px (desktop).
+ * `coarse:` raises a control to the 44 px touch target on touch screens (DESIGN.md Layout).
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+
+@source "../";
+
+@custom-variant coarse (@media (pointer: coarse));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-active: var(--primary-active);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-brand-mark: var(--brand-mark);
+  --color-money: var(--money);
+  --color-money-soft: var(--money-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-attention: var(--attention);
+  --color-attention-soft: var(--attention-soft);
+  --color-status-waiting: var(--status-waiting);
+  --color-status-waiting-soft: var(--status-waiting-soft);
+  --color-status-approved: var(--status-approved);
+  --color-status-approved-soft: var(--status-approved-soft);
+  --color-status-done: var(--status-done);
+  --color-status-done-soft: var(--status-done-soft);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-rejected-soft: var(--status-rejected-soft);
+  --color-status-attention: var(--status-attention);
+  --color-status-attention-soft: var(--status-attention-soft);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-soft: var(--status-neutral-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --font-sans: var(--font-family);
+  --font-mono: var(--font-code);
+
+  --radius-sm: var(--rounded-sm);
+  --radius-md: var(--rounded-md);
+  --radius-lg: var(--rounded-lg);
+  --radius-xl: var(--rounded-xl);
+  --radius-4xl: var(--rounded-full);
+
+  --text-caption: 12px;
+  --text-caption--line-height: 1.35;
+  --text-meta: 13px;
+  --text-meta--line-height: 1.45;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

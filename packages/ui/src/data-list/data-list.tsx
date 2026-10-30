@@ -1,0 +1,156 @@
+/**
+ * DataList (AD-12, FR-37, UX-DR2): the one way every list renders. It owns no list state: the
+ * search, filters, sort and page come from the route's URL search and every change goes back
+ * through `onStateChange`, which writes the URL (LC-4). Any change but paging resets to page 1
+ * (LC-7); when the server clamps the page, the URL is corrected in place. Previous rows stay,
+ * dimmed under the progress line, while the next query loads (LC-8). Loading, empty, no
+ * matches, error and stale are separate states (LC-9). A polite live region announces the
+ * count after each query (UX-DR13). Table on tablet and desktop, cards on phone (LC-12).
+ */
+import type { ListResponse, ListSearchState, ListSort } from "@cashback/contracts";
+import type { RowData } from "@tanstack/react-table";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import { MoneyFigure } from "../brand/money-figure";
+import { useLayout, type Layout } from "../hooks/use-media-query";
+import { cn } from "../lib/utils";
+import type { DataListProps, ListColumn } from "./data-list.types";
+import { FilterSheet } from "./filter-sheet";
+import { ListCards } from "./list-cards";
+import { ListPagination } from "./list-pagination";
+import { ListEmpty, ListError, ListNoMatches, ListSkeleton, ProgressLine } from "./list-states";
+import { ListTable } from "./list-table";
+import { RefreshButton, SearchBox, SortSelect } from "./list-toolbar";
+import { StatusChips } from "./status-chips";
+
+/** A newly chosen column sorts amounts, counts and dates largest or newest first, text A to Z. */
+export function nextSort<R>(current: ListSort, column: ListColumn<R>): ListSort {
+  if (current.field === column.key) return { field: column.key, direction: current.direction === "asc" ? "desc" : "asc" };
+  const descending = column.kind === "money" || column.kind === "integer" || column.kind === "instant";
+  return { field: column.key, direction: descending ? "desc" : "asc" };
+}
+
+function withFilter(state: ListSearchState, field: string, values: readonly string[]): ListSearchState["filters"] {
+  const { [field]: _dropped, ...rest } = state.filters;
+  return values.length === 0 ? rest : { ...rest, [field]: values };
+}
+
+function useShownData<R>(data: ListResponse<R> | undefined): ListResponse<R> | undefined {
+  const last = useRef<ListResponse<R> | undefined>(undefined);
+  if (data !== undefined) last.current = data;
+  return data ?? last.current;
+}
+
+interface ListBodyProps<R> extends DataListProps<R> {
+  readonly shown: ListResponse<R> | undefined;
+  readonly layout: Layout;
+  readonly filtered: boolean;
+  readonly onClear: () => void;
+  readonly onSort: (column: ListColumn<R>) => void;
+}
+
+/** Rows or the one state that replaces them; an error never falls through to an empty text. */
+function bodyContent<R extends RowData>({ query, shown, layout, filtered, columns, rowKey, state, emptyText, onClear, onSort }: ListBodyProps<R>): ReactNode {
+  if (shown === undefined) return query.isError ? null : <ListSkeleton />;
+  if (shown.rows.length === 0) {
+    if (query.isError) return null;
+    return filtered ? <ListNoMatches onClear={onClear} /> : <ListEmpty text={emptyText} />;
+  }
+  const dimmed = query.isFetching || query.isError;
+  return (
+    <div data-stale={query.isError ? "true" : undefined} className={cn("min-w-0 transition-opacity", dimmed && "opacity-55")}>
+      {layout === "phone" ? (
+        <ListCards columns={columns} rows={shown.rows} rowKey={rowKey} />
+      ) : (
+        <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+          <ListTable columns={layout === "tablet" ? columns.filter((c) => c.desktopOnly !== true) : columns} rows={shown.rows} rowKey={rowKey} sort={state.sort} onSort={onSort} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListBody<R extends RowData>(props: ListBodyProps<R>) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <ProgressLine active={props.query.isFetching} />
+      {bodyContent(props)}
+    </div>
+  );
+}
+
+/** "1.284 orders · cashback 12.345.678" for the filtered set the rows come from (LC-6). */
+function SummaryLine<R>({ shown, text, fields }: { shown: ListResponse<R>; text: string; fields: DataListProps<R>["summary"] }) {
+  return (
+    <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-meta">
+      <span className="font-medium tabular-nums">{text}</span>
+      {(fields ?? []).map((field) => (
+        <span key={field.key} className="inline-flex items-baseline gap-1">
+          <span className="text-muted-foreground">· {field.label}</span>
+          <MoneyFigure amount={shown.summary[field.key]} />
+        </span>
+      ))}
+    </p>
+  );
+}
+
+export function DataList<R extends RowData>(props: DataListProps<R>) {
+  const { search, state, onStateChange, query, columns, statusFilter, countLabel } = props;
+  const layout = useLayout();
+  const shown = useShownData(query.data);
+  const [announcement, setAnnouncement] = useState("");
+  const settled = query.data !== undefined && !query.isPlaceholderData ? query.data : undefined;
+
+  useEffect(() => {
+    if (settled === undefined) return;
+    setAnnouncement(countLabel(settled.total));
+    if (settled.page !== state.page) onStateChange({ ...state, page: settled.page }, { replace: true });
+    // Only a newly settled response announces its count and corrects the page.
+  }, [settled]);
+
+  const change = (patch: Partial<ListSearchState>): void => onStateChange({ ...state, page: 1, ...patch });
+  const selected = statusFilter === undefined ? [] : (state.filters[statusFilter.field] ?? []);
+  const activeFilters = Object.values(state.filters).reduce((n, values) => n + values.length, 0);
+  const filtered = state.q.trim() !== "" || activeFilters > 0;
+  const chips =
+    statusFilter === undefined ? null : (
+      <StatusChips entity={statusFilter.entity} facets={shown?.facets[statusFilter.field]} total={shown?.total} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
+    );
+  const summaryText = shown === undefined ? "" : countLabel(shown.total);
+
+  return (
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <SearchBox committed={state.q} placeholder={props.searchPlaceholder} onCommit={(q) => change({ q })} />
+        <RefreshButton asOf={shown?.asOf} onRefresh={() => void query.refetch()} />
+      </div>
+      {layout === "phone" ? (
+        <div className="flex min-w-0 items-end gap-2">
+          <SortSelect columns={columns} sort={state.sort} onChange={(sort) => change({ sort })} />
+          {chips !== null && (
+            <FilterSheet activeCount={activeFilters} summary={summaryText}>
+              {chips}
+            </FilterSheet>
+          )}
+        </div>
+      ) : (
+        chips
+      )}
+      {shown !== undefined && <SummaryLine shown={shown} text={summaryText} fields={props.summary} />}
+      <div role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+      {query.isError && <ListError error={query.error} staleAsOf={shown?.asOf ?? null} onRetry={() => void query.refetch()} onClear={filtered ? () => change({ q: "", filters: {} }) : undefined} />}
+      <ListBody {...props} shown={shown} layout={layout} filtered={filtered} onClear={() => change({ q: "", filters: {} })} onSort={(column) => change({ sort: nextSort(state.sort, column) })} />
+      {shown !== undefined && shown.total > 0 && (
+        <ListPagination
+          facts={{ page: shown.page, pageSize: shown.pageSize, total: shown.total }}
+          compact={layout === "phone"}
+          pageSizes={search.pageSizes}
+          onPage={(page) => onStateChange({ ...state, page })}
+          onPageSize={(pageSize) => change({ pageSize })}
+        />
+      )}
+    </section>
+  );
+}

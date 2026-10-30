@@ -7,7 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { errorEnvelopeSchema, listResponseSchema } from "@cashback/contracts";
+import { errorEnvelopeSchema, LIST_MAX_PAGE, listResponseSchema, parseSortParam, splitFilterValues } from "@cashback/contracts";
 import { fixedClock, parseInstant, searchText, sortKey, statusesOf, toMs } from "@cashback/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -298,5 +298,19 @@ describe("list query schema (AD-12)", () => {
     expect(() => defineList<FieldSpecs>({ ...base, fields: { orderId: { kind: "text", column: "o.order_id" } } })).toThrow(/default sort/);
     expect(() => defineList<FieldSpecs>({ ...base, fields: { ...base.fields, name: { kind: "name", column: "c.display_name", sortKeyColumn: "c.updated_at" } } })).toThrow(/sort_key/);
     expect(() => defineList<FieldSpecs>({ ...base, from: "orders; DROP TABLE orders" })).toThrow(ListSpecError);
+  });
+});
+
+describe("review item 9: the server parses the list query with the contract's shared rules and bounds", () => {
+  it("accepts the last page the client may send and refuses one past it", () => {
+    expect(query({ page: String(LIST_MAX_PAGE) }).page).toBe(LIST_MAX_PAGE);
+    expect(() => query({ page: String(LIST_MAX_PAGE + 1) })).toThrow(ListQueryError);
+  });
+
+  it("reads filter values and sorts exactly as the client writes them", () => {
+    const parsed = query({ "filter[status]": ["APPROVED,PAID", " PAID "], sort: "cashback:asc" });
+    expect(parsed.filters).toEqual([{ field: "status", kind: "in", values: splitFilterValues(["APPROVED,PAID", " PAID "]) }]);
+    expect(parsed.sort).toEqual(parseSortParam("cashback:asc", ["cashback"]));
+    expect(() => query({ sort: "estimatedCommission:asc" })).toThrow(ListQueryError);
   });
 });

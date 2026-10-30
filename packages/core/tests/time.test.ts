@@ -6,6 +6,9 @@ import {
   fixedClock,
   formatVnDate,
   formatVnDateTime,
+  formatVnDateOf,
+  formatVnTime,
+  formatVnTimeOf,
   nextVnTimeOfDay,
   parseInstant,
   parseStaffVnTime,
@@ -60,6 +63,18 @@ describe("display formats", () => {
   });
   it("formats the time in Vietnam time", () => {
     expect(formatVnDateTime(parseInstant("2026-10-30T12:42:00.000Z"), clock)).toBe("30/10 19:42");
+  });
+  it("formats a time of day alone in Vietnam time, across the UTC date line", () => {
+    expect(formatVnTime(parseInstant("2026-10-30T12:42:00.000Z"))).toBe("19:42");
+    expect(formatVnTime(parseInstant("2026-10-30T17:05:00.000Z"))).toBe("00:05");
+  });
+  it("formats an outside value only when it is a stored instant, else null", () => {
+    expect(formatVnTimeOf("2026-10-30T12:42:00.000Z")).toBe("19:42");
+    expect(formatVnDateOf("2025-10-30T12:42:00.000Z", clock)).toBe("30/10/2025");
+    for (const bad of [undefined, null, "", "2026-10-30 12:42", 42]) {
+      expect(formatVnTimeOf(bad)).toBeNull();
+      expect(formatVnDateOf(bad, clock)).toBeNull();
+    }
   });
   it("rejects naive or offset timestamps instead of guessing", () => {
     expect(() => parseInstant("2025-02-30T00:00:00.000Z")).toThrow(RangeError);
