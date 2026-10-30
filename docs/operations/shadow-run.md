@@ -103,3 +103,25 @@ pnpm --filter @cashback/server shadow:sign-off --out D:/cutover/shadow-2026-11-0
 It writes `shadow-sign-off.json` with the name, the time and the checksums of both report files.
 A folder can be signed once, and a signed folder is never written over: a new run goes to a new
 folder.
+
+## Import rehearsals on production copies
+
+### 2026-10-30, backup `cashback-20261030-122003.db` (production `main` a8a2439)
+
+The backup was copied read-only from the production host and imported on a dev machine.
+
+- Every compared table matched with zero row differences: 79 customers, 74 aliases, 104 orders,
+  401 link requests, 249 share codes, 26 payouts, 6 campaign awards.
+- Paid parity passed to the dong for all 21 customers who were paid.
+- Two importer bugs were found and fixed. Production `main` never had `payment_transfers.bill_token`,
+  so the comparison step stopped. Live `ready` links (AccessTrade TikTok and Lazada) and the
+  September `success` links were imported as FAILED, 7 of them with orders on them. Each test
+  fixture now covers its case.
+- Items for the owner to sign off:
+  - Payout 10 transferred 341,608 dong. The three orders it names add up to 341,614 dong cashback,
+    so it is 6 dong short.
+  - 16 time values have no time zone (9 September `success` links, 7 product cache rows). They are
+    listed in `timeProblems`.
+  - No live payout has a receipt token, so the 26 imported payouts have no receipt link. Receipts
+    start with payouts recorded in the new system.
+  - The test customer `test_customer` and the ended campaign `preview-test` are listed.

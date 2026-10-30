@@ -4,7 +4,10 @@
  * already handed out keeps working. The live states (repository.py:17-19, batch_queue.py:206-210)
  * become the AD-14 states: a request still waiting for its link is QUEUED, one with a link is
  * ISSUED until it was handed over (`notified_at`, repository.py:1305-1310) and DELIVERED after;
- * `converted` is CONVERTED and `failed` FAILED. Live `expired` is not a state (D23): it reads
+ * `converted` is CONVERTED and `failed` FAILED. Live `ready` (the AccessTrade TikTok and Lazada
+ * providers, tiktok_provider.py:464, lazada_provider.py:303) and the September `success` rows read
+ * like `pending`: a link was made, so it is ISSUED or DELIVERED and its orders stay attributed; one
+ * without a link is FAILED and listed. Live `expired` is not a state (D23): it reads
  * like `pending`, except that one that never got its link is FAILED, so no link is made for a
  * request past its window. A request whose customer is gone cannot be imported and is listed.
  */
@@ -48,6 +51,11 @@ export function linkStatusOf(row: LiveLinkRequest, report: ImportReport): LinkRe
       return "CONVERTED";
     case "pending":
       return hasLink(row) ? issued() : "QUEUED";
+    case "ready":
+    case "success":
+      if (hasLink(row)) return issued();
+      report.notes.push({ kind: "unknown_link_status", table: "link_requests", key: row.request_id, detail: `${row.status} without link` });
+      return "FAILED";
     case "expired":
       if (hasLink(row)) return issued();
       report.notes.push({ kind: "expired_without_link", table: "link_requests", key: row.request_id });

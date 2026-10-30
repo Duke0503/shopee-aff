@@ -169,6 +169,14 @@ describe("Story 2.4: payouts, their orders and the owner's lists", () => {
     expect(guest.report.paidParity?.result).toBe("pass");
   });
 
+  it("imports a live copy whose payment_transfers has no bill_token column, as production main does", () => {
+    const copy = buildLiveCopy({ extraSql: "DROP INDEX idx_transfer_bill_token; ALTER TABLE payment_transfers DROP COLUMN bill_token" });
+    const imported = importOnce(copy);
+    expect(imported.report.paidParity?.result).toBe("pass");
+    expect(rows(imported.targetPath, "SELECT count(*) AS n FROM payouts WHERE receipt_token IS NOT NULL")).toEqual([{ n: 0 }]);
+    expect(imported.report.notes.filter((n) => n.kind === "bill_token_missing").length).toBe(payouts.size);
+  });
+
   it("a transfer without a bill token is imported with none and listed", () => {
     const copy = buildLiveCopy({ extraSql: "UPDATE payment_transfers SET bill_token = NULL WHERE id = 3;" });
     const noToken = importOnce(copy);

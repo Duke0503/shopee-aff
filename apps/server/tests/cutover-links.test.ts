@@ -137,6 +137,21 @@ describe("Story 2.5: link states, owners and the product snapshot (D56)", () => 
     expect(run.report.notes).toContainEqual({ kind: "expired_without_link", table: "link_requests", key: "26081600006" });
   });
 
+  it("reads live ready (AccessTrade providers) and September success rows like pending: a link made keeps them issued, none is FAILED and listed", () => {
+    const copy = buildLiveCopy({
+      extraSql: `INSERT INTO link_requests (request_id, customer_id, created_at, source_url, affiliate_url, estimated_commission, channel, status, notified_at, platform, estimate_source, estimate_detail, attempts, share_code) VALUES
+        ('26102000101', '1000000000000000001', '2026-10-20T21:31:14+07:00', 'https://vt.tiktok.com/ZSready/', 'https://go.isclix.com/deep/ready', NULL, 'web', 'ready', '2026-10-20T21:31:20+07:00', 'tiktok', 'accesstrade', NULL, 1, NULL),
+        ('26092100102', '1000000000000000001', '2026-09-21T11:40:33+07:00', 'https://s.shopee.vn/success', 'https://s.shopee.vn/an_redir?sub=x', NULL, 'zalo', 'success', NULL, 'shopee', NULL, NULL, 1, NULL),
+        ('26102000103', '1000000000000000001', '2026-10-20T21:40:00+07:00', 'https://vt.tiktok.com/ZSnolink/', NULL, NULL, 'web', 'ready', NULL, 'tiktok', NULL, NULL, 1, NULL);`,
+    });
+    const imported = importOnce(copy);
+    const status = new Map((rows(imported.targetPath, "SELECT request_id, status FROM link_requests WHERE request_id LIKE '%001__'") as Row[]).map((r) => [r["request_id"], r["status"]]));
+    expect(status.get("26102000101")).toBe("DELIVERED");
+    expect(status.get("26092100102")).toBe("ISSUED");
+    expect(status.get("26102000103")).toBe("FAILED");
+    expect(imported.report.notes.filter((n) => n.kind === "unknown_link_status")).toEqual([{ kind: "unknown_link_status", table: "link_requests", key: "26102000103", detail: "ready without link" }]);
+  });
+
   it("follows the merged customer's old Zalo id to the survivor and lists a request whose customer is gone", () => {
     expect(requests.get("26091900009")).toMatchObject({ customer_id: "1000000000000000002", network: "accesstrade", platform: "tiktok", status: "DELIVERED" });
     expect(requests.has("26091800008")).toBe(false);

@@ -18,6 +18,10 @@ type Row = Record<string, string | number | null>;
 
 const all = (db: BetterSqlite3.Database, query: string) => db.prepare(query).all() as Row[];
 
+/** Whether a live table has a column: production `main` never had `bill_token`, only the main-v2 copy of the live code did. */
+const hasColumn = (db: BetterSqlite3.Database, table: string, column: string) =>
+  (db.prepare(`SELECT name FROM pragma_table_info(?)`).all(table) as { name: string }[]).some((c) => c.name === column);
+
 const AMOUNTS = ["order_value", "estimated_commission", "approved_commission"] as const;
 
 function liveOrders(source: BetterSqlite3.Database, context: CutoverContext): Row[] {
@@ -57,7 +61,12 @@ export function compareOrdersAndLinks(source: BetterSqlite3.Database, target: Be
 export function comparePayoutsAndAwards(source: BetterSqlite3.Database, target: BetterSqlite3.Database, notes: readonly ReportNote[]): Record<string, TableComparison> {
   return {
     payouts: compareRows(
-      all(source, "SELECT id AS payout_id, customer_id, amount AS transfer_amount, NULLIF(TRIM(COALESCE(bill_token, '')), '') AS receipt_token FROM payment_transfers ORDER BY id"),
+      all(
+        source,
+        `SELECT id AS payout_id, customer_id, amount AS transfer_amount, ${
+          hasColumn(source, "payment_transfers", "bill_token") ? "NULLIF(TRIM(COALESCE(bill_token, '')), '')" : "NULL"
+        } AS receipt_token FROM payment_transfers ORDER BY id`,
+      ),
       all(target, "SELECT payout_id, customer_id, transfer_amount, receipt_token FROM payouts ORDER BY payout_id"),
       "payout_id",
       ["customer_id", "transfer_amount", "receipt_token"],
