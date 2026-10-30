@@ -35,10 +35,11 @@ next one reads it. Record every approved decision in `.context/decisions/` and i
 
 | Artifact | Location | Status |
 |---|---|---|
-| Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.3.0: 8 contexts, D1 to D28 accepted, OQ1, OQ2, OQ5, OQ8 open |
+| Domain model | [domain-model.json](domain-model.json), views in [domain-viz/](domain-viz/README.md) | v0.5.0: 7 contexts, D1 to D37 accepted, OQ1 and OQ2 resolved by the architecture spine, OQ5 and OQ8 open |
 | PRD | [prd-cashback-2026-10-30/prd.md](../_bmad-output/planning-artifacts/prds/prd-cashback-2026-10-30/prd.md) | Final: FR-1 to FR-38, UJ-1 to UJ-8; list defects in `list-defects.md` |
 | UX workspace | [ux-cashback-2026-10-30/](../_bmad-output/planning-artifacts/ux-designs/ux-cashback-2026-10-30/) (`DESIGN.md`, `EXPERIENCE.md`, `.memlog.md`, `mockups/`) | Final: both spines, List Contract for FR-37/FR-38, 3 key-screen mocks |
-| Architecture spine | `_bmad-output/planning-artifacts/architecture/` | Not started |
+| Architecture spine | [architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md](../_bmad-output/planning-artifacts/architecture/architecture-cashback-2026-10-30/ARCHITECTURE-SPINE.md) (C4 diagrams in `diagrams/`, STRIDE in `stride.md`, `.memlog.md`) | Final: AD-1 to AD-27; OQ1 (SQLite) and OQ2 (TypeScript monorepo, Fastify) resolved; code rules in [rules/code.md](rules/code.md) |
+| Security model | [../SECURITY_MODEL.md](../SECURITY_MODEL.md) | Draft: INV-1 to INV-12, all planned enforcement; owner review pending |
 
 Update this table when an artifact is created, so every skill can find the current one.
 

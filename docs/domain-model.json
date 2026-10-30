@@ -1,7 +1,7 @@
 {
   "$schema": "../.claude/skills/bmad-domain-driven/references/domain-model.schema.json",
   "application": "cashback",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "generatedAt": "2026-10-30",
   "locale": "en",
   "status": "proposed",
@@ -2654,22 +2654,67 @@
         ".context/decisions/2026-10-30-D32-confirm-rereads-orders.md",
         "docs/operations/status-flows.md"
       ]
+    },
+    {
+      "id": "d33-keep-sqlite",
+      "decision": "The new platform keeps SQLite in WAL mode with the server as the only writer (AD-2). PostgreSQL only if a second writer process is ever needed.",
+      "rationale": "Low volume, one operator, one home machine; the live system already runs on SQLite. Approved by the project owner on 2026-10-30.",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D33-keep-sqlite.md"
+      ]
+    },
+    {
+      "id": "d34-fr13-single-rounding",
+      "decision": "New approvals follow FR-13: cashback is the only rounding step (half-up). The live half-even rounding of fee and tax is retired; imported amounts stay unchanged.",
+      "rationale": "One formula everywhere; the difference is at most 1 dong per new approval. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D34-fr13-single-rounding.md"
+      ]
+    },
+    {
+      "id": "d35-clawback-includes-bonus",
+      "decision": "A clawback after payout also recovers a campaign bonus already paid on that order.",
+      "rationale": "The bonus was paid only because the order was approved; it follows the order. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D35-clawback-includes-bonus.md"
+      ]
+    },
+    {
+      "id": "d36-offsite-backup-drive",
+      "decision": "Encrypted backups go off the machine to Google Drive with rclone; the owner holds the age key. Cloudflare Access on the admin host allows only the owner's and staff accounts, listed outside the repository.",
+      "rationale": "Google Drive is already used for payout proofs; the key stays with the owner. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D36-offsite-backup-drive.md"
+      ]
+    },
+    {
+      "id": "d37-dev-environment-first",
+      "decision": "A dev environment with its own Zalo account, ports, database and Chrome profile exists before the cutover rehearsal. Loss or compromise of the operator machine is accepted with full-disk encryption and a production-only OS account.",
+      "rationale": "Running dev against the production Zalo account kicks the assistant's session. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run).",
+      "status": "accepted",
+      "sources": [
+        ".context/decisions/2026-10-30-D37-dev-environment-first.md"
+      ]
     }
   ],
   "openQuestions": [
     {
       "id": "oq1-storage",
       "question": "Does the re-planned platform keep SQLite, or move to PostgreSQL?",
-      "impact": "Decides the migration path, backups and how many writers can run at once.",
+      "impact": "Decides the migration path, backups and how many writers can run at once. Answered by the project owner on 2026-10-30 (keep SQLite): SQLite in WAL mode, one writer process (the server), BEGIN IMMEDIATE on every write, automatic off-machine backups; PostgreSQL only if a second writer process is needed. Recorded as AD-2 in the architecture spine (architecture-cashback-2026-10-30).",
       "owner": "Architect, confirmed by the project owner",
-      "status": "open"
+      "status": "resolved"
     },
     {
       "id": "oq2-stack",
       "question": "Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)?",
-      "impact": "Decides how much of the main-v2 code can be reused.",
+      "impact": "Decides how much of the main-v2 code can be reused. Answered by the architecture spine AD-3 (architecture-cashback-2026-10-30): keep the TypeScript pnpm monorepo; server on Fastify without NestJS, Drizzle, Zod; customer website and admin desk on React, Vite, Tailwind, shadcn/ui and TanStack; packages/money and its golden tests kept (split rewritten to FR-13); Zalo assistant stays a separate zca-js process; the Chrome MV3 bridge stays on a loopback endpoint with X-Bridge-Token.",
       "owner": "Architect, confirmed by the project owner",
-      "status": "open"
+      "status": "resolved"
     },
     {
       "id": "oq3-networks-in-scope",

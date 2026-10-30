@@ -3,7 +3,7 @@
 Open questions are grouped by who must answer. Decisions are newest first. `proposed` means not yet signed off by the project owner.
 Decide in the meeting, then record the result in `.context/decisions/` and `docs/domain-model.json`. This file is generated only.
 
-## Open questions (4)
+## Open questions (2)
 
 ### Project owner (2)
 
@@ -12,14 +12,7 @@ Decide in the meeting, then record the result in `.context/decisions/` and `docs
 | `OQ8` | When are the hard-coded deploy webhook secret and the third-party lookup key on main moved into the environment? | The repository is public; both values are exposed. |  | Project owner | `open` |
 | `OQ5` | Does a copy of the earlier docs/architecture-v2 folder exist on another machine? | It would be useful reference input for the re-plan. |  | Project owner | `open` |
 
-### Architect, confirmed by the project owner (2)
-
-| Code | Question | Impact | Context | Who answers | Status |
-|---|---|---|---|---|---|
-| `OQ2` | Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)? | Decides how much of the main-v2 code can be reused. |  | Architect, confirmed by the project owner | `open` |
-| `OQ1` | Does the re-planned platform keep SQLite, or move to PostgreSQL? | Decides the migration path, backups and how many writers can run at once. |  | Architect, confirmed by the project owner | `open` |
-
-## Answered (4)
+## Answered (6)
 
 | Code | Question | Answer | Context | Who answers | Status |
 |---|---|---|---|---|---|
@@ -27,13 +20,20 @@ Decide in the meeting, then record the result in `.context/decisions/` and `docs
 | `OQ6` | Does the owner confirm D1 (Every amount is a whole number of dong. Money rounds half-up through one shared helper) to D13 (A customer who is still owed money is never deleted, except by an explicit forced action of the operator), the rules carried over from the live system, as accepted for the new platform? | Until confirmed they stay proposed and the model treats them as candidates. |  | Project owner | `resolved` |
 | `OQ4` | Who owns the network list when a new affiliate network is added? | Decides which context holds network rules such as caps, sub_id format and report shape. Answered by D18 (The Link Issuing context owns the affiliate network catalog: caps, sub_id format, link creation and report shape per…). |  | Architect | `resolved` |
 | `OQ3` | Which affiliate networks are in the first release: Shopee only, or also TikTok Shop through AccessTrade and Lazada? | Decides whether the Affiliate Network port needs more than one adapter at launch. Answered by D17 (The first release supports Shopee and TikTok Shop through AccessTrade). |  | Project owner | `resolved` |
+| `OQ2` | Does the re-plan keep the TypeScript monorepo stack of the earlier v2 work (NestJS, Fastify, Drizzle, React)? | Decides how much of the main-v2 code can be reused. Answered by the architecture spine AD-3 (architecture-cashback-2026-10-30): keep the TypeScript pnpm monorepo; server on Fastify without NestJS, Drizzle, Zod; customer website and admin desk on React, Vite, Tailwind, shadcn/ui and TanStack; packages/money and its golden tests kept (split rewritten to FR-13); Zalo assistant stays a separate zca-js process; the Chrome MV3 bridge stays on a loopback endpoint with X-Bridge-Token. |  | Architect, confirmed by the project owner | `resolved` |
+| `OQ1` | Does the re-planned platform keep SQLite, or move to PostgreSQL? | Decides the migration path, backups and how many writers can run at once. Answered by the project owner on 2026-10-30 (keep SQLite): SQLite in WAL mode, one writer process (the server), BEGIN IMMEDIATE on every write, automatic off-machine backups; PostgreSQL only if a second writer process is needed. Recorded as AD-2 in the architecture spine (architecture-cashback-2026-10-30). |  | Architect, confirmed by the project owner | `resolved` |
 
-## Decisions (32)
+## Decisions (37)
 
-### Accepted (32)
+### Accepted (37)
 
 | Code | Date | Decision | Why | Context | Status |
 |---|---|---|---|---|---|
+| `D37` | 2026-10-30 | A dev environment with its own Zalo account, ports, database and Chrome profile exists before the cutover rehearsal. Loss or compromise of the operator machine is accepted with full-disk encryption and a production-only OS account. | Running dev against the production Zalo account kicks the assistant's session. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run). |  | `accepted` |
+| `D36` | 2026-10-30 | Encrypted backups go off the machine to Google Drive with rclone; the owner holds the age key. Cloudflare Access on the admin host allows only the owner's and staff accounts, listed outside the repository. | Google Drive is already used for payout proofs; the key stays with the owner. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run). |  | `accepted` |
+| `D35` | 2026-10-30 | A clawback after payout also recovers a campaign bonus already paid on that order. | The bonus was paid only because the order was approved; it follows the order. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run). |  | `accepted` |
+| `D34` | 2026-10-30 | New approvals follow FR-13: cashback is the only rounding step (half-up). The live half-even rounding of fee and tax is retired; imported amounts stay unchanged. | One formula everywhere; the difference is at most 1 dong per new approval. Delegated to Claude by the project owner on 2026-10-30 (recommended option, from the architecture run). |  | `accepted` |
+| `D33` | 2026-10-30 | The new platform keeps SQLite in WAL mode with the server as the only writer (AD-2). PostgreSQL only if a second writer process is ever needed. | Low volume, one operator, one home machine; the live system already runs on SQLite. Approved by the project owner on 2026-10-30. |  | `accepted` |
 | `D32` | 2026-10-30 | Payout confirmation re-reads every covered order inside the transaction and fails if any is not APPROVED, unpaid and owned by that customer. Awaiting money is never shown as owed, in any total, QR or selection. | The live payments screen showed awaiting money by default and the confirm endpoint did not check status. Agreed in the status-flows party session; delegated by the project owner (recommended option). |  | `accepted` |
 | `D31` | 2026-10-30 | A cancel signal is checked in a fixed order: order-level status, then each item, then a commission of 0. An unknown status, a missing order id or a report page cap freezes the order (FROZEN), excludes it from every total and opens a review case. | The live reader uses only the first item's status, so a cancelled order stayed awaiting and was shown as money owed. Agreed in the status-flows party session; delegated by the project owner (recommended option). |  | `accepted` |
 | `D30` | 2026-10-30 | An order cancelled after approval and before payout becomes REVERSED and leaves every payout. An order cancelled after payout stays PAID and gets a clawback entry that is netted against the customer's next payout; an admin may write it off with a reason. | Today a cancel after approval is silently skipped; the customer could be paid for a cancelled order. Asking customers to send money back loses them. Agreed in the status-flows party session; delegated by the project owner (recommended option). |  | `accepted` |

@@ -22,7 +22,7 @@ C4Container
 
   System_Boundary(p, "Cashback Platform") {
     Container(web, "Customer website", "React, Vite, Tailwind, shadcn/ui", "Sign in, my money, account, link converter")
-    Container(admin, "Admin desk", "React, Vite, Tailwind, shadcn/ui", "Today, payouts, orders, customers, review, campaigns")
+    Container(admin, "Admin desk", "React, Vite, Tailwind, shadcn/ui", "Overview, payouts, orders, customers, review, campaigns")
     Container(server, "Server", "Node 24, Fastify, Drizzle", "7 context modules; public API, share and receipt pages; internal API")
     ContainerQueue(linkq, "Link queue", "link_requests table", "QUEUED requests, Zalo first")
     Container(linkjob, "Link job (5 s)", "in-process job", "Hands one customer's batch to the bridge, applies results")

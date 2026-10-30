@@ -274,13 +274,13 @@ and `payouts` publish events that `campaigns` and `messaging` consume in the sam
 
 - **Binds:** FR-32, FR-30, cashback-infra rule 4
 - **Prevents:** losing the ledger with the disk; migrating without a way back; backups nobody has restored
-- **Rule:** The backup job uses the SQLite online backup API to write a copy, runs `PRAGMA integrity_check` on it, encrypts it with age to the owner's public key, and copies it off the machine with rclone. It runs before every migration (startup refuses to migrate if it fails) and daily. Retention: 30 daily and 12 monthly copies. A restore drill on a scratch machine runs monthly and is a documented procedure. Any failure raises a high owner alert and shows on Today.
+- **Rule:** The backup job uses the SQLite online backup API to write a copy, runs `PRAGMA integrity_check` on it, encrypts it with age to the owner's public key, and copies it off the machine with rclone. It runs before every migration (startup refuses to migrate if it fails) and daily. Retention: 30 daily and 12 monthly copies. A restore drill on a scratch machine runs monthly and is a documented procedure. Any failure raises a high owner alert and shows on the Overview.
 
 ### AD-27 — Logs, alerts and health
 
 - **Binds:** FR-25, FR-30, FR-36, NFR-4, NFR-6
-- **Prevents:** personal data in logs; alert storms; health shown differently on Today and in alerts
-- **Rule:** All server and assistant logs are pino JSON with a redaction list (bank numbers, phone numbers, tokens, session ids, passwords). Owner alerts go to Telegram only, through one `operations.alert(kind, severity)` with cooldowns (critical 5 min, high 15, warning 30). One health model (bridge, assistant, last reconciliation, last backup, queue depth) feeds both the Today view and the alerts.
+- **Prevents:** personal data in logs; alert storms; health shown differently on the Overview and in alerts
+- **Rule:** All server and assistant logs are pino JSON with a redaction list (bank numbers, phone numbers, tokens, session ids, passwords). Owner alerts go to Telegram only, through one `operations.alert(kind, severity)` with cooldowns (critical 5 min, high 15, warning 30). One health model (bridge, assistant, last reconciliation, last backup, queue depth) feeds both the Overview (FR-25) and the alerts.
 
 ## Consistency Conventions
 
@@ -419,7 +419,7 @@ C4 views: [Context](diagrams/c4-context.md), [Container](diagrams/c4-container.m
 | FR-19 network settlement | payouts | AD-4, AD-6 |
 | FR-20, FR-21, FR-22, FR-36 chat, notifications, Zalo safety, Zalo loss | messaging, assistant | AD-15, AD-16, AD-27 |
 | FR-23 campaigns | campaigns | AD-1, AD-11 |
-| FR-24, FR-25, FR-26, FR-27 staff, Today, customers and orders, metrics | identity, operations, admin | AD-18, AD-27, AD-12 |
+| FR-24, FR-25, FR-26, FR-27 staff, Overview (with FR-27 metrics), customers and orders | identity, operations, admin | AD-18, AD-27, AD-12 |
 | FR-29, FR-31 audit, fraud flags | operations | AD-17 |
 | FR-30 owner alerts | operations | AD-27 |
 | FR-32 backups | platform jobs | AD-26, AD-13 |
