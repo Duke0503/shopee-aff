@@ -82,8 +82,16 @@ export class ReportApplyError extends Error {
   }
 }
 
+/** What reading a transition's context needs: reads only, so a preview can take it outside a transaction. */
+export interface ContextDeps {
+  readonly payouts: Pick<OrderPayoutsPort, "coveredByOpenClaim" | "clawedBack">;
+  readonly awards: Pick<OrderAwardsPort, "paidBonus">;
+  /** Production never credits a DEV sub_id (AD-25). */
+  readonly production: boolean;
+}
+
 /** A claim matters only to an APPROVED order (D39), paid bonus and earlier clawbacks only to a PAID one (D35, D42): each is read only then. */
-export function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | null, directory: LedgerDirectory, deps: ApplyDeps, now: Instant, chosen?: Attribution): TransitionContext {
+export function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | null, directory: LedgerDirectory, deps: ContextDeps, now: Instant, chosen?: Attribution): TransitionContext {
   const status = stored?.status ?? null;
   return {
     network: row.network,

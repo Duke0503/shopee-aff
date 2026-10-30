@@ -10,12 +10,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { applyReviewCase, dismissReviewCase, previewReviewApply, reportWrongRejection, type ReviewApplyInput } from "../src/modules/orders/index";
 import type { Ledger, LedgerDb } from "../src/platform/db/ledger";
 import type { Actor } from "../src/platform/ports/audit.port";
-import { applyDepsFor } from "../src/reconcile/apply-deps";
+import { applyDepsFor, reviewReadDepsFor } from "../src/reconcile/apply-deps";
 import { apply, approved, awaiting, cancelled, closeLedgers, freshLedger, HOUR, movingClock, reportRow } from "./helpers/order-ledger";
 
 afterEach(closeLedgers);
 
-const STAFF: Actor = { kind: "staff", id: "staff-anh" };
+const STAFF: Actor = { kind: "staff", id: "staff-anh", role: "EMPLOYEE" };
 const TABLES = ["orders", "order_items", "order_status_history", "order_observations", "review_cases", "audit_entries", "outbox", "campaign_awards", "ledger_entries"];
 
 const all = (ledger: Ledger, sql: string, ...args: unknown[]) => ledger.sqlite.prepare(sql).all(...args) as Record<string, unknown>[];
@@ -23,14 +23,15 @@ const one = (ledger: Ledger, sql: string, ...args: unknown[]) => ledger.sqlite.p
 const snapshot = (ledger: Ledger) => Object.fromEntries(TABLES.map((t) => [t, all(ledger, `SELECT * FROM ${t}`)]));
 const caseId = (ledger: Ledger, reason: string): number => one(ledger, "SELECT case_id FROM review_cases WHERE reason = ? AND status = 'OPEN'", reason).case_id as number;
 
-const staffDeps = (db: LedgerDb, clock: Clock, actor = STAFF) => applyDepsFor(db, clock, { production: true, actor });
+const staffDeps = (db: LedgerDb, clock: Clock, actor: Actor = STAFF) => applyDepsFor(db, clock, { production: true, actor });
 
-function applyCase(ledger: Ledger, input: ReviewApplyInput, clock: Clock, actor = STAFF) {
+function applyCase(ledger: Ledger, input: ReviewApplyInput, clock: Clock, actor: Actor = STAFF) {
   return ledger.tx((db) => applyReviewCase(db, input, staffDeps(db, clock, actor)));
 }
 
 function previewCase(ledger: Ledger, input: ReviewApplyInput, clock: Clock) {
-  return ledger.tx((db) => previewReviewApply(db, input, staffDeps(db, clock)));
+  // A preview only reads: a plain handle and read-only ports, no transaction (Story 4.2 review item 10).
+  return previewReviewApply(ledger.db, input, reviewReadDepsFor(ledger.db, clock, STAFF, true));
 }
 
 function dismissCase(ledger: Ledger, input: { caseId: number; reason: string }, clock: Clock) {

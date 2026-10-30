@@ -52,6 +52,19 @@ export interface ServerConfig {
   shopeeReportPath: string | null;
   /** The nightly sweep's pause between day slices (Story 3.8); the job's default when unset. */
   sweepPauseMs: number | null;
+  /**
+   * The admin desk behind Cloudflare Access (AD-18, D48, Story 4.2): the admin host the staff
+   * routes are registered for, the Access team domain that issues the JWT and the application
+   * audience tag it must carry. All three or none: without them no staff route exists.
+   */
+  staffAccess: StaffAccessConfig | null;
+}
+
+export interface StaffAccessConfig {
+  adminHost: string;
+  /** `<team>.cloudflareaccess.com`; the JWT issuer is `https://<teamDomain>`. */
+  accessTeamDomain: string;
+  accessAudience: string;
 }
 
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace"] as const;
@@ -71,6 +84,18 @@ export class ConfigError extends Error {
 }
 
 const port = z.coerce.number().int().min(1).max(65_535);
+/** A bare lowercase host name, no scheme, port or path, as the Host header carries it. */
+const HOST_NAME = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
+const ACCESS_TEAM_DOMAIN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com$/;
+const STAFF_ACCESS_KEYS = ["ADMIN_HOST", "ACCESS_TEAM_DOMAIN", "ACCESS_AUDIENCE"] as const;
+
+function staffAccessOf(file: { ADMIN_HOST?: string | undefined; ACCESS_TEAM_DOMAIN?: string | undefined; ACCESS_AUDIENCE?: string | undefined }): StaffAccessConfig | null {
+  const missing = STAFF_ACCESS_KEYS.filter((key) => file[key] === undefined);
+  if (missing.length === STAFF_ACCESS_KEYS.length) return null;
+  // Half a staff setup is a mistake, never a desk without its Access check.
+  if (missing.length > 0) throw new ConfigError(`config: missing or invalid ${missing.join(", ")}`);
+  return { adminHost: file.ADMIN_HOST ?? "", accessTeamDomain: file.ACCESS_TEAM_DOMAIN ?? "", accessAudience: file.ACCESS_AUDIENCE ?? "" };
+}
 
 function fileSchema(env: Environment) {
   return z.object({
@@ -84,6 +109,9 @@ function fileSchema(env: Environment) {
     ACCESSTRADE_API_KEY: z.string().optional(),
     SHOPEE_REPORT_PATH: z.string().refine(isAbsolute).optional(),
     SWEEP_PAUSE_MS: z.coerce.number().int().min(0).max(600_000).optional(),
+    ADMIN_HOST: z.string().regex(HOST_NAME).optional(),
+    ACCESS_TEAM_DOMAIN: z.string().regex(ACCESS_TEAM_DOMAIN).optional(),
+    ACCESS_AUDIENCE: z.string().regex(/^[A-Za-z0-9]{16,128}$/).optional(),
   });
 }
 
@@ -115,6 +143,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     accesstradeApiKey: file.ACCESSTRADE_API_KEY || null,
     shopeeReportPath: file.SHOPEE_REPORT_PATH || null,
     sweepPauseMs: file.SWEEP_PAUSE_MS ?? null,
+    staffAccess: staffAccessOf(file),
   };
 }
 

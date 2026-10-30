@@ -29,6 +29,7 @@ export const SENSITIVE_KEYS = [
   "authorization",
   "cookie",
   "set-cookie",
+  "cf-access-jwt-assertion",
   "sessionId",
   "sessionToken",
   "phone",
@@ -45,7 +46,7 @@ const normalise = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/
 
 const EXACT = new Set(SENSITIVE_KEYS.map(normalise));
 /** Any key containing one of these is sensitive (`fingerprintSecret`, `refresh_token`). */
-const CONTAINS = ["password", "token", "secret", "cookie", "sessionid", "phone", "accountnumber", "banknumber", "zaloid", "zalouid"];
+const CONTAINS = ["password", "token", "secret", "cookie", "sessionid", "jwt", "phone", "accountnumber", "banknumber", "zaloid", "zalouid"];
 
 export function isSensitiveKey(key: string): boolean {
   const n = normalise(key);

@@ -14,18 +14,18 @@
  * changes a PAID order (D4), never attributes a guest order to a customer (D5), never chooses a
  * customer the rules did not produce and never takes an amount (INV-1, INV-2).
  */
-import type { Instant, OrderStatus } from "@cashback/core";
+import { STAFF_ROLES, type Clock, type Instant, type OrderStatus } from "@cashback/core";
 import { eq } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
-import type { Actor } from "../../platform/ports/audit.port";
+import { hasStaffRole, type Actor } from "../../platform/ports/audit.port";
 import { sourced, type SourcedRow } from "../linking/index";
 import { applyResult } from "./domain/applied-order";
 import type { Attribution } from "./domain/attribution";
 import { transition, TransitionError, type ReviewContext, type TransitionResult } from "./domain/transition";
 import { ledgerDirectory } from "./ledger-directory.query";
 import { findOrder, frozenFrom, latestObservation, transitionOrderOf, type StoredOrder } from "./order-ledger.repository";
-import { contextFor, type ApplyDeps } from "./report-apply.command";
+import { contextFor, type ContextDeps } from "./report-apply.command";
 import { reviewCases } from "./schema";
 
 export type ReviewCaseErrorCode =
@@ -83,13 +83,22 @@ export interface ReviewPreview {
   readonly cashback: number | null;
 }
 
+/** What planning or previewing a case reads: the acting staff member and read-only context, no writer. */
+export interface ReviewReadDeps extends ContextDeps {
+  readonly clock: Clock;
+  readonly actor: Actor;
+}
+
 const refuse = (code: ReviewCaseErrorCode, message: string): never => {
   throw new ReviewCaseError(code, message);
 };
 
-/** Review commands are staff-only (admin or employee); Story 4.2 checks the role on the route. */
+/**
+ * Review commands are for staff with the admin or employee role (FR-24, Story 4.2), checked here
+ * as well as on the staff route, so no caller reaches them with another actor or role.
+ */
 export function requireStaff(actor: Actor, reason: string): void {
-  if (actor.kind !== "staff") refuse("staff_only", "only staff resolve a review case");
+  if (!hasStaffRole(actor, STAFF_ROLES)) refuse("staff_only", "only staff (admin or employee) resolve a review case");
   if (reason.trim() === "") refuse("reason_missing", "a review case is resolved with a reason");
 }
 
@@ -118,7 +127,7 @@ function caseRow(c: ReviewCaseRow): SourcedRow {
 }
 
 /** A row whose order is not recorded: staff choose one of the rule's candidates. */
-function planAttribution(db: LedgerDb, c: ReviewCaseRow, input: ReviewApplyInput, deps: ApplyDeps): ReviewPlan {
+function planAttribution(db: LedgerDb, c: ReviewCaseRow, input: ReviewApplyInput, deps: ReviewReadDeps): ReviewPlan {
   const row = caseRow(c);
   if (row.orderId === "") refuse("review_not_applicable", "a row without an order id cannot record an order");
   const candidates = candidatesOf(c);
@@ -163,7 +172,7 @@ function reviewFor(db: LedgerDb, stored: StoredOrder, input: ReviewApplyInput): 
 }
 
 /** A case on a recorded order: the order's owner stays, and `transition` decides with the review context. */
-function planReview(db: LedgerDb, c: ReviewCaseRow, stored: StoredOrder, input: ReviewApplyInput, deps: ApplyDeps): ReviewPlan {
+function planReview(db: LedgerDb, c: ReviewCaseRow, stored: StoredOrder, input: ReviewApplyInput, deps: ReviewReadDeps): ReviewPlan {
   if (stored.status === "PAID" || stored.paidAt !== null) refuse("order_paid", `order ${stored.orderId} is paid and never changes (D4)`);
   const order = transitionOrderOf(db, stored);
   if (input.customerId !== undefined && order.guest) refuse("guest_order", "a guest order is never attributed to a customer (D5)");
@@ -183,8 +192,8 @@ function planReview(db: LedgerDb, c: ReviewCaseRow, stored: StoredOrder, input: 
 }
 
 /** The plan of applying the case; writes nothing. */
-export function planReviewApply(db: LedgerDb, input: ReviewApplyInput, deps: ApplyDeps): ReviewPlan {
-  requireStaff(deps.by.actor, input.reason);
+export function planReviewApply(db: LedgerDb, input: ReviewApplyInput, deps: ReviewReadDeps): ReviewPlan {
+  requireStaff(deps.actor, input.reason);
   const c = openCaseOf(db, input.caseId);
   const stored = findOrder(db, c.orderId ?? c.subject);
   return stored === null ? planAttribution(db, c, input, deps) : planReview(db, c, stored, input, deps);
@@ -200,6 +209,7 @@ export function previewOf(db: LedgerDb, plan: ReviewPlan): ReviewPreview {
 }
 
 /** The resulting order state of applying the case, without writing anything (Story 3.9 AC6). */
-export function previewReviewApply(db: LedgerDb, input: ReviewApplyInput, deps: ApplyDeps): ReviewPreview {
+/** Reads only: call with a plain handle, outside any transaction. */
+export function previewReviewApply(db: LedgerDb, input: ReviewApplyInput, deps: ReviewReadDeps): ReviewPreview {
   return previewOf(db, planReviewApply(db, input, deps));
 }

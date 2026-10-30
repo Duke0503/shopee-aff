@@ -58,3 +58,4 @@ export {
   type PayableOrderFacts,
   type SettlementFact,
 } from "./status/shared-definitions";
+export { STAFF_ROLES, type StaffRole } from "./roles/staff-roles";

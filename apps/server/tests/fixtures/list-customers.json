@@ -1,0 +1,26 @@
+{
+  "customers": [
+    [
+      "C1",
+      "DP00001",
+      "Nguyễn Văn Bình"
+    ],
+    [
+      "C2",
+      "DP00002",
+      "Nguyen% Lan"
+    ],
+    [
+      "C3",
+      "DP00003",
+      "Trần Thị Ánh"
+    ],
+    [
+      "C4",
+      "DP00004",
+      "Đào An"
+    ]
+  ],
+  "accentedQuery": "Nguyễn",
+  "folded": "tran thi anh"
+}

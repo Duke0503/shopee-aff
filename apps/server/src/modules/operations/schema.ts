@@ -1,8 +1,9 @@
 /**
- * The operations module's tables (AD-4), as created by migrations/0005_operations.sql. Only this
+ * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012). Only this
  * module writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
+import { STAFF_ROLES } from "@cashback/core";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 import { ALERT_SEVERITIES } from "../../platform/ports/alert.port";
@@ -17,6 +18,8 @@ export const auditEntries = sqliteTable("audit_entries", {
   entityId: text("entity_id").notNull(),
   payload: text("payload").notNull().default("{}"),
   reason: text("reason"),
+  /** The staff role of a staff actor (migration 0012); NULL for other actors and older entries. */
+  actorRole: text("actor_role", { enum: STAFF_ROLES }),
 });
 
 export const ALERT_DELIVERIES = ["PENDING", "SENDING", "SENT", "FAILED"] as const;

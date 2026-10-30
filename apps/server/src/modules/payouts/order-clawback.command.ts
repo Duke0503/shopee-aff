@@ -61,11 +61,12 @@ export function openClawback(db: LedgerDb, request: ClawbackRequest, w: Clawback
   return clawbackId;
 }
 
+/** The read half of the orders port: what a preview needs, with no writer reachable. */
+export function orderPayoutReadsFor(db: LedgerDb): Pick<OrderPayoutsPort, "coveredByOpenClaim" | "clawedBack"> {
+  return { coveredByOpenClaim: () => false, clawedBack: (orderId) => clawedBackOn(db, orderId) };
+}
+
 /** The orders port bound to one transaction's handle. */
 export function orderPayoutsFor(db: LedgerDb, w: ClawbackWriters): OrderPayoutsPort {
-  return {
-    coveredByOpenClaim: () => false,
-    clawedBack: (orderId) => clawedBackOn(db, orderId),
-    openClawback: (request) => openClawback(db, request, w),
-  };
+  return { ...orderPayoutReadsFor(db), openClawback: (request) => openClawback(db, request, w) };
 }

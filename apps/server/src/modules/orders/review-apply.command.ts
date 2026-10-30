@@ -42,7 +42,7 @@ function resolveCase(db: LedgerDb, r: Resolution, deps: ApplyDeps): ReviewOutcom
 
 /** Applies the case with a reason; call inside `tx`. Refuses with a `ReviewCaseError` and writes nothing when the rules do not allow it. */
 export function applyReviewCase(db: LedgerDb, input: ReviewApplyInput, deps: ApplyDeps): ReviewOutcome {
-  const plan = planReviewApply(db, input, deps);
+  const plan = planReviewApply(db, input, { ...deps, actor: deps.by.actor });
   const c = plan.reviewCase;
   // The same refusal the preview gives: a plan that records no order is never written.
   previewOf(db, plan);

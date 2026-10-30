@@ -7,14 +7,24 @@
  * A payload carries ids, counts, statuses and HMAC fingerprints only. The type refuses the keys
  * personal data travels under, and the implementation checks every entry again at run time.
  */
+import { STAFF_ROLES, type StaffRole } from "@cashback/core";
 
-export interface Actor {
-  /** Staff member, signed-in customer, the Zalo assistant, or a system job (`cutover`, `reconcile`). */
-  readonly kind: "staff" | "customer" | "assistant" | "system";
-  readonly id: string;
-}
+export type { StaffRole } from "@cashback/core";
+
+/**
+ * Staff member (with the role their staff session carries, Story 4.2), signed-in customer, the
+ * Zalo assistant, or a system job (`cutover`, `reconcile`).
+ */
+export type Actor =
+  | { readonly kind: "staff"; readonly id: string; readonly role: StaffRole }
+  | { readonly kind: "customer" | "assistant" | "system"; readonly id: string };
 
 export const ACTOR_KINDS = ["staff", "customer", "assistant", "system"] as const satisfies readonly Actor["kind"][];
+
+/** True for a staff actor whose role is one of `roles`; checked at run time, not only by type. */
+export function hasStaffRole(actor: Actor, roles: readonly StaffRole[] = STAFF_ROLES): boolean {
+  return actor.kind === "staff" && (roles as readonly string[]).includes(actor.role);
+}
 
 /** Keys that name personal data: never in an audit payload (a bank account appears only as its fingerprint). */
 export type PersonalDataKey =

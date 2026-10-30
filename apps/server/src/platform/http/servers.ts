@@ -9,6 +9,7 @@ import type { Clock } from "@cashback/core";
 import { installErrorEnvelope } from "./error-envelope";
 import { registerHealthRoutes } from "./health.routes";
 import { requireInternalToken } from "./internal-token.guard";
+import { registerStaffRoutes, type StaffGate, type StaffRoutes } from "./staff-routes";
 
 export const LOOPBACK = "127.0.0.1";
 
@@ -17,6 +18,8 @@ export interface ServerDeps {
   internalToken: string;
   /** The shared redacting logger (AD-27); tests leave it out and log nothing. */
   logger?: FastifyBaseLogger;
+  /** The admin desk's routes behind Cloudflare Access; absent, no staff route exists (Story 4.2). */
+  staff?: { readonly gate: StaffGate; readonly routes: readonly StaffRoutes[] };
 }
 
 export interface Servers {
@@ -34,6 +37,7 @@ function baseApp(logger: FastifyBaseLogger | undefined): FastifyInstance {
 export function buildServers(deps: ServerDeps): Servers {
   const publicApp = baseApp(deps.logger);
   registerHealthRoutes(publicApp, deps.clock);
+  if (deps.staff) registerStaffRoutes(publicApp, deps.staff.gate, deps.staff.routes);
 
   const internalApp = baseApp(deps.logger);
   requireInternalToken(internalApp, deps.internalToken);

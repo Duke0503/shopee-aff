@@ -8,7 +8,7 @@
 import type { Clock } from "@cashback/core";
 
 import type { LedgerDb } from "../../platform/db/ledger";
-import { ACTOR_KINDS, type Actor, type AuditEntry, type AuditPort, type CommandAudit } from "../../platform/ports/audit.port";
+import { ACTOR_KINDS, hasStaffRole, type Actor, type AuditEntry, type AuditPort, type CommandAudit } from "../../platform/ports/audit.port";
 import { isAuditEvent, payloadProblems, type AuditProblem } from "./domain/audit-payload";
 import { auditEntries } from "./schema";
 
@@ -25,6 +25,7 @@ export class AuditEntryError extends Error {
 
 function check(entry: AuditEntry): void {
   if (!(ACTOR_KINDS as readonly string[]).includes(entry.actor.kind) || entry.actor.id.trim() === "") throw new AuditEntryError("an audit entry needs an actor kind and id");
+  if (entry.actor.kind === "staff" && !hasStaffRole(entry.actor)) throw new AuditEntryError("a staff actor needs a staff role");
   if (!isAuditEvent(entry.event)) throw new AuditEntryError(`not a context.aggregate.verb event: ${entry.event}`);
   if (entry.entityId.trim() === "") throw new AuditEntryError("an audit entry needs an entity id");
   const problems = payloadProblems(entry.payload);
@@ -44,6 +45,7 @@ export function recordAudit(db: LedgerDb, clock: Clock, entry: AuditEntry): void
       entityId: entry.entityId,
       payload: JSON.stringify(entry.payload),
       reason: entry.reason ?? null,
+      actorRole: entry.actor.kind === "staff" ? entry.actor.role : null,
     })
     .run();
 }

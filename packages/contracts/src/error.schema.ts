@@ -10,6 +10,7 @@ export const ERROR_CODES = [
   "unauthorized",
   "forbidden",
   "invalid_request",
+  "invalid_sort",
   "conflict",
   "rate_limited",
   "busy",
@@ -33,6 +34,8 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   unauthorized: 401,
   forbidden: 403,
   invalid_request: 400,
+  /** A list sort on a field its spec does not declare sortable (AD-12, Story 4.3). */
+  invalid_sort: 400,
   conflict: 409,
   rate_limited: 429,
   /** The ledger stayed locked past the busy timeout and one retry; the caller may try again. */

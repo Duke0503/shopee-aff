@@ -7,11 +7,11 @@
  */
 import type { Clock } from "@cashback/core";
 
-import { orderAwardsFor } from "../modules/campaigns/index";
+import { orderAwardsFor, paidBonusOn } from "../modules/campaigns/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
-import type { ApplyDeps, OrderEventsPort } from "../modules/orders/index";
-import { orderPayoutsFor } from "../modules/payouts/index";
+import type { ApplyDeps, OrderEventsPort, ReviewReadDeps } from "../modules/orders/index";
+import { orderPayoutReadsFor, orderPayoutsFor } from "../modules/payouts/index";
 import type { LedgerDb } from "../platform/db/ledger";
 import type { Actor } from "../platform/ports/audit.port";
 
@@ -40,4 +40,9 @@ export function applyDepsFor(db: LedgerDb, clock: Clock, options: ApplyOptions):
     events: options.events ?? NO_LISTENER,
     production: options.production,
   };
+}
+
+/** What a review preview reads (Story 4.2 review item 10): read-only ports over a plain handle, no writer. */
+export function reviewReadDepsFor(db: LedgerDb, clock: Clock, actor: Actor, production: boolean): ReviewReadDeps {
+  return { clock, actor, production, payouts: orderPayoutReadsFor(db), awards: { paidBonus: (orderId) => paidBonusOn(db, orderId) } };
 }

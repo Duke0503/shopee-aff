@@ -3,7 +3,8 @@
  * module writes them; tests/identity-schema.test.ts checks these definitions against the
  * migrated database column by column.
  */
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { STAFF_ROLES } from "@cashback/core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** HOUSE is the guest account (D5); staff are ADMIN and EMPLOYEE. */
 export const CUSTOMER_ROLES = ["USER", "ADMIN", "EMPLOYEE", "HOUSE"] as const;
@@ -54,6 +55,50 @@ export const bankAccounts = sqliteTable("bank_accounts", {
   pendingConfirmation: integer("pending_confirmation", { mode: "boolean" }).notNull().default(false),
 });
 
+/** Staff members (migrations/0011_staff_sessions.sql, Story 4.2); seeded by command (Story 4.20). */
+export const staff = sqliteTable("staff", {
+  staffId: text("staff_id").primaryKey().notNull(),
+  username: text("username").notNull(),
+  role: text("role", { enum: STAFF_ROLES }).notNull(),
+  status: text("status", { enum: ["ACTIVE", "DISABLED"] }).notNull(),
+  isRoot: integer("is_root", { mode: "boolean" }).notNull().default(false),
+  passwordHash: text("password_hash").notNull(),
+  passwordSetAt: text("password_set_at").notNull(),
+  lastSignInAt: text("last_sign_in_at"),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Failed staff sign-ins per (submitted name, Access identity) for the doubling delay (AD-18). */
+export const staffSignInThrottles = sqliteTable(
+  "staff_sign_in_throttles",
+  {
+    username: text("username").notNull(),
+    accessSubject: text("access_subject").notNull(),
+    failures: integer("failures").notNull(),
+    lockedUntil: text("locked_until"),
+    lastFailedAt: text("last_failed_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.username, t.accessSubject] })],
+);
+
+export const SESSION_KINDS = ["CUSTOMER", "STAFF"] as const;
+export type SessionKind = (typeof SESSION_KINDS)[number];
+export const SESSION_END_REASONS = ["SIGNED_OUT", "NEW_PASSWORD", "STAFF_DISABLED"] as const;
+export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
+
+/** Customer and staff sessions; only the SHA-256 of the token is stored (AD-18, INV-8). */
+export const sessions = sqliteTable("sessions", {
+  tokenHash: text("token_hash").primaryKey().notNull(),
+  kind: text("kind", { enum: SESSION_KINDS }).notNull(),
+  customerId: text("customer_id").references(() => customers.customerId),
+  staffId: text("staff_id").references(() => staff.staffId),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at"),
+  endedAt: text("ended_at"),
+  endReason: text("end_reason", { enum: SESSION_END_REASONS }),
+});
+
+export type StaffRow = typeof staff.$inferSelect;
 export type CustomerRow = typeof customers.$inferInsert;
 export type CustomerAliasRow = typeof customerAliases.$inferInsert;
 export type BankAccountRow = typeof bankAccounts.$inferInsert;

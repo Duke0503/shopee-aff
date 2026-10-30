@@ -46,7 +46,7 @@ export const LIVE_LEDGER_PATH = join(tmpdir(), "cashback-live-production", "ledg
 export const TEST_CLOCK = fixedClock("2026-10-30T07:00:00.000Z");
 
 /** The staff actor of commands tests run by hand. */
-export const TEST_ACTOR: Actor = { kind: "staff", id: "admin" };
+export const TEST_ACTOR: Actor = { kind: "staff", id: "admin", role: "ADMIN" };
 
 /** A command's actor and audit port, bound to the test's transaction handle. */
 export const auditBy = (db: LedgerDb, clock: Clock = TEST_CLOCK): CommandAudit => commandAudit(db, clock, TEST_ACTOR);

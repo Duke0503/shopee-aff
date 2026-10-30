@@ -301,7 +301,7 @@ describe("Story 3.2: every existing command writes its audit entry in its own tr
   it("an actor without an id, or an event not named context.aggregate.verb, is refused", () => {
     const ledger = freshLedger();
     const record = (entry: AuditEntry) => ledger.tx((db) => auditFor(db, TEST_CLOCK).record(entry));
-    expect(() => record({ actor: { kind: "staff", id: " " }, event: "identity.customer.updated", entityId: "C1", payload: {} })).toThrow(AuditEntryError);
+    expect(() => record({ actor: { kind: "staff", id: " ", role: "ADMIN" }, event: "identity.customer.updated", entityId: "C1", payload: {} })).toThrow(AuditEntryError);
     expect(() => record({ actor: TEST_ACTOR, event: "updated", entityId: "C1", payload: {} })).toThrow(AuditEntryError);
     expect(() => record({ actor: TEST_ACTOR, event: "identity.customer.updated", entityId: "", payload: {} })).toThrow(AuditEntryError);
   });

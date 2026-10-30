@@ -11,7 +11,7 @@ export {
   type PayoutsImport,
   type PayoutsImportResult,
 } from "./payout-import.command";
-export { CLAWBACK_MESSAGE_KEYS, clawedBackOn, openClawback, orderPayoutsFor, type ClawbackWriters } from "./order-clawback.command";
+export { CLAWBACK_MESSAGE_KEYS, clawedBackOn, openClawback, orderPayoutReadsFor, orderPayoutsFor, type ClawbackWriters } from "./order-clawback.command";
 export { getBalances, payableBalances, type Balance } from "./balance.query";
 export { clawbackOpen } from "./clawback.query";
 export { findReceipt, isReceiptToken, type Receipt } from "./receipt.query";

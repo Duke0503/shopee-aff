@@ -43,7 +43,7 @@ export type { ClawbackRequest, OrderAwardsPort, OrderEventsPort, OrderPayoutsPor
 export { markOrderPaid, OrderPayoutError, type OrderPaidDeps, type OrderPayoutErrorCode } from "./order-payout.command";
 export { stepEvent } from "./order-steps.command";
 export { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
-export { applyReportRow, ReportApplyError, type ApplyDeps, type ApplyOutcome, type ApplyReport } from "./report-apply.command";
+export { applyReportRow, ReportApplyError, type ApplyDeps, type ApplyOutcome, type ContextDeps, type ApplyReport } from "./report-apply.command";
 export { periodIsWithheld, settlementPeriodOf, splitWithheld, type SplitHolder } from "./domain/settlement";
 export { markSettlementPeriod, periodWithheld, SettlementPeriodError, type SettlementPeriodErrorCode, type SettlementPeriodMark } from "./settlement-period.command";
 export {
@@ -57,7 +57,8 @@ export {
 export { openOrRefreshCase, resolveOpenCase, type CaseEvidence, type CaseReason, type CaseWrite } from "./review-case.command";
 export { orderBalanceRows, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows } from "./order-balance.query";
 export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
-export { previewReviewApply, ReviewCaseError, type ReviewApplyInput, type ReviewCaseErrorCode, type ReviewPreview } from "./review-plan.query";
+export { reviewCaseRoutes, type ReviewCaseRouteDeps } from "./http/review-case.routes";
+export { previewReviewApply, ReviewCaseError, type ReviewReadDeps, type ReviewApplyInput, type ReviewCaseErrorCode, type ReviewPreview } from "./review-plan.query";
 export { openOrderDays, type OpenOrderDay, type OpenOrderDays } from "./open-order-days.query";
 export { AGED_AFTER_DAYS, FLAG_AFTER_DAYS, flagUnseenOrders, orderAging, resolveSeenAgain, type AgingCounts } from "./order-aging.command";
 export { lastSucceededRun, ReconciliationRunError, runReconciliation, SOURCE_STALE_AFTER_MS, type RunCounts, type RunDeps, type RunKind, type RunOutcome, type RunRecord } from "./reconciliation-run.command";
