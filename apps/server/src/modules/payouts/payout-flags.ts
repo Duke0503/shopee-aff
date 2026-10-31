@@ -19,6 +19,8 @@ export interface FlagFacts {
   readonly payable: number;
   readonly gross: number;
   readonly now: Instant;
+  /** The customer's personal data was erased (FR-35): what is owed stays, nothing can be paid. */
+  readonly erased?: boolean;
 }
 
 export function payoutFlags(f: FlagFacts): PayoutFlag[] {
@@ -30,6 +32,7 @@ export function payoutFlags(f: FlagFacts): PayoutFlag[] {
     if (f.sharedFingerprints.has(f.bank.fingerprint)) on.add("SHARED_BANK");
   }
   if (f.payable === 0 && f.gross > 0) on.add("NETTING_ONLY");
+  if (f.erased === true) on.add("ERASED");
   return PAYOUT_FLAGS.filter((flag) => on.has(flag));
 }
 

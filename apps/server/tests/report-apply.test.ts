@@ -365,13 +365,20 @@ describe("review fixes: approvals, request links and networks", () => {
 
   it("a sub_id2 request owned by no one is not linked: the order has no request and the case notes the uncredited request", () => {
     const ledger = freshLedger();
-    apply(ledger, reportRow("261020NREQ0001", "UNKNOWN", [{ status: "AWAITING", parts: [20000] }], { subIds: ["C1", "REQE", "", "", ""] }));
+    apply(ledger, reportRow("261020NREQ0001", "UNKNOWN", [{ status: "AWAITING", parts: [20000] }], { subIds: ["C1", "NOSUCHREQ", "", "", ""] }));
     expect(orderOf(ledger, "261020NREQ0001")).toMatchObject({ customer_id: "C1", request_id: null, platform: "shopee", status: "FROZEN" });
     const c = one(ledger, "SELECT reason, observation FROM review_cases") as { reason: string; observation: string };
     expect(c.reason).toBe("unknown_status");
-    expect(JSON.parse(c.observation)).toMatchObject({ unmatchedRequest: "REQE" });
-    apply(ledger, awaiting("261020NREQ0002", [20000], { subIds: ["C1", "NOSUCHREQ", "", "", ""] }));
+    expect(JSON.parse(c.observation)).toMatchObject({ unmatchedRequest: "NOSUCHREQ" });
+    apply(ledger, awaiting("261020NREQ0002", [20000], { subIds: ["C1", "NOSUCHREQ2", "", "", ""] }));
     expect(orderOf(ledger, "261020NREQ0002")).toMatchObject({ customer_id: "C1", request_id: null, platform: "shopee" });
+  });
+
+  it("Story 4.16: a request of an erased customer still belongs to that record, so another sub_id1 on it is an owner disagreement", () => {
+    const ledger = freshLedger();
+    apply(ledger, awaiting("261020EREQ0001", [20000], { subIds: ["C1", "REQE", "", "", ""] }));
+    expect(orderOf(ledger, "261020EREQ0001")).toBeUndefined();
+    expect(all(ledger, "SELECT reason, candidates FROM review_cases")).toEqual([{ reason: "owner_disagreement", candidates: '["C1","CE"]' }]);
   });
 
   it("a sub_id2 request owned by someone else credits nobody (owner disagreement); one whose owner is credited is linked", () => {

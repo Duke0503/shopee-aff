@@ -1,0 +1,81 @@
+{
+  "rule": "operatorProfit",
+  "source": "docs/operations/dashboard-spec.md Block 2: profit = commission - fee - tax - cashback - event bonus + clawback netted; margin = profit / commission in basis points, half-up (Story 4.17)",
+  "cases": [
+    {
+      "name": "one withheld Shopee order of 100,000: fee 980, tax 10,000, cashback 71,216, profit 17,804 (17.80%)",
+      "input": {
+        "commission": 100000,
+        "fee": 980,
+        "tax": 10000,
+        "cashback": 71216,
+        "eventBonus": 0,
+        "clawbackNetted": 0
+      },
+      "expected": {
+        "profit": 17804,
+        "marginBps": 1780
+      }
+    },
+    {
+      "name": "an event bonus of 20,000 lowers it and a netted clawback of 9,263 raises it: 7,067 (7.07%)",
+      "input": {
+        "commission": 100000,
+        "fee": 980,
+        "tax": 10000,
+        "cashback": 71216,
+        "eventBonus": 20000,
+        "clawbackNetted": 9263
+      },
+      "expected": {
+        "profit": 7067,
+        "marginBps": 707
+      }
+    },
+    {
+      "name": "a bonus larger than the operator share is a loss: -10,098 and a margin of -20.20% (half away from zero)",
+      "input": {
+        "commission": 50000,
+        "fee": 490,
+        "tax": 0,
+        "cashback": 39608,
+        "eventBonus": 20000,
+        "clawbackNetted": 0
+      },
+      "expected": {
+        "profit": -10098,
+        "marginBps": -2020
+      }
+    },
+    {
+      "name": "guest orders count in commission and profit, never in cashback (D5)",
+      "input": {
+        "commission": 30000,
+        "fee": 294,
+        "tax": 3000,
+        "cashback": 0,
+        "eventBonus": 0,
+        "clawbackNetted": 0
+      },
+      "expected": {
+        "profit": 26706,
+        "marginBps": 8902
+      }
+    },
+    {
+      "name": "a period with no approved order: profit 0 and no margin",
+      "input": {
+        "commission": 0,
+        "fee": 0,
+        "tax": 0,
+        "cashback": 0,
+        "eventBonus": 0,
+        "clawbackNetted": 0
+      },
+      "expected": {
+        "profit": 0,
+        "marginBps": null
+      }
+    }
+  ]
+}

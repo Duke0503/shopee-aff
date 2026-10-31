@@ -89,10 +89,10 @@ development_status:
   4-13-orders-list-with-search-filters-and-sort-on-the-list-contrac: review
   4-14-customers-list-and-one-customer-s-page: review
   4-15-review-cases-screen-with-apply-and-dismiss: review
-  4-16-erase-a-customer-s-personal-data: backlog
-  4-17-overview-shows-what-needs-the-operator-now: backlog
+  4-16-erase-a-customer-s-personal-data: review
+  4-17-overview-shows-what-needs-the-operator-now: review
   4-18-settings-mark-a-shopee-settlement-period-withheld-or-not: review
-  4-19-customer-merge-by-admin-command-with-preview-and-apply: backlog
+  4-19-customer-merge-by-admin-command-with-preview-and-apply: review
   4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: review
   4-21-network-payouts-matched-to-exact-orders: review
   epic-4-retrospective: optional

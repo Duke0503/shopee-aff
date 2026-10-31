@@ -81,3 +81,4 @@ export {
   LINK_REQUESTS_LIST,
   linkRequestCountOf,
 } from "./link-requests.list";
+export { deliveredLinkCounts, failedLinkCount, type NetworkCount } from "./link-overview.query";

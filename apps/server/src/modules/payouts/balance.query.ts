@@ -20,7 +20,7 @@ import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { confirmedBonusByCustomer } from "../campaigns/index";
-import { customerKeys, resolveCustomer } from "../identity/index";
+import { customerKeys, ledgerOwnerOf } from "../identity/index";
 import { orderBalanceRows } from "../orders/index";
 import { CREDIT_KINDS, ledgerEntries, payouts } from "./schema";
 
@@ -78,12 +78,15 @@ export type Owner = (stored: string) => string | null;
 /** A balance of nothing at all: every figure 0. */
 export const NO_BALANCE: Omit<Balance, "customerId"> = { gross: 0, payable: 0, waiting: 0, paid: 0, deductedNext: 0 };
 
-/** The survivor a stored customer id belongs to, resolved once per id; null for nobody, an erased customer or HOUSE (D5). */
+/**
+ * The survivor a stored customer id belongs to, resolved once per id; null for nobody or HOUSE (D5).
+ * An erased record keeps its money facts (FR-35, D26): what it is still owed stays its own balance.
+ */
 export function survivorResolver(db: LedgerDb): Owner {
   const known = new Map<string, string | null>();
   return (stored) => {
     if (!known.has(stored)) {
-      const found = resolveCustomer(db, stored);
+      const found = ledgerOwnerOf(db, stored);
       known.set(stored, found === null || found.role === "HOUSE" ? null : found.customerId);
     }
     return known.get(stored) ?? null;
@@ -124,13 +127,13 @@ function balanceOf(customerId: string, p: Parts): Balance {
 
 /**
  * The balance of each customer named (by id, code or alias), once per survivor, in the order asked.
- * A key that resolves to nobody, to an erased customer or to the guest account returns no balance.
+ * A key that resolves to nobody or to the guest account returns no balance; an erased record keeps its own (FR-35).
  */
 export function getBalances(db: LedgerDb, customerIds: readonly string[]): Balance[] {
   const asked: string[] = [];
   const keys = new Set<string>();
   for (const id of customerIds) {
-    const found = customerKeys(db, id);
+    const found = customerKeys(db, id, { erased: true });
     if (found === null || found.customer.role === "HOUSE" || asked.includes(found.customer.customerId)) continue;
     asked.push(found.customer.customerId);
     for (const key of found.keys) keys.add(key);
@@ -155,8 +158,8 @@ export function allBalances(db: LedgerDb, owner?: Owner): Map<string, Balance> {
  * Every customer with something to pay or to net (gross above 0), by survivor id. One whose open
  * clawbacks reach the gross stays in the list with payable 0: a netting-only payout clears it (D42).
  */
-export function payableBalances(db: LedgerDb): Balance[] {
-  return [...allBalances(db).values()]
+export function payableBalances(db: LedgerDb, all: ReadonlyMap<string, Balance> = allBalances(db)): Balance[] {
+  return [...all.values()]
     .filter((b) => b.gross > 0)
     .sort((a, b) => (a.customerId < b.customerId ? -1 : a.customerId > b.customerId ? 1 : 0));
 }

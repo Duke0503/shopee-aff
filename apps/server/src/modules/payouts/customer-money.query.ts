@@ -9,7 +9,7 @@ import type { CustomerPage, PayoutFlag } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 
 import type { LedgerDb } from "../../platform/db/ledger";
-import { bankAccountsOf, bankDisplayName, sharedBankFingerprints } from "../identity/index";
+import { bankAccountsOf, bankDisplayName, erasedIdsOf, sharedBankFingerprints } from "../identity/index";
 import { getBalances, NO_BALANCE } from "./balance.query";
 import { customerFlags } from "./customers.list";
 import { payoutCountOf } from "./payout-history.list";
@@ -36,6 +36,7 @@ export function customerMoney(
     payable: balance.payable,
     gross: balance.gross,
     now: clock.now(),
+    erased: erasedIdsOf(db, [customerId]).has(customerId),
   });
   return {
     balance,

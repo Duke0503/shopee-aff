@@ -75,6 +75,7 @@ export function customerPage(db: LedgerDb, scope: Scope, clock: Clock): Customer
     status: profile.status,
     zaloUserId: profile.zaloUserId,
     joinedAt: profile.createdAt,
+    erasedAt: profile.erasedAt,
     balance: money.balance,
     flags: money.flags,
     bank: money.bank,

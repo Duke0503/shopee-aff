@@ -57,6 +57,8 @@ export const customerPageSchema = z.object({
   status: z.enum(["ACTIVE", "DISABLED", "ERASED"]),
   zaloUserId: z.string().nullable(),
   joinedAt: instant.nullable(),
+  /** When the personal data was erased (FR-35); null for a live customer. */
+  erasedAt: instant.nullable(),
   /** getBalances, the one payable definition (AD-6). */
   balance: z.object({ payable: dong, gross: dong, waiting: dong, paid: dong, deductedNext: dong }),
   flags: z.array(z.enum(PAYOUT_FLAGS)),
@@ -102,3 +104,15 @@ export const adminLinkRequestRowSchema = z.object({
 export type AdminLinkRequestRow = z.infer<typeof adminLinkRequestRowSchema>;
 
 export const adminLinkRequestsResponseSchema = listResponseSchema(adminLinkRequestRowSchema);
+
+/** Erasing a customer's personal data (FR-35, Story 4.16): the forced erase needs the admin's reason. */
+export const customerEraseRequestSchema = z.object({ reason: z.string().trim().min(1).max(500).optional() }).strict();
+export type CustomerEraseRequest = z.infer<typeof customerEraseRequestSchema>;
+
+export const customerErasedResponseSchema = z.object({
+  customerId: z.string(),
+  erasedAt: instant,
+  forced: z.boolean(),
+  mergedRecords: z.number().int().min(0),
+});
+export type CustomerErasedResponse = z.infer<typeof customerErasedResponseSchema>;

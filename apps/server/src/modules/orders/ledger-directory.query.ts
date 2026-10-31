@@ -1,10 +1,11 @@
 /**
  * The attribution directory over the ledger (AD-8, AD-23): identity resolves a customer through
- * aliases to the survivor, linking knows each link request's owner. Each request is read once per
+ * aliases to the survivor, linking knows each link request's owner. An erased record is still
+ * found, as one that earns nothing and is told nothing, like the guest (FR-35, Story 4.16). Each request is read once per
  * apply; the platform of the request attribution credited comes from that same read.
  */
 import type { LedgerDb } from "../../platform/db/ledger";
-import { resolveCustomer } from "../identity/index";
+import { earnsNothing, ledgerOwnerOf } from "../identity/index";
 import { findLinkRequestOwner, type LinkRequestOwner } from "../linking/index";
 import type { AttributionDirectory } from "./domain/attribution";
 
@@ -21,8 +22,9 @@ export function ledgerDirectory(db: LedgerDb): LedgerDirectory {
   };
   return {
     resolveCustomer: (key) => {
-      const found = resolveCustomer(db, key);
-      return found === null ? null : { customerId: found.customerId, guest: found.role === "HOUSE" };
+      const found = ledgerOwnerOf(db, key);
+      // Attribution records a new order now, so an erased owner earns nothing on it (FR-35).
+      return found === null ? null : { customerId: found.customerId, guest: earnsNothing(found, null) };
     },
     requestOwner: (requestId) => request(requestId)?.customerId ?? null,
     requestPlatform: (requestId) => request(requestId)?.platform ?? null,

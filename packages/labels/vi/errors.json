@@ -55,5 +55,20 @@
   "error.review_case.cancel_signal_seen": "Báo cáo mới nhất của sàn vẫn ghi đơn bị huỷ nên chưa khôi phục được.",
   "error.review_case.no_observation": "Chưa có dòng báo cáo nào của đơn này để đối chiếu.",
   "error.review_case.evidence_changed": "Dòng báo cáo của ca này vừa thay đổi. Đóng rồi mở lại ca để xem số mới.",
-  "error.review_case.review_not_applicable": "Ca này không áp dụng được. Kiểm tra rồi bỏ qua với lý do."
+  "error.review_case.review_not_applicable": "Ca này không áp dụng được. Kiểm tra rồi bỏ qua với lý do.",
+  "error.customer.customer_not_found": "Không tìm thấy khách này.",
+  "error.customer.not_a_customer": "Đây không phải tài khoản khách.",
+  "error.customer.already_erased": "Dữ liệu cá nhân của khách này đã được xoá trước đó.",
+  "error.customer.owed_money": "Khách còn tiền chưa nhận nên chưa xoá được: {payable} chờ chuyển, {waiting} chờ sàn duyệt.",
+  "error.customer.admin_only": "Chỉ quản trị viên được xoá khi khách còn tiền.",
+  "error.customer.reason_required": "Ghi lý do xoá dù khách còn tiền.",
+  "error.customer.claim_open": "Đang có người mở chuyển tiền cho khách này. Đóng lần chuyển đó trước.",
+  "error.merge.admin_only": "Chỉ quản trị viên được gộp khách.",
+  "error.merge.customer_not_found": "Không tìm thấy khách {customer}.",
+  "error.merge.same_customer": "Hai mã này là cùng một khách.",
+  "error.merge.not_a_customer": "{customer} không phải tài khoản khách.",
+  "error.merge.bank_differs": "Hai khách có số tài khoản khác nhau ({mergedBank} và {survivorBank}). Không gộp được.",
+  "error.merge.claim_open": "Đang có người mở chuyển tiền cho {customer}. Đóng lần chuyển đó trước.",
+  "error.merge.changed": "Dữ liệu đã đổi từ lúc xem trước. Xem trước lại rồi gộp.",
+  "error.overview.bad_period": "Khoảng ngày không hợp lệ. Chọn từ 1 đến 366 ngày, ngày đầu trước ngày cuối."
 }

@@ -1,6 +1,6 @@
 {
   "rule": "attribute",
-  "source": "src/cashback/shopee/reconciliation.py:60-80 (live: sub_id1 through find_customer_id and aliases, else the sub_id2 request owner); target rule AD-8, D5, D6, D7, D58, AD-25",
+  "source": "src/cashback/shopee/reconciliation.py:60-80 (live: sub_id1 through find_customer_id and aliases, else the sub_id2 request owner); target rule AD-8, D5, D6, D7, D58, AD-25; an erased record still receives its old links and earns nothing (FR-35, Story 4.16)",
   "directory": {
     "customers": [
       "CUSTA",
@@ -352,8 +352,8 @@
       }
     },
     {
-      "name": "a request owned by an erased customer is never credited",
-      "story": "2.7",
+      "name": "a legacy link of an erased customer still attributes to the erased record, earning nothing (FR-35)",
+      "story": "4.16",
       "input": {
         "subIds": [
           "",
@@ -362,14 +362,17 @@
         "production": true
       },
       "expected": {
-        "kind": "review",
-        "reason": "unattributed",
-        "candidates": []
+        "kind": "customer",
+        "customerId": "CUSTE",
+        "source": "sub_id2",
+        "guest": true,
+        "requestId": "REQE",
+        "unmatchedRequest": null
       }
     },
     {
-      "name": "an erased customer in sub_id1 is never credited",
-      "story": "2.7",
+      "name": "an erased customer in sub_id1 attributes to the erased record with cashback 0 (FR-35, Story 4.16 AC3)",
+      "story": "4.16 AC3",
       "input": {
         "subIds": [
           "CUSTE"
@@ -377,9 +380,12 @@
         "production": true
       },
       "expected": {
-        "kind": "review",
-        "reason": "unattributed",
-        "candidates": []
+        "kind": "customer",
+        "customerId": "CUSTE",
+        "source": "sub_id1",
+        "guest": true,
+        "requestId": null,
+        "unmatchedRequest": null
       }
     },
     {

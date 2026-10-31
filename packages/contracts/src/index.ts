@@ -67,6 +67,8 @@ export {
   adminLinkRequestRowSchema,
   adminLinkRequestsResponseSchema,
   CUSTOMER_BANK_STATES,
+  customerErasedResponseSchema,
+  customerEraseRequestSchema,
   customerKeyParamsSchema,
   customerPageSchema,
   LINK_REQUEST_NETWORKS,
@@ -74,6 +76,8 @@ export {
   type AdminCustomerRow,
   type AdminLinkRequestRow,
   type CustomerBankState,
+  type CustomerErasedResponse,
+  type CustomerEraseRequest,
   type CustomerPage,
 } from "./customer-list.schema";
 export {
@@ -180,3 +184,32 @@ export {
   type SettlementPeriodImpact,
   type SettlementPeriodsResponse,
 } from "./settlement-period.schema";
+export {
+  customerMergedResponseSchema,
+  customerMergePreviewSchema,
+  customerMergeRequestSchema,
+  mergeBalanceSchema,
+  mergeSideSchema,
+  type CustomerMergedResponse,
+  type CustomerMergePreview,
+  type CustomerMergeRequest,
+  type MergeBalance,
+} from "./customer-merge.schema";
+export {
+  figureSchema,
+  HEALTH_COMPONENTS,
+  HEALTH_STATES,
+  MAX_PERIOD_DAYS,
+  OVERVIEW_PERIODS,
+  overviewQuerySchema,
+  overviewSchema,
+  ratioSchema,
+  type Figure,
+  type Overview,
+  type OverviewEvent,
+  type OverviewHealth,
+  type OverviewNetworkOrders,
+  type OverviewQuery,
+  type OverviewWeek,
+  type Ratio,
+} from "./overview.schema";

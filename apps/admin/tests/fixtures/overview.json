@@ -1,0 +1,400 @@
+{
+ "$comment": "The Overview answer of the golden ledger (packages/golden/fixtures/overview/overview-ledger.json) with its clock as asOf, for the desk tests and screenshots. Fake data.",
+ "overview": {
+  "asOf": "2026-10-30T05:00:00.000Z",
+  "period": {
+   "preset": "thisMonth",
+   "from": "2026-10-01",
+   "to": "2026-10-30",
+   "previousFrom": "2026-09-01",
+   "previousTo": "2026-09-30"
+  },
+  "todo": {
+   "payable": {
+    "customers": 1,
+    "amount": 100459
+   },
+   "openReviewCases": 2,
+   "failedLinksToday": 1,
+   "owedWithoutBank": {
+    "customers": 1,
+    "amount": 7122
+   }
+  },
+  "business": {
+   "commission": {
+    "value": 210000,
+    "previous": 60000,
+    "change": 150000
+   },
+   "approvedOrders": {
+    "value": 5,
+    "previous": 1,
+    "change": 4
+   },
+   "fee": {
+    "value": 2058,
+    "previous": 588,
+    "change": 1470
+   },
+   "tax": {
+    "value": 21000,
+    "previous": 6000,
+    "change": 15000
+   },
+   "cashback": {
+    "value": 128189,
+    "previous": 42730,
+    "change": 85459
+   },
+   "eventBonus": {
+    "value": 40000,
+    "previous": 0,
+    "change": 40000
+   },
+   "clawbackNetted": {
+    "value": 9263,
+    "previous": 0,
+    "change": 9263
+   },
+   "profit": {
+    "value": 28016,
+    "previous": 10682,
+    "change": 17334
+   },
+   "margin": {
+    "bps": 1334,
+    "previousBps": 1780,
+    "changeBps": -446,
+    "enoughData": true
+   },
+   "split": {
+    "feeAndTax": 23058,
+    "feeAndTaxBps": 1052,
+    "cashbackBps": 5846,
+    "eventBonusBps": 1824,
+    "profitBps": 1278
+   },
+   "byNetwork": [
+    {
+     "network": "shopee",
+     "commission": 190000,
+     "orders": 4
+    },
+    {
+     "network": "accesstrade",
+     "commission": 20000,
+     "orders": 1
+    }
+   ],
+   "withheldPeriods": [
+    "2026-10"
+   ],
+   "cashbackPaid": 35608,
+   "cashbackOwed": 92581,
+   "byCampaign": [
+    {
+     "campaignId": "EV1",
+     "name": "Ngay hoi thang 10",
+     "bonus": 40000
+    }
+   ],
+   "withoutSplit": 0,
+   "importedWithoutApproval": 1,
+   "cashBasis": {
+    "received": 30000,
+    "paidOut": 12000,
+    "profit": 18000,
+    "previousProfit": null
+   },
+   "totalProfit": {
+    "value": 46016,
+    "previous": 10682,
+    "change": 35334
+   }
+  },
+  "money": {
+   "networksOwe": 160000,
+   "weOweCustomers": 107581,
+   "customersOweUs": 5000,
+   "awaiting": {
+    "orders": 3,
+    "commission": 35000,
+    "cashback": 17804
+   },
+   "cash": {
+    "networkBatches": 3,
+    "networkGross": {
+     "value": 143700,
+     "previous": null,
+     "change": null
+    },
+    "networkFee": 1408,
+    "networkTax": 14370,
+    "received": {
+     "value": 127922,
+     "previous": 0,
+     "change": 127922
+    },
+    "paidOut": {
+     "value": 58345,
+     "previous": 42730,
+     "change": 15615
+    },
+    "payouts": 2,
+    "difference": {
+     "value": 69577,
+     "previous": -42730,
+     "change": 112307
+    }
+   },
+   "processing": {
+    "batches": 1,
+    "gross": 100000,
+    "received": 89020
+   },
+   "advanceWarning": true,
+   "last60Days": {
+    "received": 127922,
+    "paidOut": 101075
+   }
+  },
+  "trend": {
+   "weeks": [
+    {
+     "weekStart": "2026-08-10",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-17",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-24",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-31",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-07",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-14",
+     "profit": 10682,
+     "commission": 60000,
+     "cashback": 42730
+    },
+    {
+     "weekStart": "2026-09-21",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-28",
+     "profit": 1780,
+     "commission": 10000,
+     "cashback": 7122
+    },
+    {
+     "weekStart": "2026-10-05",
+     "profit": -2196,
+     "commission": 100000,
+     "cashback": 71216
+    },
+    {
+     "weekStart": "2026-10-12",
+     "profit": 19169,
+     "commission": 100000,
+     "cashback": 49851
+    },
+    {
+     "weekStart": "2026-10-19",
+     "profit": 9263,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-10-26",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    }
+   ],
+   "totals": {
+    "profit": {
+     "value": 38698,
+     "previous": null,
+     "change": null
+    },
+    "commission": {
+     "value": 270000,
+     "previous": null,
+     "change": null
+    },
+    "cashback": {
+     "value": 170919,
+     "previous": null,
+     "change": null
+    }
+   }
+  },
+  "orders": {
+   "networks": [
+    {
+     "network": "shopee",
+     "linksDelivered": 4,
+     "recorded": 8,
+     "ordersPerLink": {
+      "bps": 20000,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     },
+     "approved": 3,
+     "cancelled": 2,
+     "awaiting": 2,
+     "cancelRate": {
+      "bps": 4000,
+      "previousBps": 0,
+      "changeBps": 4000,
+      "enoughData": false
+     },
+     "averageCommission": 60000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": 1000,
+      "changeBps": 0,
+      "enoughData": false
+     }
+    },
+    {
+     "network": "accesstrade",
+     "linksDelivered": 1,
+     "recorded": 1,
+     "ordersPerLink": {
+      "bps": 10000,
+      "previousBps": 0,
+      "changeBps": 10000,
+      "enoughData": false
+     },
+     "approved": 1,
+     "cancelled": 0,
+     "awaiting": 0,
+     "cancelRate": {
+      "bps": 0,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     },
+     "averageCommission": 20000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     }
+    },
+    {
+     "network": "all",
+     "linksDelivered": 5,
+     "recorded": 9,
+     "ordersPerLink": {
+      "bps": 18000,
+      "previousBps": 20000,
+      "changeBps": -2000,
+      "enoughData": false
+     },
+     "approved": 4,
+     "cancelled": 2,
+     "awaiting": 2,
+     "cancelRate": {
+      "bps": 3333,
+      "previousBps": 0,
+      "changeBps": 3333,
+      "enoughData": false
+     },
+     "averageCommission": 50000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": 1000,
+      "changeBps": 0,
+      "enoughData": false
+     }
+    }
+   ],
+   "aged": 1
+  },
+  "events": [
+   {
+    "campaignId": "EV1",
+    "name": "Ngay hoi thang 10",
+    "startsAt": "2026-09-30T17:00:00.000Z",
+    "endsAt": "2026-10-15T17:00:00.000Z",
+    "slotsUsed": 3,
+    "slots": 10,
+    "bonus": 40000,
+    "commission": 150000,
+    "operatorShare": 26706,
+    "result": -13294
+   }
+  ],
+  "customers": {
+   "withOrder": {
+    "value": 2,
+    "previous": 2,
+    "change": 0
+   },
+   "newCustomers": {
+    "value": 1,
+    "previous": 0,
+    "change": 1
+   },
+   "repeatShare": {
+    "bps": 10000,
+    "previousBps": 5000,
+    "changeBps": 5000,
+    "enoughData": false
+   },
+   "concentration": {
+    "customerCode": "DP00001",
+    "shareBps": 5714
+   }
+  },
+  "health": [
+   {
+    "component": "bridge",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "assistant",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "reconciliation",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "backup",
+    "state": "unknown",
+    "at": null
+   }
+  ]
+ }
+}

@@ -6,6 +6,7 @@
  *   staff-password <staffId> --as <admin>               set a new password; the member's sessions end
  *   staff-access <staffId> --as <admin> [--role R] [--status S]
  *   campaign-create <campaign.json> --as <admin> [--apply]   preview, and with --apply create
+ *   customer-merge <merged> --into <survivor> --as <admin> [--apply]   preview the merge, and with --apply merge
  *
  * `--as` signs in as that admin (the password is asked, never an argument) and signs out at the
  * end. The first seed of an empty staff table needs no `--as`. Every new password is asked twice
@@ -19,6 +20,8 @@ import {
   adminSignInResponseSchema,
   campaignInputSchema,
   campaignPreviewResponseSchema,
+  customerMergedResponseSchema,
+  customerMergePreviewSchema,
   STAFF_TOKEN_HEADER,
   staffAccessResponseSchema,
   staffPasswordResponseSchema,
@@ -79,8 +82,8 @@ interface Args {
   readonly flags: ReadonlyMap<string, string | true>;
 }
 
-const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create"];
-export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply]";
+const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge"];
+export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply]";
 
 function parseArgs(argv: readonly string[]): Args | null {
   const [command, target, ...rest] = argv;
@@ -169,11 +172,23 @@ async function campaignCreate(io: CliIo, args: Args, token: string | null): Prom
   return { applied: true, preview: created, endsBefore: endsBeforeText(created) };
 }
 
+/** Story 4.19: the preview first, always; `--apply` merges and answers the survivor's balance read again. */
+async function customerMerge(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
+  const survivor = args.flags.get("--into");
+  if (typeof survivor !== "string") throw new CliRefusal("usage", { error: CLI_USAGE });
+  const body = { merged: args.target, survivor };
+  const preview = customerMergePreviewSchema.parse(await ok(io, "POST", "/internal/admin/customers/merge/preview", body, token));
+  if (args.flags.get("--apply") !== true) return { applied: false, preview };
+  const merged = customerMergedResponseSchema.parse(await ok(io, "POST", "/internal/admin/customers/merge", body, token));
+  return { applied: true, preview, merged };
+}
+
 const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promise<Record<string, unknown>>> = {
   "staff-seed": staffSeed,
   "staff-password": staffPassword,
   "staff-access": staffAccess,
   "campaign-create": campaignCreate,
+  "customer-merge": customerMerge,
 };
 
 /** Runs one command; returns the exit code after printing its one JSON line. */

@@ -16,6 +16,7 @@ const FLAG_KEYS: Readonly<Record<PayoutFlag, AdminKey>> = {
   BANK_CHANGED: "flag_bank_changed",
   SHARED_BANK: "flag_shared_bank",
   NETTING_ONLY: "flag_netting_only",
+  ERASED: "flag_erased",
 };
 
 export const flagsOf = (text: string): PayoutFlag[] => PAYOUT_FLAGS.filter((flag) => text.split(",").includes(flag));

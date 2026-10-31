@@ -11,7 +11,7 @@ export interface AttributionDirectoryData {
   customers: string[];
   /** Customers whose role is HOUSE (the guest account, D5). */
   guests: string[];
-  /** Customers whose status is ERASED: they resolve to nobody. */
+  /** Customers whose status is ERASED: their old links attribute to them, earning nothing like a guest (FR-35). */
   erased: string[];
   /** Alias to surviving customer id. */
   aliases: Record<string, string>;

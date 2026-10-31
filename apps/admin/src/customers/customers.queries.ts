@@ -11,6 +11,7 @@ import {
   adminLinkRequestsResponseSchema,
   adminOrdersResponseSchema,
   CUSTOMER_BANK_STATES,
+  customerErasedResponseSchema,
   customerPageSchema,
   LINK_REQUEST_NETWORKS,
   listSearch,
@@ -20,6 +21,7 @@ import {
   YES_NO,
   type AdminCustomerRow,
   type AdminLinkRequestRow,
+  type CustomerErasedResponse,
   type CustomerPage,
   type ListResponse,
   type ListSearchState,
@@ -27,7 +29,7 @@ import {
 } from "@cashback/contracts";
 import { storedValues } from "@cashback/core";
 import { useListQuery } from "@cashback/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "../api/api.queries";
 import type { OrderRow } from "../orders/orders.queries";
@@ -163,5 +165,21 @@ export function useCustomerPayouts(key: string, state: ListSearchState) {
     search: CUSTOMER_PAYOUTS_SEARCH,
     state,
     fetchList,
+  });
+}
+
+/**
+ * Erasing a customer's personal data (FR-35, Story 4.16): staff send only the customer's key and,
+ * for an admin's forced erase, the reason; the server checks what is owed. Afterwards every desk
+ * query refreshes (LC-10): the lists drop the name, the page shows the erased state.
+ */
+export function useEraseCustomer(customerKey: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { readonly force: boolean; readonly reason?: string }): Promise<CustomerErasedResponse> =>
+      customerErasedResponseSchema.parse(
+        await apiRequest(`/api/admin/customers/${encodeURIComponent(customerKey)}/${input.force ? "force-erase" : "erase"}`, { method: "POST", body: input.force ? { reason: input.reason } : {} }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["admin"], predicate: (query) => query.queryKey[1] !== "session" }),
   });
 }

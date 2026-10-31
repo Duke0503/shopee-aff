@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { classifyWithholding, clawbackAmount, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { averageDong, classifyWithholding, clawbackAmount, combinedBalance, eventResult, operatorProfit, operatorShareOf, ratioBps, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan" | "batchWithholding";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan" | "batchWithholding" | "operatorProfit" | "overviewRatio" | "eventResult" | "combinedBalance";
   source?: string;
   cases: GoldenCase[];
 }
@@ -82,5 +82,21 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
     }
     case "batchWithholding":
       return classifyWithholding(network(input), num(input, "eligible"), num(input, "received"));
+    case "operatorProfit": {
+      const parts = { commission: num(input, "commission"), fee: num(input, "fee"), tax: num(input, "tax"), cashback: num(input, "cashback"), eventBonus: num(input, "eventBonus"), clawbackNetted: num(input, "clawbackNetted") };
+      const profit = operatorProfit(parts);
+      return { profit, marginBps: ratioBps(profit, parts.commission) };
+    }
+    case "overviewRatio":
+      return input["kind"] === "average" ? averageDong(num(input, "numerator"), num(input, "denominator")) : ratioBps(num(input, "numerator"), num(input, "denominator"));
+    case "eventResult": {
+      const share = operatorShareOf({ commission: num(input, "commission"), fee: num(input, "fee"), tax: num(input, "tax"), cashback: num(input, "cashback") });
+      return { operatorShare: share, result: eventResult(share, num(input, "bonus")) };
+    }
+    case "combinedBalance": {
+      const parts = input["parts"];
+      if (!Array.isArray(parts)) throw new Error("parts must be an array");
+      return combinedBalance(parts.map((p: Input) => ({ gross: num(p, "gross"), deductedNext: num(p, "deductedNext"), waiting: num(p, "waiting"), paid: num(p, "paid") })));
+    }
   }
 }

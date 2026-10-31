@@ -39,6 +39,14 @@ The largest figure on the screen is **Lợi nhuận của mình**.
 | **Lợi nhuận của mình** | Commission − fee − tax − cashback − event bonus + clawback netted |
 | Biên lợi nhuận | Profit ÷ commission (computed in `packages/money`) |
 
+**Orders imported at cutover (owner decision, 2026-10-31).** The live system stored no approved
+commission and no approval day, so imported orders cannot be placed by approval day. When the
+period holds such orders, or money moved for them, their part is read on the cash basis: what the
+networks paid in the period in batches imported at cutover, minus the imported payouts recorded in
+the period (bonuses paid are inside those transfers). The profit card then shows the total on top
+and both parts labelled: "Theo ngày duyệt (đơn mới)" and "Theo tiền thực (đơn từ hệ thống cũ)",
+the cash part with what it is made of. Margin and the split bar stay on the approval basis.
+
 Guest (HOUSE) orders count in commission and profit, never in cashback. REVERSED, REJECTED and FROZEN
 orders are in no line. The operator's own income tax on the commission is outside this block and is
 named as such in a footnote.
@@ -48,6 +56,7 @@ named as such in a footnote.
 | Figure | Definition |
 |---|---|
 | Sàn còn nợ mình | Approved commission not yet settled by the network |
+| Sàn đang xử lý | Network batches created and not paid yet (status PROCESSING): their gross and what the network will pay, as its own line under "Sàn còn nợ mình" (owner decision, 2026-10-31) |
 | Mình còn nợ khách | Payable balance of all customers (D27) plus confirmed unpaid bonuses |
 | Khách đang nợ mình | Open clawback amounts not yet netted |
 | Đang chờ sàn duyệt | Estimated commission and estimated cashback of AWAITING_APPROVAL orders, labelled "ước tính" |

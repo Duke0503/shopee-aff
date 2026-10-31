@@ -21,9 +21,9 @@ import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import { defineList } from "../../platform/list/define-list";
 import { answerList } from "../../platform/list/list-request";
 import { withTempRows, type TempTable } from "../../platform/list/temp-rows";
-import { bankAccountsOf, bankDisplayName, sharedBankFingerprints, staffNamesOf } from "../identity/index";
+import { bankAccountsOf, bankDisplayName, erasedIdsOf, sharedBankFingerprints, staffNamesOf } from "../identity/index";
 import { payableOrderLines } from "../orders/index";
-import { payableBalances, survivorResolver } from "./balance.query";
+import { payableBalances, survivorResolver, type Balance } from "./balance.query";
 import { payoutFlags, queueOf } from "./payout-flags";
 import { payoutClaims } from "./schema";
 
@@ -78,18 +78,22 @@ function openClaimHolders(db: LedgerDb): Map<string, { staffId: string; staffNam
   return new Map(open.map((c) => [c.customerId, { staffId: c.staffId, staffName: names.get(c.staffId) ?? c.staffId }]));
 }
 
-/** One row per customer with a gross above 0, built from `payableBalances` and the shared flag rules. */
-export function payoutQueueRows(db: LedgerDb, clock: Clock): QueueRow[] {
-  const balances = payableBalances(db);
+/**
+ * One row per customer with a gross above 0, built from `payableBalances` and the shared flag rules.
+ * A caller that already read `allBalances` in the same snapshot passes it, so balances are read once.
+ */
+export function payoutQueueRows(db: LedgerDb, clock: Clock, all?: ReadonlyMap<string, Balance>): QueueRow[] {
+  const balances = payableBalances(db, all);
   const ids = balances.map((b) => b.customerId);
   const banks = bankAccountsOf(db, ids);
+  const erased = erasedIdsOf(db, ids);
   const shared = sharedBankFingerprints(db);
   const orders = orderFacts(db);
   const claims = openClaimHolders(db);
   const now = clock.now();
   return balances.map((b) => {
     const bank = banks.get(b.customerId) ?? null;
-    const flags = payoutFlags({ bank, sharedFingerprints: shared, payable: b.payable, gross: b.gross, now });
+    const flags = payoutFlags({ bank, sharedFingerprints: shared, payable: b.payable, gross: b.gross, now, erased: erased.has(b.customerId) });
     const settled = orders.get(b.customerId) ?? [];
     const claim = claims.get(b.customerId);
     return {

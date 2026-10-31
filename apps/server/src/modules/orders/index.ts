@@ -71,3 +71,4 @@ export { openOrderDays, type OpenOrderDay, type OpenOrderDays } from "./open-ord
 export { AGED_AFTER_DAYS, FLAG_AFTER_DAYS, flagUnseenOrders, orderAging, resolveSeenAgain, type AgingCounts } from "./order-aging.command";
 export { lastSucceededRun, ReconciliationRunError, runReconciliation, SOURCE_STALE_AFTER_MS, type RunCounts, type RunDeps, type RunKind, type RunOutcome, type RunRecord } from "./reconciliation-run.command";
 export { ORDER_NETWORKS, ORDER_STATUSES, RECONCILIATION_RUN_KINDS, REVIEW_CASE_STATUSES, type OrderNetwork } from "./schema";
+export { approvedFactsOf, approvedOrderFacts, awaitingOrderFacts, customersWithOrderBefore, importedWithoutApproval, openReviewCaseCount, recordedOrderFacts, unsettledApprovedCommission, type ApprovedOrderFact, type AwaitingOrderFact, type RecordedOrderFact } from "./overview.query";

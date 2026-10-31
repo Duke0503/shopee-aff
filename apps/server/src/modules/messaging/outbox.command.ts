@@ -8,7 +8,7 @@
  * none. Delivery, retries, the daily cap and `messaging.silent` come with Stories 6.4 and 6.10.
  */
 import type { Clock, Instant } from "@cashback/core";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -78,4 +78,14 @@ export function seedSentNotifications(db: LedgerDb, rows: readonly SeededNotific
   }
   by.audit.record({ actor: by.actor, event: "messaging.outbox.seeded", entityId: by.actor.id, payload: { seeded: sorted.length } });
   return sorted.length;
+}
+
+/**
+ * Withdraws every notification not yet sent to these stored customer ids (an erased customer,
+ * FR-35): it is never due again, so nothing is delivered. Returns how many were withdrawn. Call
+ * inside the erasing command's transaction.
+ */
+export function withdrawUnsent(db: LedgerDb, customerIds: readonly string[]): number {
+  if (customerIds.length === 0) return 0;
+  return db.update(outbox).set({ dueAt: null }).where(and(inArray(outbox.customerId, [...customerIds]), isNull(outbox.sentAt))).run().changes;
 }

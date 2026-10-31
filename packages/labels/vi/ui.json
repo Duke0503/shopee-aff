@@ -47,5 +47,11 @@
   "list_date_range": "{from} – {to}",
   "list_columns": "Cột",
   "list_columns_title": "Hiện thêm cột",
-  "list_chip_group": "Lọc nhanh"
+  "list_chip_group": "Lọc nhanh",
+  "chart_show_table": "Xem bảng số",
+  "chart_show_chart": "Xem biểu đồ",
+  "percent": "{value}%",
+  "points_change": "{value} điểm",
+  "compact_thousand": "{value}k",
+  "compact_million": "{value}tr"
 }

@@ -7,7 +7,7 @@ export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-finger
 export { accountNumberOf, bankAccountsOf, bankDisplayName, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
 export { distinctiveBankText, findVietQrBank, plainBankText, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
-export { customerCardOf, customerCardsOf, customerCodeOf, customerProfileOf, deskCustomerOf, deskCustomers, DESK_CUSTOMER_ROLES, isDeskCustomer, guestCustomerIds, customerKeys, resolveCustomer, type CustomerKeys, type CustomerProfile, type DeskCustomer, type ResolvedCustomer } from "./customer.query";
+export { earnsNothing, erasedIdsOf, ledgerOwnerOf, type LedgerOwner, customerCardOf, newCustomerCount, customerCardsOf, customerCodeOf, customerProfileOf, deskCustomerOf, deskCustomers, DESK_CUSTOMER_ROLES, isDeskCustomer, guestCustomerIds, customerKeys, resolveCustomer, type CustomerKeys, type CustomerProfile, type DeskCustomer, type ResolvedCustomer } from "./customer.query";
 export { counterAbove, customerCodeNumber, CUSTOMER_CODE_PREFIX, formatCustomerCode } from "./domain/customer-code";
 export {
   IdentityImportError,
@@ -42,3 +42,5 @@ export {
   type StaffAdminErrorCode,
   type StaffSeed,
 } from "./staff-admin.command";
+export { checkErase, CustomerEraseError, ERASE_REASON_MAX, eraseCustomer, type EraseErrorCode, type EraseInput, type ErasedCustomer, type OwedMoney } from "./customer-erase.command";
+export { applyMerge, CustomerMergeError, planMerge, type MergeErrorCode, type MergePlan, type MergeSide } from "./customer-merge.command";

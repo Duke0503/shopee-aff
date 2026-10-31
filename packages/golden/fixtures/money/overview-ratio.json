@@ -1,0 +1,64 @@
+{
+  "rule": "overviewRatio",
+  "source": "FR-27, docs/operations/dashboard-spec.md Block 5: ratios in basis points and averages in whole dong, half-up once; nothing over 0 is null (Story 4.17)",
+  "cases": [
+    {
+      "name": "cancellation rate 3 of 11 is 27.27%",
+      "input": {
+        "numerator": 3,
+        "denominator": 11
+      },
+      "expected": 2727
+    },
+    {
+      "name": "1 of 8 is exactly 12.50%",
+      "input": {
+        "numerator": 1,
+        "denominator": 8
+      },
+      "expected": 1250
+    },
+    {
+      "name": "2 of 3 rounds up to 66.67%",
+      "input": {
+        "numerator": 2,
+        "denominator": 3
+      },
+      "expected": 6667
+    },
+    {
+      "name": "half a basis point rounds up",
+      "input": {
+        "numerator": 1,
+        "denominator": 20000
+      },
+      "expected": 1
+    },
+    {
+      "name": "no denominator is no ratio, never 0",
+      "input": {
+        "numerator": 0,
+        "denominator": 0
+      },
+      "expected": null
+    },
+    {
+      "name": "average commission per order 250,001 over 2 orders is 125,001 (half-up)",
+      "input": {
+        "kind": "average",
+        "numerator": 250001,
+        "denominator": 2
+      },
+      "expected": 125001
+    },
+    {
+      "name": "no approved order has no average",
+      "input": {
+        "kind": "average",
+        "numerator": 0,
+        "denominator": 0
+      },
+      "expected": null
+    }
+  ]
+}

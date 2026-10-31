@@ -1,8 +1,9 @@
 /**
- * The admin commands on the internal listener (decision H8, AD-2, AD-18, AD-28, Story 4.20): the
- * internal CLI calls these with the internal token, so the server stays the one writer. Staff
- * screens come after cutover; until then staff are seeded, passwords reset, roles changed and a
- * cutover campaign created here, each preview first where it writes.
+ * The admin commands on the internal listener (decision H8, AD-2, AD-18, AD-28, Stories 4.19,
+ * 4.20): the internal CLI calls these with the internal token, so the server stays the one writer.
+ * Staff screens come after cutover; until then staff are seeded, passwords reset, roles changed, a
+ * cutover campaign created and duplicate customers merged here, each preview first where it
+ * writes. A merge's balances are the payouts module's `getBalances`, read through the aliases.
  *
  * The CLI signs in as an admin with name and password (the same argon2id check and doubling delay
  * as the desk, keyed by the fixed `internal-cli` identity instead of an Access identity) and sends
@@ -13,6 +14,9 @@
 import {
   adminSignInRequestSchema,
   campaignRequestSchema,
+  customerMergedResponseSchema,
+  customerMergePreviewSchema,
+  customerMergeRequestSchema,
   STAFF_TOKEN_HEADER,
   staffAccessRequestSchema,
   staffParamsSchema,
@@ -21,16 +25,20 @@ import {
   staffSeedRequestSchema,
   type CampaignInputBody,
   type CampaignPreviewResponse,
+  type CustomerMergedResponse,
+  type CustomerMergePreview,
   type ErrorCode,
   type StaffSeedInput,
 } from "@cashback/contracts";
 import { formatVnDate, formatVnTime, type Clock } from "@cashback/core";
+import { combinedBalance } from "@cashback/money";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
 import { CampaignCreateError, createCampaign, previewCampaign, type CampaignInput, type CampaignPreview } from "../modules/campaigns/index";
-import { endSession, hashPassword, planStaffSeed, resetStaffPassword, resolveCustomer, seedStaff, setStaffAccess, signInStaff, STAFF_SEED_ACTOR, StaffAdminError, staffSessionOf, type SeedPlan, type StaffSeed } from "../modules/identity/index";
+import { applyMerge, CustomerMergeError, customerKeys, endSession, hashPassword, planMerge, planStaffSeed, type MergeErrorCode, type MergePlan, type MergeSide, resetStaffPassword, resolveCustomer, seedStaff, setStaffAccess, signInStaff, STAFF_SEED_ACTOR, StaffAdminError, staffSessionOf, type SeedPlan, type StaffSeed } from "../modules/identity/index";
 import { auditFor, commandAudit } from "../modules/operations/index";
+import { getBalances, hasOpenClaim, NO_BALANCE, type Balance } from "../modules/payouts/index";
 import type { Ledger, LedgerDb } from "../platform/db/ledger";
 import { HttpError } from "../platform/http/error-envelope";
 import type { InternalRoutes } from "../platform/http/servers";
@@ -48,6 +56,8 @@ export interface AdminCommandDeps {
 const STAFF_STATUS: Record<StaffAdminError["code"], ErrorCode> = { admin_only: "forbidden", root_differs: "conflict", username_taken: "conflict", password_required: "invalid_request", staff_not_found: "not_found", root_protected: "conflict" };
 const CAMPAIGN_STATUS: Record<CampaignCreateError["code"], ErrorCode> = { admin_only: "forbidden", campaign_exists: "conflict", bad_window: "invalid_request", bad_field: "invalid_request" };
 
+const MERGE_STATUS: Record<MergeErrorCode, ErrorCode> = { admin_only: "forbidden", customer_not_found: "not_found", same_customer: "invalid_request", not_a_customer: "invalid_request", bank_differs: "conflict", claim_open: "conflict" };
+
 function parsed<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
   const result = schema.safeParse(value);
   if (!result.success) throw new HttpError("invalid_request", "error.invalid_request");
@@ -56,6 +66,7 @@ function parsed<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
 
 function refusal(error: unknown): unknown {
   if (error instanceof StaffAdminError) return new HttpError(STAFF_STATUS[error.code], `error.staff.${error.code}`, error.staffId === undefined ? undefined : { staffId: error.staffId });
+  if (error instanceof CustomerMergeError) return new HttpError(MERGE_STATUS[error.code], `error.merge.${error.code}`, Object.keys(error.fields).length === 0 ? undefined : { ...error.fields });
   if (error instanceof CampaignCreateError) return new HttpError(CAMPAIGN_STATUS[error.code], `error.campaign.${error.code}`, error.field === undefined ? undefined : { field: error.field });
   return error;
 }
@@ -182,10 +193,45 @@ function campaignRoutes(app: FastifyInstance, deps: AdminCommandDeps): void {
   });
 }
 
+const balanceFigures = (b: Omit<Balance, "customerId">) => ({ gross: b.gross, payable: b.payable, waiting: b.waiting, paid: b.paid, deductedNext: b.deductedNext });
+const balanceOf = (db: LedgerDb, customerId: string) => balanceFigures(getBalances(db, [customerId])[0] ?? NO_BALANCE);
+const openClaimOf = (db: LedgerDb) => (customerId: string) => hasOpenClaim(db, customerKeys(db, customerId)?.keys ?? [customerId]);
+
+function mergePreview(db: LedgerDb, plan: MergePlan): CustomerMergePreview {
+  const sideOf = (s: MergeSide) => ({ customerId: s.customerId, customerCode: s.customerCode, customerName: s.displayName, status: s.status, bank: s.bank, balance: balanceOf(db, s.customerId) });
+  const merged = sideOf(plan.merged);
+  const survivor = sideOf(plan.survivor);
+  return { merged, survivor, survivorId: plan.survivor.customerId, bankMoves: plan.bankMoves, result: balanceFigures(combinedBalance([merged.balance, survivor.balance])) };
+}
+
+/** Story 4.19: preview writes nothing; apply re-plans inside its transaction, so it refuses what a fresh preview would. */
+function mergeRoutes(app: FastifyInstance, deps: AdminCommandDeps): void {
+  app.post("/internal/admin/customers/merge/preview", async (request): Promise<CustomerMergePreview> => {
+    adminActor(deps, request);
+    const body = parsed(customerMergeRequestSchema, request.body);
+    const db = deps.ledger.db;
+    try {
+      return customerMergePreviewSchema.parse(mergePreview(db, planMerge(db, body.merged, body.survivor, openClaimOf(db))));
+    } catch (error) {
+      throw refusal(error);
+    }
+  });
+  app.post("/internal/admin/customers/merge", async (request): Promise<CustomerMergedResponse> => {
+    const actor = adminActor(deps, request);
+    const body = parsed(customerMergeRequestSchema, request.body);
+    const done = inTx(deps, actor, (db, by) => {
+      const plan = applyMerge(db, planMerge(db, body.merged, body.survivor, openClaimOf(db)), { clock: deps.clock, by });
+      return { mergedId: plan.merged.customerId, survivorId: plan.survivor.customerId, bankMoves: plan.bankMoves, balance: balanceOf(db, plan.survivor.customerId) };
+    });
+    return customerMergedResponseSchema.parse(done);
+  });
+}
+
 export function adminCommandRoutes(deps: AdminCommandDeps): InternalRoutes {
   return (app) => {
     sessionRoutes(app, deps);
     staffRoutes(app, deps);
     campaignRoutes(app, deps);
+    mergeRoutes(app, deps);
   };
 }

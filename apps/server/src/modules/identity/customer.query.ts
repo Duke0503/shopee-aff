@@ -7,7 +7,7 @@
  * row, or a merged row with no survivor, resolves to null. Attribution, balances and lists
  * resolve through it.
  */
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, ne } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { customerAliases, customers, type CustomerRole } from "./schema";
@@ -22,9 +22,9 @@ export interface ResolvedCustomer {
 /** Merges chain at most this deep; a longer chain is a data error and resolves to null. */
 const MAX_MERGE_HOPS = 5;
 
-type Row = { customerId: string; role: CustomerRole; status: "ACTIVE" | "DISABLED" | "MERGED" | "ERASED" };
+type Row = { customerId: string; role: CustomerRole; status: "ACTIVE" | "DISABLED" | "MERGED" | "ERASED"; erasedAt: string | null };
 
-const columns = { customerId: customers.customerId, role: customers.role, status: customers.status };
+const columns = { customerId: customers.customerId, role: customers.role, status: customers.status, erasedAt: customers.erasedAt };
 
 function byId(db: LedgerDb, id: string): Row | undefined {
   return db.select(columns).from(customers).where(eq(customers.customerId, id)).get();
@@ -57,12 +57,49 @@ function followMerges(db: LedgerDb, start: Row | undefined): Row | undefined {
   return row;
 }
 
-export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | null {
+/** The one row resolver: the record behind a key of any kind, merges followed; never a MERGED row. */
+type LiveRow = Omit<Row, "status"> & { status: Exclude<Row["status"], "MERGED"> };
+
+function resolveRow(db: LedgerDb, key: string): LiveRow | null {
   const compact = key.replace(/\s+/g, "");
   if (compact === "") return null;
   const row = followMerges(db, firstMatch(db, compact, compact.toUpperCase()));
-  if (!row || row.status === "MERGED" || row.status === "ERASED") return null;
+  return !row || row.status === "MERGED" ? null : { ...row, status: row.status };
+}
+
+export function resolveCustomer(db: LedgerDb, key: string): ResolvedCustomer | null {
+  const row = resolveRow(db, key);
+  if (row === null || row.status === "ERASED") return null;
   return { customerId: row.customerId, role: row.role, status: row.status };
+}
+
+export interface LedgerOwner {
+  readonly customerId: string;
+  readonly role: CustomerRole;
+  /** When the record's personal data was erased; null for a live record (FR-35). */
+  readonly erasedAt: string | null;
+}
+
+/**
+ * The record the money facts and the attribution of a key belong to (FR-35, D26, Story 4.16):
+ * `resolveCustomer`, except that an erased record is still found. Its orders, payouts and balance
+ * stay its own, and its old links still attribute to it; whether an order earns anything is
+ * `earnsNothing`.
+ */
+export function ledgerOwnerOf(db: LedgerDb, key: string): LedgerOwner | null {
+  const row = resolveRow(db, key);
+  return row === null ? null : { customerId: row.customerId, role: row.role, erasedAt: row.status === "ERASED" ? (row.erasedAt ?? "") : null };
+}
+
+/**
+ * The one rule for who earns nothing on an order (D5, FR-35): the guest account always; an erased
+ * record for orders recorded at or after its erasure. Orders recorded before keep their cashback
+ * and their clawback rules. `recordedAt` null is an order being recorded now.
+ */
+export function earnsNothing(owner: LedgerOwner | null, recordedAt: string | null): boolean {
+  if (owner === null) return false;
+  if (owner.role === "HOUSE") return true;
+  return owner.erasedAt !== null && (recordedAt === null || recordedAt >= owner.erasedAt);
 }
 
 /** A customer's code by its permanent id, or null (staff, HOUSE and unknown ids have none). */
@@ -83,9 +120,11 @@ export interface CustomerKeys {
  * walker and its hop limit, and an alias that is another live customer's id never pulls that
  * customer's records in.
  */
-export function customerKeys(db: LedgerDb, key: string): CustomerKeys | null {
-  const customer = resolveCustomer(db, key);
-  if (customer === null) return null;
+export function customerKeys(db: LedgerDb, key: string, options: { readonly erased?: boolean } = {}): CustomerKeys | null {
+  const row = resolveRow(db, key);
+  if (row === null || (row.status === "ERASED" && options.erased !== true)) return null;
+  // An erased record (asked for with `erased`) reads as DISABLED here: it can do nothing, its money facts stay.
+  const customer: ResolvedCustomer = { customerId: row.customerId, role: row.role, status: row.status === "ERASED" ? "DISABLED" : row.status };
   const keys = new Set([customer.customerId]);
   const seen = new Set(keys);
   let frontier = [customer.customerId];
@@ -93,7 +132,7 @@ export function customerKeys(db: LedgerDb, key: string): CustomerKeys | null {
     const next = db.select({ alias: customerAliases.alias }).from(customerAliases).where(inArray(customerAliases.customerId, frontier)).all().map((r) => r.alias).filter((a) => !seen.has(a));
     for (const alias of next) {
       seen.add(alias);
-      if (resolveCustomer(db, alias)?.customerId === customer.customerId) keys.add(alias);
+      if (resolveRow(db, alias)?.customerId === customer.customerId) keys.add(alias);
     }
     frontier = next.filter((a) => keys.has(a));
   }
@@ -111,6 +150,12 @@ export function customerCardsOf(db: LedgerDb, customerIds: readonly string[]): M
   if (ids.length === 0) return new Map();
   const rows = db.select({ customerId: customers.customerId, customerCode: customers.customerCode, displayName: customers.displayName }).from(customers).where(inArray(customers.customerId, ids)).all();
   return new Map(rows.map(({ customerId, ...card }) => [customerId, card]));
+}
+
+/** Which of the customer ids named are erased records (FR-35). */
+export function erasedIdsOf(db: LedgerDb, customerIds: readonly string[]): Set<string> {
+  if (customerIds.length === 0) return new Set();
+  return new Set(db.select({ id: customers.customerId }).from(customers).where(and(inArray(customers.customerId, [...customerIds]), eq(customers.status, "ERASED"))).all().map((r) => r.id));
 }
 
 /** The ids of the guest accounts (role HOUSE, D5): their orders earn no cashback. */
@@ -137,10 +182,8 @@ export interface DeskCustomer {
  * or someone who is not a desk customer.
  */
 export function deskCustomerOf(db: LedgerDb, key: string): DeskCustomer | null {
-  const compact = key.replace(/\s+/g, "");
-  if (compact === "") return null;
-  const row = followMerges(db, firstMatch(db, compact, compact.toUpperCase()));
-  if (!row || row.status === "MERGED" || !isDeskCustomer(row.role)) return null;
+  const row = resolveRow(db, key);
+  if (row === null || !isDeskCustomer(row.role)) return null;
   return { customerId: row.customerId, status: row.status };
 }
 
@@ -165,6 +208,7 @@ export interface CustomerProfile {
   readonly status: "ACTIVE" | "DISABLED" | "ERASED";
   readonly zaloUserId: string | null;
   readonly createdAt: string | null;
+  readonly erasedAt: string | null;
 }
 
 /** What a staff customer page shows of one surviving customer (never a password or session fact). */
@@ -177,10 +221,20 @@ export function customerProfileOf(db: LedgerDb, customerId: string): CustomerPro
       status: customers.status,
       zaloUserId: customers.zaloUserId,
       createdAt: customers.createdAt,
+      erasedAt: customers.erasedAt,
     })
     .from(customers)
     .where(eq(customers.customerId, customerId))
     .get();
   if (row === undefined || row.status === "MERGED") return null;
   return { ...row, status: row.status };
+}
+
+/** Desk customers who joined inside the range (the Overview's new customers); a merged record is not a new customer. */
+export function newCustomerCount(db: LedgerDb, range: { readonly from: string; readonly to: string }): number {
+  return db
+    .select({ customerId: customers.customerId })
+    .from(customers)
+    .where(and(inArray(customers.role, [...DESK_CUSTOMER_ROLES]), ne(customers.status, "MERGED"), gte(customers.createdAt, range.from), lt(customers.createdAt, range.to)))
+    .all().length;
 }

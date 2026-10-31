@@ -1,0 +1,34 @@
+{
+  "rule": "eventResult",
+  "source": "docs/operations/dashboard-spec.md Block 6: the operator share of an event's award orders minus its bonuses (Story 4.17)",
+  "cases": [
+    {
+      "name": "two award orders of 120,000 commission and 40,000 in bonuses lose 18,635",
+      "input": {
+        "commission": 120000,
+        "fee": 1176,
+        "tax": 12000,
+        "cashback": 85459,
+        "bonus": 40000
+      },
+      "expected": {
+        "operatorShare": 21365,
+        "result": -18635
+      }
+    },
+    {
+      "name": "an event with no confirmed bonus keeps the whole share",
+      "input": {
+        "commission": 120000,
+        "fee": 1176,
+        "tax": 12000,
+        "cashback": 85459,
+        "bonus": 0
+      },
+      "expected": {
+        "operatorShare": 21365,
+        "result": 21365
+      }
+    }
+  ]
+}

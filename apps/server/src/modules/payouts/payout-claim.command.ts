@@ -19,7 +19,7 @@
 import { randomBytes } from "node:crypto";
 import type { PayoutFlag } from "@cashback/contracts";
 import { instantFromMs, parseInstant, toMs, type Clock } from "@cashback/core";
-import { and, desc, eq, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, ne, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { hasStaffRole, type CommandAudit } from "../../platform/ports/audit.port";
@@ -252,6 +252,12 @@ export function expireIdleClaims(db: LedgerDb, deps: Pick<ClaimDeps, "clock" | "
   const idle = db.select().from(payoutClaims).where(and(eq(payoutClaims.status, "OPEN"), lte(payoutClaims.lastActiveAt, cutoff))).all();
   for (const claim of idle) abandon(db, claim, deps, "idle");
   return idle.length;
+}
+
+/** True when a payout claim is open for one of the stored customer ids: a transfer may be under way. */
+export function hasOpenClaim(db: LedgerDb, customerIds: readonly string[]): boolean {
+  if (customerIds.length === 0) return false;
+  return db.select({ id: payoutClaims.claimId }).from(payoutClaims).where(and(eq(payoutClaims.status, "OPEN"), inArray(payoutClaims.customerId, [...customerIds]))).get() !== undefined;
 }
 
 /** The order is in the snapshot of an OPEN claim (D39, AD-7): a cancel waits until the claim ends. */

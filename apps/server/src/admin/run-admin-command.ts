@@ -1,5 +1,5 @@
 /**
- * `pnpm staff:seed | staff:password | staff:access | campaign:create ...` (Story 4.20): the
+ * `pnpm staff:seed | staff:password | staff:access | campaign:create | customer:merge ...` (Story 4.20): the
  * internal CLI's entry. It reads the internal token and port from the environment's config file,
  * calls the running server's internal listener on 127.0.0.1, asks every password without echo on
  * a terminal (or reads one line per answer from a pipe), and prints one JSON line. No secret is

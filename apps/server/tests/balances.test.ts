@@ -124,10 +124,13 @@ describe("Story 4.1: what counts and what does not", () => {
     expect(getBalances(ledger.db, ["C1"])).toEqual([{ customerId: "C1", gross: 36000, payable: 36000, waiting: 0, paid: 99216, deductedNext: 0 }]);
   });
 
-  it("an approved order with commission 0 is not payable (R1); an unknown or erased customer has no balance", () => {
+  it("an approved order with commission 0 is not payable (R1); an unknown customer has no balance, an erased one keeps its own (FR-35)", () => {
     const ledger = freshLedger();
     ledger.sqlite.exec("INSERT INTO orders (order_id, network, platform, customer_id, status, approved_commission, cashback, origin) VALUES ('261001ZERO0001', 'shopee', 'shopee', 'C1', 'APPROVED', 0, 500, 'CUTOVER')");
-    expect(getBalances(ledger.db, ["C1", "NOBODY", "CE"])).toEqual([{ customerId: "C1", gross: 0, payable: 0, waiting: 0, paid: 0, deductedNext: 0 }]);
+    expect(getBalances(ledger.db, ["C1", "NOBODY", "CE"])).toEqual([
+      { customerId: "C1", gross: 0, payable: 0, waiting: 0, paid: 0, deductedNext: 0 },
+      { customerId: "CE", gross: 0, payable: 0, waiting: 0, paid: 0, deductedNext: 0 },
+    ]);
   });
 
   it("the payable list keeps a netting-only customer (payable 0, gross above 0) and leaves out a customer with nothing to pay", () => {

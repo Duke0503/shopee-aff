@@ -14,8 +14,8 @@ function directoryOf(data: AttributionDirectoryData): AttributionDirectory {
   const customers = new Set(data.customers);
   const resolve = (key: string) => {
     const id = customers.has(key) ? key : data.aliases[key];
-    if (id === undefined || data.erased.includes(id)) return null;
-    return { customerId: id, guest: data.guests.includes(id) };
+    if (id === undefined) return null;
+    return { customerId: id, guest: data.guests.includes(id) || data.erased.includes(id) };
   };
   return { resolveCustomer: resolve, requestOwner: (requestId) => data.requests[requestId] ?? null };
 }

@@ -15,6 +15,7 @@
     "staff:password": "tsx src/admin/run-admin-command.ts staff-password",
     "staff:access": "tsx src/admin/run-admin-command.ts staff-access",
     "campaign:create": "tsx src/admin/run-admin-command.ts campaign-create",
+    "customer:merge": "tsx src/admin/run-admin-command.ts customer-merge",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

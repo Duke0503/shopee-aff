@@ -1,0 +1,58 @@
+{
+  "rule": "combinedBalance",
+  "source": "FR-11, D42, Story 4.19 AC3: after a merge the survivor's balance reads both records; payable is recomputed from the summed gross and clawbacks, not the sum of the two payables",
+  "cases": [
+    {
+      "name": "a clawback on the merged record is netted against the survivor's cashback: payable 74,953, not 79,216",
+      "input": {
+        "parts": [
+          {
+            "gross": 79216,
+            "deductedNext": 0,
+            "waiting": 12000,
+            "paid": 50000
+          },
+          {
+            "gross": 5000,
+            "deductedNext": 9263,
+            "waiting": 0,
+            "paid": 0
+          }
+        ]
+      },
+      "expected": {
+        "gross": 84216,
+        "deductedNext": 9263,
+        "payable": 74953,
+        "waiting": 12000,
+        "paid": 50000
+      }
+    },
+    {
+      "name": "two empty records stay empty",
+      "input": {
+        "parts": [
+          {
+            "gross": 0,
+            "deductedNext": 0,
+            "waiting": 0,
+            "paid": 0
+          },
+          {
+            "gross": 0,
+            "deductedNext": 0,
+            "waiting": 0,
+            "paid": 0
+          }
+        ]
+      },
+      "expected": {
+        "gross": 0,
+        "deductedNext": 0,
+        "payable": 0,
+        "waiting": 0,
+        "paid": 0
+      }
+    }
+  ]
+}

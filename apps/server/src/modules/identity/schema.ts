@@ -26,6 +26,8 @@ export const customers = sqliteTable("customers", {
   lockedUntil: text("locked_until"),
   lastSignInAt: text("last_sign_in_at"),
   createdAt: text("created_at"),
+  /** When the personal data was erased (migrations/0021_customer_erasure.sql, Story 4.16). */
+  erasedAt: text("erased_at"),
 });
 
 export const customerAliases = sqliteTable("customer_aliases", {

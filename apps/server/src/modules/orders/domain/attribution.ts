@@ -1,7 +1,8 @@
 /**
  * Attribution (AD-8, AD-23, AD-25, D5, D6, D7, D58, FR-12, INV-1): the one rule that finds the
- * customer of a report row. Only a known, non-erased customer is ever credited, resolved through
- * aliases to the survivor; a raw id that resolves to nobody is never credited.
+ * customer of a report row. Only a known customer is ever credited, resolved through aliases to
+ * the survivor; a raw id that resolves to nobody is never credited. An erased record keeps its old
+ * links: it is credited like the guest, with cashback 0 and no message (FR-35, Story 4.16).
  *
  * - sub_id1 present and resolving: that customer, unless the sub_id2 request's owner resolves to
  *   someone else (review case "owner_disagreement").
@@ -21,12 +22,12 @@ export const DEV_SUB_ID_PREFIX = "DEV";
 export interface DirectoryCustomer {
   /** The surviving customer id. */
   readonly customerId: string;
-  /** True for the guest account (role HOUSE). */
+  /** True for the guest account (role HOUSE) and an erased record: it earns nothing and is told nothing. */
   readonly guest: boolean;
 }
 
 export interface AttributionDirectory {
-  /** The surviving, non-erased customer for a customer id or alias, or null when there is none. */
+  /** The surviving customer (an erased record included) for a customer id or alias, or null when there is none. */
   resolveCustomer(key: string): DirectoryCustomer | null;
   /** The customer id stored on a link request, or null when the request is unknown. */
   requestOwner(requestId: string): string | null;

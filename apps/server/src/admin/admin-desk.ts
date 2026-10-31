@@ -18,6 +18,8 @@ import { cloudflareAccessKeys, type AccessKeySource } from "../platform/http/acc
 import type { StaffGate, StaffRoutes } from "../platform/http/staff-routes";
 import { applyDepsFor, reviewReadDepsFor } from "../reconcile/apply-deps";
 import { customerDeskRoutes } from "./customer-desk.routes";
+import { customerEraseRoutes } from "./customer-erase.routes";
+import { overviewRoutes } from "./overview.routes";
 
 export interface AdminDeskDeps {
   readonly access: StaffAccessConfig;
@@ -58,6 +60,8 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     orderDeskRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
     networkSettlementRoutes({ ledger, clock }),
     customerDeskRoutes({ ledger, clock }),
+    customerEraseRoutes({ ledger, clock }),
+    overviewRoutes({ ledger, clock }),
   ];
   return { gate, routes };
 }

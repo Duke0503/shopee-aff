@@ -5,6 +5,8 @@
 // in the browser (the real staff routes need a Cloudflare Access JWT), and checks every page for
 // sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too, and
 // Customers with one customer's page and the review queue with a case's panel (Stories 4.14, 4.15).
+// The Overview at every period preset, the erase flow on a customer's page and the erased page (Stories 4.16, 4.17)
+// are shot too; every grid row of the Overview is checked for cards of equal height.
 // Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -156,7 +158,7 @@ function customerRows() {
   return { rows, total: 57, page: 1, pageSize: 25, facets, summary: { payable: 279563, paid: 1536200 }, asOf: "2026-10-30T12:42:00.000Z", overall: 57 };
 }
 const CUSTOMER_PAGE = {
-  customerId: "P0", customerCode: "DP00012", customerName: payoutFixtures.names[0], status: "ACTIVE", zaloUserId: "8812447100930012", joinedAt: "2026-09-12T03:00:00.000Z",
+  customerId: "P0", customerCode: "DP00012", customerName: payoutFixtures.names[0], status: "ACTIVE", zaloUserId: "8812447100930012", joinedAt: "2026-09-12T03:00:00.000Z", erasedAt: null,
   balance: { payable: 79216, gross: 88479, waiting: 15880, paid: 212400, deductedNext: 9263 },
   flags: ["BANK_CHANGED"],
   bank: { bankName: "Vietcombank", holderName: payoutFixtures.holder, lastFour: "6789", changedAt: "2026-10-29T05:10:00.000Z", held: false, changedRecently: true },
@@ -164,6 +166,26 @@ const CUSTOMER_PAGE = {
   counts: { orders: 18, linkRequests: 41, payouts: 3 },
 };
 const linkRows = () => ({ rows: fixtures.products.map((productName, i) => ({ requestId: `R2610${String(2714023 + i * 97)}`, productName, productImageUrl: i === 3 ? null : `https://cf.example.test/file/${PHOTOS[i % PHOTOS.length]}`, network: i === 2 ? "accesstrade" : "shopee", status: ["DELIVERED", "CONVERTED", "DELIVERED", "FAILED", "CONVERTED"][i], createdAt: `2026-10-${String(28 - i * 3).padStart(2, "0")}T03:00:00.000Z` })), total: 41, page: 1, pageSize: 25, facets: { status: [] }, summary: {}, asOf: "2026-10-30T12:42:00.000Z" });
+
+const ERASED_PAGE = { ...CUSTOMER_PAGE, customerName: null, status: "ERASED", zaloUserId: null, erasedAt: "2026-10-30T12:00:00.000Z", balance: { payable: 0, gross: 0, waiting: 0, paid: 212400, deductedNext: 0 }, flags: [], bank: null, clawbacks: [] };
+
+// The Overview: the golden ledger's server answer, with each preset's own period; "today" has no approval yet (dashes).
+const GOLDEN_OVERVIEW = JSON.parse(readFileSync(join(root, "tests/fixtures/overview.json"), "utf8")).overview;
+const PERIODS_BY_PRESET = {
+  today: { from: "2026-10-30", to: "2026-10-30", previousFrom: "2026-10-29", previousTo: "2026-10-29" },
+  last7: { from: "2026-10-24", to: "2026-10-30", previousFrom: "2026-10-17", previousTo: "2026-10-23" },
+  thisMonth: { from: "2026-10-01", to: "2026-10-30", previousFrom: "2026-09-01", previousTo: "2026-09-30" },
+  lastMonth: { from: "2026-09-01", to: "2026-09-30", previousFrom: "2026-08-01", previousTo: "2026-08-31" },
+  custom: { from: "2026-10-01", to: "2026-10-15", previousFrom: "2026-09-16", previousTo: "2026-09-30" },
+};
+const NONE = { value: null, previous: null, change: null };
+function overviewOf(url) {
+  const preset = url.searchParams.get("period") ?? "thisMonth";
+  const base = { ...GOLDEN_OVERVIEW, period: { preset, ...PERIODS_BY_PRESET[preset] } };
+  if (preset !== "today") return base;
+  const b = base.business;
+  return { ...base, business: { ...b, commission: NONE, approvedOrders: NONE, fee: NONE, tax: NONE, cashback: NONE, eventBonus: NONE, clawbackNetted: NONE, profit: NONE, margin: { bps: null, previousBps: null, changeBps: null, enoughData: true }, split: null, byNetwork: [], byCampaign: [], withheldPeriods: [], cashbackPaid: 0, cashbackOwed: 0 }, events: [], customers: { ...base.customers, concentration: null } };
+}
 
 const REVIEW_ROWS = [
   { caseId: 7, network: "shopee", subject: "241027F3HQ", orderId: null, reason: "unattributed_sub_id1", status: "OPEN", resolution: null, openedAt: "2026-10-27T03:10:00.000Z", resolvedAt: null },
@@ -208,7 +230,9 @@ async function shoot(name, width, height, path, after, answers = {}) {
     if (url.pathname === "/api/admin/customers") return route.fulfill({ json: customerRows() });
     if (url.pathname.endsWith("/link-requests")) return route.fulfill({ json: linkRows() });
     if (/^\/api\/admin\/customers\/[^/]+\/payouts$/.test(url.pathname)) return route.fulfill({ json: historyRows() });
+    if (url.pathname === "/api/admin/customers/DP00099") return route.fulfill({ json: ERASED_PAGE });
     if (/^\/api\/admin\/customers\/[^/]+$/.test(url.pathname)) return route.fulfill({ json: CUSTOMER_PAGE });
+    if (url.pathname === "/api/admin/overview") return route.fulfill({ json: overviewOf(url) });
     if (url.pathname === "/api/admin/review-cases") return route.fulfill({ json: reviewRows(url) });
     if (/^\/api\/admin\/review-cases\/\d+$/.test(url.pathname)) return route.fulfill({ json: REVIEW_DETAIL });
     if (url.pathname.endsWith("/preview")) return route.fulfill({ json: REVIEW_PREVIEW });
@@ -246,9 +270,19 @@ async function shoot(name, width, height, path, after, answers = {}) {
     const doc = document.documentElement;
     const wide = [...document.querySelectorAll("body *")].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(el).position !== "fixed");
     const small = [...document.querySelectorAll("body *")].filter((el) => el.childNodes.length > 0 && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== "") && parseFloat(getComputedStyle(el).fontSize) < 12);
-    return { sideways: doc.scrollWidth > window.innerWidth, wide: wide.slice(0, 5).map((el) => el.outerHTML.slice(0, 120)), small: small.slice(0, 5).map((el) => el.outerHTML.slice(0, 120)) };
+    // Every row of an Overview card grid: the cards that share a top edge have one height.
+    const uneven = [...document.querySelectorAll("[data-overview] .grid")].flatMap((grid) => {
+      const rows = new Map();
+      for (const card of grid.children) {
+        const box = card.getBoundingClientRect();
+        const top = Math.round(box.top);
+        rows.set(top, [...(rows.get(top) ?? []), Math.round(box.height)]);
+      }
+      return [...rows.values()].filter((heights) => new Set(heights).size > 1).map((heights) => `${grid.className.slice(0, 60)}: ${heights.join("/")}`);
+    });
+    return { sideways: doc.scrollWidth > window.innerWidth, wide: wide.slice(0, 5).map((el) => el.outerHTML.slice(0, 120)), small: small.slice(0, 5).map((el) => el.outerHTML.slice(0, 120)), uneven };
   });
-  if (overflow.sideways || overflow.wide.length > 0 || overflow.small.length > 0) problems.push({ name, ...overflow });
+  if (overflow.sideways || overflow.wide.length > 0 || overflow.small.length > 0 || overflow.uneven.length > 0) problems.push({ name, ...overflow });
   const file = join(out, `${name}.png`);
   await page.screenshot({ path: file, fullPage: !name.endsWith("-sheet") });
   console.log(file);
@@ -309,6 +343,17 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`review-case-${label}-sheet`, width, height, "/admin/review", reviewPreview);
 }
 await shoot("review-case-phone-390-candidates-sheet", 390, 844, "/admin/review", (page) => reviewPreview(page).then(() => page.locator("[data-review-body]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
+for (const [label, width, height] of WIDTHS) {
+  for (const preset of ["today", "last7", "thisMonth", "lastMonth", "custom"]) {
+    const query = preset === "thisMonth" ? "" : preset === "custom" ? "?period=custom&from=2026-10-01&to=2026-10-15" : `?period=${preset}`;
+    await shoot(`overview-${preset}-${label}`, width, height, `/admin/${query}`);
+  }
+  await shoot(`customer-erase-${label}-sheet`, width, height, "/admin/customers/DP00012", (page) =>
+    page.locator("[data-danger-zone] button").click().then(() => page.locator("[data-erase-dialog] textarea").fill("Kh\u00e1ch y\u00eau c\u1ea7u xo\u00e1 qua Zalo")));
+  await shoot(`customer-erased-${label}`, width, height, "/admin/customers/DP00099");
+}
+await shoot("overview-desktop-1440-trend-table", 1440, 960, "/admin/", (page) => page.getByRole("button", { name: /^Xem b\u1ea3ng s\u1ed1$/ }).click());
+await shoot("overview-desktop-1440-trend-tooltip-sheet", 1440, 960, "/admin/", (page) => page.locator("[data-trend-summary]").scrollIntoViewIfNeeded().then(() => page.getByRole("button", { name: /^Tu\u1ea7n 12\/10/ }).hover()));
 await shoot("customer-tablet-768-columns", 768, 1024, "/admin/customers/DP00012", (page) => page.getByRole("button", { name: /^C\u1ed9t$/ }).click());
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));

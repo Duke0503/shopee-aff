@@ -13,6 +13,8 @@ import { CustomersPage } from "./customers/customers.page";
 import { CUSTOMERS_SEARCH, TAB_SEARCH, tabOf } from "./customers/customers.queries";
 import { adminText, type AdminKey } from "./labels";
 import { OrdersPage } from "./orders/orders.page";
+import { OverviewPage } from "./overview/overview.page";
+import { overviewSearch } from "./overview/overview.queries";
 import { ORDERS_SEARCH } from "./orders/orders.queries";
 import { AdminOnly } from "./pages/admin-only";
 import { DeskLayout } from "./pages/desk-layout";
@@ -56,6 +58,17 @@ function pendingRoute<const P extends string>(path: P, titleKey: AdminKey, admin
     component: () => (adminOnly ? <AdminOnly>{<PendingPage titleKey={titleKey} />}</AdminOnly> : <PendingPage titleKey={titleKey} />),
   });
 }
+
+export const overviewRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "/",
+  validateSearch: (raw: Record<string, unknown>) => overviewSearch(raw),
+  component: function OverviewScreen() {
+    const search = overviewRoute.useSearch();
+    const navigate = useNavigate({ from: overviewRoute.fullPath });
+    return <OverviewPage search={search} onChange={(next) => void navigate({ search: { ...next } })} />;
+  },
+});
 
 export const ordersRoute = createRoute({
   getParentRoute: () => deskRoute,
@@ -160,7 +173,7 @@ const settingsRoute = createRoute({ getParentRoute: () => deskRoute, path: "sett
 const routeTree = rootRoute.addChildren([
   signInRoute,
   deskRoute.addChildren([
-    pendingRoute("/", "nav_overview"),
+    overviewRoute,
     payoutsRoute,
     payoutHistoryRoute,
     networkSettlementsRoute,

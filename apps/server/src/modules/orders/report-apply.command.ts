@@ -33,6 +33,7 @@ import type { LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import type { AuditValue, CommandAudit } from "../../platform/ports/audit.port";
 import type { OutboxPort } from "../../platform/ports/outbox.port";
+import { earnsNothing, ledgerOwnerOf } from "../identity/index";
 import type { SourcedRow } from "../linking/index";
 import { applyResult, type ApprovalEffect, type AppliedStep } from "./domain/applied-order";
 import { attribute, type Attribution } from "./domain/attribution";
@@ -99,8 +100,18 @@ export function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | 
     coveredByOpenClaim: status === "APPROVED" && deps.payouts.coveredByOpenClaim(row.orderId),
     paidBonus: status === "PAID" ? deps.awards.paidBonus(row.orderId) : 0,
     alreadyClawedBack: status === "PAID" ? deps.payouts.clawedBack(row.orderId) : 0,
-    attribution: stored === null ? (chosen ?? attribute(row, directory, deps.production)) : undefined,
+    attribution: stored === null ? atOrderTime(db, chosen ?? attribute(row, directory, deps.production), row.purchasedAt ?? now) : undefined,
   };
+}
+
+/**
+ * Whether the credited customer earns on this order is decided by the order's own time (`earnsNothing`):
+ * an erased record earns nothing on an order recorded after its erasure, and keeps earning on one
+ * placed before it, however late the network reports it (FR-35).
+ */
+function atOrderTime(db: LedgerDb, attribution: Attribution, recordedAt: string): Attribution {
+  if (attribution.kind !== "customer") return attribution;
+  return { ...attribution, guest: earnsNothing(ledgerOwnerOf(db, attribution.customerId), recordedAt) };
 }
 
 const observationJson = (row: SourcedRow, unmatchedRequest: string | null = null): string =>

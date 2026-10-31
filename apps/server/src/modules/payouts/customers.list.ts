@@ -142,11 +142,8 @@ export function customerRows(db: LedgerDb, clock: Clock): FigureRow[] {
   const balances = allBalances(db, survivor);
   const banks = bankAccountsOf(db, ids);
   const shared = sharedBankFingerprints(db);
-  const counts = orderCounts(
-    db,
-    survivor,
-    new Set(listed.filter((c) => c.status === "ERASED").map((c) => c.customerId)),
-  );
+  const erased = new Set(listed.filter((c) => c.status === "ERASED").map((c) => c.customerId));
+  const counts = orderCounts(db, survivor, erased);
   const now = clock.now();
   return ids.map((id) => {
     const balance = balances.get(id) ?? NO_BALANCE;
@@ -157,6 +154,7 @@ export function customerRows(db: LedgerDb, clock: Clock): FigureRow[] {
       payable: balance.payable,
       gross: balance.gross,
       now,
+      erased: erased.has(id),
     });
     return rowOf(id, balance, bank, all, counts.get(id) ?? 0);
   });

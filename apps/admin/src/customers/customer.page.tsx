@@ -14,6 +14,7 @@ import {
   ChevronLeftIcon,
   CodeChip,
   formatMoney,
+  MissingValue,
   MoneyFigure,
   Skeleton,
   StatusBadge,
@@ -24,6 +25,7 @@ import type { ReactNode } from "react";
 import { ApiError } from "../api/api.queries";
 import { adminText, errorText } from "../labels";
 import { FlagBadges, MaskedAccount } from "../payouts/payout-badges";
+import { DangerZone } from "./customer-erase";
 import { CustomerLists } from "./customer-lists";
 import { useCustomerPage, type CustomerTab } from "./customers.queries";
 
@@ -73,7 +75,9 @@ function BankCard({ page }: { readonly page: Page }) {
       className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3"
     >
       <h2 className="text-sm font-semibold">{adminText("customer_bank_title")}</h2>
-      {bank === null ? (
+      {page.status === "ERASED" ? (
+        <MissingValue className="text-sm" />
+      ) : bank === null ? (
         <p className="text-sm text-muted-foreground">{adminText("customer_bank_none")}</p>
       ) : (
         <>
@@ -140,17 +144,22 @@ function Clawbacks({ page }: { readonly page: Page }) {
 }
 
 function Header({ page }: { readonly page: Page }) {
+  const erased = page.status === "ERASED";
   const joined = formatVnDateOf(page.joinedAt, systemClock);
   const facts = [
     joined === null ? null : adminText("customer_joined", { date: joined }),
-    page.zaloUserId === null ? null : adminText("customer_zalo", { id: page.zaloUserId }),
+    // An erased customer's personal fields show the dash (FR-35); a live one without a Zalo id shows nothing.
+    page.zaloUserId === null ? (erased ? adminText("customer_zalo", { id: "\u2013" }) : null) : adminText("customer_zalo", { id: page.zaloUserId }),
   ].filter((f) => f !== null);
+  const erasedOn = formatVnDateOf(page.erasedAt, systemClock);
   return (
     <header className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="flex min-w-0 flex-col gap-1.5">
         <h1 className="text-[22px] leading-tight font-bold tracking-tight break-words md:text-2xl">
-          {page.status === "ERASED"
-            ? adminText("customer_erased")
+          {erased
+            ? erasedOn === null
+              ? adminText("customer_erased")
+              : adminText("erased_title", { date: erasedOn })
             : (page.customerName ?? adminText("customer_unnamed"))}
         </h1>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -163,8 +172,9 @@ function Header({ page }: { readonly page: Page }) {
         {facts.length > 0 && (
           <p className="text-meta break-words text-muted-foreground">{facts.join(" · ")}</p>
         )}
+        {erased && <p data-erased className="text-meta break-words text-muted-foreground">{adminText("erased_note")}</p>}
       </div>
-      {page.balance.payable > 0 && page.customerCode !== null && (
+      {!erased && page.balance.payable > 0 && page.customerCode !== null && (
         <Link
           to="/payouts"
           search={{ q: page.customerCode }}
@@ -249,6 +259,7 @@ export function CustomerPage({ customerKey, tab, state, onChange }: CustomerPage
         state={state}
         onChange={onChange}
       />
+      <DangerZone page={page} customerKey={customerKey} />
     </div>
   );
 }

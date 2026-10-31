@@ -12,13 +12,13 @@ export {
   type PayoutsImportResult,
 } from "./payout-import.command";
 export { CLAWBACK_MESSAGE_KEYS, clawedBackOn, openClawback, orderPayoutReadsFor, orderPayoutsFor, type ClawbackWriters } from "./order-clawback.command";
-export { allBalances, getBalances, NO_BALANCE, payableBalances, type Balance } from "./balance.query";
+export { allBalances, getBalances, NO_BALANCE, payableBalances, survivorResolver, type Balance } from "./balance.query";
 export { clawbackOpen } from "./clawback.query";
 export { findReceipt, isReceiptToken, type Receipt } from "./receipt.query";
 export { CLAWBACK_KINDS, CREDIT_KINDS, LEDGER_ENTRY_KINDS, PAYOUT_CLAIM_STATUSES, PAYOUT_STATUSES, PROOF_CONTENT_TYPES } from "./schema";
 export { confirmPayout, PAYOUT_RECORDED_MESSAGE, type ConfirmDeps, type ConfirmInput, type ConfirmOutcome, type RecordedPayout } from "./payout-confirm.command";
 export { WRITE_OFF_REASON_MAX, WriteOffError, writeOffClawback, type WriteOffErrorCode, type WrittenOff } from "./clawback-write-off.command";
-export { CLAIM_IDLE_MS, coveredByOpenClaim, isNettingOnly, expireIdleClaims, openPayoutClaim, PayoutClaimError, randomClaimId, releasePayoutClaim, revealClaimAccount, type ClaimDeps, type ClaimOutcome, type ClaimedPayout, type PayoutClaimErrorCode, type QrMissing } from "./payout-claim.command";
+export { CLAIM_IDLE_MS, coveredByOpenClaim, hasOpenClaim, isNettingOnly, expireIdleClaims, openPayoutClaim, PayoutClaimError, randomClaimId, releasePayoutClaim, revealClaimAccount, type ClaimDeps, type ClaimOutcome, type ClaimedPayout, type PayoutClaimErrorCode, type QrMissing } from "./payout-claim.command";
 export { CLAIM_EXPIRY_ACTOR, runClaimExpiry, type ClaimExpiryDeps } from "./claim-expiry.job";
 export { crc16Ccitt, vietQrPayload, VietQrError, VIETQR_CONTENT_MAX, type VietQrInput } from "./domain/vietqr";
 export { BANK_CHANGE_FLAG_MS, payoutFlags, queueOf } from "./payout-flags";
@@ -39,3 +39,4 @@ export { NETWORK_SYNC_ACTOR, networkPayoutInternalRoutes, networkSettlementRoute
 export { importNetworkSettlements, type ImportedNetworkSettlement, type NetworkSettlementsImportResult } from "./network-settlement-import.command";
 export { answerCustomersList, bankStateOf, CUSTOMERS_LIST, customerFlags, customerRows } from "./customers.list";
 export { customerMoney, type CustomerMoney } from "./customer-money.query";
+export { networkCash, networkProcessing, nettingFacts, owedNow, payoutsSent, type CashOrigin, type NettingFact, type NetworkCash, type OwedNow, type PayoutCash, type ProcessingBatches } from "./payout-overview.query";

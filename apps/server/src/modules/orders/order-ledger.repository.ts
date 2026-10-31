@@ -7,7 +7,7 @@ import type { Instant } from "@cashback/core";
 import { and, desc, eq } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
-import { resolveCustomer } from "../identity/index";
+import { earnsNothing, ledgerOwnerOf } from "../identity/index";
 import type { ObservedStatus } from "./domain/report-signal";
 import type { TransitionOrder } from "./domain/transition";
 import { orderItems, orderObservations, orders, orderStatusHistory } from "./schema";
@@ -18,11 +18,18 @@ export function findOrder(db: LedgerDb, orderId: string): StoredOrder | null {
   return db.select().from(orders).where(eq(orders.orderId, orderId)).get() ?? null;
 }
 
-const isGuest = (db: LedgerDb, customerId: string | null): boolean => customerId !== null && resolveCustomer(db, customerId)?.role === "HOUSE";
+/**
+ * The guest account (D5) earns nothing; an erased record earns nothing on orders recorded after its
+ * erasure, and its earlier orders keep their cashback and clawback rules (FR-35, `earnsNothing`).
+ */
+function isGuest(db: LedgerDb, o: StoredOrder): boolean {
+  // A stored order without a recorded time came from the cutover, before any erasure.
+  return o.customerId !== null && earnsNothing(ledgerOwnerOf(db, o.customerId), o.recordedAt ?? "");
+}
 
-/** The stored order as `transition` reads it; the guest flag comes from the owner's role (D5). */
+/** The stored order as `transition` reads it; the guest flag comes from the owner's role (D5) or its erasure. */
 export function transitionOrderOf(db: LedgerDb, o: StoredOrder): TransitionOrder {
-  return { status: o.status, paidAt: o.paidAt, approvedCommission: o.approvedCommission, cashback: o.cashback, guest: isGuest(db, o.customerId) };
+  return { status: o.status, paidAt: o.paidAt, approvedCommission: o.approvedCommission, cashback: o.cashback, guest: isGuest(db, o) };
 }
 
 export interface LatestObservations {

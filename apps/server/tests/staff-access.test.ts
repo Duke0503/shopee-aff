@@ -25,15 +25,13 @@ afterEach(async () => {
 });
 
 /**
- * A stand-in for a route a later story adds (Story 6.x), on the real gate and policy. Payout void
- * is the real route of Story 4.10: an admin past the gate reaches the command, which answers
- * `reason_required` for the empty body these tests send (400), never 403.
+ * No stand-in routes are left: payout void (Story 4.10) and forced erase (Story 4.16) are the real
+ * routes. An admin past the gate reaches the command, which answers `reason_required` for the
+ * empty body these tests send (400), never 403.
  */
-const LATER_ROUTES: StaffRoutes = (add) => {
-  add({ method: "POST", url: "/api/admin/customers/:customerId/force-erase", adminOnly: true, handler: async () => ({ erased: true }) });
-};
-/** The status an admin past the gate gets: the stand-in's 200, or the real void's 400 reason_required. */
-const PASSED: Record<string, number> = { "/api/admin/payouts/1/void": 400, "/api/admin/customers/C1/force-erase": 200 };
+const LATER_ROUTES: StaffRoutes = () => undefined;
+/** The status an admin past the gate gets: the real commands' 400 reason_required. */
+const PASSED: Record<string, number> = { "/api/admin/payouts/1/void": 400, "/api/admin/customers/C1/force-erase": 400 };
 
 interface Desk {
   ledger: Ledger;

@@ -57,6 +57,7 @@ function customerPage(n: number, overrides: Partial<CustomerPage> = {}): Custome
     status: "ACTIVE",
     zaloUserId: `88124471009${n}`,
     joinedAt: "2026-09-12T03:00:00.000Z",
+    erasedAt: null,
     balance: {
       payable: row.payable,
       gross: row.payable,

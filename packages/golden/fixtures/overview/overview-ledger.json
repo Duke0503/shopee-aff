@@ -1,0 +1,436 @@
+{
+ "rule": "overview",
+ "source": "docs/operations/dashboard-spec.md, Story 4.17. The seed goes on top of apps/server/tests/helpers/order-ledger.ts freshLedger (C1, C2, HOUSE, CE, five link requests, CAMP1). Every expected figure is computed independently with exact fractions and half-up rounding (scratch generator), never by the server code.",
+ "clock": "2026-10-30T05:00:00.000Z",
+ "query": {
+  "period": "thisMonth"
+ },
+ "seed": [
+  "INSERT INTO customers (customer_id, customer_code, role, status, created_at) VALUES ('C3', 'DP00003', 'USER', 'ACTIVE', '2026-10-03T03:00:00.000Z'), ('CM', 'DP00004', 'USER', 'MERGED', '2026-10-04T03:00:00.000Z')",
+  "INSERT INTO customer_aliases (alias, customer_id, note) VALUES ('CM', 'C3', 'merge')",
+  "INSERT INTO bank_accounts (customer_id, bank_name, account_number, holder_name, fingerprint, consent_at, pending_confirmation) VALUES ('C1', 'Vietcombank', '0071000000001', 'KHACH MOT', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '2026-09-01T03:00:00.000Z', 0)",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O1', 'shopee', 'shopee', 'C1', 'APPROVED', 1000000, NULL, 100000, 71216, 980, 10000, 1, '2026-10', '2026-10-05T03:00:00.000Z', '2026-10-10T03:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O2', 'shopee', 'shopee', 'C2', 'PAID', 500000, NULL, 50000, 35608, 490, 5000, 1, '2026-10', '2026-10-06T03:00:00.000Z', '2026-10-12T03:00:00.000Z', '2026-10-20T05:00:00.000Z', '2026-10-25T03:00:00.000Z', 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O3', 'shopee', 'shopee', 'HOUSE', 'APPROVED', 300000, NULL, 30000, 0, 294, 3000, 1, '2026-10', '2026-10-07T03:00:00.000Z', '2026-10-15T03:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O4', 'accesstrade', 'tiktok', 'C1', 'APPROVED', 200000, NULL, 20000, 14243, 196, 2000, 1, '2026-10', '2026-10-08T03:00:00.000Z', '2026-10-18T03:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O5', 'shopee', 'shopee', 'C2', 'REVERSED', 400000, NULL, 40000, 28486, 392, 4000, 1, '2026-10', '2026-10-04T03:00:00.000Z', '2026-10-11T03:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O6', 'shopee', 'shopee', 'C1', 'FROZEN', 100000, NULL, 10000, 7122, 98, 1000, 1, '2026-10', '2026-10-04T04:00:00.000Z', '2026-10-11T04:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O7', 'shopee', 'shopee', 'C2', 'REJECTED', 100000, 9000, NULL, NULL, NULL, NULL, NULL, NULL, '2026-10-09T03:00:00.000Z', NULL, NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O8', 'shopee', 'shopee', 'C1', 'AWAITING_APPROVAL', 250000, 25000, NULL, NULL, NULL, NULL, NULL, NULL, '2026-10-20T03:00:00.000Z', NULL, NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O9', 'shopee', 'shopee', 'HOUSE', 'AWAITING_APPROVAL', 100000, 10000, NULL, NULL, NULL, NULL, NULL, NULL, '2026-10-21T03:00:00.000Z', NULL, NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O10', 'shopee', 'shopee', 'C2', 'APPROVED', 100000, NULL, 10000, 7122, 98, 1000, 1, '2026-10', '2026-09-29T03:00:00.000Z', '2026-09-30T18:00:00.000Z', NULL, NULL, 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O12', 'shopee', 'shopee', 'C1', 'PAID', 600000, NULL, 60000, 42730, 588, 6000, 1, '2026-09', '2026-09-10T03:00:00.000Z', '2026-09-15T03:00:00.000Z', '2026-09-25T05:00:00.000Z', '2026-09-28T03:00:00.000Z', 'REPORT')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, approved_commission, cashback, cashback_fee, cashback_tax, cashback_withheld, settlement_period, recorded_at, approved_at, paid_at, settled_at, origin) VALUES ('O14', 'shopee', 'shopee', 'C1', 'AWAITING_APPROVAL', 80000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-08-01T03:00:00.000Z', NULL, NULL, NULL, 'REPORT')",
+  "INSERT INTO campaigns (campaign_id, name, starts_at, ends_at, slots, bonus, origin) VALUES ('EV1', 'Ngay hoi thang 10', '2026-09-30T17:00:00.000Z', '2026-10-15T17:00:00.000Z', 10, 20000, 'STAFF'), ('EV0', 'Thang 8', '2026-08-01T17:00:00.000Z', '2026-08-05T17:00:00.000Z', 5, 10000, 'STAFF')",
+  "INSERT INTO campaign_awards (campaign_id, customer_id, order_id, amount, status, origin) VALUES ('EV1', 'C1', 'O1', 20000, 'CONFIRMED', 'RULE'), ('EV1', 'C2', 'O2', 20000, 'PAID', 'RULE'), ('EV1', 'C1', 'O8', 20000, 'HELD', 'RULE'), ('EV1', 'C2', 'O5', 20000, 'VOID', 'RULE')",
+  "INSERT INTO payouts (payout_id, customer_id, status, transfer_amount, recorded_at, origin) VALUES (1, 'C1', 'RECORDED', 42730, '2026-09-25T05:00:00.000Z', 'CONFIRM'), (2, 'C2', 'RECORDED', 46345, '2026-10-20T05:00:00.000Z', 'CONFIRM')",
+  "INSERT INTO payouts (payout_id, customer_id, status, transfer_amount, recorded_at, voided_at, void_reason, origin) VALUES (3, 'C1', 'VOIDED', 10000, '2026-10-22T05:00:00.000Z', '2026-10-23T05:00:00.000Z', 'wrong account', 'CONFIRM')",
+  "INSERT INTO ledger_entries (customer_id, clawback_id, kind, amount, order_id, payout_id, created_at, created_by) VALUES ('C2', 'CB1', 'CLAWBACK', -9263, 'O5', NULL, '2026-10-02T03:00:00.000Z', 'test'), ('C2', 'CB1', 'NETTING', 9263, 'O5', 2, '2026-10-20T05:00:00.000Z', 'test'), ('C1', 'CB2', 'CLAWBACK', -5000, 'O12', NULL, '2026-10-25T03:00:00.000Z', 'test')",
+  "INSERT INTO network_settlements (network, network_payout_id, status, amount, eligible_amount, withheld, fee, tax, created_at, paid_at, match, origin, recorded_at, updated_at) VALUES ('shopee', 'B1', 'PAID', 53412, 60000, 1, 588, 6000, '2026-09-27T19:00:00.000Z', '2026-10-01T04:00:00.000Z', 'MATCHED', 'NETWORK', '2026-10-01T04:00:00.000Z', '2026-10-01T04:00:00.000Z'), ('shopee', 'B2', 'PAID', 44510, 50000, 1, 490, 5000, '2026-10-22T19:00:00.000Z', '2026-10-26T04:00:00.000Z', 'MATCHED', 'NETWORK', '2026-10-26T04:00:00.000Z', '2026-10-26T04:00:00.000Z'), ('shopee', 'B3', 'PROCESSING', 89020, 100000, 1, 980, 10000, '2026-10-28T19:00:00.000Z', NULL, 'PENDING', 'NETWORK', '2026-10-29T04:00:00.000Z', '2026-10-29T04:00:00.000Z')",
+  "INSERT INTO orders (order_id, network, platform, customer_id, status, order_value, estimated_commission, cashback, paid_at, origin) VALUES ('O20', 'shopee', 'shopee', 'C2', 'PAID', 150000, 15000, 12000, '2026-10-04T05:00:00.000Z', 'CUTOVER')",
+  "INSERT INTO payouts (payout_id, customer_id, status, transfer_amount, recorded_at, origin) VALUES (4, 'C2', 'RECORDED', 12000, '2026-10-04T05:00:00.000Z', 'CUTOVER')",
+  "INSERT INTO network_settlements (network, network_payout_id, status, amount, eligible_amount, withheld, fee, tax, created_at, paid_at, match, origin, recorded_at, updated_at) VALUES ('shopee', 'B0', 'PAID', 30000, 33700, 1, 330, 3370, '2026-09-29T19:00:00.000Z', '2026-10-03T04:00:00.000Z', 'HISTORIC', 'CUTOVER', '2026-10-30T00:00:00.000Z', '2026-10-30T00:00:00.000Z')",
+  "INSERT INTO review_cases (network, subject, reason, status, candidates, observation, opened_at, opened_by) VALUES ('shopee', 'X1', 'unattributed', 'OPEN', '[]', '{}', '2026-10-20T03:00:00.000Z', 'reconcile'), ('shopee', 'X2', 'unattributed', 'OPEN', '[]', '{}', '2026-10-21T03:00:00.000Z', 'reconcile')",
+  "INSERT INTO review_cases (network, subject, reason, status, resolution, candidates, observation, opened_at, opened_by, resolved_at, resolved_by, resolution_reason) VALUES ('shopee', 'X3', 'unattributed', 'RESOLVED', 'DISMISSED', '[]', '{}', '2026-10-01T03:00:00.000Z', 'reconcile', '2026-10-02T03:00:00.000Z', 'minh', 'test row')",
+  "UPDATE link_requests SET delivered_at = '2026-10-05T03:00:00.000Z', created_at = '2026-10-05T02:00:00.000Z' WHERE request_id IN ('REQ1', 'REQH', 'REQ2')",
+  "UPDATE link_requests SET delivered_at = '2026-10-06T03:00:00.000Z', created_at = '2026-10-06T02:00:00.000Z' WHERE request_id = 'REQT'",
+  "UPDATE link_requests SET delivered_at = '2026-09-20T03:00:00.000Z', created_at = '2026-09-20T02:00:00.000Z' WHERE request_id = 'REQE'",
+  "INSERT INTO link_requests (request_id, customer_id, network, platform, status, source_url, created_at, delivered_at, origin) VALUES ('REQ6', 'C2', 'shopee', 'shopee', 'DELIVERED', 'https://shopee.vn/p/6', '2026-10-07T02:00:00.000Z', '2026-10-07T03:00:00.000Z', 'REQUEST'), ('REQF1', 'C1', 'shopee', 'shopee', 'FAILED', 'https://shopee.vn/p/7', '2026-10-29T18:30:00.000Z', NULL, 'REQUEST'), ('REQF2', 'C1', 'shopee', 'shopee', 'FAILED', 'https://shopee.vn/p/8', '2026-10-29T16:00:00.000Z', NULL, 'REQUEST')"
+ ],
+ "expected": {
+  "period": {
+   "preset": "thisMonth",
+   "from": "2026-10-01",
+   "to": "2026-10-30",
+   "previousFrom": "2026-09-01",
+   "previousTo": "2026-09-30"
+  },
+  "todo": {
+   "payable": {
+    "customers": 1,
+    "amount": 100459
+   },
+   "openReviewCases": 2,
+   "failedLinksToday": 1,
+   "owedWithoutBank": {
+    "customers": 1,
+    "amount": 7122
+   }
+  },
+  "business": {
+   "commission": {
+    "value": 210000,
+    "previous": 60000,
+    "change": 150000
+   },
+   "approvedOrders": {
+    "value": 5,
+    "previous": 1,
+    "change": 4
+   },
+   "fee": {
+    "value": 2058,
+    "previous": 588,
+    "change": 1470
+   },
+   "tax": {
+    "value": 21000,
+    "previous": 6000,
+    "change": 15000
+   },
+   "cashback": {
+    "value": 128189,
+    "previous": 42730,
+    "change": 85459
+   },
+   "eventBonus": {
+    "value": 40000,
+    "previous": 0,
+    "change": 40000
+   },
+   "clawbackNetted": {
+    "value": 9263,
+    "previous": 0,
+    "change": 9263
+   },
+   "profit": {
+    "value": 28016,
+    "previous": 10682,
+    "change": 17334
+   },
+   "margin": {
+    "bps": 1334,
+    "previousBps": 1780,
+    "changeBps": -446,
+    "enoughData": true
+   },
+   "split": {
+    "feeAndTax": 23058,
+    "feeAndTaxBps": 1052,
+    "cashbackBps": 5846,
+    "eventBonusBps": 1824,
+    "profitBps": 1278
+   },
+   "byNetwork": [
+    {
+     "network": "shopee",
+     "commission": 190000,
+     "orders": 4
+    },
+    {
+     "network": "accesstrade",
+     "commission": 20000,
+     "orders": 1
+    }
+   ],
+   "withheldPeriods": [
+    "2026-10"
+   ],
+   "cashbackPaid": 35608,
+   "cashbackOwed": 92581,
+   "byCampaign": [
+    {
+     "campaignId": "EV1",
+     "name": "Ngay hoi thang 10",
+     "bonus": 40000
+    }
+   ],
+   "withoutSplit": 0,
+   "importedWithoutApproval": 1,
+   "cashBasis": {
+    "received": 30000,
+    "paidOut": 12000,
+    "profit": 18000,
+    "previousProfit": null
+   },
+   "totalProfit": {
+    "value": 46016,
+    "previous": 10682,
+    "change": 35334
+   }
+  },
+  "money": {
+   "networksOwe": 160000,
+   "weOweCustomers": 107581,
+   "customersOweUs": 5000,
+   "awaiting": {
+    "orders": 3,
+    "commission": 35000,
+    "cashback": 17804
+   },
+   "cash": {
+    "networkBatches": 3,
+    "networkGross": {
+     "value": 143700,
+     "previous": null,
+     "change": null
+    },
+    "networkFee": 1408,
+    "networkTax": 14370,
+    "received": {
+     "value": 127922,
+     "previous": 0,
+     "change": 127922
+    },
+    "paidOut": {
+     "value": 58345,
+     "previous": 42730,
+     "change": 15615
+    },
+    "payouts": 2,
+    "difference": {
+     "value": 69577,
+     "previous": -42730,
+     "change": 112307
+    }
+   },
+   "processing": {
+    "batches": 1,
+    "gross": 100000,
+    "received": 89020
+   },
+   "advanceWarning": true,
+   "last60Days": {
+    "received": 127922,
+    "paidOut": 101075
+   }
+  },
+  "trend": {
+   "weeks": [
+    {
+     "weekStart": "2026-08-10",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-17",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-24",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-08-31",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-07",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-14",
+     "profit": 10682,
+     "commission": 60000,
+     "cashback": 42730
+    },
+    {
+     "weekStart": "2026-09-21",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-09-28",
+     "profit": 1780,
+     "commission": 10000,
+     "cashback": 7122
+    },
+    {
+     "weekStart": "2026-10-05",
+     "profit": -2196,
+     "commission": 100000,
+     "cashback": 71216
+    },
+    {
+     "weekStart": "2026-10-12",
+     "profit": 19169,
+     "commission": 100000,
+     "cashback": 49851
+    },
+    {
+     "weekStart": "2026-10-19",
+     "profit": 9263,
+     "commission": 0,
+     "cashback": 0
+    },
+    {
+     "weekStart": "2026-10-26",
+     "profit": 0,
+     "commission": 0,
+     "cashback": 0
+    }
+   ],
+   "totals": {
+    "profit": {
+     "value": 38698,
+     "previous": null,
+     "change": null
+    },
+    "commission": {
+     "value": 270000,
+     "previous": null,
+     "change": null
+    },
+    "cashback": {
+     "value": 170919,
+     "previous": null,
+     "change": null
+    }
+   }
+  },
+  "orders": {
+   "networks": [
+    {
+     "network": "shopee",
+     "linksDelivered": 4,
+     "recorded": 8,
+     "ordersPerLink": {
+      "bps": 20000,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     },
+     "approved": 3,
+     "cancelled": 2,
+     "awaiting": 2,
+     "cancelRate": {
+      "bps": 4000,
+      "previousBps": 0,
+      "changeBps": 4000,
+      "enoughData": false
+     },
+     "averageCommission": 60000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": 1000,
+      "changeBps": 0,
+      "enoughData": false
+     }
+    },
+    {
+     "network": "accesstrade",
+     "linksDelivered": 1,
+     "recorded": 1,
+     "ordersPerLink": {
+      "bps": 10000,
+      "previousBps": 0,
+      "changeBps": 10000,
+      "enoughData": false
+     },
+     "approved": 1,
+     "cancelled": 0,
+     "awaiting": 0,
+     "cancelRate": {
+      "bps": 0,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     },
+     "averageCommission": 20000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": null,
+      "changeBps": null,
+      "enoughData": false
+     }
+    },
+    {
+     "network": "all",
+     "linksDelivered": 5,
+     "recorded": 9,
+     "ordersPerLink": {
+      "bps": 18000,
+      "previousBps": 20000,
+      "changeBps": -2000,
+      "enoughData": false
+     },
+     "approved": 4,
+     "cancelled": 2,
+     "awaiting": 2,
+     "cancelRate": {
+      "bps": 3333,
+      "previousBps": 0,
+      "changeBps": 3333,
+      "enoughData": false
+     },
+     "averageCommission": 50000,
+     "effectiveRate": {
+      "bps": 1000,
+      "previousBps": 1000,
+      "changeBps": 0,
+      "enoughData": false
+     }
+    }
+   ],
+   "aged": 1
+  },
+  "events": [
+   {
+    "campaignId": "EV1",
+    "name": "Ngay hoi thang 10",
+    "startsAt": "2026-09-30T17:00:00.000Z",
+    "endsAt": "2026-10-15T17:00:00.000Z",
+    "slotsUsed": 3,
+    "slots": 10,
+    "bonus": 40000,
+    "commission": 150000,
+    "operatorShare": 26706,
+    "result": -13294
+   }
+  ],
+  "customers": {
+   "withOrder": {
+    "value": 2,
+    "previous": 2,
+    "change": 0
+   },
+   "newCustomers": {
+    "value": 1,
+    "previous": 0,
+    "change": 1
+   },
+   "repeatShare": {
+    "bps": 10000,
+    "previousBps": 5000,
+    "changeBps": 5000,
+    "enoughData": false
+   },
+   "concentration": {
+    "customerCode": "DP00001",
+    "shareBps": 5714
+   }
+  },
+  "health": [
+   {
+    "component": "bridge",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "assistant",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "reconciliation",
+    "state": "unknown",
+    "at": null
+   },
+   {
+    "component": "backup",
+    "state": "unknown",
+    "at": null
+   }
+  ]
+ }
+}

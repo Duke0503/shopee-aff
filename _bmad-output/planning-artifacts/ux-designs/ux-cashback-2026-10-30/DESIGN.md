@@ -59,11 +59,12 @@ colors:
   sidebar-accent: '#ECFDF5'
   sidebar-accent-foreground: '#065F46'
   sidebar-border: '#E2E8F0'
-  # Charts (Metrics only).
+  # Charts (the Overview). Fixed order: profit, cashback, event bonus, fee and tax;
+  # validated with the dataviz validator (all pairs, light, on #FFFFFF), Sprint 19.
   chart-1: '#047857'
-  chart-2: '#7B8798'
-  chart-3: '#B45309'
-  chart-4: '#1D4E89'
+  chart-2: '#2F6CB3'
+  chart-3: '#C2410C'
+  chart-4: '#8B5CF6'
 typography:
   # One family everywhere. Be Vietnam Pro (Google Fonts, latin + vietnamese
   # subsets, weights 400/500/600/700) with a system fallback that renders

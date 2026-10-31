@@ -14,6 +14,9 @@ export { MissingValue, MoneyFigure, type MoneyFigureProps } from "./brand/money-
 export { ProductThumb, type ProductThumbProps } from "./brand/product-thumb";
 export { StatusBadge, type StatusBadgeProps } from "./brand/status-badge";
 export { formatAmountDigits, formatCount, formatMoney, moneyAriaLabel } from "./format/format-money";
+export { formatBps, formatBpsChange, formatCompactMoney, formatSignedMoney } from "./format/format-ratio";
+export { BarChart, type BarChartProps, type BarPoint } from "./charts/bar-chart";
+export { SegmentedBar, type Segment } from "./charts/segmented-bar";
 export { DESKTOP_QUERY, TABLET_QUERY, useLayout, useMediaQuery, type Layout } from "./hooks/use-media-query";
 export { fillLabel, statusLabel, uiText, type UiKey } from "./labels";
 export { cn } from "./lib/utils";

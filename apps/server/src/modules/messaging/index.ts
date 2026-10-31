@@ -13,6 +13,7 @@ export {
   OutboxSeedError,
   seedSentNotifications,
   wasTold,
+  withdrawUnsent,
   type EnqueueResult,
   type SeededNotification,
 } from "./outbox.command";

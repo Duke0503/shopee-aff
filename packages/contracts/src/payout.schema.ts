@@ -23,11 +23,12 @@ export type PayoutQueue = (typeof PAYOUT_QUEUES)[number];
  * clawbacks reach the gross, AD-6) is a transfer of 0: it opens as a netting-only payout (Story
  * 4.11) that needs no bank account, so no flag blocks it.
  */
-export const PAYOUT_FLAGS = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY"] as const;
+/** ERASED: the customer's personal data was erased while money was still owed (FR-35); nothing can be paid. */
+export const PAYOUT_FLAGS = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY", "ERASED"] as const;
 export type PayoutFlag = (typeof PAYOUT_FLAGS)[number];
-export const ACTION_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY"];
+export const ACTION_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD", "BANK_CHANGED", "SHARED_BANK", "NETTING_ONLY", "ERASED"];
 /** Flags that refuse a claim outright: no confirmed account to transfer to (a netting-only row is never blocked). */
-export const BLOCKING_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD"];
+export const BLOCKING_FLAGS: readonly PayoutFlag[] = ["NO_BANK", "BANK_HELD", "ERASED"];
 
 /** The settled fact of a row's payable orders (D27): information only, never a status. */
 export const SETTLEMENT_FACTS = ["UNSETTLED", "PARTLY_SETTLED", "SETTLED"] as const;
