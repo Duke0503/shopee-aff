@@ -39,6 +39,7 @@ export function reconcileJobs(input: ReconcileJobsInput): Job[] {
     logger: input.logger,
     sources: reconcileSources(input.config),
     production: input.config.env === "prod",
+    devOnly: input.config.env === "dev",
   };
   if (ctx.sources.length === 0) input.logger.warn({}, "orders.reconciliation.no_sources");
   const pacing = { ...SWEEP_PACING, pauseMs: input.config.sweepPauseMs ?? SWEEP_PACING.pauseMs };

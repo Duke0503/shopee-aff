@@ -25,6 +25,8 @@ export interface ReconcileContext {
   readonly sources: readonly WindowedReportSource[];
   /** Production never credits a DEV sub_id (AD-25). */
   readonly production: boolean;
+  /** Dev credits only DEV links (Story 8.1). */
+  readonly devOnly?: boolean;
   /** The scheduler's stop signal for this run (AD-13); nothing touches the ledger after it. */
   readonly signal?: AbortSignal;
   /** A clock that never steps back, for run durations; `performance.now` by default. */
@@ -47,7 +49,7 @@ export function runDepsFor(ctx: ReconcileContext): RunDeps {
     logger: ctx.logger,
     ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
     ...(ctx.monotonic === undefined ? {} : { monotonic: ctx.monotonic }),
-    applyRow: (row) => ctx.ledger.tx((db) => applyReportRow(db, row, applyDepsFor(db, ctx.clock, { production: ctx.production }))),
+    applyRow: (row) => ctx.ledger.tx((db) => applyReportRow(db, row, applyDepsFor(db, ctx.clock, { production: ctx.production, devOnly: ctx.devOnly === true }))),
   };
 }
 

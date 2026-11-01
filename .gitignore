@@ -125,3 +125,5 @@ uploads/
 
 # New platform ledger, lock file and backups (data/<env>/, AD-13)
 /data/
+# PID files of the start and stop scripts (run/<env>/, AD-25)
+/run/

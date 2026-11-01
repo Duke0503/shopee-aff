@@ -12,7 +12,10 @@
  * - nothing resolves: review case "unattributed".
  *
  * Guests are decided by the directory (the customer's role HOUSE): their effect carries cashback
- * 0 (D5). In production a `DEV` sub_id1 or a `DEV` request owner is only a review case (AD-25).
+ * 0 (D5). In production a `DEV` sub_id1, a `DEV` request id or a `DEV` request owner is only a
+ * review case (AD-25). In dev (`devOnly`) the reverse holds: a link without the `DEV` prefix on
+ * its sub_id1 or its request id is a production link and only a review case
+ * ("production_link_in_dev"), and the prefix is dropped from sub_id1 before it is resolved.
  * Pure: the caller hands in a directory whose lookups are already loaded or synchronous.
  */
 
@@ -40,7 +43,7 @@ export interface AttributionInput {
 
 export type AttributionSource = "sub_id1" | "sub_id2" | "both";
 
-export type ReviewReason = "owner_disagreement" | "unattributed" | "unattributed_sub_id1" | "dev_link_in_production";
+export type ReviewReason = "owner_disagreement" | "unattributed" | "unattributed_sub_id1" | "dev_link_in_production" | "production_link_in_dev";
 
 export type Attribution =
   | {
@@ -78,12 +81,19 @@ function review(reason: ReviewReason, candidates: readonly (DirectoryCustomer | 
 
 const isDev = (id: string | null | undefined): boolean => id !== null && id !== undefined && id.startsWith(DEV_SUB_ID_PREFIX);
 
-export function attribute(input: AttributionInput, directory: AttributionDirectory, production: boolean): Attribution {
-  const subId1 = blankToNull(input.subIds[0]);
+export interface AttributionOptions {
+  /** The dev environment: only `DEV` links are its own (Story 8.1). Never set with `production`. */
+  readonly devOnly?: boolean;
+}
+
+export function attribute(input: AttributionInput, directory: AttributionDirectory, production: boolean, options: AttributionOptions = {}): Attribution {
+  const rawSubId1 = blankToNull(input.subIds[0]);
   const subId2 = blankToNull(input.subIds[1]);
+  if (options.devOnly && ((rawSubId1 !== null && !isDev(rawSubId1)) || (subId2 !== null && !isDev(subId2)))) return review("production_link_in_dev", []);
+  const subId1 = options.devOnly && rawSubId1 !== null ? blankToNull(rawSubId1.slice(DEV_SUB_ID_PREFIX.length)) : rawSubId1;
   const owner = subId2 === null ? null : directory.requestOwner(subId2);
   const byRequest = owner === null ? null : directory.resolveCustomer(owner);
-  if (production && (isDev(subId1) || isDev(owner) || isDev(byRequest?.customerId))) return review("dev_link_in_production", []);
+  if (production && (isDev(subId1) || isDev(subId2) || isDev(owner) || isDev(byRequest?.customerId))) return review("dev_link_in_production", []);
 
   if (subId1 === null) return byRequest !== null ? customer(byRequest, "sub_id2", subId2) : review("unattributed", []);
   const byCustomer = directory.resolveCustomer(subId1);

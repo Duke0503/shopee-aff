@@ -23,6 +23,8 @@ const NO_LISTENER: OrderEventsPort = { recorded: () => undefined };
 export interface ApplyOptions {
   /** Production never credits a DEV sub_id (AD-25). */
   readonly production: boolean;
+  /** Dev credits only DEV links (Story 8.1). */
+  readonly devOnly?: boolean;
   readonly actor?: Actor;
   readonly events?: OrderEventsPort;
 }
@@ -39,6 +41,7 @@ export function applyDepsFor(db: LedgerDb, clock: Clock, options: ApplyOptions):
     awards: orderAwardsFor(db, clock, by),
     events: options.events ?? NO_LISTENER,
     production: options.production,
+    devOnly: options.devOnly === true,
   };
 }
 

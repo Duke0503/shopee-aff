@@ -58,6 +58,8 @@ export interface ApplyDeps {
   readonly events: OrderEventsPort;
   /** Production never credits a DEV sub_id (AD-25). */
   readonly production: boolean;
+  /** Dev credits only DEV links (Story 8.1); unset outside the dev server's own runs. */
+  readonly devOnly?: boolean;
 }
 
 /**
@@ -89,6 +91,8 @@ export interface ContextDeps {
   readonly awards: Pick<OrderAwardsPort, "paidBonus">;
   /** Production never credits a DEV sub_id (AD-25). */
   readonly production: boolean;
+  /** Dev credits only DEV links (Story 8.1). */
+  readonly devOnly?: boolean;
 }
 
 /** A claim matters only to an APPROVED order (D39), paid bonus and earlier clawbacks only to a PAID one (D35, D42): each is read only then. */
@@ -100,7 +104,7 @@ export function contextFor(db: LedgerDb, row: SourcedRow, stored: StoredOrder | 
     coveredByOpenClaim: status === "APPROVED" && deps.payouts.coveredByOpenClaim(row.orderId),
     paidBonus: status === "PAID" ? deps.awards.paidBonus(row.orderId) : 0,
     alreadyClawedBack: status === "PAID" ? deps.payouts.clawedBack(row.orderId) : 0,
-    attribution: stored === null ? atOrderTime(db, chosen ?? attribute(row, directory, deps.production), row.purchasedAt ?? now) : undefined,
+    attribution: stored === null ? atOrderTime(db, chosen ?? attribute(row, directory, deps.production, { devOnly: deps.devOnly === true }), row.purchasedAt ?? now) : undefined,
   };
 }
 

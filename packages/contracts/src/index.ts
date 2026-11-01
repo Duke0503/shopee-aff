@@ -213,3 +213,4 @@ export {
   type OverviewWeek,
   type Ratio,
 } from "./overview.schema";
+export { ASSISTANT_TOKEN_HEADER, linkRequestCreatedSchema, linkRequestCreateSchema, type LinkRequestCreate, type LinkRequestCreated } from "./link-request.schema";

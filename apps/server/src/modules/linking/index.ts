@@ -75,10 +75,17 @@ export {
 export { findLinkRequestOwner, type LinkRequestOwner } from "./link-request.query";
 export { httpsImageUrl, productSnapshotsOf, type ProductSnapshot } from "./product-snapshot.query";
 export { findShareCode, type SharedLink } from "./share-code.query";
-export { LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";
+export { BRIDGE_JOB_KINDS, BRIDGE_JOB_STATUSES, LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";
 export {
   answerCustomerLinkRequests,
   LINK_REQUESTS_LIST,
   linkRequestCountOf,
 } from "./link-requests.list";
 export { deliveredLinkCounts, failedLinkCount, type NetworkCount } from "./link-overview.query";
+export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type QueuedLinkRequest } from "./link-request.command";
+export { claimLinkJob, randomShareCode, recordLinkResult, SHARE_CODE_LENGTH, type ClaimOptions, type LinkResultRecorded, type RecordOptions } from "./link-issue.command";
+export { checkReturnedLink, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure } from "./domain/link-check";
+export { MAX_LINKS_PER_RUN, runLinkJob, type LinkJobDeps, type LinkJobRun } from "./link.job";
+export { FAKE_BRIDGE_HOST, fakeBridge, fakeLinkUrl } from "./fake-bridge.adapter";
+export { shopeeProductUrl, SUB_ID_PATTERN } from "./domain/product-url";
+export { linkRequestInternalRoutes, type LinkRequestRouteDeps } from "./http/link-request.routes";

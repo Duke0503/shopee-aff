@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
+    "dev:start": "tsx src/dev-start.ts",
+    "dev:stop": "tsx src/dev-stop.ts",
     "rehearse:migration": "tsx src/rehearse-migration.ts",
     "cutover:import": "tsx src/cutover/run-import.ts",
     "shadow:run": "tsx src/cutover/run-shadow.ts",

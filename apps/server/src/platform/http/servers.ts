@@ -16,6 +16,8 @@ export const LOOPBACK = "127.0.0.1";
 export interface ServerDeps {
   clock: Clock;
   internalToken: string;
+  /** The Zalo assistant's token for its routes (AD-15); absent, those routes answer 401. */
+  assistantToken?: string | null;
   /** The shared redacting logger (AD-27); tests leave it out and log nothing. */
   logger?: FastifyBaseLogger;
   /** The admin desk's routes behind Cloudflare Access; absent, no staff route exists (Story 4.2). */
@@ -51,7 +53,7 @@ export function buildServers(deps: ServerDeps): Servers {
   if (deps.staff) registerStaffRoutes(publicApp, deps.staff.gate, deps.staff.routes);
 
   const internalApp = baseApp(deps.logger);
-  requireInternalToken(internalApp, deps.internalToken);
+  requireInternalToken(internalApp, { internal: deps.internalToken, assistant: deps.assistantToken ?? null });
   internalApp.get("/internal/ping", async () => ({ status: "ok" }));
   for (const add of deps.internal ?? []) add(internalApp);
 

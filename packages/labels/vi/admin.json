@@ -410,6 +410,8 @@
   "review_why_owner_disagreement": "Mã khách trong link và người tạo link là hai khách khác nhau, nên hệ thống không tự chọn.",
   "review_reason_dev_link_in_production": "Đơn từ link dùng để thử",
   "review_why_dev_link_in_production": "Đơn đến từ một link dùng để thử, nên không tự tính cho khách nào.",
+  "review_reason_production_link_in_dev": "Đơn từ link thật trên máy thử",
+  "review_why_production_link_in_dev": "Máy thử chỉ tính đơn từ link dùng để thử. Đơn này đến từ một link thật nên không tự tính cho khách nào.",
   "review_reason_unknown_status": "Sàn báo trạng thái lạ",
   "review_why_unknown_status": "Sàn báo một trạng thái hệ thống chưa biết. Đơn được giữ lại, chưa tính vào số tiền nào.",
   "review_reason_missing_order_id": "Sàn không ghi mã đơn",

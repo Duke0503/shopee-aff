@@ -25,6 +25,7 @@ export const REVIEW_CASE_REASONS = [
   "unattributed_sub_id1",
   "owner_disagreement",
   "dev_link_in_production",
+  "production_link_in_dev",
   "unknown_status",
   "missing_order_id",
   "no_items",

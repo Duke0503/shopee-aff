@@ -1,0 +1,33 @@
+{
+  "$comment": "Story 8.1 (AD-25, D37, NFR-5): every production resource a dev configuration must never point at. Identifiers only, never a secret: secrets are compared with the production env file on the same machine instead (isolation.config.ts). The live system on main runs on the Windows VPS in C:/Project/mmo; the new production follows the deployment table of diagrams/c4-deployment.md. A value the owner learns later (the production Zalo account) is added here.",
+  "ports": [
+    { "port": 80, "what": "live web dashboard behind the Cloudflare tunnel (scripts/start-all.ps1)" },
+    { "port": 8899, "what": "live backend API and dashboard" },
+    { "port": 8787, "what": "live Edge extension bridge (BRIDGE_PORT)" },
+    { "port": 8891, "what": "live Zalo assistant worker (zalo_assistant/assistant_worker.js)" },
+    { "port": 8080, "what": "new production public listener" },
+    { "port": 8081, "what": "new production internal listener" }
+  ],
+  "paths": [
+    { "absolute": "C:/Project/mmo", "tree": true, "what": "the live system folder on the VPS: its cashback.db ledger, .env and browser profile" },
+    { "repository": "data/prod", "tree": true, "what": "new production ledger, lock file, backups and proof files" },
+    { "repository": "run/prod", "tree": true, "what": "new production PID files" },
+    { "repository": ".browser-profile/prod", "tree": true, "what": "new production affiliate Chrome profile" },
+    { "repository": ".browser-profile", "tree": false, "what": "the live affiliate Chrome profile (scripts/start-browser.ps1); dev may use a folder of its own beside it, never this one" },
+    { "home": ".config/cashback/prod.env", "tree": false, "what": "new production secrets file" }
+  ],
+  "zalo": {
+    "productionGroups": [{ "id": "2813090100064697955", "what": "live main customer group" }],
+    "devGroups": [{ "id": "8786316503449470342", "what": "Dev Internal DP, the only group dev may post to" }]
+  },
+  "productionZaloAccounts": {
+    "$comment": "Placeholder: the production Zalo bot account id is not known yet. The group ids above already keep dev from posting anywhere but the Dev group; add the account id here once the owner reads it.",
+    "ids": []
+  },
+  "telegramChats": [
+    { "id": "-1004416753701", "what": "production owner alerts (the live config also names it the dev chat)" },
+    { "id": "-5232520551", "what": "business chat" }
+  ],
+  "hostnames": ["hoantiendp.com", "www.hoantiendp.com", "admin.hoantiendp.com"],
+  "zones": ["hoantiendp.com"]
+}

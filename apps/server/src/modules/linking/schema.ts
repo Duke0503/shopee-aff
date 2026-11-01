@@ -47,6 +47,8 @@ export const linkRequests = sqliteTable("link_requests", {
   origin: text("origin", { enum: ["CUTOVER", "REQUEST"] }).notNull(),
   // The folded product name of the snapshot (migration 0019), for the Orders list's search.
   searchText: text("search_text").notNull().default(""),
+  // When a failed QUEUED request may be tried again (migration 0022); null means now.
+  nextAttemptAt: text("next_attempt_at"),
 });
 
 export const shareCodes = sqliteTable("share_codes", {
@@ -56,6 +58,25 @@ export const shareCodes = sqliteTable("share_codes", {
     .unique()
     .references(() => linkRequests.requestId),
   createdAt: text("created_at"),
+});
+
+export const BRIDGE_JOB_KINDS = ["LINK", "LOOKUP", "REPORT_PAGE"] as const;
+export const BRIDGE_JOB_STATUSES = ["PENDING", "DONE", "FAILED"] as const;
+
+/** The affiliate browser's work list (migration 0022, AD-14): one LINK job is one request, so one customer. */
+export const bridgeJobs = sqliteTable("bridge_jobs", {
+  jobId: integer("job_id").primaryKey({ autoIncrement: true }),
+  kind: text("kind", { enum: BRIDGE_JOB_KINDS }).notNull(),
+  status: text("status", { enum: BRIDGE_JOB_STATUSES }).notNull(),
+  requestId: text("request_id").references(() => linkRequests.requestId),
+  customerId: text("customer_id"),
+  subId1: text("sub_id1"),
+  subId2: text("sub_id2"),
+  sourceUrl: text("source_url"),
+  resultUrl: text("result_url"),
+  failure: text("failure"),
+  createdAt: text("created_at").notNull(),
+  finishedAt: text("finished_at"),
 });
 
 export type ProductOfferRow = typeof productOffers.$inferInsert;

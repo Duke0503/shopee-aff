@@ -70,5 +70,10 @@
   "error.merge.bank_differs": "Hai khách có số tài khoản khác nhau ({mergedBank} và {survivorBank}). Không gộp được.",
   "error.merge.claim_open": "Đang có người mở chuyển tiền cho {customer}. Đóng lần chuyển đó trước.",
   "error.merge.changed": "Dữ liệu đã đổi từ lúc xem trước. Xem trước lại rồi gộp.",
-  "error.overview.bad_period": "Khoảng ngày không hợp lệ. Chọn từ 1 đến 366 ngày, ngày đầu trước ngày cuối."
+  "error.overview.bad_period": "Khoảng ngày không hợp lệ. Chọn từ 1 đến 366 ngày, ngày đầu trước ngày cuối.",
+  "error.link.customer_not_found": "Không tìm thấy mã khách này.",
+  "error.link.customer_disabled": "Tài khoản này đang tạm khoá nên chưa tạo được link. Vui lòng nhắn quản trị viên.",
+  "error.link.customer_id_unusable": "Tài khoản này chưa tạo được link. Vui lòng nhắn quản trị viên.",
+  "error.link.network_unsupported": "Link này chưa được hỗ trợ. Hãy gửi link sản phẩm Shopee.",
+  "error.link.day_full": "Hôm nay đã có quá nhiều yêu cầu link. Vui lòng thử lại sau."
 }
