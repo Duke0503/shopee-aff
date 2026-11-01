@@ -68,3 +68,22 @@ export const OFFER_EMPTY = ".ant-empty";
 /** The labels of the card's commission and XTRA elements, in Vietnamese (escaped) or English. */
 export const COMMISSION_LABEL = "hoa h\u1ed3ng|commission";
 export const XTRA_LABEL = "xtra";
+
+/**
+ * The conversion report page (Story 5.9; the live `report_reader.py` and `payout_sync.py` read as
+ * reference, without their API call): opened at one page of one purchase-time window, like a
+ * person paging through it, and read from the table the page itself rendered. Each row of the
+ * table carries the conversion the page shows in its React props (`record`), as the live payout
+ * reader reads the payout table; the pager carries the total. The address takes the page and the
+ * window as query parameters; whether the page honours them is checked on the server (the page
+ * number shown, every purchase time inside the window).
+ */
+export const REPORT_PAGE_URL = "https://affiliate.shopee.vn/report/conversion_report";
+export const REPORT_PAGE_SIZE = 50;
+export const reportPageUrl = (job: { page: number; purchaseTimeStart: number; purchaseTimeEnd: number }): string =>
+  `${REPORT_PAGE_URL}?page_num=${job.page}&page_size=${REPORT_PAGE_SIZE}&purchase_time_s=${job.purchaseTimeStart}&purchase_time_e=${job.purchaseTimeEnd}`;
+export const REPORT_ROW = "tr[data-row-key]";
+export const REPORT_EMPTY = ".ant-empty";
+export const REPORT_PAGER = ".ant-pagination";
+export const REPORT_ACTIVE_PAGE = ".ant-pagination-item-active";
+export const REPORT_LOADING = ".ant-spin-spinning";

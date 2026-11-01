@@ -6,7 +6,8 @@
 // sideways scrolling. The proof upload and the void dialog (Stories 4.9 and 4.10) are shot too, and
 // Customers with one customer's page and the review queue with a case's panel (Stories 4.14, 4.15).
 // The Overview at every period preset, the erase flow on a customer's page and the erased page (Stories 4.16, 4.17)
-// are shot too; every grid row of the Overview is checked for cards of equal height.
+// are shot too; every grid row of the Overview is checked for cards of equal height. The link requests list
+// (Story 5.10), whole and as the Overview's failed-links tile opens it, is shot too.
 // Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -167,6 +168,33 @@ const CUSTOMER_PAGE = {
 };
 const linkRows = () => ({ rows: fixtures.products.map((productName, i) => ({ requestId: `R2610${String(2714023 + i * 97)}`, productName, productImageUrl: i === 3 ? null : `https://cf.example.test/file/${PHOTOS[i % PHOTOS.length]}`, network: i === 2 ? "accesstrade" : "shopee", status: ["DELIVERED", "CONVERTED", "DELIVERED", "FAILED", "CONVERTED"][i], createdAt: `2026-10-${String(28 - i * 3).padStart(2, "0")}T03:00:00.000Z` })), total: 41, page: 1, pageSize: 25, facets: { status: [] }, summary: {}, asOf: "2026-10-30T12:42:00.000Z" });
 
+// The link requests list (Story 5.10): every state, both channels, a guest link and a ShopeeFood shop link.
+const DESK_LINK_STATES = ["FAILED", "DELIVERED", "QUEUED", "CONVERTED", "FAILED", "ISSUED", "DELIVERED", "FAILED"];
+function deskLinkRows(url) {
+  const status = url.searchParams.get("filter[status]")?.split(",") ?? [];
+  const all = Array.from({ length: 16 }, (_, i) => {
+    const state = DESK_LINK_STATES[i % DESK_LINK_STATES.length];
+    const guest = i === 5;
+    return {
+      requestId: `2610${String(3000001 + i * 37).padStart(7, "0")}`,
+      customerCode: guest ? null : `DP${String(12 + i * 7).padStart(5, "0")}`,
+      guest,
+      productName: i === 6 ? null : fixtures.products[i % fixtures.products.length],
+      productImageUrl: i % 5 === 4 || i === 6 ? null : `https://cf.example.test/file/${PHOTOS[i % PHOTOS.length]}`,
+      network: i % 4 === 3 ? "accesstrade" : "shopee",
+      platform: i === 6 ? "shopeefood" : i % 4 === 3 ? "tiktok" : "shopee",
+      channel: i % 3 === 1 ? "web" : "zalo",
+      status: state,
+      attempts: state === "FAILED" ? 3 : state === "QUEUED" ? 1 : 1,
+      deliveredAt: state === "DELIVERED" || state === "CONVERTED" ? `2026-10-30T0${i % 9}:12:00.000Z` : null,
+      createdAt: `2026-10-30T0${i % 9}:10:00.000Z`,
+    };
+  });
+  const rows = status.length === 0 ? all : all.filter((r) => status.includes(r.status));
+  const facets = { status: ["QUEUED", "ISSUED", "DELIVERED", "CONVERTED", "FAILED"].map((value) => ({ value, count: rows.filter((r) => r.status === value).length })), channel: ["web", "zalo"].map((value) => ({ value, count: rows.filter((r) => r.channel === value).length })) };
+  return { rows, total: rows.length, page: 1, pageSize: 25, facets, summary: {}, asOf: "2026-10-30T12:42:00.000Z", overall: 1384 };
+}
+
 const ERASED_PAGE = { ...CUSTOMER_PAGE, customerName: null, status: "ERASED", zaloUserId: null, erasedAt: "2026-10-30T12:00:00.000Z", balance: { payable: 0, gross: 0, waiting: 0, paid: 212400, deductedNext: 0 }, flags: [], bank: null, clawbacks: [] };
 
 // The Overview: the golden ledger's server answer, with each preset's own period; "today" has no approval yet (dashes).
@@ -228,6 +256,7 @@ async function shoot(name, width, height, path, after, answers = {}) {
     if (url.pathname === "/api/admin/session") return route.fulfill({ json: { staffId: "stf_1", username: "minh", role: "ADMIN" } });
     if (url.pathname === "/api/admin/orders" || /^\/api\/admin\/customers\/[^/]+\/orders$/.test(url.pathname)) return route.fulfill({ json: orders(url) });
     if (url.pathname === "/api/admin/customers") return route.fulfill({ json: customerRows() });
+    if (url.pathname === "/api/admin/link-requests") return route.fulfill({ json: deskLinkRows(url) });
     if (url.pathname.endsWith("/link-requests")) return route.fulfill({ json: linkRows() });
     if (/^\/api\/admin\/customers\/[^/]+\/payouts$/.test(url.pathname)) return route.fulfill({ json: historyRows() });
     if (url.pathname === "/api/admin/customers/DP00099") return route.fulfill({ json: ERASED_PAGE });
@@ -359,6 +388,10 @@ await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts",
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
 await shoot("orders-phone-390-filter-sheet", 390, 844, "/admin/orders", (page) => page.getByRole("button", { name: /^B/ }).first().click());
 await shoot("shell-phone-390-more-sheet", 390, 844, "/admin/", (page) => page.locator("nav button").last().click());
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`links-${label}`, width, height, "/admin/links");
+  await shoot(`links-${label}-failed-today`, width, height, "/admin/links?filter[status]=FAILED&filter[createdAt]=2026-10-30..2026-10-30");
+}
 await shoot("orders-desktop-1440-error", 1440, 960, "/admin/orders?q=x", (page) => page.route("**/api/admin/orders**", (route) => route.fulfill({ status: 500, json: { error: { code: "internal", messageKey: "error.internal" } } })).then(() => page.reload()).then(() => page.getByRole("alert").waitFor({ timeout: 10_000 })));
 
 await browser.close();

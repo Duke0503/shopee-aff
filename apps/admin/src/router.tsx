@@ -12,6 +12,8 @@ import { CustomerPage } from "./customers/customer.page";
 import { CustomersPage } from "./customers/customers.page";
 import { CUSTOMERS_SEARCH, TAB_SEARCH, tabOf } from "./customers/customers.queries";
 import { adminText, type AdminKey } from "./labels";
+import { LinkRequestsPage } from "./links/link-requests.page";
+import { LINK_REQUESTS_SEARCH } from "./links/link-requests.queries";
 import { OrdersPage } from "./orders/orders.page";
 import { OverviewPage } from "./overview/overview.page";
 import { overviewSearch } from "./overview/overview.queries";
@@ -79,6 +81,18 @@ export const ordersRoute = createRoute({
     const navigate = useNavigate({ from: ordersRoute.fullPath });
     const state = useMemo(() => ORDERS_SEARCH.parse(search), [search]);
     return <OrdersPage state={state} onStateChange={(next, options) => void navigate({ search: ORDERS_SEARCH.toParams(next), replace: options?.replace === true })} />;
+  },
+});
+
+export const linksRoute = createRoute({
+  getParentRoute: () => deskRoute,
+  path: "links",
+  validateSearch: (raw: Record<string, unknown>) => LINK_REQUESTS_SEARCH.validate(raw),
+  component: function LinksScreen() {
+    const search = linksRoute.useSearch();
+    const navigate = useNavigate({ from: linksRoute.fullPath });
+    const state = useMemo(() => LINK_REQUESTS_SEARCH.parse(search), [search]);
+    return <LinkRequestsPage state={state} onStateChange={(next, options) => void navigate({ search: LINK_REQUESTS_SEARCH.toParams(next), replace: options?.replace === true })} />;
   },
 });
 
@@ -181,7 +195,7 @@ const routeTree = rootRoute.addChildren([
     ordersRoute,
     customersRoute,
     customerRoute,
-    pendingRoute("links", "nav_links"),
+    linksRoute,
     pendingRoute("campaigns", "nav_campaigns", true),
     pendingRoute("staff", "nav_staff", true),
     pendingRoute("audit", "nav_audit"),

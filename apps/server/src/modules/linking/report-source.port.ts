@@ -8,8 +8,8 @@
  *
  * Reconciliation (Stories 3.7, 3.8) reads through `WindowedReportSource`: the same all-or-nothing
  * read, asked for one purchase-time window (the hourly 7 days, or one day of the nightly sweep).
- * AccessTrade answers it from its API; Shopee, until the browser bridge of Story 5.9 answers it
- * (shopee-bridge.adapter.ts), from a file the operator saved.
+ * AccessTrade answers it from its API; Shopee in production from its report pages through the
+ * browser bridge (shopee-bridge.adapter.ts, Story 5.9), in rehearsals and dev from a saved file.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";

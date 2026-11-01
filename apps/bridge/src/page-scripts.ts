@@ -168,3 +168,55 @@ export function readOfferResults(input: OfferLookInput): OfferLook & { href: str
   const prices = leaves.map(textOf).filter((t) => t.includes("\u20ab")).join(" ");
   return { ...page, state: "found", commissionTexts: labelled(commission, xtra), xtraTexts: labelled(xtra, null), priceText: prices !== "" && prices.length <= 120 ? prices : null };
 }
+
+export interface ReportTableInput {
+  readonly row: string;
+  readonly empty: string;
+  readonly pager: string;
+  readonly activePage: string;
+  readonly loading: string;
+  readonly maxRows: number;
+}
+
+export type ReportLook = { readonly href: string; readonly passwordBox: boolean; readonly shownPage: number | null; readonly total: number | null } & (
+  | { readonly state: "rows"; readonly records: unknown[] }
+  | { readonly state: "empty" | "waiting" | "unreadable" }
+);
+
+/**
+ * One look at the conversion report table: the record each row was rendered from (found up the
+ * row's React fiber, as the live payout reader does), the page the pager marks as shown, and the
+ * total the pager was given. Nothing is read out of the records here; a row without a record, or
+ * more rows than one page holds, is "unreadable", and the server decides on everything else.
+ */
+export function readReportTable(input: ReportTableInput): ReportLook {
+  const propOf = (el: Element, key: string): unknown => {
+    const fiberKey = Object.keys(el).find((k) => k.startsWith("__reactFiber") || k.startsWith("__reactInternalInstance"));
+    let node = fiberKey === undefined ? null : (el as unknown as Record<string, unknown>)[fiberKey];
+    for (let depth = 0; node !== null && typeof node === "object" && depth < 40; depth++) {
+      const props = (node as { memoizedProps?: unknown }).memoizedProps;
+      if (props !== null && typeof props === "object" && key in props) return (props as Record<string, unknown>)[key];
+      node = (node as { return?: unknown }).return ?? null;
+    }
+    return undefined;
+  };
+  const activeText = (document.querySelector(input.activePage)?.textContent ?? "").trim();
+  const pager = document.querySelector(input.pager);
+  const total = pager === null ? undefined : propOf(pager, "total");
+  const base = {
+    href: location.href,
+    passwordBox: document.querySelector("input[type=password]") !== null,
+    shownPage: /^\d{1,4}$/.test(activeText) ? Number(activeText) : null,
+    total: typeof total === "number" && Number.isSafeInteger(total) && total >= 0 ? total : null,
+  };
+  if (document.querySelector(input.loading) !== null) return { ...base, state: "waiting" };
+  const rows = Array.from(document.querySelectorAll(input.row));
+  if (rows.length === 0) return { ...base, state: document.querySelector(input.empty) === null ? "waiting" : "empty" };
+  const records = rows.map((r) => propOf(r, "record"));
+  if (rows.length > input.maxRows || records.some((r) => r === null || typeof r !== "object" || Array.isArray(r))) return { ...base, state: "unreadable" };
+  try {
+    return { ...base, state: "rows", records: JSON.parse(JSON.stringify(records)) as unknown[] };
+  } catch {
+    return { ...base, state: "unreadable" };
+  }
+}

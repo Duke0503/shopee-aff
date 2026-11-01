@@ -30,16 +30,36 @@ export function isShortLink(text: string): boolean {
   return url !== null && url.protocol === "https:" && hostOnDomain(url.hostname, SHOPEE_SHORT_LINK_DOMAINS) && !url.searchParams.has("utm_content");
 }
 
-export function shortLinkResolver(follow: FollowLink, timeoutMs = RESOLVE_TIMEOUT_MS): ResolveLink {
+/**
+ * The browser's own request to `url`, followed to its end, within `timeoutMs`: its target when that
+ * is an https link on a Shopee host other than `url` itself, else null (an error included).
+ */
+async function followToShopee(follow: FollowLink, url: string, timeoutMs: number): Promise<string | null> {
+  try {
+    const { finalUrl } = await follow(url, AbortSignal.timeout(timeoutMs));
+    const target = parse(finalUrl);
+    if (target === null || target.protocol !== "https:" || target.href === url || !hostOnDomain(target.hostname, SHOPEE_LINK_DOMAINS)) return null;
+    return target.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A ShopeeFood source link that names no shop yet (a `/u/` or `/share/` short link, an invite whose
+ * token cannot be read; the link job decides that with `readShopeeFoodLink`), followed in this
+ * browser to its target before it is submitted (Story 5.11, D8). A pasted http link is asked for
+ * over https, as ShopeeFood serves it.
+ */
+export function shopeeFoodResolver(follow: FollowLink, timeoutMs = RESOLVE_TIMEOUT_MS): ResolveLink {
   return async (url) => {
-    if (!isShortLink(url)) return null;
-    try {
-      const { finalUrl } = await follow(url, AbortSignal.timeout(timeoutMs));
-      const target = parse(finalUrl);
-      if (target === null || target.protocol !== "https:" || target.href === url || !hostOnDomain(target.hostname, SHOPEE_LINK_DOMAINS)) return null;
-      return target.href;
-    } catch {
-      return null;
-    }
+    const asked = parse(url);
+    if (asked === null || (asked.protocol !== "https:" && asked.protocol !== "http:")) return null;
+    asked.protocol = "https:";
+    return followToShopee(follow, asked.href, timeoutMs);
   };
+}
+
+export function shortLinkResolver(follow: FollowLink, timeoutMs = RESOLVE_TIMEOUT_MS): ResolveLink {
+  return async (url) => (isShortLink(url) ? followToShopee(follow, url, timeoutMs) : null);
 }

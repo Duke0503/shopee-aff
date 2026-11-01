@@ -250,6 +250,22 @@ As the operator, I want every Shopee and AccessTrade payout matched to the exact
 4. Given the "Sàn thanh toán" tab, when staff open a payout, then they see its orders with product thumbnails, the matched total, the payout amount and the difference, from the server.
 5. Given the payout panel for a customer, when it shows the covered orders, then each order says whether the network has paid it and by which payout.
 
+#### Story 4.22: Shopee payout record page through the bridge records network payouts
+
+As the operator, I want Shopee's payout batches read from the affiliate payout record page every day and recorded by themselves, so that each batch is matched to its orders without my typing it in.
+
+**Context:** The bridge extension reads `https://affiliate.shopee.vn/payment/payout_record` (the live `payout_sync.py` read as reference, without any API call, D8) as a new report-like bridge job, page 1 only, once a day, served after link and lookup jobs like a report page (AD-14). It answers each row's rendered record (payout id, status, `totalPaymentAmount`, `eligibleTotalAmount`, creation and arrival times); the server converts amounts with `fromNetworkUnits` (x100,000) and records each batch through the existing network-payout recording of Story 4.21 (`POST /internal/network-payouts`, in process), which matches it to exact orders and classifies the withholding (D59). A page whose rows do not have the known record shape writes nothing. A captcha or login page holds or pauses the Shopee queue as any bridge job does (Story 5.5). Realises FR-19. Follows AD-14, AD-22, AD-6. Decisions: D8, D27, D59.
+**Screens:** none. **Skills:** none.
+**Blocked by:** Story 4.21, Story 5.9.
+**Size:** M
+
+**Acceptance criteria**
+1. Given the payout record page showing three batches (paid, processing, failed), when the daily job runs, then each batch is recorded once with its id, status, amount, eligible amount and times in whole dong, and a second run the same day records nothing new.
+2. Given a paid batch, when it is recorded, then its withholding is classified (withheld or not from the amount against the eligible amount) and it is matched to its orders by the Story 4.21 rules.
+3. Given a page whose rows carry no record of the known shape (or an unreadable amount), when it is read, then nothing is written, the run fails loudly and an owner alert is raised.
+4. Given a captcha page or the login page, when the job meets it, then the Shopee queue is held or paused exactly as for a link job and nothing is written.
+5. Given the job, when it runs, then it reads page 1 only and holds no page parameter.
+
 ## Epic 5: Link issuing, browser bridge and share page
 A customer's link request becomes an affiliate link that carries only that customer's id, created through the operator's real browser for Shopee or the AccessTrade API for TikTok Shop, and opened through the share page in a real browser.
 **FRs covered:** FR-1, FR-3, FR-5, FR-6, FR-7, FR-12 (Shopee report pages), FR-37 (basic link requests list).

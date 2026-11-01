@@ -8,7 +8,8 @@ import type { Clock } from "@cashback/core";
 
 import { staffSessionRoutes, staffSessionsFor } from "../modules/identity/index";
 import { outboxFor, wasTold } from "../modules/messaging/index";
-import { auditFor, commandAudit } from "../modules/operations/index";
+import { auditFor, commandAudit, type AssistantHeartbeats } from "../modules/operations/index";
+import { linkRequestDeskRoutes } from "../modules/linking/index";
 import { orderDeskRoutes, reviewCaseRoutes } from "../modules/orders/index";
 import { networkSettlementRoutes, payoutRecordRoutes, payoutRoutes, type ProofStore } from "../modules/payouts/index";
 import type { StaffAccessConfig } from "../platform/config/env.config";
@@ -33,6 +34,8 @@ export interface AdminDeskDeps {
   readonly logger?: Logger;
   /** Where proof images are kept: data/<env>/files/proofs (Story 4.9). */
   readonly proofs: ProofStore;
+  /** The assistant's heartbeat store, shared with its heartbeat route (Story 6.1). */
+  readonly heartbeats?: AssistantHeartbeats;
 }
 
 export interface AdminDesk {
@@ -60,8 +63,9 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     orderDeskRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
     networkSettlementRoutes({ ledger, clock }),
     customerDeskRoutes({ ledger, clock }),
+    linkRequestDeskRoutes({ ledger, clock }),
     customerEraseRoutes({ ledger, clock }),
-    overviewRoutes({ ledger, clock }),
+    overviewRoutes({ ledger, clock, lastHeartbeat: () => deps.heartbeats?.last() ?? null }),
   ];
   return { gate, routes };
 }

@@ -11,8 +11,12 @@
  * Lazada included, is refused as `network_unsupported`, so the customer hears which networks earn
  * cashback. The host decides first, so a long Lazada link is refused as unsupported, never as too
  * long (review item 6).
+ *
+ * A ShopeeFood link (Story 5.11, D60) is a Shopee-network link on the platform `shopeefood`: read by
+ * `readShopeeFoodLink` in packages/core, keyed by its shop (`shopeefood:<shopId>`) when the link
+ * names one; a short link gets its key from the browser that resolves it (link-result.command.ts).
  */
-import { hostOnDomain, readShopeeProduct, SHOPEE_LINK_DOMAINS, SHOPEE_SOURCE_MAX_LENGTH, shopeeProductKeyOf, type ShopeeProduct } from "@cashback/core";
+import { hostOnDomain, readShopeeFoodLink, readShopeeProduct, SHOPEE_LINK_DOMAINS, SHOPEE_SOURCE_MAX_LENGTH, shopeeFoodKey, shopeeProductKeyOf, type ShopeeProduct } from "@cashback/core";
 
 export { readShopeeProduct, shopeeProductKeyOf, type ShopeeProduct };
 
@@ -35,7 +39,7 @@ const TIKTOK_DOMAINS = ["tiktok.com", "tiktok.shop"] as const;
 const TIKTOK_PRODUCT_ID = /\/(?:product|pdp)\/(\d{5,})(?:[/?#]|$)/;
 
 export type ProductLink =
-  | { readonly ok: true; readonly network: "shopee"; readonly platform: "shopee"; readonly sourceUrl: string; readonly productKey: string | null }
+  | { readonly ok: true; readonly network: "shopee"; readonly platform: "shopee" | "shopeefood"; readonly sourceUrl: string; readonly productKey: string | null }
   | { readonly ok: true; readonly network: "accesstrade"; readonly platform: "tiktok"; readonly sourceUrl: string; readonly productKey: string | null }
   | { readonly ok: false; readonly reason: "network_unsupported" | "too_long" };
 
@@ -59,6 +63,9 @@ export function readProductLink(text: string): ProductLink {
   const host = linkHost(text);
   if (host === null) return { ok: false, reason: "network_unsupported" };
   if (hostOnDomain(host, TIKTOK_DOMAINS)) return readTikTokLink(text);
+  const food = readShopeeFoodLink(text);
+  if (food.ok) return { ok: true, network: "shopee", platform: "shopeefood", sourceUrl: food.sourceUrl, productKey: food.shopId === null ? null : shopeeFoodKey(food.shopId) };
+  if (food.reason === "too_long") return { ok: false, reason: "too_long" };
   if (!hostOnDomain(host, SHOPEE_LINK_DOMAINS)) return { ok: false, reason: "network_unsupported" };
   const shopee = readShopeeProduct(text);
   if (shopee.ok) return { ok: true, network: "shopee", platform: "shopee", sourceUrl: shopee.sourceUrl, productKey: shopee.productKey };

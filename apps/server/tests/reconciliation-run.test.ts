@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ReportSourceError, shopeeBridgeSource, sourced, withinWindow, type ReportWindow, type SourcedReport, type SourcedRow, type WindowedReportSource } from "../src/modules/linking/index";
+import { ReportSourceError, sourced, withinWindow, type ReportWindow, type SourcedReport, type SourcedRow, type WindowedReportSource } from "../src/modules/linking/index";
 import { createLogger } from "../src/platform/log/logger";
 import { JOB_SCHEDULES } from "../src/platform/jobs/job-schedules";
 import type { Ledger } from "../src/platform/db/ledger";
@@ -248,18 +248,6 @@ describe("Story 3.7: sources and jobs as the server starts them", () => {
       ["reconcile", "orders", JOB_SCHEDULES.reconcile.schedule],
       ["nightlySweep", "orders", JOB_SCHEDULES.nightlySweep.schedule],
     ]);
-  });
-
-  it("the bridge source is behind the same port and, until Story 5.9, fails the run without changing anything", async () => {
-    const ledger = freshLedger();
-    const [run] = await runHourlyReconcile(context(ledger, [shopeeBridgeSource()]));
-    expect(run).toMatchObject({
-      network: "shopee",
-      outcome: "FAILED",
-      errorCode: "report_source_unavailable",
-      rowsRead: 0,
-    });
-    expect(all(ledger, "SELECT * FROM orders")).toEqual([]);
   });
 });
 

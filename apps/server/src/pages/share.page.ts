@@ -71,7 +71,7 @@ export interface ShareView {
   readonly shareUrl: string;
 }
 
-const networkName = (link: SharePageLink): string => text(link.network === "shopee" ? "share_network_shopee" : "share_network_accesstrade");
+const networkName = (link: SharePageLink): string => text(link.platform === "shopeefood" ? "share_network_shopeefood" : link.network === "shopee" ? "share_network_shopee" : "share_network_accesstrade");
 
 function money(amount: number): string {
   const digits = formatAmountDigits(amount);
@@ -108,6 +108,7 @@ function rateLines(estimate: LinkEstimate): string {
 function cashbackBlock(reply: LinkReplyData): string {
   if (reply.guest) return `<div class="panel guest" role="note" data-guest><strong>${t("share_guest_title")}</strong><p>${t("share_guest_body")}</p></div>`;
   const label = `<p class="cash-label">${t("share_cashback_label")}</p>`;
+  if (reply.perShopKey !== null) return `<div class="cash" data-estimate="per-shop">${label}<p class="small">${t("share_shopeefood_per_shop")}</p></div>`;
   if (reply.estimate === null) return `<div class="cash" data-estimate="none">${label}<p class="cash-line"><span class="missing">${t("value_missing")}</span></p><p class="small">${t("share_no_estimate")}</p></div>`;
   const e = reply.estimate;
   const line = `<p class="cash-line"><span class="estimate">${t("share_about")} <b>${money(e.cashback)}</b></span><span class="estimate-tag">${t("share_estimate_tag")}</span></p>`;

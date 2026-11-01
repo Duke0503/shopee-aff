@@ -18,7 +18,7 @@ import { failedLinkCount } from "../modules/linking/index";
 import { awaitingOrderFacts, importedWithoutApproval, openReviewCaseCount, orderAging, unsettledApprovedCommission } from "../modules/orders/index";
 import { allBalances, networkCash, networkProcessing, owedNow, payoutQueueRows, payoutsSent, type Balance } from "../modules/payouts/index";
 import type { LedgerDb } from "../platform/db/ledger";
-import { customersOf, healthOf, ordersOf } from "./overview-activity.query";
+import { customersOf, healthOf, ordersOf, type LastHeartbeat } from "./overview-activity.query";
 import { businessOf, eventsOf, figureOf, periodFacts, trendOf, type CashPart } from "./overview-business.query";
 
 /** The window the advance warning compares money in and out over. */
@@ -116,7 +116,7 @@ export function periodOf(query: OverviewQuery, clock: Clock): OverviewPeriod {
  * Every figure of the Overview for one period. Call it inside one read transaction (overview.routes.ts)
  * so every block reads the same snapshot; the balances are read once and shared by the blocks.
  */
-export function overviewOf(db: LedgerDb, query: OverviewQuery, clock: Clock): Overview {
+export function overviewOf(db: LedgerDb, query: OverviewQuery, clock: Clock, lastHeartbeat?: LastHeartbeat): Overview {
   const period = periodOf(query, clock);
   const range = rangeOf(period);
   const previous = rangeOf(period.previous);
@@ -137,6 +137,6 @@ export function overviewOf(db: LedgerDb, query: OverviewQuery, clock: Clock): Ov
     orders: { networks: orders, aged: orderAging(db, clock.now()).aged },
     events: eventsOf(db, range, guests),
     customers: customersOf(db, range, previous, now.orders, approvedRecorded),
-    health: healthOf(db, clock),
+    health: healthOf(db, clock, lastHeartbeat),
   };
 }

@@ -87,7 +87,7 @@ describe("Story 5.3: the browser bridge takes one job at a time over the interna
   it("AC1: with report, lookup and link jobs queued, the bridge gets the link job first and only one job is outstanding at a time", async () => {
     const { bridge } = bridgeWith();
     const s = internal(bridge);
-    const report = bridge.submit({ kind: "report", page: 1 }, NEVER);
+    const report = bridge.submit({ kind: "report", page: 1, purchaseTimeStart: 1_761_955_200, purchaseTimeEnd: 1_762_041_599 }, NEVER);
     const lookup = bridge.submit({ kind: "lookup", url: PRODUCT }, NEVER);
     const link = bridge.submit({ kind: "link", sourceUrl: PRODUCT, subId1: C1, subId2: "26110100001" }, NEVER);
 
@@ -207,7 +207,7 @@ describe("Story 5.3: the bridge survives the server or the browser restarting", 
     expect(timer.pending()).toBe(0);
 
     const stop = new AbortController();
-    const stopped = bridge.submit({ kind: "report", page: 1 }, stop.signal);
+    const stopped = bridge.submit({ kind: "report", page: 1, purchaseTimeStart: 1_761_955_200, purchaseTimeEnd: 1_762_041_599 }, stop.signal);
     stop.abort(new Error("shutdown"));
     await expect(stopped).rejects.toThrow("shutdown");
     expect(timer.pending()).toBe(0);
@@ -402,7 +402,7 @@ describe("Story 5.3 review: nothing blocks the line or hands a link out twice", 
 
     // A link job queued ahead of a waiting report page takes the front; the report's wait starts again after it.
     let reportDone = false;
-    const report = bridge.submit({ kind: "report", page: 1 }, NEVER).then((a) => ((reportDone = true), a));
+    const report = bridge.submit({ kind: "report", page: 1, purchaseTimeStart: 1_761_955_200, purchaseTimeEnd: 1_762_041_599 }, NEVER).then((a) => ((reportDone = true), a));
     timer.advance(30_000);
     const link = bridge.submit({ kind: "link", sourceUrl: PRODUCT, subId1: C1, subId2: "26110100003" }, NEVER);
     timer.advance(59_999);

@@ -63,3 +63,4 @@ export { STAFF_ROLES, type StaffRole } from "./roles/staff-roles";
 export { MAX_PERIOD_DAYS, OVERVIEW_PERIODS, overviewPeriod, vnDaysBetween, vnWeekStart, type OverviewPeriod, type OverviewPeriodPreset, type VnDays } from "./time/period";
 export { hostOnDomain, SHOPEE_LINK_DOMAINS, SHOPEE_SHORT_LINK_DOMAINS } from "./text/host-domain";
 export { readShopeeProduct, SHOPEE_PASTE_MAX_LENGTH, SHOPEE_SOURCE_MAX_LENGTH, shopeeProductKeyOf, type ShopeeProduct } from "./text/shopee-product";
+export { isShopeeFoodLink, readShopeeFoodLink, SHOPEEFOOD_DOMAINS, shopeeFoodKey, shopeeFoodShopUrl, type ShopeeFoodLink } from "./text/shopeefood-link";

@@ -95,6 +95,7 @@ development_status:
   4-19-customer-merge-by-admin-command-with-preview-and-apply: review
   4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: review
   4-21-network-payouts-matched-to-exact-orders: review
+  4-22-shopee-payout-record-page-through-the-bridge-records-network: backlog
   epic-4-retrospective: optional
 
   epic-5: in-progress
@@ -106,13 +107,13 @@ development_status:
   5-6-product-lookup-reads-page-1-and-shows-the-estimated-cashback: review
   5-7-tiktok-shop-links-through-accesstrade-and-a-polite-lazada-re: review
   5-8-share-page-opens-a-real-browser-and-records-clicks: review
-  5-9-shopee-report-pages-through-the-bridge-feed-reconciliation: backlog
-  5-10-basic-link-requests-list-for-staff: backlog
-  5-11-shopeefood-links-through-the-bridge: backlog
+  5-9-shopee-report-pages-through-the-bridge-feed-reconciliation: review
+  5-10-basic-link-requests-list-for-staff: review
+  5-11-shopeefood-links-through-the-bridge: review
   epic-5-retrospective: optional
 
-  epic-6: backlog
-  6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace: backlog
+  epic-6: in-progress
+  6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace: review
   6-2-registration-from-zalo-assigns-a-customer-code: backlog
   6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: backlog
   6-4-notification-outbox-delivered-by-pull-and-acknowledgement: backlog
@@ -321,11 +322,12 @@ sprint_plan:
       - 5-11-shopeefood-links-through-the-bridge
       - 6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace
   - sprint: 25
-    goal: "Zalo registration; link reply in chat"
-    points: 4
+    goal: "Zalo registration; link reply in chat; Shopee payout record page"
+    points: 6
     stories:
       - 6-2-registration-from-zalo-assigns-a-customer-code
       - 6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply
+      - 4-22-shopee-payout-record-page-through-the-bridge-records-network
   - sprint: 26
     goal: "Notification outbox; delivered once; quiet first run"
     points: 4

@@ -95,8 +95,11 @@ which stays untouched and keeps serving production from its own profile. The new
 to the server's internal listener on 127.0.0.1 with `X-Bridge-Token`, takes one job at a time from
 `GET /internal/bridge/next` and answers on `POST /internal/bridge/results`. It fills the custom
 link page's own form (`https://affiliate.shopee.vn/offer/custom_link`) like a person; it calls no
-Shopee API and builds no signature (D8, INV-10). Lookup and report-page jobs are answered
-`unsupported` until Stories 5.6 and 5.9.
+Shopee API and builds no signature (D8, INV-10). It also reads products for lookups (Story 5.6)
+and pages of the conversion report (`https://affiliate.shopee.vn/report/conversion_report`, from
+the table the page renders, Story 5.9), and resolves ShopeeFood short links before submitting
+them (Story 5.11). Production reconciliation reads Shopee this way; in dev a saved report
+(`SHOPEE_REPORT_PATH`) takes its place when set.
 
 Only on the owner's machine, with a profile of dev's own. Never load it into the production
 profile, and never run it beside the live extension in one profile.

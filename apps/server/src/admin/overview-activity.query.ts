@@ -10,7 +10,7 @@ import { averageDong, ratioBps, sumDong } from "@cashback/money";
 
 import { customerCodeOf, deskCustomers, newCustomerCount } from "../modules/identity/index";
 import { deliveredLinkCounts } from "../modules/linking/index";
-import { customersWithOrderBefore, lastSucceededRun, recordedOrderFacts, type ApprovedOrderFact, type RecordedOrderFact } from "../modules/orders/index";
+import { customersWithOrderBefore, hasRun, lastSucceededRun, recordedOrderFacts, type ApprovedOrderFact, type RecordedOrderFact } from "../modules/orders/index";
 import { survivorResolver } from "../modules/payouts/index";
 import type { LedgerDb } from "../platform/db/ledger";
 import { figureOf, ratioOf } from "./overview-business.query";
@@ -123,25 +123,42 @@ export function customersOf(db: LedgerDb, range: InstantRange, previous: Instant
   };
 }
 
+/** The assistant is down once no heartbeat came for this long (AD-15). */
+export const ASSISTANT_DOWN_AFTER_MS = 5 * 60_000;
+
+/** The last assistant heartbeat this server received, from the one shared store (Story 6.1). */
+export type LastHeartbeat = () => { readonly receivedAt: string } | null;
+
 /**
- * Block 8 from the one health model (AD-27): the hourly reconciliation from its last successful run;
- * the browser bridge, the Zalo assistant and the backup do not report to the server yet, so they
- * are "not known yet", never "up".
+ * Block 8 from the one health model (AD-27): the hourly reconciliation from its runs, the Zalo
+ * assistant from its last heartbeat (Story 6.1: up within 5 minutes, down after; not known before
+ * the first beat since this server started); the browser bridge and the backup do not report to
+ * the server yet, so they are "not known yet", never "up".
  */
-export function healthOf(db: LedgerDb, clock: Clock): OverviewHealth[] {
-  return [{ component: "bridge", state: "unknown", at: null }, { component: "assistant", state: "unknown", at: null }, reconciliationHealth(db, clock), { component: "backup", state: "unknown", at: null }];
+export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat: LastHeartbeat = () => null): OverviewHealth[] {
+  return [{ component: "bridge", state: "unknown", at: null }, assistantHealth(clock, lastHeartbeat()), reconciliationHealth(db, clock), { component: "backup", state: "unknown", at: null }];
+}
+
+function assistantHealth(clock: Clock, beat: { readonly receivedAt: string } | null): OverviewHealth {
+  if (beat === null) return { component: "assistant", state: "unknown", at: null };
+  const late = toMs(clock.now()) - toMs(parseInstant(beat.receivedAt)) > ASSISTANT_DOWN_AFTER_MS;
+  return { component: "assistant", state: late ? "down" : "up", at: beat.receivedAt };
 }
 
 /**
  * Each network's hourly reconciliation on its own, the worst one wins: a network whose last success
- * is over 3 hours old, or that never succeeded while another did, is down. Before any network ever
- * succeeded nothing reports yet ("not known yet"). `at` is the oldest of the last successes.
+ * is over 3 hours old, or that never succeeded while it or another network recorded a run, is
+ * down, so a source that fails every run (a production Shopee with no bridge) is never silent.
+ * Before any hourly run was recorded nothing reports yet ("not known yet"). `at` is the oldest of
+ * the last successes.
  */
 function reconciliationHealth(db: LedgerDb, clock: Clock): OverviewHealth {
-  const last = (["shopee", "accesstrade"] as const).map((n) => lastSucceededRun(db, n, "HOURLY"));
+  const networks = ["shopee", "accesstrade"] as const;
+  const last = networks.map((n) => lastSucceededRun(db, n, "HOURLY"));
   const seen = last.filter((at) => at !== null).sort();
-  if (seen.length === 0) return { component: "reconciliation", state: "unknown", at: null };
+  const ran = networks.filter((n) => hasRun(db, n, "HOURLY"));
+  if (seen.length === 0 && ran.length === 0) return { component: "reconciliation", state: "unknown", at: null };
   const stale = (at: string | null): boolean => at === null || toMs(clock.now()) - toMs(parseInstant(at)) > RECONCILIATION_DOWN_AFTER_MS;
-  return { component: "reconciliation", state: last.some(stale) ? "down" : "up", at: seen[0] ?? null };
+  const watched = networks.map((n, i) => ({ ran: ran.includes(n) || last[i] !== null, at: last[i] ?? null })).filter((w) => w.ran || seen.length > 0);
+  return { component: "reconciliation", state: watched.some((w) => stale(w.at)) ? "down" : "up", at: seen[0] ?? null };
 }
-

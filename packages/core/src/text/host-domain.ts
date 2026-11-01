@@ -11,7 +11,7 @@ export function hostOnDomain(host: string, domains: readonly string[]): boolean 
   return domains.some((d) => h === d || h.endsWith(`.${d}`));
 }
 
-/** Every domain Shopee hands out links on. */
-export const SHOPEE_LINK_DOMAINS = ["shopee.vn", "shope.ee", "shp.ee"] as const;
-/** Shopee's short-link hosts. */
-export const SHOPEE_SHORT_LINK_DOMAINS = ["s.shopee.vn", "shope.ee", "shp.ee"] as const;
+/** Every domain Shopee hands out links on, ShopeeFood's included (D60). */
+export const SHOPEE_LINK_DOMAINS = ["shopee.vn", "shope.ee", "shp.ee", "shopeefood.vn"] as const;
+/** Shopee's short-link hosts; `spf.shopee.vn` is the custom-link page's ShopeeFood short link (D60). */
+export const SHOPEE_SHORT_LINK_DOMAINS = ["s.shopee.vn", "spf.shopee.vn", "shope.ee", "shp.ee"] as const;

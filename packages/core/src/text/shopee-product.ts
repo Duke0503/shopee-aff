@@ -4,8 +4,9 @@
  * `shopee_product_key` (platform/db/ledger.ts), so a migration backfills stored requests with
  * exactly the rule new requests use, and platform code never imports a module.
  *
- * Shopee hands out links on shopee.vn, shope.ee and shp.ee and any subdomain of them; ShopeeFood
- * is a different programme. Only http and https links without credentials count.
+ * Shopee hands out links on shopee.vn, shope.ee and shp.ee and any subdomain of them. A ShopeeFood
+ * link names a shop, not a product, and is read by shopeefood-link.ts (D60), never here. Only http
+ * and https links without credentials count.
  *
  * A product is named by its shop id and item id, in either live form (`Name-i.<shop>.<item>` or
  * `/<anything>/<shop>/<item>`, as the live `third_party_lookup.py` reads them). Such a link is kept

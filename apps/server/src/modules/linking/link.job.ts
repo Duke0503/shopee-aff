@@ -63,6 +63,7 @@ function logRecorded(deps: LinkJobDeps, where: Record<string, unknown>, recorded
   if (recorded.outcome === "paused") deps.logger.error({ ...line, runbook: RELOGIN_RUNBOOK }, "linking.link_queue.paused");
   else if (recorded.reason?.startsWith("link_") === true) deps.logger.warn({ ...line, link: link === null ? null : linkWithoutQuery(link) }, "linking.link.dropped");
   else deps.logger.info(line, "linking.link.recorded");
+  if (recorded.sourceTargetIgnored === true) deps.logger.warn({ requestId: recorded.requestId }, "linking.link.source_target_ignored");
 }
 
 /** One bridge submission: the bridge call with no transaction open, then its result in one transaction. */

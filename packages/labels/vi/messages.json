@@ -10,5 +10,7 @@
   "payout_recorded": "Mình đã chuyển {amount} cho bạn. Biên nhận: hoantiendp.com/b/{receiptToken}",
   "payout_voided": "Mình ghi nhận nhầm lần chuyển {amount} trước đó nên đã huỷ ghi nhận. Biên nhận của lần đó nay hiện \"Đã huỷ ghi nhận\"; số dư của bạn đã được tính lại.",
   "link_failed": "Mình chưa tạo được link cho sản phẩm này. Bạn gửi lại link giúp mình, hoặc thử một sản phẩm khác.",
-  "link_not_in_affiliate": "Sản phẩm này không nằm trong chương trình hoàn tiền của TikTok Shop, nên mình không tạo được link. Bạn thử một sản phẩm khác nhé."
+  "link_not_in_affiliate": "Sản phẩm này không nằm trong chương trình hoàn tiền của TikTok Shop, nên mình không tạo được link. Bạn thử một sản phẩm khác nhé.",
+  "link_shopeefood_per_shop": "Link ShopeeFood: tiền hoàn tính theo từng quán, có số chính xác sau khi đơn được duyệt.",
+  "friend_request_greeting": "Mình là trợ lý Hoàn Tiền DP. Kết bạn để nhận thông báo đơn hàng và tiền hoàn ngay trong hộp thư chính nhé!"
 }

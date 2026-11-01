@@ -56,7 +56,9 @@ function CodeChips<R>({ columns, row }: { columns: readonly ListColumn<R>[]; row
     <>
       {columns.map((column) => {
         const code = textOf(row[column.key]);
-        return code === null ? null : <CodeChip key={column.key} code={code} className="shrink-0" />;
+        // A row with no code shows the column's own words instead (a guest link's owner), never an empty chip.
+        if (code === null) return column.cardText?.(row) ? <span key={column.key} className="shrink-0 font-medium">{column.cardText(row)}</span> : null;
+        return <CodeChip key={column.key} code={code} className="shrink-0" />;
       })}
     </>
   );

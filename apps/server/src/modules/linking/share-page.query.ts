@@ -51,6 +51,7 @@ export function sharePageLink(db: LedgerDb, code: string, acceptFakeHost = false
     target: row.target,
     guest: isGuestCustomer(db, row.customerId),
     network,
+    platform: row.platform,
     productName: row.productName,
     productImageUrl: httpsImageUrl(row.productImageUrl),
     productPrice: row.productPrice,

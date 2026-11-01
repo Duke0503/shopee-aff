@@ -1,0 +1,20 @@
+{
+  "name": "@cashback/assistant",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Zalo assistant (AD-15, Story 6.1): a separate Node process with the only Zalo session. It never opens the database and serves no listener; it calls the server's internal listener with X-Assistant-Token and paces every send like a person (D9).",
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cashback/contracts": "workspace:*",
+    "@cashback/core": "workspace:*",
+    "@cashback/labels": "workspace:*",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  }
+}

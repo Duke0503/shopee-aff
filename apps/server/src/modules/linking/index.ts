@@ -46,7 +46,7 @@ export {
   type WindowedReportSource,
 } from "./report-source.port";
 export { readShopeeFile, readShopeePages, SHOPEE_MAX_PAGES, SHOPEE_PAGE_SIZE, shopeeFileSource, shopeeFileWindowSource, type ShopeeFileOptions } from "./shopee-file.adapter";
-export { shopeeBridgeSource } from "./shopee-bridge.adapter";
+export { REPORT_YIELD_MAX_MS, REPORT_YIELD_POLL_MS, reportSeconds, SHOPEE_BRIDGE_REPORT, shopeeBridgeSource, type ShopeeBridgeSourceDeps } from "./shopee-bridge.adapter";
 export { accessTradeFileSource, accessTradeFileWindowSource, accessTradePages, readAccessTradeFile, readAccessTradePages, type AccessTradePage } from "./accesstrade-file.adapter";
 export {
   ACCESSTRADE_MAX_PAGES,
@@ -89,7 +89,7 @@ export { LINK_FAILED_MESSAGE, randomShareCode, recordApiLinkResult, recordLinkRe
 export { holdShopeeQueue, notePageError, pauseShopeeQueue, resumeShopeeQueue, shopeeQueueGate, shopeeQueueState, type LinkQueueState, type QueueGate, type QueueResumed } from "./link-queue.command";
 export { CAPTCHA_HOLD_MS, FINAL_FAILURE_MESSAGES, handlingOf, LINK_MAX_ATTEMPTS, LINK_QUEUE_ALERTS, PAGE_ERROR_FAIL_AFTER_MS, PAGE_ERROR_HOLD_MS, pageErrorStep, RELOGIN_RUNBOOK, RESOLUTION_RETRY_MS, type FailureHandling } from "./domain/link-failure";
 export { ACCESSTRADE_LINK_PATH, accessTradeLinkCreator, fakeAccessTradeLinks, fetchPost, type AccessTradeLinkOptions, type HttpPost, type LinkCreator, type PostAnswer } from "./accesstrade-link.adapter";
-export { checkReturnedLink, isShopeeShortHost, linkWithoutQuery, needsResolution, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure, type LinkOrigin } from "./domain/link-check";
+export { checkReturnedLink, isShopeeShortHost, linkWithoutQuery, needsResolution, shopKeyFromTarget, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure, type LinkOrigin } from "./domain/link-check";
 export { MAX_LINKS_PER_RUN, runLinkJob, type LinkJobDeps, type LinkJobRun } from "./link.job";
 export { FAKE_BRIDGE_HOST, fakeBridge, fakeLinkUrl } from "./fake-bridge.adapter";
 export { readProductLink, readShopeeProduct, shopeeProductKey, shopeeProductKeyOf, shopeeProductUrl, SUB_ID_PATTERN, type ProductLink } from "./domain/product-url";
@@ -100,9 +100,11 @@ export { bridgeInternalRoutes, type BridgeRouteDeps } from "./http/bridge.routes
 export { claimLookupJob, linkWorkDue, LOOKUP_RETRY_MS, LOOKUP_WINDOW_MS, LOOKUPS_PER_REQUEST, PRODUCT_FACTS_FRESH_MS, recordLookupResult, recordSilentLookup, SILENT_LOOKUPS_BEFORE_FAILURE, type LookupRecorded, type RecordedLookupAnswer } from "./link-lookup.command";
 export { MAX_LOOKUPS_PER_RUN, runProductLookups, type LookupJobDeps } from "./link-lookup.job";
 export { labelledRate, readLookupFacts, readPriceText, readRateText, splitRates, type LookupPageTexts, type ProductFacts } from "./domain/product-lookup";
-export { linkReplyData, type LinkEstimate, type LinkReplyData, type ProductSnapshotFacts, type RateExample, type ReplyContext } from "./domain/link-reply";
+export { linkReplyData, SHOPEEFOOD_REPLY_KEY, type LinkEstimate, type LinkReplyData, type ProductSnapshotFacts, type RateExample, type ReplyContext } from "./domain/link-reply";
 export { chromeIntentUrl, shareAgentOf, shareDeviceOf, type ShareAgent, type ShareDevice } from "./domain/share-agent";
 export { isShareTarget } from "./domain/link-check";
 export { sharePageLink, type SharePageLink } from "./share-page.query";
 export { recordLinkClick, type LinkVisit } from "./link-click.command";
 export { LINK_CLICK_AGENTS, type LinkClickAgent } from "./schema";
+export { answerDeskLinkRequests, DESK_LINK_REQUESTS_LIST } from "./link-requests-desk.list";
+export { linkRequestDeskRoutes, type LinkRequestDeskRouteDeps } from "./http/link-request-desk.routes";

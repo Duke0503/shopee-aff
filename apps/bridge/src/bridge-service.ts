@@ -11,7 +11,7 @@ import { runBridgeLoop, jobWorker, type LoopDeps, type LoopEnd } from "./bridge-
 import { chromePageDriver, keepAlive, type Wait } from "./bridge-tab";
 import type { ChromeApi } from "./chrome-api.types";
 import { serverClient, type Fetch } from "./server-client";
-import { shortLinkResolver, type FollowLink } from "./short-link";
+import { shopeeFoodResolver, shortLinkResolver, type FollowLink } from "./short-link";
 
 export const KEEPALIVE_ALARM = "cashback-bridge-keepalive";
 /** Chrome's shortest alarm period. */
@@ -55,7 +55,7 @@ export function bridgeService(deps: ServiceDeps, stop: { readonly stopped: boole
   const loop: LoopDeps = {
     loadSettings: () => loadConnected(deps),
     client: (settings) => serverClient(settings, deps.fetch),
-    work: jobWorker(page, wait, shortLinkResolver(deps.follow)),
+    work: jobWorker(page, wait, shortLinkResolver(deps.follow), shopeeFoodResolver(deps.follow)),
     wait,
     log: deps.log,
   };

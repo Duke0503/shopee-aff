@@ -237,3 +237,8 @@ export function lastSucceededRun(db: LedgerDb, network: WindowedReportSource["ne
     .get();
   return (last?.finishedAt ?? null) as Instant | null;
 }
+
+/** Whether any run of this kind was recorded for the network, whatever its outcome. */
+export function hasRun(db: LedgerDb, network: WindowedReportSource["network"], kind: RunKind): boolean {
+  return db.select({ runId: reconciliationRuns.runId }).from(reconciliationRuns).where(and(eq(reconciliationRuns.network, network), eq(reconciliationRuns.kind, kind))).limit(1).get() !== undefined;
+}

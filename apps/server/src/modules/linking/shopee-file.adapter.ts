@@ -128,7 +128,7 @@ export function shopeeFileSource(options: ShopeeFileOptions): ReportSource {
   return { network: "shopee", read: () => Promise.resolve().then(() => readShopeeFile(options)) };
 }
 
-/** A saved report read for reconciliation (until the bridge of Story 5.9): parsed once while unchanged, cut to each window. */
+/** A saved report read for reconciliation in rehearsals and dev (production reads the bridge, Story 5.9): parsed once while unchanged, cut to each window. */
 export function shopeeFileWindowSource(options: ShopeeFileOptions): WindowedReportSource {
   const report = cachedFileReport(options.path, () => readShopeeFile(options));
   return { network: "shopee", read: (window) => Promise.resolve().then(() => withinWindow(report(), window)) };

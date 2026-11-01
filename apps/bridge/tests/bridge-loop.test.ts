@@ -67,11 +67,12 @@ describe("Story 5.3: the extension takes one job at a time", () => {
     expect(server.posted.map((r) => r.ticket)).toEqual([ticket(1), ticket(2)]);
   });
 
-  it("AC1: a report page job is answered unsupported until Story 5.9; a lookup is worked (Story 5.6), and one whose link names no product touches no page", async () => {
+  it("AC1: a lookup is worked (Story 5.6), and one whose link names no product touches no page; a report page job is worked too (Story 5.9)", async () => {
     const page = fakePage();
     const work = jobWorker(page, recordingWait());
     expect(await work({ ticket: ticket(1), kind: "lookup", url: "https://shopee.vn/x", timeoutMs: 90_000 })).toEqual({ outcome: "value", value: { found: false } });
-    expect(await work({ ticket: ticket(2), kind: "report", page: 1, timeoutMs: 90_000 })).toEqual({ outcome: "failed", reason: "unsupported" });
+    expect(page.calls).toEqual([]);
+    expect(await work({ ticket: ticket(2), kind: "report", page: 2, purchaseTimeStart: 20, purchaseTimeEnd: 10, timeoutMs: 90_000 })).toEqual({ outcome: "failed", reason: "bad_job" });
     expect(page.calls).toEqual([]);
   });
 

@@ -118,6 +118,8 @@ function nextUnlooked(db: LedgerDb, now: Instant) {
         inArray(linkRequests.status, ["ISSUED", "DELIVERED"]),
         eq(linkRequests.origin, "REQUEST"),
         sql`coalesce(${linkRequests.network}, 'shopee') = 'shopee'`,
+        // A ShopeeFood request names a shop, not a product: there is nothing to look up (D60).
+        sql`${linkRequests.platform} <> 'shopeefood'`,
         isNull(linkRequests.shopeeRateBps),
         gte(linkRequests.createdAt, minus(now, LOOKUP_WINDOW_MS)),
         sql`${lookups} < ${LOOKUPS_PER_REQUEST}`,

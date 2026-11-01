@@ -25,7 +25,7 @@
 import { randomBytes } from "node:crypto";
 import { bridgeJobSchema, type BridgeFailure, type BridgeJob, type BridgeJobKind, type BridgeResult } from "@cashback/contracts";
 
-import type { BridgeLinkResult, BridgeLookupResult, BridgePort, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob, LookupBridgeJob } from "../../platform/ports/bridge.port";
+import type { BridgeLinkResult, BridgeLookupResult, BridgePort, BridgeReportResult, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob, LookupBridgeJob, ReportBridgeJob } from "../../platform/ports/bridge.port";
 
 /** Seconds-scale timers, injected so tests run without waiting. */
 export interface BridgeTimer {
@@ -54,9 +54,12 @@ export const BRIDGE_ANSWER_GRACE_MS = 15_000;
 const SERVICE_ORDER: Record<BridgeJobKind, number> = { link: 0, lookup: 1, report: 2 };
 
 /** What is asked of the browser, before the queue gives it a ticket and a timeout. */
-export type BridgeWork = { kind: "link"; sourceUrl: string; subId1: string; subId2: string } | { kind: "lookup"; url: string } | { kind: "report"; page: number };
+export type BridgeWork =
+  | { kind: "link"; sourceUrl: string; subId1: string; subId2: string }
+  | { kind: "lookup"; url: string }
+  | { kind: "report"; page: number; purchaseTimeStart: number; purchaseTimeEnd: number };
 
-export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
+export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
 
 export interface BrowserBridge extends BridgePort {
   readonly mode: "browser";
@@ -93,7 +96,7 @@ const newTicket = (): string => randomBytes(16).toString("hex");
 
 /** The answer to a link job in the port's terms; a lookup or report answer to a link job is a failure. */
 function linkResultOf(answer: BridgeAnswer): BridgeLinkResult {
-  if (answer.outcome === "link") return { outcome: "link", url: answer.url, resolvedUrl: answer.resolvedUrl ?? null };
+  if (answer.outcome === "link") return { outcome: "link", url: answer.url, resolvedUrl: answer.resolvedUrl ?? null, ...(answer.sourceTarget === undefined ? {} : { sourceTarget: answer.sourceTarget }) };
   if (answer.outcome === "unavailable") return answer;
   return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
 }
@@ -234,5 +237,6 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
     submit,
     createLink: async (job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult> => linkResultOf(await submit({ kind: "link", sourceUrl: job.sourceUrl, subId1: job.subId1, subId2: job.subId2 }, signal)),
     lookupProduct: async (job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult> => lookupResultOf(await submit({ kind: "lookup", url: job.url }, signal)),
+    readReportPage: async (job: ReportBridgeJob, signal: AbortSignal): Promise<BridgeReportResult> => lookupResultOf(await submit({ kind: "report", ...job }, signal)),
   };
 }

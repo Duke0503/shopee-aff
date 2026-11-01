@@ -29,10 +29,11 @@ export interface LinkBridgeJob {
 /**
  * The bridge's answer. A link is attached only after the server checks it carries this job's
  * sub_ids; `resolvedUrl` is a short link's target as the bridge resolved it in the real browser
- * (Story 5.4), answered on the same job's ticket.
+ * (Story 5.4), answered on the same job's ticket; `sourceTarget` is the job's own source link as
+ * the browser resolved it before submitting it (a ShopeeFood short link, Story 5.11).
  */
 export type BridgeLinkResult =
-  | { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null }
+  | { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null; readonly sourceTarget?: string | null }
   | { readonly outcome: "failed"; readonly reason: string }
   | { readonly outcome: "unavailable"; readonly reason: BridgeUnavailable };
 
@@ -51,12 +52,27 @@ export type BridgeLookupResult =
   | { readonly outcome: "failed"; readonly reason: string }
   | { readonly outcome: "unavailable"; readonly reason: BridgeUnavailable };
 
+/**
+ * One page of the Shopee conversion report (Story 5.9): no customer, no sub_ids, and no request;
+ * the purchase-time window in Unix seconds, both ends included.
+ */
+export interface ReportBridgeJob {
+  readonly page: number;
+  readonly purchaseTimeStart: number;
+  readonly purchaseTimeEnd: number;
+}
+
+/** A report page's answer: the page's rows as `value` (checked by the server), a failure, or nobody answered. */
+export type BridgeReportResult = BridgeLookupResult;
+
 export interface BridgePort {
   readonly mode: BridgeMode;
   /** Never called inside a transaction; `signal` aborts at shutdown. */
   createLink(job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult>;
   /** A product lookup (Story 5.6), never inside a transaction; a bridge without it makes no lookups. */
   lookupProduct?(job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult>;
+  /** A report page (Story 5.9), never inside a transaction; a bridge without it reads no report. */
+  readReportPage?(job: ReportBridgeJob, signal: AbortSignal): Promise<BridgeReportResult>;
 }
 
 /**

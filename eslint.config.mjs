@@ -3,7 +3,7 @@
 //   - size: 400 lines per server/package .ts file, 300 per frontend file, 60 per function (§3)
 //   - money: no Math.round / toFixed / legacy rounding in packages/money (§4)
 //   - time: no Date.now() or new Date() outside packages/core/src/time (§7)
-//   - config: no process.env outside apps/server/src/platform/config (§9)
+//   - config: no process.env outside apps/server/src/platform/config and apps/assistant/src/assistant.config.ts (§9)
 //   - transactions: no async callback passed to tx (§5)
 import js from "@eslint/js";
 import checkFile from "eslint-plugin-check-file";
@@ -70,7 +70,7 @@ export default tseslint.config(
     rules: { "no-restricted-syntax": ["error", ...NO_ROUNDING, ...NO_ASYNC_TX] },
   },
   {
-    files: ["apps/server/src/platform/config/**/*.ts"],
+    files: ["apps/server/src/platform/config/**/*.ts", "apps/assistant/src/assistant.config.ts"],
     rules: { "no-restricted-properties": "off" },
   },
   {

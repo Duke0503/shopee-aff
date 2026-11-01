@@ -29,7 +29,7 @@ export const PAGE_POLL_MS = 500;
 const STOREFRONT = { name: STOREFRONT_NAME, image: STOREFRONT_IMAGE, price: STOREFRONT_PRICE };
 const NOT_FOUND: LookupAnswer = { outcome: "value", value: { found: false } };
 
-class Blocked extends Error {
+export class Blocked extends Error {
   constructor(readonly reason: BridgeFailure) {
     super(reason);
   }
@@ -53,8 +53,8 @@ async function productIds(url: string, resolve: ResolveLink): Promise<{ shopId: 
   return target === null ? null : idsOf(target);
 }
 
-/** Looks at the page until `ready` says so or the wait ends; every look checks for a block first. */
-async function lookUntil<L extends { href: string; passwordBox: boolean }>(look: () => Promise<L>, ready: (l: L) => boolean, wait: Wait): Promise<L> {
+/** Looks at the page until `ready` says so or the wait ends; every look checks for a block first (the report job uses it too). */
+export async function lookUntil<L extends { href: string; passwordBox: boolean }>(look: () => Promise<L>, ready: (l: L) => boolean, wait: Wait): Promise<L> {
   for (let waited = 0; ; waited += PAGE_POLL_MS) {
     const seen = await look();
     check(seen);

@@ -21,7 +21,7 @@
  * Also the back-off of a request whose submission failed, so it never holds up the queue.
  */
 
-import { hostOnDomain, SHOPEE_LINK_DOMAINS, SHOPEE_SHORT_LINK_DOMAINS } from "@cashback/core";
+import { hostOnDomain, readShopeeFoodLink, SHOPEE_LINK_DOMAINS, SHOPEE_SHORT_LINK_DOMAINS, shopeeFoodKey } from "@cashback/core";
 
 /** The fake bridge's links live on the reserved `.invalid` domain (RFC 2606). */
 export const FAKE_BRIDGE_HOST = "fake-bridge.invalid";
@@ -140,4 +140,22 @@ export function isShareTarget(text: string | null, acceptFakeHost: boolean): boo
   const host = url.hostname.toLowerCase();
   if (host === FAKE_BRIDGE_HOST) return acceptFakeHost;
   return onShopee(host) || hostOnDomain(host, ACCESSTRADE_LINK_DOMAINS);
+}
+
+export type SourceTargetCheck = { readonly kind: "none" } | { readonly kind: "key"; readonly productKey: string } | { readonly kind: "ignored" };
+
+/**
+ * The reuse key a ShopeeFood request learns from the target its source resolved to in the browser
+ * (Story 5.11, review item 10), only when that target can belong to this job: the request's own
+ * source is a ShopeeFood link that named no shop yet, the target is a ShopeeFood shop, and a shop
+ * the source names itself (an invite's token) is the same shop. Anything else is ignored (no key)
+ * and reported, never trusted.
+ */
+export function shopKeyFromTarget(sourceUrl: string, sourceTarget: string | null | undefined): SourceTargetCheck {
+  if (!sourceTarget) return { kind: "none" };
+  const source = readShopeeFoodLink(sourceUrl);
+  const target = readShopeeFoodLink(sourceTarget);
+  if (!source.ok || !source.resolve || !target.ok || target.shopId === null) return { kind: "ignored" };
+  if (source.shopId !== null && source.shopId !== target.shopId) return { kind: "ignored" };
+  return { kind: "key", productKey: shopeeFoodKey(target.shopId) };
 }

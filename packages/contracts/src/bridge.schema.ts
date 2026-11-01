@@ -7,8 +7,7 @@
  * before a restart is dropped. Every call also carries `X-Bridge-Instance`, the extension's own id
  * kept in its profile: the job out belongs to that instance, so a second browser never gets it
  * (no duplicate submission) and the same instance polling again after a restart gets it back. Link
- * and product lookup (Story 5.6) jobs are worked; report page jobs (Story 5.9) travel the same way
- * and are answered `unsupported` until then.
+ * jobs, product lookups (Story 5.6) and Shopee report pages (Story 5.9) are worked.
  */
 import { SHOPEE_SOURCE_MAX_LENGTH } from "@cashback/core";
 import { z } from "zod";
@@ -47,18 +46,33 @@ export const bridgeLinkJobSchema = z.strictObject({
  * sent the live session to Shopee's traffic check.
  */
 export const bridgeLookupJobSchema = z.strictObject({ ticket, kind: z.literal("lookup"), url: z.string().min(1).max(2048), timeoutMs: z.number().int().min(1_000).max(300_000) });
-export const bridgeReportJobSchema = z.strictObject({ ticket, kind: z.literal("report"), page: z.number().int().min(1).max(1_000), timeoutMs: z.number().int().min(1_000).max(300_000) });
+/**
+ * One page of the Shopee conversion report (Story 5.9): page `page` of the purchases from
+ * `purchaseTimeStart` to `purchaseTimeEnd` (Unix seconds, both included, as the report page takes
+ * them). One page per job, so a link job is served between any two pages.
+ */
+export const bridgeReportJobSchema = z.strictObject({
+  ticket,
+  kind: z.literal("report"),
+  page: z.number().int().min(1).max(1_000),
+  purchaseTimeStart: z.number().int().min(0),
+  purchaseTimeEnd: z.number().int().min(0),
+  timeoutMs: z.number().int().min(1_000).max(300_000),
+});
 
 export const bridgeJobSchema = z.discriminatedUnion("kind", [bridgeLinkJobSchema, bridgeLookupJobSchema, bridgeReportJobSchema]);
 export type BridgeJob = z.infer<typeof bridgeJobSchema>;
 export type BridgeLinkJob = z.infer<typeof bridgeLinkJobSchema>;
 export type BridgeLookupJob = z.infer<typeof bridgeLookupJobSchema>;
+export type BridgeReportJob = z.infer<typeof bridgeReportJobSchema>;
 
 /**
  * Why the bridge could not make a link. `captcha` and `login_redirect` are whole-session states
  * (Story 5.5 pauses or retries on them); the others are about this one submission or page.
+ * `source_unresolved`: a ShopeeFood short link or invite the browser could not resolve to a shop
+ * (Story 5.11); it counts like any failed submission.
  */
-export const BRIDGE_FAILURES = ["captcha", "login_redirect", "page_not_ready", "form_missing", "submit_failed", "shopee_refused", "no_link", "script_error", "bad_job", "unsupported"] as const;
+export const BRIDGE_FAILURES = ["captcha", "login_redirect", "page_not_ready", "form_missing", "submit_failed", "shopee_refused", "no_link", "script_error", "bad_job", "unsupported", "source_unresolved"] as const;
 export type BridgeFailure = (typeof BRIDGE_FAILURES)[number];
 
 export const bridgeResultSchema = z.discriminatedUnion("outcome", [
@@ -66,7 +80,14 @@ export const bridgeResultSchema = z.discriminatedUnion("outcome", [
    * A link, and for a short link its target as the real browser resolved it (Story 5.4): the server
    * never calls Shopee, so it reads the sub_ids from `resolvedUrl` and attaches `url`.
    */
-  z.strictObject({ ticket, outcome: z.literal("link"), url: httpsUrl, resolvedUrl: httpsUrl.optional() }),
+  z.strictObject({
+    ticket,
+    outcome: z.literal("link"),
+    url: httpsUrl,
+    resolvedUrl: httpsUrl.optional(),
+    /** The job's own source link as this browser resolved it (a ShopeeFood short link or invite, Story 5.11). */
+    sourceTarget: httpsUrl.optional(),
+  }),
   z.strictObject({ ticket, outcome: z.literal("failed"), reason: z.enum(BRIDGE_FAILURES) }),
   z.strictObject({ ticket, outcome: z.literal("value"), value: z.json() }),
 ]);
@@ -99,3 +120,19 @@ export type BridgeLookupValue = z.infer<typeof bridgeLookupValueSchema>;
 
 export const bridgeResultAcceptedSchema = z.object({ accepted: z.boolean() });
 export type BridgeResultAccepted = z.infer<typeof bridgeResultAcceptedSchema>;
+
+/** The report page's rows per page and the most pages one read takes (the live `report_reader.py`). */
+export const SHOPEE_REPORT_PAGE_SIZE = 50;
+
+/**
+ * What a report page job answers as its `value` (Story 5.9): the conversions the report page's
+ * table shows on that page, each the record the page itself rendered (never a value computed in
+ * the browser), the page number the table says it shows, and the total the pager states, if any.
+ * The server reads every amount and status itself (domain/shopee-report.ts).
+ */
+export const bridgeReportValueSchema = z.strictObject({
+  page: z.number().int().min(1).max(1_000),
+  total: z.number().int().min(0).nullable(),
+  list: z.array(z.record(z.string(), z.json())).max(SHOPEE_REPORT_PAGE_SIZE),
+});
+export type BridgeReportValue = z.infer<typeof bridgeReportValueSchema>;

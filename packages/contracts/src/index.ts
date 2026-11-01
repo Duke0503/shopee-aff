@@ -222,11 +222,13 @@ export {
   BRIDGE_NEXT_PATH,
   BRIDGE_RESULTS_PATH,
   BRIDGE_TOKEN_HEADER,
+  SHOPEE_REPORT_PAGE_SIZE,
   bridgeJobSchema,
   bridgeLinkJobSchema,
   bridgeLookupJobSchema,
   bridgeLookupValueSchema,
   bridgeReportJobSchema,
+  bridgeReportValueSchema,
   bridgeResultAcceptedSchema,
   bridgeResultSchema,
   type BridgeFailure,
@@ -235,6 +237,10 @@ export {
   type BridgeLinkJob,
   type BridgeLookupJob,
   type BridgeLookupValue,
+  type BridgeReportJob,
+  type BridgeReportValue,
   type BridgeResult,
   type BridgeResultAccepted,
 } from "./bridge.schema";
+export { ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
+export { DESK_LINK_REQUEST_NETWORKS, DESK_LINK_REQUESTS_PATH, deskLinkRequestRowSchema, deskLinkRequestsResponseSchema, LINK_REQUEST_CHANNELS, type DeskLinkRequestRow } from "./link-request-list.schema";
