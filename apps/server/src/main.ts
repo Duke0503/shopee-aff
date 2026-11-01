@@ -16,6 +16,7 @@ import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { linkQueueRoutes } from "./admin/link-queue.routes";
 import { messagingSilentRoutes } from "./admin/messaging-silent.routes";
 import { adminDesk } from "./admin/admin-desk";
+import { assistantCommandRoutes } from "./links/assistant-command.routes";
 import { environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, type LinkBridge } from "./links/link-jobs";
 import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
@@ -85,6 +86,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     if (config.assistantToken !== null) {
       internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats }));
       // The assistant pulls the outbox one row at a time and acknowledges each send (Story 6.4).
+      // Chat commands: /id, /sodu, /donhang, /stk, /help (Story 6.7).
+      internal.push(assistantCommandRoutes({ ledger, clock: systemClock }));
       internal.push(notificationRoutes({ ledger, clock: systemClock, dailyCap: config.notificationDailyCap, shareBaseUrl: shareBaseUrlFor(config), production: config.env === "prod" }));
     }
     const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });

@@ -5,6 +5,7 @@
  * error names the path, the status and the server's message key, never the token or a body.
  */
 import {
+  ASSISTANT_COMMAND_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
   ASSISTANT_LINK_CONFIRM_PATH,
@@ -13,6 +14,8 @@ import {
   ASSISTANT_LINK_REQUEST_PATH,
   ASSISTANT_REGISTRATION_PATH,
   ASSISTANT_TOKEN_HEADER,
+  assistantCommandAnswerSchema,
+  assistantCommandSchema,
   assistantHeartbeatReceivedSchema,
   assistantHeartbeatSchema,
   assistantLinkAnswerSchema,
@@ -31,6 +34,8 @@ import {
   notificationAckPath,
   notificationAckSchema,
   notificationNextSchema,
+  type AssistantCommand,
+  type AssistantCommandAnswer,
   type AssistantHeartbeat,
   type AssistantHeartbeatReceived,
   type AssistantLinkAnswer,
@@ -77,6 +82,8 @@ export interface InternalApi {
   releaseLink(claim: AssistantLinkClaim): Promise<boolean>;
   /** The chat reply was sent: the claimed link is DELIVERED (Story 6.5). */
   confirmLink(claim: AssistantLinkClaim): Promise<boolean>;
+  /** A chat command answered with its facts; a private one registers its sender first (Story 6.7). */
+  command(command: AssistantCommand): Promise<AssistantCommandAnswer>;
   /** The next due notification, leased to this assistant, or null (Story 6.4). */
   nextNotification(signal?: AbortSignal): Promise<AssistantNotification | null>;
   acknowledgeNotification(id: number, ack: NotificationAck, signal?: AbortSignal): Promise<NotificationAcked>;
@@ -125,6 +132,7 @@ export function internalApi(options: InternalApiOptions): InternalApi {
     claimLink: async (claim) => assistantLinkClaimedSchema.parse(await post(ASSISTANT_LINK_CLAIM_PATH, assistantLinkClaimSchema.parse(claim))),
     releaseLink: async (claim) => assistantLinkReleasedSchema.parse(await post(ASSISTANT_LINK_RELEASE_PATH, assistantLinkClaimSchema.parse(claim))).released,
     confirmLink: async (claim) => assistantLinkConfirmedSchema.parse(await post(ASSISTANT_LINK_CONFIRM_PATH, assistantLinkClaimSchema.parse(claim))).confirmed,
+    command: async (command) => assistantCommandAnswerSchema.parse(await post(ASSISTANT_COMMAND_PATH, assistantCommandSchema.parse(command))),
     nextNotification: async (signal) => notificationNextSchema.parse(await call("GET", NOTIFICATION_NEXT_PATH, undefined, signal)).notification,
     acknowledgeNotification: async (id, ack, signal) => notificationAckedSchema.parse(await post(notificationAckPath(id), notificationAckSchema.parse(ack), signal)),
   };

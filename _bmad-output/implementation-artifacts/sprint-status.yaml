@@ -118,8 +118,8 @@ development_status:
   6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: review
   6-4-notification-outbox-delivered-by-pull-and-acknowledgement: review
   6-5-link-delivered-once-by-chat-or-by-notification: review
-  6-6-order-clawback-and-payout-notifications-told-once: backlog
-  6-7-chat-commands-for-balance-orders-code-bank-and-help: backlog
+  6-6-order-clawback-and-payout-notifications-told-once: review
+  6-7-chat-commands-for-balance-orders-code-bank-and-help: review
   6-8-matkhau-issues-a-new-password-and-ends-other-sessions: backlog
   6-9-bank-account-saved-or-changed-from-the-zalo-private-chat: backlog
   6-10-quiet-first-run-after-cutover-reports-would-be-sends: review

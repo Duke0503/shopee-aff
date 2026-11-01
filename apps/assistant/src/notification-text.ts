@@ -2,7 +2,9 @@
  * The sentence of one notification (AD-16, D57; Stories 6.4 and 6.5), from the message file by
  * key. A "link ready" notification is written exactly as the chat reply would be, from the link
  * reply facts the server attached (link-reply-text.ts). Every other one fills its key's
- * placeholders from the parameters; an amount is written in dong ("79.216d"). A key the message
+ * placeholders from the parameters; an amount is written in dong ("79.216d") and a rejected
+ * order's reason code in words; an order notice, old keys included, is written by order-text.ts
+ * (Story 6.6). A key the message
  * file does not have, a "link ready" one without a made link, or one whose parameters leave a
  * placeholder unfilled has no sentence: it is undeliverable, never sent as a raw key or with a
  * raw `{placeholder}`.
@@ -11,6 +13,7 @@ import type { AssistantNotification } from "@cashback/contracts";
 
 import { dongText, linkReplyMessage, type ReplyMessage } from "./link-reply-text";
 import { isMessageKey, messageText } from "./messages";
+import { orderNoticeMessage, rejectionReasonText } from "./order-text";
 
 /** Parameters that are amounts in whole dong. */
 const AMOUNT_PARAMS = new Set(["amount", "cashback", "price"]);
@@ -32,8 +35,15 @@ function messageOf(notification: AssistantNotification): ReplyMessage | null {
     if (link.shareUrl === null || link.status === "FAILED" || link.status === "QUEUED") return null;
     return linkReplyMessage({ ...link, shareUrl: link.shareUrl });
   }
+  const order = orderNoticeMessage(notification.messageKey, notification.params);
+  if (order !== undefined) return order;
   if (!isMessageKey(notification.messageKey)) return null;
   const values: Record<string, string> = {};
-  for (const [name, value] of Object.entries(notification.params)) values[name] = typeof value === "number" && AMOUNT_PARAMS.has(name) ? dongText(value) : String(value);
+  for (const [name, value] of Object.entries(notification.params)) values[name] = valueText(name, value);
   return { key: notification.messageKey, values };
+}
+
+function valueText(name: string, value: string | number): string {
+  if (name === "reason") return rejectionReasonText(String(value));
+  return typeof value === "number" && AMOUNT_PARAMS.has(name) ? dongText(value) : String(value);
 }

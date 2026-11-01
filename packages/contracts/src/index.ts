@@ -269,6 +269,20 @@ export {
   type AssistantRegistered,
   type AssistantRegistration,
 } from "./assistant-chat.schema";
+export {
+  ASSISTANT_COMMAND_PATH,
+  ASSISTANT_COMMANDS,
+  assistantCommandAnswerSchema,
+  assistantCommandReplySchema,
+  assistantCommandSchema,
+  CHAT_ORDERS_MAX,
+  PRIVATE_ONLY_COMMANDS,
+  type AssistantChatOrder,
+  type AssistantCommand,
+  type AssistantCommandAnswer,
+  type AssistantCommandName,
+  type AssistantCommandReply,
+} from "./assistant-command.schema";
 export { ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
 export { DESK_LINK_REQUEST_NETWORKS, DESK_LINK_REQUESTS_PATH, deskLinkRequestRowSchema, deskLinkRequestsResponseSchema, LINK_REQUEST_CHANNELS, type DeskLinkRequestRow } from "./link-request-list.schema";
 export {

@@ -120,7 +120,7 @@ describe("Story 3.9 acceptance criteria", () => {
     expect(all(ledger, "SELECT from_status, to_status, actor, reason FROM order_status_history WHERE order_id = '261020WRRJ0001'")).toEqual([
       { from_status: "REJECTED", to_status: "AWAITING_APPROVAL", actor: "staff-anh", reason: "rejected on UNPAID by the old system" },
     ]);
-    expect(all(ledger, "SELECT dedup_key FROM outbox WHERE dedup_key LIKE 'order:261020WRRJ0001:%'")).toEqual([{ dedup_key: "order:261020WRRJ0001:reopened" }]);
+    expect(all(ledger, "SELECT dedup_key FROM outbox WHERE dedup_key LIKE 'order:261020WRRJ0001%'")).toEqual([{ dedup_key: "order:261020WRRJ0001@1:reopened" }]);
 
     const cancelledId = wronglyRejected(ledger, "261020WRRJ0002", cancelled("261020WRRJ0002"), clock);
     const before = snapshot(ledger);
@@ -195,7 +195,7 @@ describe("Story 3.9: apply never chooses for staff", () => {
     apply(ledger, approved("261020FROZ0002"));
     apply(ledger, reportRow("261020FROZ0002", "UNKNOWN", [{ status: "APPROVED", parts: [20000] }]));
     applyCase(ledger, { caseId: caseId(ledger, "unknown_status"), reason: "fraud confirmed by the network", outcome: "reject" }, clock);
-    expect(one(ledger, "SELECT status, rejection_reason FROM orders WHERE order_id = '261020FROZ0002'")).toEqual({ status: "REJECTED", rejection_reason: "order_cancelled" });
+    expect(one(ledger, "SELECT status, rejection_reason FROM orders WHERE order_id = '261020FROZ0002'")).toEqual({ status: "REJECTED", rejection_reason: "not_eligible" });
   });
 
   it("a case with nothing to change is refused: dismiss it instead", () => {
@@ -226,7 +226,7 @@ describe("Story 3.9 code review: apply writes the plan through reconciliation's 
     ledger.sqlite.exec("INSERT INTO campaign_awards (campaign_id, customer_id, order_id, amount, status, origin) VALUES ('CAMP1', 'C1', '261020EFFX0001', 20000, 'CONFIRMED', 'RULE')");
     apply(ledger, reportRow("261020EFFX0001", "UNKNOWN", [{ status: "APPROVED", parts: [20000] }]));
     applyCase(ledger, { caseId: caseId(ledger, "unknown_status"), reason: "fraud", outcome: "reject" }, clock);
-    expect(one(ledger, "SELECT status, rejection_reason FROM orders")).toEqual({ status: "REJECTED", rejection_reason: "order_cancelled" });
+    expect(one(ledger, "SELECT status, rejection_reason FROM orders")).toEqual({ status: "REJECTED", rejection_reason: "not_eligible" });
     expect(all(ledger, "SELECT status FROM campaign_awards")).toEqual([{ status: "VOID" }]);
     expect(all(ledger, "SELECT to_status, actor, reason FROM order_status_history WHERE to_status = 'REJECTED'")).toEqual([{ to_status: "REJECTED", actor: "staff-anh", reason: "fraud" }]);
     expect(all(ledger, "SELECT count(*) AS n FROM order_observations")).toEqual([{ n: 2 }]);

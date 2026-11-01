@@ -24,6 +24,13 @@ import { clawbackAmount, isWithheld, partialClawbackAmount, splitCommission, sum
 import type { Attribution, ReviewReason } from "./attribution";
 import { reportSignal, type CancelReason, type FreezeReason, type ReportObservation, type ReportSignal } from "./report-signal";
 
+/**
+ * Why an order is rejected: the network's cancel signal, or `not_eligible` when staff reject a
+ * frozen order the report did not cancel (fraud, a rule broken); the customer is never told the
+ * network cancelled what staff decided.
+ */
+export type RejectionReason = CancelReason | "not_eligible";
+
 export interface TransitionOrder {
   readonly status: OrderStatus;
   readonly paidAt: string | null;
@@ -69,7 +76,7 @@ export type Effect =
   | { readonly kind: "store_observation"; readonly applied: boolean; readonly reason?: "open_payout_claim" }
   /** The split at approval (AD-5): stored with its inputs and never recomputed. */
   | { readonly kind: "store_cashback"; readonly approvedCommission: number; readonly cashback: number; readonly fee: number; readonly tax: number; readonly withheld: boolean }
-  | { readonly kind: "record_rejection"; readonly reason: CancelReason }
+  | { readonly kind: "record_rejection"; readonly reason: RejectionReason }
   | { readonly kind: "open_review_case"; readonly reason: ReviewCaseReason }
   | { readonly kind: "alert"; readonly alert: "order_reversed" }
   | { readonly kind: "clawback"; readonly amount: number; readonly partial: boolean }
@@ -195,7 +202,7 @@ function requireReason(reason: string): void {
 
 function resolveFrozen(out: Out, order: TransitionOrder, row: ReportObservation, signal: ReportSignal, review: Extract<ReviewContext, { kind: "resolve_frozen" }>, ctx: TransitionContext): OrderStatus {
   if (review.outcome === "reject" || signal.kind === "CANCEL") {
-    out.effects.push({ kind: "record_rejection", reason: signal.kind === "CANCEL" ? signal.reason : "order_cancelled" }, { kind: "awards", to: "VOID" });
+    out.effects.push({ kind: "record_rejection", reason: signal.kind === "CANCEL" ? signal.reason : "not_eligible" }, { kind: "awards", to: "VOID" });
     return move(out, order.status, "REJECTED");
   }
   const commission = commissionOf(row, signal);

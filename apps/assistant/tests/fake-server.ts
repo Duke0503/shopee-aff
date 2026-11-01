@@ -3,6 +3,7 @@
  * handlers the test sets, and records every call. Nothing here opens a connection.
  */
 import {
+  ASSISTANT_COMMAND_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
   ASSISTANT_LINK_CONFIRM_PATH,
@@ -70,6 +71,11 @@ export function fakeServer(): FakeServer {
     [ASSISTANT_LINK_CLAIM_PATH]: () => ok({ claim: "claimed" }),
     [ASSISTANT_LINK_RELEASE_PATH]: () => ok({ released: true }),
     [ASSISTANT_LINK_CONFIRM_PATH]: () => ok({ confirmed: true }),
+    // Story 6.7: a private command registers its sender; a group one answers for a known member.
+    [ASSISTANT_COMMAND_PATH]: (body) => {
+      const { code, created } = body["chat"] === "private" ? register(body) : { code: "DP00009", created: false };
+      return ok({ registered: created, customerCode: body["chat"] === "private" ? code : null, reply: { kind: "help" } });
+    },
     [NOTIFICATION_NEXT_PATH]: () => ok({ notification: null }),
     [NOTIFICATION_ACK_ROUTE]: (body) => ok({ id: body["id"], outcome: "sent" }),
   };

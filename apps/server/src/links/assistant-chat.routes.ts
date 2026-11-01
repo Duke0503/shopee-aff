@@ -73,7 +73,8 @@ export interface AssistantChatRouteDeps {
   readonly shareBaseUrl: string;
 }
 
-function register(deps: AssistantChatRouteDeps, log: FastifyBaseLogger, zaloUserId: string, displayName: string | null, via: RegistrationChannel): Registered {
+/** Registers the sender, or finds them again (also for a chat command, Story 6.7). */
+export function register(deps: Pick<AssistantChatRouteDeps, "ledger" | "clock">, log: FastifyBaseLogger, zaloUserId: string, displayName: string | null, via: RegistrationChannel): Registered {
   try {
     return deps.ledger.tx((db) => registerCustomer(db, { zaloUserId, displayName, via }, { clock: deps.clock, logger: log, by: commandAudit(db, deps.clock, ASSISTANT_ACTOR) }));
   } catch (error) {

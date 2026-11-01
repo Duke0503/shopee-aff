@@ -75,7 +75,7 @@ describe("Story 3.3 acceptance criteria", () => {
     expect(all(ledger, "SELECT fingerprint, applied, observed_at FROM order_observations")).toEqual([{ fingerprint: row.fingerprint, applied: 1, observed_at: TEST_CLOCK.now() }]);
     expect(all(ledger, "SELECT from_status, to_status, actor FROM order_status_history")).toEqual([{ from_status: null, to_status: "AWAITING_APPROVAL", actor: "reconcile" }]);
     expect(all(ledger, "SELECT actor_kind, actor_id, event, entity_id FROM audit_entries WHERE event LIKE 'orders.%'")).toEqual([{ actor_kind: "system", actor_id: "reconcile", event: "orders.order.recorded", entity_id: "261020AAAA0001" }]);
-    expect(all(ledger, "SELECT dedup_key, customer_id, message_key FROM outbox")).toEqual([{ dedup_key: "order:261020AAAA0001:recorded", customer_id: "C1", message_key: "order_recorded" }]);
+    expect(all(ledger, "SELECT dedup_key, customer_id, message_key FROM outbox")).toEqual([{ dedup_key: "order:261020AAAA0001:recorded", customer_id: "C1", message_key: "notice_order_recorded" }]);
     expect(recorded).toEqual([{ orderId: "261020AAAA0001", network: "shopee", customerId: "C1", requestId: "REQ1" }]);
   });
 

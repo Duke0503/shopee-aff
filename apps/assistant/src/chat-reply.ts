@@ -8,7 +8,9 @@
  * silent and staff answer. A group message is read only when it carries a link, and then only a
  * product link the server supports registers its sender (D25): joining the group, or chatting in
  * it, registers no one. A link to no shop at all gets no reply in the group (owner decision).
- * Group replies tag the sender. Each reply goes out in the pacer's turn.
+ * Group replies tag the sender. Each reply goes out in the pacer's turn. A chat command (`/id`,
+ * `/sodu`, `/donhang`, `/stk`, `/help`) without a link is answered in both chats (chat-command.ts,
+ * Story 6.7); a link in the same message wins, as it did live.
  *
  * A link is asked for once, for the sender alone (the server queues it under the sender's own
  * customer id, so it carries their sub_id1), before the welcome is sent, so the wait for the link
@@ -33,6 +35,7 @@ import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply, t
 
 type LinkClaim = (typeof LINK_CLAIMS)[number];
 
+import { answerCommand, commandOf } from "./chat-command";
 import type { InternalApi } from "./internal-api.adapter";
 import { linkReplyMessage, refusalMessage, type ReplyMessage } from "./link-reply-text";
 import { extractFirstUrl } from "./message-parse";
@@ -169,6 +172,8 @@ export function chatReplier(deps: ChatReplyDeps): (message: IncomingMessage) => 
   };
   return async (message) => {
     const url = extractFirstUrl(message.text);
+    const command = url === null ? commandOf(message.text) : null;
+    if (command !== null) return answerCommand(deps, message, command, displayNameOf(message));
     if (message.chat.kind === "group") {
       if (url !== null) await answerLink(deps, message, url, "group");
       return;

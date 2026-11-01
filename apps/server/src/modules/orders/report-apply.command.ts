@@ -38,7 +38,7 @@ import type { SourcedRow } from "../linking/index";
 import { applyResult, type ApprovalEffect, type AppliedStep } from "./domain/applied-order";
 import { attribute, type Attribution } from "./domain/attribution";
 import { settlementPeriodOf, splitWithheld } from "./domain/settlement";
-import { rowCommission, transition, type Effect, type Step, type TransitionContext, type TransitionOrder, type TransitionResult } from "./domain/transition";
+import { rowCommission, transition, type Effect, type RejectionReason, type Step, type TransitionContext, type TransitionOrder, type TransitionResult } from "./domain/transition";
 import { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
 import type { OrderAwardsPort, OrderEventsPort, OrderPayoutsPort } from "./order-effects.port";
 import { findOrder, insertObservation, latestObservations, replaceItems, touchLastSeen, transitionOrderOf, type LatestObservations, type StoredOrder } from "./order-ledger.repository";
@@ -231,8 +231,8 @@ function orderChanges(a: Applying, order: TransitionOrder): Partial<OrderRow> {
   }
   if (a.step.approval !== null) Object.assign(changes, approvalChanges(a, a.step.approval), { updatedAt: a.now });
   Object.assign(changes, approvalStamp(a));
-  const rejection = a.result.effects.find((e): e is Extract<Effect, { kind: "record_rejection" }> => e.kind === "record_rejection");
-  if (rejection !== undefined) changes.rejectionReason = rejection.reason;
+  const rejection = rejectionOf(a);
+  if (rejection !== null) changes.rejectionReason = rejection;
   // A wrong rejection reopened (D38): the rejection no longer holds.
   if (a.result.steps.some(([from, to]) => from === "REJECTED" && to === "AWAITING_APPROVAL")) changes.rejectionReason = null;
   return changes;
@@ -261,10 +261,16 @@ function carryOut(a: Applying, orderId: string, customerId: string | null, deps:
   }
 }
 
+/** The rejection reason `transition` recorded for this row, or null. */
+function rejectionOf(a: Applying): RejectionReason | null {
+  const rejection = a.result.effects.find((e): e is Extract<Effect, { kind: "record_rejection" }> => e.kind === "record_rejection");
+  return rejection?.reason ?? null;
+}
+
 function reasonOf(a: Applying): string {
   if (a.review !== undefined) return a.review.reason;
-  const rejection = a.result.effects.find((e) => e.kind === "record_rejection");
-  if (rejection?.kind === "record_rejection") return rejection.reason;
+  const rejection = rejectionOf(a);
+  if (rejection !== null) return rejection;
   return a.step.reviewCases[0] ?? "report";
 }
 
@@ -273,9 +279,13 @@ function writeSteps(db: LedgerDb, a: Applying, order: TransitionOrder, customerI
   const approval = a.step.approval;
   const period = approval !== null && stampsApproval(a) ? settlementPeriodOf(a.now) : null;
   const facts: Record<string, AuditValue> = { network: a.row.network, ...(a.review === undefined ? {} : { caseId: a.review.caseId }) };
-  const params: Record<string, number> = {};
+  const params: Record<string, string | number> = {};
   if (approval !== null) Object.assign(facts, { cashback: approval.cashback, withheld: approval.withheld }, period === null ? {} : { settlementPeriod: period });
-  if (approval !== null) params.cashback = approval.cashback;
+  // The approved notice states the cashback: the new one, else the one stored before a freeze.
+  const cashback = approval?.cashback ?? a.stored?.cashback ?? null;
+  if (cashback !== null) params.cashback = cashback;
+  const rejection = rejectionOf(a);
+  if (rejection !== null) params.reason = rejection;
   const approvalReason = period === null || approval === null || a.review !== undefined ? undefined : `approved in settlement period ${a.row.network} ${period}, ${approval.withheld ? "withheld" : "not withheld"}`;
   recordSteps(db, { orderId, customerId, guest: order.guest, steps: a.result.steps, reason: reasonOf(a), approvalReason, facts, params }, deps);
   if (takesNetwork(a, order)) recordNetworkSet(db, { orderId, status: order.status, network: a.row.network }, deps);

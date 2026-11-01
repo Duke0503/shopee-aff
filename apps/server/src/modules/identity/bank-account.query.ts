@@ -9,10 +9,12 @@
  * (FR-31, the one fraud flag of v1). The change time is the consent time: every save of an
  * account stores a new consent time with it (FR-10), and a confirmation in Zalo does not change it.
  */
+import { hasBankAccount } from "@cashback/core";
 import { eq, inArray, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { lastFour } from "./bank-fingerprint";
+import { resolveCustomer } from "./customer.query";
 import { findVietQrBank, type VietQrBank } from "./domain/bank-match";
 import { bankAccounts, customers } from "./schema";
 
@@ -60,6 +62,23 @@ export function bankAccountsOf(db: LedgerDb, customerIds: readonly string[]): Ma
       },
     ]),
   );
+}
+
+/** The saved account of the customer `key` resolves to (an alias reads the survivor's), or null. */
+export function bankAccountOfCustomer(db: LedgerDb, key: string): BankAccountFacts | null {
+  const customer = resolveCustomer(db, key);
+  return customer === null ? null : (bankAccountsOf(db, [customer.customerId]).get(customer.customerId) ?? null);
+}
+
+/**
+ * Where the customer `key` resolves to stands with a bank account: `none`, `held` (saved but
+ * waiting for their confirmation in Zalo, so not yet one to pay to) or `confirmed`, the one
+ * meaning of "has a bank account" (AD-10).
+ */
+export function customerBankState(db: LedgerDb, key: string): "none" | "held" | "confirmed" {
+  const account = bankAccountOfCustomer(db, key);
+  if (account === null) return "none";
+  return hasBankAccount({ pendingConfirmation: account.held }) ? "confirmed" : "held";
 }
 
 /** The bank name a desk screen shows: the matched VietQR bank's short name, else the name as written. */

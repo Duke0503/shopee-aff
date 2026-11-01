@@ -3,8 +3,10 @@
  * customer's code and name, the product snapshot of its link (D56, https images only), its
  * status, its stored approved commission and the network payout that settled it; and the open
  * review cases of one network payout; how many orders each stored customer id holds; and a
- * customer's latest orders for a review case's candidate (Story 4.15). Read only.
+ * customer's latest orders for a review case's candidate (Story 4.15) and for the `/donhang` chat
+ * reply (Story 6.7). Read only.
  */
+import type { OrderStatus } from "@cashback/core";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -121,4 +123,24 @@ export function recentOrdersOf(
       productImageUrl: product?.productImageUrl ?? null,
     };
   });
+}
+
+export interface ChatOrder {
+  readonly orderId: string;
+  readonly status: OrderStatus;
+  readonly cashback: number | null;
+  /** The cancel reason code of a REJECTED order, as reconciliation stored it. */
+  readonly rejectionReason: string | null;
+}
+
+/** The latest orders under the stored ids, newest first, with what the `/donhang` reply says of each. */
+export function chatOrdersOf(db: LedgerDb, customerIds: readonly string[], limit: number): ChatOrder[] {
+  if (customerIds.length === 0) return [];
+  return db
+    .select({ orderId: orders.orderId, status: orders.status, cashback: orders.cashback, rejectionReason: orders.rejectionReason })
+    .from(orders)
+    .where(inArray(orders.customerId, [...customerIds]))
+    .orderBy(sql`${orders.recordedAt} DESC NULLS LAST`, desc(orders.orderId))
+    .limit(limit)
+    .all();
 }

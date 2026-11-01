@@ -4,7 +4,7 @@
  * §1).
  */
 export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-fingerprint";
-export { accountNumberOf, bankAccountsOf, bankDisplayName, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
+export { accountNumberOf, bankAccountOfCustomer, bankAccountsOf, customerBankState, bankDisplayName, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
 export { distinctiveBankText, findVietQrBank, plainBankText, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
 export { CustomerRegisterError, DISPLAY_NAME_MAX, registerCustomer, REGISTRATION_CHANNELS, ZALO_USER_ID_PATTERN, type Registered, type RegistrationChannel, type RegistrationInput } from "./customer-register.command";

@@ -60,7 +60,7 @@ export { latestWithholding, observeWithholding, settleOrders, settlementCandidat
 export { answerCustomerOrders, answerOrdersList, ORDERS_LIST } from "./orders.list";
 export { answerReviewCases, REVIEW_CASES_LIST } from "./review-cases.list";
 export { reviewCaseDetail } from "./review-case-detail.query";
-export { openSettlementCaseIds, orderCardsOf, orderCountOf, orderCountsByCustomer, recentOrdersOf, type OrderCard, type RecentOrder } from "./order-cards.query";
+export { chatOrdersOf, openSettlementCaseIds, orderCardsOf, orderCountOf, orderCountsByCustomer, recentOrdersOf, type ChatOrder, type OrderCard, type RecentOrder } from "./order-cards.query";
 export { orderBalanceRows, payableOrderLines, type AwaitingEstimate, type CustomerTotal, type OrderBalanceRows, type PayableOrderLine } from "./order-balance.query";
 export { applyReviewCase, dismissReviewCase, reportWrongRejection, type ReviewOutcome } from "./review-apply.command";
 export { reviewCaseRoutes, type ReviewCaseRouteDeps } from "./http/review-case.routes";
