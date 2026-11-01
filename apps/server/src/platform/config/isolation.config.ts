@@ -48,7 +48,7 @@ export interface IsolationSubject {
   readonly assistantToken: string | null;
   readonly bridgeToken: string | null;
   readonly bridgeMode: "fake" | "browser";
-  readonly zaloMode: "fake" | "account";
+  readonly zaloMode: "fake" | "account" | "relay";
   readonly zaloGroupIds: readonly string[];
   readonly browserProfileDir: string | null;
   readonly telegram: { readonly botToken: string; readonly chatId: string } | null;
@@ -73,7 +73,7 @@ export interface IsolationContext {
 
 export interface IsolationProblem {
   readonly key: string;
-  readonly reason: "production_port" | "production_path" | "production_value" | "not_the_dev_group" | "required" | "must_be_empty" | "same_as_production" | "production_env_file" | "fake_in_production" | "same_as_internal_token" | "same_as_assistant_token" | "own_ledger";
+  readonly reason: "production_port" | "production_path" | "production_value" | "not_the_dev_group" | "required" | "must_be_empty" | "same_as_production" | "production_env_file" | "fake_in_production" | "relay_in_production" | "same_as_internal_token" | "same_as_assistant_token" | "own_ledger";
 }
 
 /** The committed identifiers with their paths made absolute for this repository and home. */
@@ -161,7 +161,7 @@ function resourceProblems(config: IsolationSubject, ids: ProductionIdentifiers, 
   for (const [key, dir] of folders) if (dir !== null && ids.paths.some((p) => pathConflicts(dir, p, ci))) add(key, "production_path");
   if (config.bridgeMode === "browser" && config.browserProfileDir === null) add("BROWSER_PROFILE_DIR", "required");
   if (config.zaloGroupIds.some((g) => !ids.devZaloGroups.includes(g) || ids.productionZaloGroups.includes(g))) add("ZALO_GROUP_IDS", "not_the_dev_group");
-  if (config.zaloMode === "account" && config.zaloGroupIds.length === 0) add("ZALO_GROUP_IDS", "required");
+  if (config.zaloMode !== "fake" && config.zaloGroupIds.length === 0) add("ZALO_GROUP_IDS", "required");
   if (config.telegram !== null && ids.telegramChatIds.includes(config.telegram.chatId)) add("TELEGRAM_CHAT_ID", "production_value");
   if (config.publicBaseUrl !== null) add("PUBLIC_BASE_URL", "must_be_empty");
   if (config.staffAccess !== null && onHost(config.staffAccess.adminHost, ids)) add("ADMIN_HOST", "production_value");
@@ -184,6 +184,8 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
   if (config.env === "prod") {
     if (config.bridgeMode === "fake") out.push({ key: "BRIDGE_MODE", reason: "fake_in_production" });
     if (config.zaloMode === "fake") out.push({ key: "ZALO_MODE", reason: "fake_in_production" });
+    // The relay is the assistant's send-only test path to the Dev group (Story 6.3); never production's session.
+    if (config.zaloMode === "relay") out.push({ key: "ZALO_MODE", reason: "relay_in_production" });
     // Share links and the share page's hand-off are built on it (Story 5.8); never on a request's own Host.
     if (config.publicBaseUrl === null) out.push({ key: "PUBLIC_BASE_URL", reason: "required" });
     return out;

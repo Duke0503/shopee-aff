@@ -9,7 +9,8 @@
  * needs its own ZALO_CREDENTIALS_PATH, which must not be the production credentials (the live
  * assistant's folder, a production folder of production-identifiers.json, or the production env
  * file's ZALO_CREDENTIALS_PATH), and its groups may only be the Dev group. Production never runs
- * the fake session.
+ * the fake session. `ZALO_MODE=relay` (send-only to the Dev group through the live bot,
+ * relay-zalo.adapter.ts) is dev only, needs LIVE_BOT_TOKEN and exactly one group, the Dev group.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -35,6 +36,8 @@ export interface AssistantConfig {
   readonly zaloGroupIds: readonly string[];
   /** The Zalo session file; set exactly when `zaloMode` is `account`. */
   readonly zaloCredentialsPath: string | null;
+  /** The live bot's broadcast token; set exactly when `zaloMode` is `relay`. */
+  readonly liveBotToken: string | null;
   readonly sendDelay: HumanDelay;
   readonly friendRequestsPerDay: number;
   /** The assistant's own folder for its small state files (AD-15); never the server's ledger. */
@@ -80,6 +83,7 @@ function fileSchema(env: Environment) {
     ZALO_MODE: z.enum(ZALO_MODES).default(DEFAULTS[env].zalo),
     ZALO_GROUP_IDS: z.string().regex(/^[\d\s,]+$/).optional(),
     ZALO_CREDENTIALS_PATH: z.string().refine(isAbsolute).optional(),
+    LIVE_BOT_TOKEN: z.string().min(16).optional(),
     ASSISTANT_DATA_DIR: z.string().refine(isAbsolute).optional(),
     ASSISTANT_SEND_DELAY_MIN_MS: ms.default(6_000),
     ASSISTANT_SEND_DELAY_MAX_MS: ms.default(12_000),
@@ -102,8 +106,9 @@ export function isInsidePath(candidate: string, root: { path: string; tree: bool
 }
 
 function isolationProblems(config: AssistantConfig, internalPort: number, isolation: AssistantIsolation): string[] {
-  if (config.env === "prod") return config.zaloMode === "fake" ? ["ZALO_MODE (fake in production)"] : [];
+  if (config.env === "prod") return config.zaloMode === "account" ? [] : [`ZALO_MODE (${config.zaloMode} in production)`];
   const problems: string[] = [];
+  if (config.zaloMode === "relay" && config.zaloGroupIds.length !== 1) problems.push("ZALO_GROUP_IDS (relay needs exactly the Dev group)");
   if (isolation.productionPorts.includes(internalPort)) problems.push("INTERNAL_PORT (production port)");
   if (config.zaloGroupIds.some((id) => !isolation.devGroupIds.includes(id))) problems.push("ZALO_GROUP_IDS (not the Dev group)");
   const path = config.zaloCredentialsPath;
@@ -119,6 +124,7 @@ export function parseAssistantConfig(env: Environment, values: Readonly<Record<s
   const file = parsed.data;
   if (file.ASSISTANT_SEND_DELAY_MAX_MS < file.ASSISTANT_SEND_DELAY_MIN_MS) throw new AssistantConfigError("assistant config: missing or invalid ASSISTANT_SEND_DELAY_MAX_MS");
   if (file.ZALO_MODE === "account" && file.ZALO_CREDENTIALS_PATH === undefined) throw new AssistantConfigError("assistant config: missing or invalid ZALO_CREDENTIALS_PATH");
+  if (file.ZALO_MODE === "relay" && file.LIVE_BOT_TOKEN === undefined) throw new AssistantConfigError("assistant config: missing or invalid LIVE_BOT_TOKEN");
   const config: AssistantConfig = {
     env,
     internalBaseUrl: `http://127.0.0.1:${file.INTERNAL_PORT}`,
@@ -126,6 +132,7 @@ export function parseAssistantConfig(env: Environment, values: Readonly<Record<s
     zaloMode: file.ZALO_MODE,
     zaloGroupIds: idList(file.ZALO_GROUP_IDS),
     zaloCredentialsPath: file.ZALO_MODE === "account" ? (file.ZALO_CREDENTIALS_PATH ?? null) : null,
+    liveBotToken: file.ZALO_MODE === "relay" ? (file.LIVE_BOT_TOKEN ?? null) : null,
     sendDelay: { minMs: file.ASSISTANT_SEND_DELAY_MIN_MS, maxMs: file.ASSISTANT_SEND_DELAY_MAX_MS },
     friendRequestsPerDay: file.ASSISTANT_FRIEND_REQUESTS_PER_DAY,
     dataDir: file.ASSISTANT_DATA_DIR ?? join(REPOSITORY_ROOT, "data", env, "assistant"),

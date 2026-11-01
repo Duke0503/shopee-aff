@@ -65,6 +65,9 @@ export interface ReportBridgeJob {
 /** A report page's answer: the page's rows as `value` (checked by the server), a failure, or nobody answered. */
 export type BridgeReportResult = BridgeLookupResult;
 
+/** Page 1 of the Shopee payout record page (Story 4.22): its batches as `value` (checked by the server), a failure, or nobody answered. */
+export type BridgePayoutRecordResult = BridgeLookupResult;
+
 export interface BridgePort {
   readonly mode: BridgeMode;
   /** Never called inside a transaction; `signal` aborts at shutdown. */
@@ -73,6 +76,8 @@ export interface BridgePort {
   lookupProduct?(job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult>;
   /** A report page (Story 5.9), never inside a transaction; a bridge without it reads no report. */
   readReportPage?(job: ReportBridgeJob, signal: AbortSignal): Promise<BridgeReportResult>;
+  /** The payout record page, page 1 only (Story 4.22), never inside a transaction; a bridge without it records no Shopee payouts. */
+  readPayoutRecords?(signal: AbortSignal): Promise<BridgePayoutRecordResult>;
 }
 
 /**

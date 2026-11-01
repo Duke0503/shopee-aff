@@ -12,11 +12,11 @@ export const ASSISTANT_HEARTBEAT_PATH = "/internal/assistant/heartbeat";
 /** How often the assistant sends its heartbeat (AD-15). */
 export const ASSISTANT_HEARTBEAT_INTERVAL_MS = 60_000;
 
-export const ZALO_SESSION_MODES = ["fake", "account"] as const;
+export const ZALO_SESSION_MODES = ["fake", "account", "relay"] as const;
 export const ZALO_SESSION_STATES = ["connected", "disconnected"] as const;
 
 export const assistantHeartbeatSchema = z.strictObject({
-  /** `fake` in dev and tests (D37), `account` with a real Zalo session. */
+  /** `fake` in dev and tests (D37), `account` with a real Zalo session, `relay` the send-only Dev group path. */
   zalo: z.enum(ZALO_SESSION_MODES),
   session: z.enum(ZALO_SESSION_STATES),
   /** When this assistant process started. */

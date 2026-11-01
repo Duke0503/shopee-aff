@@ -87,3 +87,17 @@ export const REPORT_EMPTY = ".ant-empty";
 export const REPORT_PAGER = ".ant-pagination";
 export const REPORT_ACTIVE_PAGE = ".ant-pagination-item-active";
 export const REPORT_LOADING = ".ant-spin-spinning";
+
+/**
+ * The payout record page (Story 4.22; the live `payout_sync.py` read as reference): the operator's
+ * payout batches, page 1 only. Its address carries no page or other parameter; each row carries
+ * the batch the page shows in its React props (`record`), of which only these fields are answered.
+ */
+export const PAYOUT_RECORD_URL = "https://affiliate.shopee.vn/payment/payout_record";
+export const PAYOUT_ROW = "tr[data-row-key]";
+/** antd's fixed-column copies of a table (left, right), whose rows repeat the main body's. */
+export const PAYOUT_FIXED_COPIES = ".ant-table-fixed-left, .ant-table-fixed-right";
+export const PAYOUT_EMPTY = ".ant-empty";
+export const PAYOUT_LOADING = ".ant-spin-spinning";
+export const PAYOUT_PAGE_SIZE = 50;
+export const PAYOUT_FIELDS = ["payoutId", "payoutPaymentStatus", "totalPaymentAmount", "eligibleTotalAmount", "payoutCreatedTime", "payArrivalTime"] as const;

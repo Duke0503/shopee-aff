@@ -177,6 +177,7 @@ describe("the scheduler's own rules", () => {
       reconcile: { context: "orders", schedule: { kind: "every", delayMs: 3_600_000 } },
       nightlySweep: { context: "orders", schedule: { kind: "daily_vn", at: { hour: 2, minute: 0 } } },
       backup: { context: "platform", schedule: { kind: "daily_vn", at: { hour: 3, minute: 0 } } },
+      payoutRecords: { context: "payouts", schedule: { kind: "every", delayMs: 3_600_000 } },
     });
   });
 

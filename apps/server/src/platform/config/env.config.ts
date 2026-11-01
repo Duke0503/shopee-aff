@@ -92,7 +92,8 @@ export interface ServerConfig {
   isolationWarnings: readonly string[];
 }
 
-export const ZALO_MODES = ["fake", "account"] as const;
+/** `relay`: the assistant's send-only path to the Dev group through the live bot (Story 6.3), dev only. */
+export const ZALO_MODES = ["fake", "account", "relay"] as const;
 export type ZaloMode = (typeof ZALO_MODES)[number];
 
 /** What dev runs when its env file names nothing: no browser, no Zalo session (AD-25, D37). */

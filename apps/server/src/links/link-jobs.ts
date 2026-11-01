@@ -12,6 +12,7 @@
  */
 import type { Clock } from "@cashback/core";
 
+import { assistantChatRoutes } from "./assistant-chat.routes";
 import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkEffects } from "../modules/linking/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
@@ -67,13 +68,20 @@ export interface LinkWiringInput {
   readonly logger: Logger;
 }
 
-/** The bridge's own routes, and the assistant's link-request route when its token is configured. */
+/** Where share links are written: the public origin, else (dev without a tunnel) this machine's public listener. */
+export const shareBaseUrlFor = (config: Pick<ServerConfig, "publicBaseUrl" | "publicPort">): string => config.publicBaseUrl ?? `http://127.0.0.1:${config.publicPort}`;
+
+/**
+ * The bridge's own routes, and when the assistant token is configured the assistant's link-request
+ * route and its chat routes (registration, link request and link reply, Stories 6.2 and 6.3).
+ */
 export function linkRoutes(input: LinkWiringInput, bridge: LinkBridge): InternalRoutes[] {
   if (input.config.assistantToken === null) {
     input.logger.warn({ env: input.config.env }, "linking.assistant_routes.absent");
     return [...bridge.routes];
   }
-  return [...bridge.routes, linkRequestInternalRoutes({ ledger: input.ledger, clock: input.clock, requestIdPrefix: subIdPrefixFor(input.config.env), tikTok: accessTradeLinksFor(input.config) !== null })];
+  const shared = { ledger: input.ledger, clock: input.clock, requestIdPrefix: subIdPrefixFor(input.config.env), tikTok: accessTradeLinksFor(input.config) !== null };
+  return [...bridge.routes, linkRequestInternalRoutes(shared), assistantChatRoutes({ ...shared, shareBaseUrl: shareBaseUrlFor(input.config) })];
 }
 
 /** The actor of the link job's own writes: the "link failed" outbox rows (AD-17). */

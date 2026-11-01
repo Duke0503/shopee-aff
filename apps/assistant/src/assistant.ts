@@ -1,20 +1,21 @@
 /**
  * The running assistant (AD-15): one Zalo session behind the target guard, one pacer for every
  * send, the friend-request limit, and the heartbeat loop. It holds no database and serves no
- * listener; the server is reached only through the internal api. Replying to what people write
- * (registration, link requests, commands) arrives with Stories 6.2 onward; for now an incoming
- * private message only records that the person wrote first.
+ * listener; the server is reached only through the internal api. An incoming private message
+ * records that the person wrote first; every message is then answered by `answerMessage`
+ * (registration and link replies, Stories 6.2 and 6.3), its sends in the pacer's turn.
  */
 import type { AssistantHeartbeat } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 
+import { chatReplier, type ChatSend } from "./chat-reply";
 import { runHeartbeat } from "./heartbeat.job";
 import { friendRequestLimiter, requestFriend, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
 import type { InternalApi } from "./internal-api.adapter";
-import { messageText, type MessageKey } from "./messages";
+import { messageText } from "./messages";
 import { createPacer, type HumanDelay, type Pacer, type Sleep } from "./pacer";
 import { guardTargets } from "./zalo-target.guard";
-import type { ChatTarget, ZaloSession } from "./zalo.port";
+import type { ZaloSession } from "./zalo.port";
 
 export interface AssistantDeps {
   readonly zalo: ZaloSession;
@@ -29,12 +30,14 @@ export interface AssistantDeps {
   readonly onError: (event: string, error: unknown) => void;
   readonly random?: () => number;
   readonly heartbeatIntervalMs?: number;
+  /** How long a link reply waits on the server (chat-reply.ts); tests shorten it. */
+  readonly replyWaitMs?: number;
 }
 
 export interface RunningAssistant {
   readonly pacer: Pacer;
-  /** Sends one message by key, in the pacer's turn. */
-  send(target: ChatTarget, key: MessageKey, values?: Readonly<Record<string, string | number>>): Promise<void>;
+  /** Sends one message by key, in the pacer's turn; a group message may tag a person. */
+  readonly send: ChatSend;
   requestFriend(userId: string): Promise<FriendRequestOutcome>;
   stop(): Promise<void>;
 }
@@ -46,8 +49,17 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
   const stopping = new AbortController();
   const startedAt = deps.clock.now();
 
+  const send: ChatSend = (target, key, values, tag) => {
+    const text = messageText(key, values);
+    if (target.kind !== "group" || !tag) return pacer.send(() => zalo.sendText(target, text));
+    // A group reply opens with "@Name" on its own line, tagged as a mention of the sender (as live).
+    const mark = `@${tag.name}`;
+    return pacer.send(() => zalo.sendText(target, `${mark}\n${text}`, [{ userId: tag.userId, pos: 0, len: mark.length }]));
+  };
+  const answer = chatReplier({ api: deps.api, clock: deps.clock, sleep: deps.sleep, send, ...(deps.replyWaitMs === undefined ? {} : { replyWaitMs: deps.replyWaitMs }) });
   zalo.onMessage(async (message) => {
     if (message.chat.kind === "private") limiter.noteWroteFirst(message.senderId);
+    await answer(message).catch((error: unknown) => deps.onError("assistant.message.failed", error));
   });
 
   const beat = (): AssistantHeartbeat => ({ zalo: zalo.mode, session: zalo.connected() ? "connected" : "disconnected", startedAt, queuedSends: pacer.queued() });
@@ -63,7 +75,7 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
 
   return {
     pacer,
-    send: (target, key, values) => pacer.send(() => zalo.sendText(target, messageText(key, values))),
+    send,
     requestFriend: (userId) => requestFriend(friends, userId),
     stop: async () => {
       stopping.abort();

@@ -92,7 +92,7 @@ export { ACCESSTRADE_LINK_PATH, accessTradeLinkCreator, fakeAccessTradeLinks, fe
 export { checkReturnedLink, isShopeeShortHost, linkWithoutQuery, needsResolution, shopKeyFromTarget, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure, type LinkOrigin } from "./domain/link-check";
 export { MAX_LINKS_PER_RUN, runLinkJob, type LinkJobDeps, type LinkJobRun } from "./link.job";
 export { FAKE_BRIDGE_HOST, fakeBridge, fakeLinkUrl } from "./fake-bridge.adapter";
-export { readProductLink, readShopeeProduct, shopeeProductKey, shopeeProductKeyOf, shopeeProductUrl, SUB_ID_PATTERN, type ProductLink } from "./domain/product-url";
+export { isOtherShopLink, OTHER_SHOP_DOMAINS, readProductLink, readShopeeProduct, shopeeProductKey, shopeeProductKeyOf, shopeeProductUrl, SUB_ID_PATTERN, type ProductLink } from "./domain/product-url";
 export { chooseReusable, isReusable, LINK_REUSE_WINDOW_DAYS, unreadableTimes, type ReuseCandidate, type ReuseRule } from "./domain/link-reuse";
 export { linkRequestInternalRoutes, type LinkRequestRouteDeps } from "./http/link-request.routes";
 export { BRIDGE_ANSWER_GRACE_MS, BRIDGE_JOB_TIMEOUT_MS, BRIDGE_PICKUP_MS, BRIDGE_POLL_MS, browserBridge, type BridgeAnswer, type BridgeTimer, type BridgeWork, type BrowserBridge, type BrowserBridgeOptions } from "./browser-bridge.adapter";
@@ -108,3 +108,6 @@ export { recordLinkClick, type LinkVisit } from "./link-click.command";
 export { LINK_CLICK_AGENTS, type LinkClickAgent } from "./schema";
 export { answerDeskLinkRequests, DESK_LINK_REQUESTS_LIST } from "./link-requests-desk.list";
 export { linkRequestDeskRoutes, type LinkRequestDeskRouteDeps } from "./http/link-request-desk.routes";
+export { linkReplyFactsOf, type LinkReplyFacts } from "./link-reply.query";
+export { readShopeePayoutRecords, SHOPEE_PAYOUT_STATUS_MAP, type PayoutRecordRead, type ShopeePayoutBatch } from "./domain/shopee-payout-record";
+export { PayoutRecordError, readShopeePayouts, type PayoutRecordErrorCode, type ShopeePayoutSourceDeps } from "./shopee-payout.adapter";

@@ -27,6 +27,9 @@ function openers(): SessionOpeners & { accountCalls: string[] } {
       accountCalls.push(path);
       return fakeZaloSession(CLOCK);
     },
+    relay: () => {
+      throw new Error("no relay in these tests");
+    },
   };
 }
 

@@ -12,5 +12,21 @@
   "link_failed": "Mình chưa tạo được link cho sản phẩm này. Bạn gửi lại link giúp mình, hoặc thử một sản phẩm khác.",
   "link_not_in_affiliate": "Sản phẩm này không nằm trong chương trình hoàn tiền của TikTok Shop, nên mình không tạo được link. Bạn thử một sản phẩm khác nhé.",
   "link_shopeefood_per_shop": "Link ShopeeFood: tiền hoàn tính theo từng quán, có số chính xác sau khi đơn được duyệt.",
-  "friend_request_greeting": "Mình là trợ lý Hoàn Tiền DP. Kết bạn để nhận thông báo đơn hàng và tiền hoàn ngay trong hộp thư chính nhé!"
+  "friend_request_greeting": "Mình là trợ lý Hoàn Tiền DP. Kết bạn để nhận thông báo đơn hàng và tiền hoàn ngay trong hộp thư chính nhé!",
+  "welcome": "Chào bạn, mình là trợ lý Hoàn Tiền DP. Mã khách của bạn là {customerCode}.\n\nGửi mình link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop, mình gửi lại link hoàn tiền của riêng bạn. Mua qua link đó, sau khi sàn duyệt đơn bạn nhận lại 80% hoa hồng còn lại sau phí sàn và thuế: ví dụ hoa hồng 10.000đ thì bạn nhận khoảng 7.100đ.",
+  "link_ready": "Link hoàn tiền của bạn:\n{link}\n\nSản phẩm: {product}\nGiá: {price}\nBạn nhận lại khoảng {cashback}, tức {share} hoa hồng của đơn này sau phí sàn.\n\nBấm link, mở bằng trình duyệt rồi mua luôn trên máy đó. Số tiền chính xác tính theo hoa hồng sàn duyệt.",
+  "link_ready_withheld": "Link hoàn tiền của bạn:\n{link}\n\nSản phẩm: {product}\nGiá: {price}\nBạn nhận lại khoảng {cashback}, tức {share} hoa hồng của đơn này sau phí sàn và thuế.\n\nBấm link, mở bằng trình duyệt rồi mua luôn trên máy đó. Số tiền chính xác tính theo hoa hồng sàn duyệt.",
+  "link_ready_no_estimate": "Link hoàn tiền của bạn:\n{link}\n\nSản phẩm: {product}\nGiá: {price}\nMình chưa có số tiền hoàn ước tính cho sản phẩm này. Số tiền được tính khi sàn duyệt đơn.\n\nBấm link, mở bằng trình duyệt rồi mua luôn trên máy đó.",
+  "link_ready_shopeefood": "Link ShopeeFood của bạn:\n{link}\n\nTiền hoàn tính theo từng quán, có số chính xác sau khi đơn được duyệt.\n\nBấm link, mở bằng trình duyệt rồi đặt món luôn trên máy đó.",
+  "link_on_its_way": "Mình đã nhận link và đang tạo link hoàn tiền cho bạn. Có link là mình nhắn bạn ngay.",
+  "link_network_unsupported": "Link này chưa được hoàn tiền. Hiện mình chỉ hoàn tiền cho link Shopee, ShopeeFood và TikTok Shop. Bạn gửi link sản phẩm của ba sàn này nhé.",
+  "link_url_too_long": "Link này quá dài. Bạn gửi link Shopee, ShopeeFood hoặc TikTok Shop ngắn hơn nhé.",
+  "link_tiktok_unavailable": "Hiện mình chưa tạo được link TikTok Shop. Bạn gửi link sản phẩm Shopee nhé.",
+  "link_customer_disabled": "Tài khoản của bạn đang tạm khoá nên mình chưa tạo được link. Bạn nhắn quản trị viên giúp mình nhé.",
+  "link_try_later": "Mình chưa nhận được link này, bạn gửi lại sau ít phút giúp mình nhé.",
+  "send_a_link": "Bạn gửi mình link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop, mình gửi lại link hoàn tiền nhé.",
+  "amount_dong": "{amount}đ",
+  "value_missing": "–",
+  "link_day_full": "Hôm nay mình đã nhận quá nhiều yêu cầu link. Bạn gửi lại link này vào ngày mai giúp mình nhé.",
+  "link_contact_admin": "Tài khoản của bạn chưa tạo được link. Bạn nhắn quản trị viên giúp mình nhé."
 }

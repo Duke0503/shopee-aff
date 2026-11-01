@@ -4,17 +4,17 @@
  */
 import type { Clock, Instant } from "@cashback/core";
 
-import type { ChatTarget, IncomingMessage, MessageHandler, ZaloSession } from "./zalo.port";
+import type { ChatTarget, IncomingMessage, Mention, MessageHandler, ZaloSession } from "./zalo.port";
 
 export interface FakeZaloSession extends ZaloSession {
-  readonly sent: readonly { readonly target: ChatTarget; readonly text: string; readonly at: Instant }[];
+  readonly sent: readonly { readonly target: ChatTarget; readonly text: string; readonly at: Instant; readonly mentions?: readonly Mention[] }[];
   readonly friendRequests: readonly { readonly userId: string; readonly greeting: string; readonly at: Instant }[];
   /** Test helper: deliver a message as if a person had written it. */
   deliver(message: IncomingMessage): Promise<void>;
 }
 
 export function fakeZaloSession(clock: Clock): FakeZaloSession {
-  const sent: { target: ChatTarget; text: string; at: Instant }[] = [];
+  const sent: { target: ChatTarget; text: string; at: Instant; mentions?: readonly Mention[] }[] = [];
   const friendRequests: { userId: string; greeting: string; at: Instant }[] = [];
   let handler: MessageHandler | null = null;
   let open = true;
@@ -26,8 +26,8 @@ export function fakeZaloSession(clock: Clock): FakeZaloSession {
     onMessage: (next) => {
       handler = next;
     },
-    sendText: async (target, text) => {
-      sent.push({ target, text, at: clock.now() });
+    sendText: async (target, text, mentions) => {
+      sent.push({ target, text, at: clock.now(), ...(mentions === undefined ? {} : { mentions }) });
     },
     addFriend: async (userId, greeting) => {
       friendRequests.push({ userId, greeting, at: clock.now() });

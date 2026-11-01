@@ -20,6 +20,8 @@ export const JOB_SCHEDULES = {
   reconcile: { context: "orders", schedule: every(60 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },
   backup: { context: "platform", schedule: dailyVn(3) },
+  /** The Shopee payout record page: hourly, read once a day from 09:30 Vietnam time until it succeeds (Story 4.22). */
+  payoutRecords: { context: "payouts", schedule: every(60 * 60_000) },
 } as const satisfies Record<string, JobTiming>;
 
 export type JobName = keyof typeof JOB_SCHEDULES;

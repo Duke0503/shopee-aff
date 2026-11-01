@@ -19,10 +19,10 @@ const THREAD_GROUP = 1;
 
 /** The part of the zca-js api this adapter uses. */
 interface ZcaApi {
-  sendMessage(message: { msg: string }, threadId: string, threadType: number): Promise<unknown>;
+  sendMessage(message: { msg: string; mentions?: { uid: string; pos: number; len: number }[] }, threadId: string, threadType: number): Promise<unknown>;
   sendFriendRequest(message: string, userId: string): Promise<unknown>;
   listener: {
-    on(event: "message", handler: (message: { type: number; threadId: string; data: { uidFrom?: string; content?: unknown } }) => void): void;
+    on(event: "message", handler: (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown } }) => void): void;
     on(event: "connected" | "closed", handler: () => void): void;
     start(options?: { retryOnClose?: boolean }): void;
     stop(): void;
@@ -43,11 +43,11 @@ async function loadZca(): Promise<ZcaModule> {
   }
 }
 
-const incoming = (message: { type: number; threadId: string; data: { uidFrom?: string; content?: unknown } }): IncomingMessage | null => {
+const incoming = (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown } }): IncomingMessage | null => {
   const senderId = message.data.uidFrom;
   if (typeof senderId !== "string" || typeof message.data.content !== "string") return null;
   const chat: ChatTarget = message.type === THREAD_GROUP ? { kind: "group", groupId: String(message.threadId) } : { kind: "private", userId: senderId };
-  return { chat, senderId, text: message.data.content };
+  return { chat, senderId, senderName: typeof message.data.dName === "string" ? message.data.dName : null, text: message.data.content };
 };
 
 export async function openZcaSession(credentialsPath: string, allowedGroupIds: readonly string[], onError: (error: unknown) => void): Promise<ZaloSession> {
@@ -69,8 +69,10 @@ export async function openZcaSession(credentialsPath: string, allowedGroupIds: r
     onMessage: (next) => {
       handler = next;
     },
-    sendText: async (target, text) => {
-      await (target.kind === "group" ? api.sendMessage({ msg: text }, target.groupId, THREAD_GROUP) : api.sendMessage({ msg: text }, target.userId, THREAD_USER));
+    sendText: async (target, text, mentions) => {
+      if (target.kind === "private") return void (await api.sendMessage({ msg: text }, target.userId, THREAD_USER));
+      const tags = (mentions ?? []).map((m) => ({ uid: m.userId, pos: m.pos, len: m.len }));
+      await api.sendMessage(tags.length === 0 ? { msg: text } : { msg: text, mentions: tags }, target.groupId, THREAD_GROUP);
     },
     addFriend: async (userId, greeting) => {
       await api.sendFriendRequest(greeting, userId);

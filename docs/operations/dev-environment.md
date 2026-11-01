@@ -86,7 +86,29 @@ ASSISTANT_TOKEN=<at least 32 random characters, different from INTERNAL_TOKEN>
 # ACCESSTRADE_API_KEY=<a dev key; the production key also needs ALLOW_PROD_ACCESSTRADE_KEY=1>
 # LIVE_LEDGER_PATH=<absolute path of the live copy a rehearsal reads, outside data/dev>
 # PUBLIC_BASE_URL stays unset in dev.
+# With ZALO_MODE=relay (see below) the live bot's broadcast token and exactly the Dev group:
+# LIVE_BOT_TOKEN=<read on the production host only, never committed>
 ```
+
+## Sending to the Dev group through the live bot (`ZALO_MODE=relay`)
+
+A second login of the production Zalo account cuts the live bot off, so the new assistant never
+logs in to it. For end-to-end checks on the production host, `ZALO_MODE=relay` gives the assistant
+a send-only session (`apps/assistant/src/relay-zalo.adapter.ts`) that posts each message to the
+live bot's own local API, `POST http://127.0.0.1:8891/api/broadcast`, always with
+`{"group": "test"}`, which the live bot maps to the Dev group "Dev Internal DP". Group mentions go
+along as `mentions: [{uid, pos, len}]`.
+
+- **Dev only.** The assistant refuses `ZALO_MODE=relay` with `CASHBACK_ENV=prod`, and the server's
+  config refuses it in production too.
+- **Dev group only.** `ZALO_GROUP_IDS` must be exactly the Dev group's id. The session refuses
+  every other group (the main group included), every private target and every friend request
+  before anything is sent, and it is wrapped by the target guard like every other session.
+- **It hears nothing.** No message arrives through it, so it registers no one and answers no one.
+- **The token.** `LIVE_BOT_TOKEN` is the live bot's `x-assistant-token`. Read it on the production
+  host only, put it in that host's `~/.config/cashback/dev.env`, and never commit it or copy it
+  elsewhere.
+- **Tests never use it** except with a fake `fetch` (`apps/assistant/tests/relay.test.ts`).
 
 ## Trying the browser bridge extension in dev (Story 5.3)
 

@@ -58,6 +58,19 @@ function readTikTokLink(text: string): ProductLink {
   return { ok: true, network: "accesstrade", platform: "tiktok", sourceUrl: url.href, productKey: id === undefined ? null : `tiktok:${id}` };
 }
 
+/**
+ * Shops this platform does not serve (D17), as the live assistant knew them: a link to one of them
+ * is answered with the polite refusal, while any other non-shop link pasted in the community group
+ * gets no reply at all (owner decision, Sprint 25 review).
+ */
+export const OTHER_SHOP_DOMAINS = ["lazada.vn", "tiki.vn", "ti.ki"] as const;
+
+/** True for a link to a shop the platform does not serve (Lazada, Tiki). */
+export function isOtherShopLink(text: string): boolean {
+  const host = linkHost(text);
+  return host !== null && hostOnDomain(host, OTHER_SHOP_DOMAINS);
+}
+
 /** The network, the link as a request keeps it and its product key, or why it is refused. */
 export function readProductLink(text: string): ProductLink {
   const host = linkHost(text);

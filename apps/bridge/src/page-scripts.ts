@@ -220,3 +220,65 @@ export function readReportTable(input: ReportTableInput): ReportLook {
     return { ...base, state: "unreadable" };
   }
 }
+
+export interface PayoutTableInput {
+  readonly row: string;
+  /** antd's copies of the table for fixed columns: their rows repeat the main table's and are skipped. */
+  readonly fixedCopies: string;
+  /** The record field that names a batch; a batch shown twice is kept once. */
+  readonly idField: string;
+  readonly empty: string;
+  readonly loading: string;
+  readonly maxRows: number;
+  /** The record fields answered, as the page holds them; nothing else of a record leaves the page. */
+  readonly fields: readonly string[];
+}
+
+export type PayoutLook = { readonly href: string; readonly passwordBox: boolean } & ({ readonly state: "rows"; readonly records: Record<string, string | number | null>[] } | { readonly state: "empty" | "waiting" | "unreadable" });
+
+/**
+ * One look at the payout record table (Story 4.22; the live payout reader's script): the record
+ * each row was rendered from, found up the row's React fiber, cut down to the fields asked for,
+ * each passed on as it is (a text or a number), never converted. Rows of antd's fixed-column
+ * copies of the table are skipped, and a batch found twice with the same fields is kept once. A
+ * row without a record, a field of another kind, one batch twice with different fields, or more
+ * rows than one page holds is "unreadable"; the server decides the rest.
+ */
+export function readPayoutTable(input: PayoutTableInput): PayoutLook {
+  const recordOf = (el: Element): unknown => {
+    const fiberKey = Object.keys(el).find((k) => k.startsWith("__reactFiber") || k.startsWith("__reactInternalInstance"));
+    let node = fiberKey === undefined ? null : (el as unknown as Record<string, unknown>)[fiberKey];
+    for (let depth = 0; node !== null && typeof node === "object" && depth < 40; depth++) {
+      const props = (node as { memoizedProps?: unknown }).memoizedProps;
+      if (props !== null && typeof props === "object" && "record" in props) return (props as Record<string, unknown>)["record"];
+      node = (node as { return?: unknown }).return ?? null;
+    }
+    return undefined;
+  };
+  const base = { href: location.href, passwordBox: document.querySelector("input[type=password]") !== null };
+  if (document.querySelector(input.loading) !== null) return { ...base, state: "waiting" };
+  const rows = Array.from(document.querySelectorAll(input.row)).filter((r) => r.closest(input.fixedCopies) === null);
+  if (rows.length === 0) return { ...base, state: document.querySelector(input.empty) === null ? "waiting" : "empty" };
+  const records: Record<string, string | number | null>[] = [];
+  const seen = new Map<string, string>();
+  for (const row of rows) {
+    const record = recordOf(row);
+    if (record === null || typeof record !== "object" || Array.isArray(record)) return { ...base, state: "unreadable" };
+    const picked: Record<string, string | number | null> = {};
+    for (const field of input.fields) {
+      const value = (record as Record<string, unknown>)[field];
+      if (value === undefined || value === null) picked[field] = null;
+      else if ((typeof value === "string" && value.length <= 64) || (typeof value === "number" && Number.isFinite(value))) picked[field] = value;
+      else return { ...base, state: "unreadable" };
+    }
+    const id = String(picked[input.idField] ?? "");
+    const content = JSON.stringify(picked);
+    const before = seen.get(id);
+    if (before === content) continue;
+    if (before !== undefined) return { ...base, state: "unreadable" };
+    seen.set(id, content);
+    records.push(picked);
+  }
+  if (records.length > input.maxRows) return { ...base, state: "unreadable" };
+  return { ...base, state: "rows", records };
+}

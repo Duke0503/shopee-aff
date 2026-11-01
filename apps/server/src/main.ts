@@ -31,6 +31,7 @@ import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
 import { shutdownRoutes } from "./platform/lifecycle/shutdown.routes";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
 import { createLogger, type Logger } from "./platform/log/logger";
+import { payoutRecordJobs } from "./reconcile/payout-record.job";
 import { reconcileJobs } from "./reconcile/reconcile-jobs";
 
 function readConfig(): ServerConfig | null {
@@ -46,7 +47,8 @@ function readConfig(): ServerConfig | null {
 /** The module jobs; Stories 8.2 and 8.3 add theirs here. */
 function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger, bridge: LinkBridge): Job[] {
   const claimExpiry: Job = { name: "claimExpiry", ...JOB_SCHEDULES.claimExpiry, run: () => void runClaimExpiry({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }) };
-  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge)];
+  const payoutRecords = payoutRecordJobs({ ledger, clock: systemClock, bridge: bridge.port, logger });
+  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge), ...payoutRecords];
 }
 
 /** The one stop of this process, whichever asks first: a signal, or the dev shutdown route. */

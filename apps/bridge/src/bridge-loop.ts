@@ -13,6 +13,7 @@ import type { ConnectedSettings } from "./bridge-settings";
 import type { PageDriver, Wait } from "./bridge-tab";
 import { runLinkJob } from "./link-job";
 import { runLookupJob } from "./lookup-job";
+import { runPayoutRecordJob } from "./payout-record-job";
 import { runReportJob } from "./report-job";
 import type { ServerClient } from "./server-client";
 import { NO_RESOLUTION, type ResolveLink } from "./short-link";
@@ -35,11 +36,12 @@ export const RETRY_FIRST_MS = 1_000;
 export const RETRY_MAX_MS = 30_000;
 export const POST_TRIES = 3;
 
-/** The work for one job: a link on the custom link page, a product lookup (Story 5.6), a report page (Story 5.9). */
+/** The work for one job: a link on the custom link page, a product lookup (Story 5.6), a report page (Story 5.9), the payout record page (Story 4.22). */
 export function jobWorker(page: PageDriver, wait: Wait, resolve: ResolveLink = NO_RESOLUTION, resolveSource: ResolveLink = NO_RESOLUTION): (job: BridgeJob) => Promise<Answer> {
   return async (job) => {
     if (job.kind === "link") return runLinkJob(job, page, wait, resolve, resolveSource);
     if (job.kind === "lookup") return runLookupJob(job, page, wait, resolve);
+    if (job.kind === "payout_record") return runPayoutRecordJob(job, page, wait);
     return runReportJob(job, page, wait);
   };
 }

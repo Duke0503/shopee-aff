@@ -1,8 +1,8 @@
 /**
  * The real browser bridge behind the bridge port (AD-14, AD-25, D8, D47, INV-10; Story 5.3). The
  * affiliate Chrome's extension long-polls the internal listener; this adapter is the meeting point.
- * Work waits in memory in the order of service (link, product lookup, report page, then oldest
- * first), and exactly one job is out at a time: the next job is handed out only after the one out
+ * Work waits in memory in the order of service (link, product lookup, then a report page or the
+ * payout record page, then oldest first), and exactly one job is out at a time: the next job is handed out only after the one out
  * is answered or given up, so a Zalo link waits for at most one report page.
  *
  * Every wait is here, on the server: the poll is held until work arrives or `pollMs` ends. The job
@@ -25,7 +25,7 @@
 import { randomBytes } from "node:crypto";
 import { bridgeJobSchema, type BridgeFailure, type BridgeJob, type BridgeJobKind, type BridgeResult } from "@cashback/contracts";
 
-import type { BridgeLinkResult, BridgeLookupResult, BridgePort, BridgeReportResult, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob, LookupBridgeJob, ReportBridgeJob } from "../../platform/ports/bridge.port";
+import type { BridgeLinkResult, BridgeLookupResult, BridgePayoutRecordResult, BridgePort, BridgeReportResult, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob, LookupBridgeJob, ReportBridgeJob } from "../../platform/ports/bridge.port";
 
 /** Seconds-scale timers, injected so tests run without waiting. */
 export interface BridgeTimer {
@@ -51,13 +51,14 @@ export const BRIDGE_PICKUP_MS = 60_000;
 export const BRIDGE_JOB_TIMEOUT_MS = 90_000;
 export const BRIDGE_ANSWER_GRACE_MS = 15_000;
 
-const SERVICE_ORDER: Record<BridgeJobKind, number> = { link: 0, lookup: 1, report: 2 };
+const SERVICE_ORDER: Record<BridgeJobKind, number> = { link: 0, lookup: 1, report: 2, payout_record: 2 };
 
 /** What is asked of the browser, before the queue gives it a ticket and a timeout. */
 export type BridgeWork =
   | { kind: "link"; sourceUrl: string; subId1: string; subId2: string }
   | { kind: "lookup"; url: string }
-  | { kind: "report"; page: number; purchaseTimeStart: number; purchaseTimeEnd: number };
+  | { kind: "report"; page: number; purchaseTimeStart: number; purchaseTimeEnd: number }
+  | { kind: "payout_record" };
 
 export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
 
@@ -67,6 +68,7 @@ export interface BrowserBridge extends BridgePort {
   readonly work: BridgeWorkQueue;
   /** Queues one job and waits for its answer; `signal` aborts at shutdown. */
   submit(work: BridgeWork, signal: AbortSignal): Promise<BridgeAnswer>;
+  readPayoutRecords(signal: AbortSignal): Promise<BridgePayoutRecordResult>;
 }
 
 interface Entry {
@@ -238,5 +240,6 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
     createLink: async (job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult> => linkResultOf(await submit({ kind: "link", sourceUrl: job.sourceUrl, subId1: job.subId1, subId2: job.subId2 }, signal)),
     lookupProduct: async (job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult> => lookupResultOf(await submit({ kind: "lookup", url: job.url }, signal)),
     readReportPage: async (job: ReportBridgeJob, signal: AbortSignal): Promise<BridgeReportResult> => lookupResultOf(await submit({ kind: "report", ...job }, signal)),
+    readPayoutRecords: async (signal: AbortSignal): Promise<BridgePayoutRecordResult> => lookupResultOf(await submit({ kind: "payout_record" }, signal)),
   };
 }

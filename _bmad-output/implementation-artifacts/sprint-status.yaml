@@ -95,7 +95,7 @@ development_status:
   4-19-customer-merge-by-admin-command-with-preview-and-apply: review
   4-20-seed-staff-accounts-and-create-a-campaign-by-admin-command: review
   4-21-network-payouts-matched-to-exact-orders: review
-  4-22-shopee-payout-record-page-through-the-bridge-records-network: backlog
+  4-22-shopee-payout-record-page-through-the-bridge-records-network: review
   epic-4-retrospective: optional
 
   epic-5: in-progress
@@ -114,8 +114,8 @@ development_status:
 
   epic-6: in-progress
   6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace: review
-  6-2-registration-from-zalo-assigns-a-customer-code: backlog
-  6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: backlog
+  6-2-registration-from-zalo-assigns-a-customer-code: review
+  6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: review
   6-4-notification-outbox-delivered-by-pull-and-acknowledgement: backlog
   6-5-link-delivered-once-by-chat-or-by-notification: backlog
   6-6-order-clawback-and-payout-notifications-told-once: backlog

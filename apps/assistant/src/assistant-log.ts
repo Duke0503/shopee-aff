@@ -7,7 +7,7 @@ import { pino, type Logger } from "pino";
 
 import type { LogLevel } from "./assistant.config";
 
-const SENSITIVE = ["token", "assistantToken", "authorization", "cookie", "credentials", "userId", "senderId", "groupId", "zaloId", "text", "greeting", "phone"];
+const SENSITIVE = ["token", "assistantToken", "liveBotToken", "authorization", "cookie", "credentials", "userId", "senderId", "groupId", "zaloId", "text", "greeting", "phone"];
 
 export const REDACT_PATHS = SENSITIVE.flatMap((key) => [key, `*.${key}`]);
 

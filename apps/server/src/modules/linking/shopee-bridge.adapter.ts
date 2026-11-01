@@ -77,19 +77,27 @@ async function yieldToLinks(deps: ShopeeBridgeSourceDeps, signal: AbortSignal | 
   }
 }
 
+/**
+ * A page that answered with a captcha holds the Shopee queue, the login page pauses it, each with
+ * its owner alert, exactly as a link submission does (Story 5.5); any other reason changes nothing.
+ * Shared by every report-like page read (the conversion report, the payout record page).
+ */
+export function blockOnSessionPage(deps: Pick<ShopeeBridgeSourceDeps, "ledger" | "clock" | "alerts">, reason: string): void {
+  if (reason !== "captcha" && reason !== "login_redirect") return;
+  const at = deps.clock.now();
+  deps.ledger.tx((db) => {
+    if (reason === "captcha") {
+      holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS));
+      deps.alerts(db).alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity);
+    } else if (pauseShopeeQueue(db, "login_redirect", at)) {
+      deps.alerts(db).alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);
+    }
+  });
+}
+
 /** A failed page: a captcha holds the queue, the login page pauses it (Story 5.5); the read fails either way. */
 function pageFailed(deps: ShopeeBridgeSourceDeps, page: number, reason: string): never {
-  const at = deps.clock.now();
-  if (reason === "captcha" || reason === "login_redirect") {
-    deps.ledger.tx((db) => {
-      if (reason === "captcha") {
-        holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS));
-        deps.alerts(db).alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity);
-      } else if (pauseShopeeQueue(db, "login_redirect", at)) {
-        deps.alerts(db).alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);
-      }
-    });
-  }
+  blockOnSessionPage(deps, reason);
   return fail("report_fetch_failed", `report page ${page}: the browser answered ${reason}`);
 }
 

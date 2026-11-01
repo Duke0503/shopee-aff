@@ -7,7 +7,8 @@
  * before a restart is dropped. Every call also carries `X-Bridge-Instance`, the extension's own id
  * kept in its profile: the job out belongs to that instance, so a second browser never gets it
  * (no duplicate submission) and the same instance polling again after a restart gets it back. Link
- * jobs, product lookups (Story 5.6) and Shopee report pages (Story 5.9) are worked.
+ * jobs, product lookups (Story 5.6), Shopee report pages (Story 5.9) and the Shopee payout record
+ * page (Story 4.22) are worked.
  */
 import { SHOPEE_SOURCE_MAX_LENGTH } from "@cashback/core";
 import { z } from "zod";
@@ -24,7 +25,7 @@ const ticket = z.string().regex(/^[a-f0-9]{32}$/);
 const httpsUrl = z.string().max(2048).regex(/^https:\/\//);
 
 /** The kinds in their order of service: a link is never held up by more than one report page. */
-export const BRIDGE_JOB_KINDS = ["link", "lookup", "report"] as const;
+export const BRIDGE_JOB_KINDS = ["link", "lookup", "report", "payout_record"] as const;
 export type BridgeJobKind = (typeof BRIDGE_JOB_KINDS)[number];
 
 export const bridgeLinkJobSchema = z.strictObject({
@@ -60,11 +61,18 @@ export const bridgeReportJobSchema = z.strictObject({
   timeoutMs: z.number().int().min(1_000).max(300_000),
 });
 
-export const bridgeJobSchema = z.discriminatedUnion("kind", [bridgeLinkJobSchema, bridgeLookupJobSchema, bridgeReportJobSchema]);
+/**
+ * The Shopee payout record page (Story 4.22): page 1 of the operator's payout batches, read once a
+ * day. It has no page parameter on purpose, like a lookup: only the first page is ever read.
+ */
+export const bridgePayoutRecordJobSchema = z.strictObject({ ticket, kind: z.literal("payout_record"), timeoutMs: z.number().int().min(1_000).max(300_000) });
+
+export const bridgeJobSchema = z.discriminatedUnion("kind", [bridgeLinkJobSchema, bridgeLookupJobSchema, bridgeReportJobSchema, bridgePayoutRecordJobSchema]);
 export type BridgeJob = z.infer<typeof bridgeJobSchema>;
 export type BridgeLinkJob = z.infer<typeof bridgeLinkJobSchema>;
 export type BridgeLookupJob = z.infer<typeof bridgeLookupJobSchema>;
 export type BridgeReportJob = z.infer<typeof bridgeReportJobSchema>;
+export type BridgePayoutRecordJob = z.infer<typeof bridgePayoutRecordJobSchema>;
 
 /**
  * Why the bridge could not make a link. `captcha` and `login_redirect` are whole-session states
@@ -136,3 +144,29 @@ export const bridgeReportValueSchema = z.strictObject({
   list: z.array(z.record(z.string(), z.json())).max(SHOPEE_REPORT_PAGE_SIZE),
 });
 export type BridgeReportValue = z.infer<typeof bridgeReportValueSchema>;
+
+/** The most batches page 1 of the payout record page shows. */
+export const SHOPEE_PAYOUT_PAGE_SIZE = 50;
+
+/**
+ * What a payout record job answers as its `value` (Story 4.22): each row's record as the page
+ * rendered it, cut down to the six fields the server reads (payout id, payment status, amount paid,
+ * eligible amount, creation and arrival times) and passed on as they were, never converted in the
+ * browser. The server reads the amounts (x100,000) and the status itself.
+ */
+const rawField = z.union([z.string().max(64), z.number(), z.null()]);
+export const bridgePayoutRecordValueSchema = z.strictObject({
+  list: z
+    .array(
+      z.strictObject({
+        payoutId: rawField,
+        payoutPaymentStatus: rawField,
+        totalPaymentAmount: rawField,
+        eligibleTotalAmount: rawField,
+        payoutCreatedTime: rawField,
+        payArrivalTime: rawField,
+      }),
+    )
+    .max(SHOPEE_PAYOUT_PAGE_SIZE),
+});
+export type BridgePayoutRecordValue = z.infer<typeof bridgePayoutRecordValueSchema>;
