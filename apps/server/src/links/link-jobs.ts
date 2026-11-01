@@ -8,12 +8,14 @@
  * link job hands it one submission at a time. The job also gets the outbox and alerts of its
  * results (Story 5.5) and the AccessTrade creator (Story 5.7); without a creator the assistant's
  * route refuses TikTok Shop links when they are submitted. After its links the run makes the
- * product lookups (Story 5.6) through the same bridge.
+ * product lookups (Story 5.6) through the same bridge. A job of its own, every 5 s, sends a link
+ * not handed over 55 s after its request by notification and closes older ones without a
+ * message (Story 6.5), so a busy bridge never delays that.
  */
 import type { Clock } from "@cashback/core";
 
 import { assistantChatRoutes } from "./assistant-chat.routes";
-import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkEffects } from "../modules/linking/index";
+import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, checkLinkDeliveries, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkDeliveryCheck, type LinkEffects } from "../modules/linking/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
 import { DEV_SUB_ID_PREFIX } from "../modules/orders/index";
@@ -103,6 +105,13 @@ export function accessTradeLinksFor(config: Pick<ServerConfig, "env" | "accesstr
   return config.env === "dev" ? fakeAccessTradeLinks() : null;
 }
 
+/** One delivery check in one transaction, with the outbox bound to it (Story 6.5). */
+export function runLinkDeliveryCheck(ledger: Ledger, clock: Clock, logger?: Logger): LinkDeliveryCheck {
+  const checked = ledger.tx((db) => checkLinkDeliveries(db, clock, { outbox: outboxFor(db, clock, commandAudit(db, clock, LINKS_ACTOR)), alerts: alertsFor(db, clock, logger) }));
+  if (checked.notified + checked.closed > 0) logger?.info({ ...checked }, "linking.link_delivery.checked");
+  return checked;
+}
+
 export function linkJobs(input: LinkWiringInput, bridge: LinkBridge): Job[] {
   const deps = {
     ledger: input.ledger,
@@ -118,5 +127,9 @@ export function linkJobs(input: LinkWiringInput, bridge: LinkBridge): Job[] {
     const links = await runLinkJob(deps, signal);
     if (!links.interrupted && !signal.aborted) await runProductLookups(deps, signal);
   };
-  return [{ name: "links", ...JOB_SCHEDULES.links, run }];
+  const delivery = (): void => void runLinkDeliveryCheck(input.ledger, input.clock, input.logger);
+  return [
+    { name: "links", ...JOB_SCHEDULES.links, run },
+    { name: "linkDelivery", ...JOB_SCHEDULES.linkDelivery, run: delivery },
+  ];
 }

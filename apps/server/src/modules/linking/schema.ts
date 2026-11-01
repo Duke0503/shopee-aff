@@ -54,6 +54,9 @@ export const linkRequests = sqliteTable("link_requests", {
   // A request's own page errors in a row and the first one's time (migration 0024, Story 5.5).
   pageErrors: integer("page_errors").notNull().default(0),
   pageErrorSince: text("page_error_since"),
+  // The chat reply's claim on the link and the notification key in use (migration 0027, Story 6.5).
+  deliveryClaimedUntil: text("delivery_claimed_until"),
+  deliveryAttempt: integer("delivery_attempt").notNull().default(0),
 });
 
 export const shareCodes = sqliteTable("share_codes", {

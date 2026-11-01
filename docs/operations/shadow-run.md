@@ -104,6 +104,32 @@ It writes `shadow-sign-off.json` with the name, the time and the checksums of bo
 A folder can be signed once, and a signed folder is never written over: a new run goes to a new
 folder.
 
+## Quiet first run after the import (D46, Story 6.10)
+
+The import turns the server flag `messaging.silent` on. While it is on, every notification a
+command enqueues is recorded as a would-be send and never becomes due, also after the flag is
+turned off; keys the import seeded as already told stay no-ops. Rehearse the first run on the
+imported ledger with saved reports only (no network call):
+
+```bash
+pnpm --filter @cashback/server cutover:first-run D:/cutover/new-ledger.db   --shopee D:/cutover/shopee-report.json --accesstrade D:/cutover/accesstrade-transactions.json
+```
+
+It refuses the live production file, a ledger with pending migrations and a ledger that is not
+quiet, runs one hourly reconciliation and one link delivery check, and prints one JSON line of
+counts: the runs, the links sent or closed, the would-be sends per event and message key, and the
+notifications due (0). On the server, each hourly run and nightly sweep while quiet logs
+`messaging.outbox.would_be_sends` with the same counts. When they are understood, the owner turns
+the flag off; the change is audited under the admin:
+
+```bash
+pnpm --filter @cashback/server messaging:silent off --as <admin>
+```
+
+The daily cap on proactive sends is `NOTIFICATION_DAILY_CAP` (150 by default); the first time a
+Vietnam day reaches it the owner gets one `notification_daily_cap` alert and the rest wait for the
+next day.
+
 ## Import rehearsals on production copies
 
 ### 2026-10-30, backup `cashback-20261030-122003.db` (production `main` a8a2439)

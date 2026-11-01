@@ -28,6 +28,8 @@ interface Call {
 function fakeFetch(status = 200): { fetch: FetchLike; calls: Call[] } {
   const calls: Call[] = [];
   const fetch: FetchLike = async (url, init) => {
+    // The notification loop (Story 6.4) pulls too; only the heartbeat calls are counted here.
+    if (url !== `${BASE}${ASSISTANT_HEARTBEAT_PATH}`) return { status: 200, json: async () => ({ notification: null }) };
     calls.push({ url, headers: init.headers, body: JSON.parse(init.body ?? "null") });
     return { status, json: async () => ({ receivedAt: systemClock.now() }) };
   };

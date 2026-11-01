@@ -10,7 +10,7 @@ import { COMPARISON_SKIPS } from "../src/cutover/import-report";
 import { wholeDong } from "../src/cutover/live-values";
 import { percentToBps } from "../src/cutover/product-snapshot";
 import { findShareCode, isShareCode } from "../src/modules/linking/index";
-import { dedupKey, dedupKeyParts, enqueue, outboxFor } from "../src/modules/messaging/index";
+import { dedupKey, dedupKeyParts, enqueue, outboxFor, setSilent } from "../src/modules/messaging/index";
 import { openLedger } from "../src/platform/db/ledger";
 import { auditBy, buildLiveCopy, importOnce, rows, TEST_CLOCK } from "./helpers/live-fixture";
 
@@ -74,6 +74,8 @@ describe("Story 2.5 acceptance criteria", () => {
       const results = ledger.tx((db) => [enqueue(db, LATER, message("order:260911AAAA0001:paid"), auditBy(db, LATER)), outboxFor(db, LATER, auditBy(db, LATER)).enqueue(message("link_request:26091100001:delivered"))]);
       expect(results).toEqual(["duplicate", "duplicate"]);
       expect(ledger.sqlite.prepare("SELECT count(*) AS n FROM outbox WHERE due_at IS NOT NULL").get()).toEqual({ n: 0 });
+      // The import leaves the ledger quiet (Story 6.10); once the owner turns that off, a new event is due.
+      expect(ledger.tx((db) => setSilent(db, false, LATER.now(), auditBy(db, LATER)))).toEqual({ silent: false, changed: true });
       // A new event is enqueued and due; the same key again is a no-op.
       expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002"), auditBy(db, LATER)))).toBe("enqueued");
       expect(ledger.tx((db) => enqueue(db, LATER, message("order:260912BBBB0002:approved", "1000000000000000002"), auditBy(db, LATER)))).toBe("duplicate");

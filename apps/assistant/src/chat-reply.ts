@@ -18,12 +18,23 @@
  * an estimate; with no link yet, or when the server could not be asked, the sender is told it is
  * on its way, and the link follows later by notification (Story 6.5). A request that failed is
  * told by the server's own `link_failed` notification, so nothing is sent for it here.
+ *
+ * A link goes out once (Story 6.5); the server's claim decides who hands it over. The assistant
+ * claims it in the reply's own pacer turn, right before the Zalo send, so a long pacer queue never
+ * outlives the claim: `claimed` holds it for 2 minutes, the reply is sent and then confirmed,
+ * which makes it DELIVERED; a reply that could not be sent releases the claim, and a
+ * claim never confirmed (the assistant stopped) lapses, so the server's delivery check sends the
+ * link by notification instead of losing it. `pending` (a notification is on its way) and a claim
+ * the server did not answer send "on its way" and no link, so the link is never sent twice.
+ * `delivered` sends the link again only for the same product asked again (the request reused).
  */
 import { toMs, vnDateOf, type Clock } from "@cashback/core";
-import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply } from "@cashback/contracts";
+import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply, type LINK_CLAIMS } from "@cashback/contracts";
+
+type LinkClaim = (typeof LINK_CLAIMS)[number];
 
 import type { InternalApi } from "./internal-api.adapter";
-import { linkReplyMessage, refusalMessage } from "./link-reply-text";
+import { linkReplyMessage, refusalMessage, type ReplyMessage } from "./link-reply-text";
 import { extractFirstUrl } from "./message-parse";
 import type { MessageKey } from "./messages";
 import type { Sleep } from "./pacer";
@@ -32,6 +43,8 @@ import type { ChatTarget, IncomingMessage } from "./zalo.port";
 /** How long a reply waits for its link on the server; the pacer's delay comes on top (AC1: under 30 s). */
 export const REPLY_WAIT_MS = 16_000;
 export const REPLY_POLL_MS = 2_000;
+/** Tries of the confirm after a sent reply, before the claim is left to lapse. */
+const CONFIRM_TRIES = 3;
 
 /** The person a group reply tags. */
 export interface Tag {
@@ -41,12 +54,19 @@ export interface Tag {
 
 export type ChatSend = (target: ChatTarget, key: MessageKey, values?: Readonly<Record<string, string | number>>, tag?: Tag | null) => Promise<void>;
 
+/**
+ * Sends one message whose words are decided only when the pacer grants its turn, right before the
+ * Zalo send; `decide` answering null sends nothing in that turn.
+ */
+export type ChatSendWhenDue = (target: ChatTarget, decide: () => Promise<ReplyMessage | null>, tag?: Tag | null) => Promise<void>;
+
 export interface ChatReplyDeps {
   readonly api: InternalApi;
   readonly clock: Clock;
   readonly sleep: Sleep;
   /** Sends one message by key in the pacer's turn; a tag is written in front of a group message. */
   readonly send: ChatSend;
+  readonly sendWhenDue: ChatSendWhenDue;
   readonly replyWaitMs?: number;
   readonly pollMs?: number;
 }
@@ -107,8 +127,30 @@ async function answerLink(deps: ChatReplyDeps, message: IncomingMessage, url: st
   await welcomed();
   if (reply === "failed") return;
   if (reply === null) return deps.send(message.chat, "link_on_its_way", {}, tag);
-  const { key, values } = linkReplyMessage(reply);
-  return deps.send(message.chat, key, values, tag);
+  return handOver(deps, message.chat, tag, { requestId: answer.requestId, customerId: answer.customerId }, reply, answer.reused);
+}
+
+/** Sends a made link in the reply only when the server's claim gives it to the reply (Story 6.5). */
+async function handOver(deps: ChatReplyDeps, chat: ChatTarget, tag: Tag | null, request: { requestId: string; customerId: string }, reply: Made, reused: boolean): Promise<void> {
+  let claim: LinkClaim | null = null;
+  // The claim is taken in the send's own turn, so its 2 minutes start right before the send.
+  const decide = async (): Promise<ReplyMessage | null> => {
+    claim = (await deps.api.claimLink(request).catch(() => null))?.claim ?? null;
+    if (claim === null || claim === "pending" || claim === "not_made") return { key: "link_on_its_way", values: {} };
+    if (claim === "delivered" && !reused) return null;
+    return linkReplyMessage(reply);
+  };
+  try {
+    await deps.sendWhenDue(chat, decide, tag);
+  } catch (error) {
+    if (claim === "claimed") await deps.api.releaseLink(request).catch(() => false);
+    throw error;
+  }
+  if (claim !== "claimed") return;
+  for (let tries = 1; tries <= CONFIRM_TRIES; tries++) {
+    if (await deps.api.confirmLink(request).then(() => true, () => false)) return;
+    if (tries < CONFIRM_TRIES) await deps.sleep(deps.pollMs ?? REPLY_POLL_MS);
+  }
 }
 
 /** Answers each message; remembers which known people were asked for a link today. */

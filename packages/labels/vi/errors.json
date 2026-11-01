@@ -79,6 +79,7 @@
   "error.link.day_full": "Hôm nay đã có quá nhiều yêu cầu link. Vui lòng thử lại sau.",
   "error.link.tiktok_unavailable": "Hiện mình chưa tạo được link TikTok Shop. Bạn gửi link sản phẩm Shopee nhé.",
   "error.link.request_not_found": "Không tìm thấy yêu cầu link này.",
+  "error.notification.not_found": "Không tìm thấy thông báo này.",
   "error.registration.zalo_id_invalid": "Mã Zalo không hợp lệ.",
   "error.registration.zalo_id_held": "Mã Zalo này đang thuộc một khách đã gộp. Vui lòng nhắn quản trị viên."
 }

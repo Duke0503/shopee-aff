@@ -11,6 +11,7 @@ import { loadAssistantConfig } from "./assistant.config";
 import { assistantLogger } from "./assistant-log";
 import { fileFriendStateStore, type StateFiles } from "./friend-state-file.adapter";
 import { internalApi } from "./internal-api.adapter";
+import { fileSentNotifications } from "./sent-notifications-file.adapter";
 import { timerSleep } from "./pacer";
 import { openZaloSession } from "./zalo-session";
 
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
   const onError = (event: string, error: unknown) => log.warn({ error: error instanceof Error ? error.name : "unknown" }, event);
   mkdirSync(config.dataDir, { recursive: true });
   const friendState = fileFriendStateStore(config.dataDir, NODE_FILES, (event) => log.warn({}, event));
+  const sentNotifications = fileSentNotifications(config.dataDir, NODE_FILES, systemClock, (event) => log.warn({}, event));
   const zalo = await openZaloSession(config, systemClock, (error) => onError("assistant.message.failed", error));
   const assistant = startAssistant({
     zalo,
@@ -43,6 +45,7 @@ async function main(): Promise<void> {
     zaloGroupIds: config.zaloGroupIds,
     friendRequestsPerDay: config.friendRequestsPerDay,
     friendState,
+    sentNotifications,
     onError,
   });
   log.info({ env: config.env, zalo: zalo.mode, groups: config.zaloGroupIds.length }, "assistant.process.started");

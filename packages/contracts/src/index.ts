@@ -271,3 +271,32 @@ export {
 } from "./assistant-chat.schema";
 export { ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
 export { DESK_LINK_REQUEST_NETWORKS, DESK_LINK_REQUESTS_PATH, deskLinkRequestRowSchema, deskLinkRequestsResponseSchema, LINK_REQUEST_CHANNELS, type DeskLinkRequestRow } from "./link-request-list.schema";
+export {
+  ASSISTANT_LINK_CLAIM_PATH,
+  ASSISTANT_LINK_CONFIRM_PATH,
+  ASSISTANT_LINK_RELEASE_PATH,
+  assistantLinkClaimedSchema,
+  assistantLinkConfirmedSchema,
+  LINK_CLAIMS,
+  assistantLinkClaimSchema,
+  assistantLinkReleasedSchema,
+  assistantNotificationSchema,
+  MESSAGING_SILENT_PATH,
+  messagingSilentSchema,
+  messagingSilentSetSchema,
+  NOTIFICATION_ACK_RESULTS,
+  NOTIFICATION_ACK_ROUTE,
+  NOTIFICATION_NEXT_PATH,
+  notificationAckedSchema,
+  notificationAckPath,
+  notificationAckSchema,
+  notificationNextSchema,
+  type AssistantLinkClaim,
+  type AssistantLinkClaimed,
+  type AssistantLinkReleased,
+  type AssistantNotification,
+  type MessagingSilentSet,
+  type NotificationAck,
+  type NotificationAcked,
+  type NotificationNext,
+} from "./notification.schema";

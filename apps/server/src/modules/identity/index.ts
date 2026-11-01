@@ -45,3 +45,4 @@ export {
 } from "./staff-admin.command";
 export { checkErase, CustomerEraseError, ERASE_REASON_MAX, eraseCustomer, type EraseErrorCode, type EraseInput, type ErasedCustomer, type OwedMoney } from "./customer-erase.command";
 export { applyMerge, CustomerMergeError, planMerge, type MergeErrorCode, type MergePlan, type MergeSide } from "./customer-merge.command";
+export { LIVE_ZALO_UID, zaloRecipientOf, type ZaloRecipient } from "./zalo-recipient.query";

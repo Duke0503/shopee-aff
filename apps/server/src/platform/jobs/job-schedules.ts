@@ -15,7 +15,11 @@ export interface JobTiming {
 
 export const JOB_SCHEDULES = {
   links: { context: "linking", schedule: every(5_000) },
+  /** Links still not handed over 55 s after their request go by notification (Story 6.5). */
+  linkDelivery: { context: "linking", schedule: every(5_000) },
   claimExpiry: { context: "payouts", schedule: every(60_000) },
+  /** Unsent notifications older than 7 days are dropped and counted (Story 6.4). */
+  notificationExpiry: { context: "messaging", schedule: every(10 * 60_000) },
   health: { context: "operations", schedule: every(60_000) },
   reconcile: { context: "orders", schedule: every(60 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },

@@ -3,7 +3,9 @@
  * everything from the live copy, write it in one transaction, then fill the report from what was
  * written and from both databases. The run (import-run.ts) owns the refusals and the files.
  * Every module import is a command by the system actor `cutover` and writes its audit entry in
- * the same transaction (AD-17).
+ * the same transaction (AD-17). The import also turns `messaging.silent` on (D46, Story 6.10): the
+ * first reconciliation after it records would-be sends and sends nothing until the owner turns
+ * the flag off.
  */
 import type { Clock } from "@cashback/core";
 import type BetterSqlite3 from "better-sqlite3";
@@ -11,7 +13,7 @@ import type BetterSqlite3 from "better-sqlite3";
 import { importCampaigns, type CampaignsImportResult } from "../modules/campaigns/index";
 import { customerCodeNumber, formatCustomerCode, importIdentity, lastFour, type IdentityImport, type IdentityImportResult } from "../modules/identity/index";
 import { importLinks, type LinksImportResult } from "../modules/linking/index";
-import { seedSentNotifications } from "../modules/messaging/index";
+import { seedSentNotifications, setSilent } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { importOrders, type ImportedOrder, type OrdersImportResult } from "../modules/orders/index";
 import { importNetworkSettlements, importPayouts, type ImportedNetworkSettlement, type NetworkSettlementsImportResult, type PayoutsImportResult } from "../modules/payouts/index";
@@ -52,6 +54,8 @@ export interface Written {
   payouts: PayoutsImportResult;
   networkPayouts: NetworkSettlementsImportResult;
   seeded: number;
+  /** True: the new ledger starts with `messaging.silent` on. */
+  silent: boolean;
 }
 
 /** Reads the live copy; stops with duplicate_identity before anything is written. */
@@ -92,6 +96,7 @@ export function writeLive(ledger: Ledger, live: LiveData, fingerprintKey: string
       payouts: importPayouts(db, { payouts: live.payouts.payouts, items: live.payouts.items }, by),
       networkPayouts: importNetworkSettlements(db, live.networkPayouts, importedAt, by),
       seeded: seedSentNotifications(db, live.notifications.seeds, importedAt, by),
+      silent: setSilent(db, true, importedAt, by).silent,
     };
   });
 }
@@ -162,6 +167,7 @@ export function finishedLine(report: ImportReport, written: Written): Record<str
     payouts: written.payouts.payouts,
     campaignAwards: written.campaigns.awards,
     seededNotifications: written.seeded,
+    messagingSilent: written.silent,
     paidParity: report.paidParity?.result ?? null,
     timeProblems: report.timeProblems.length,
     notes: report.notes.length,

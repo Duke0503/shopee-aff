@@ -8,6 +8,7 @@
  *   campaign-create <campaign.json> --as <admin> [--apply]   preview, and with --apply create
  *   customer-merge <merged> --into <survivor> --as <admin> [--apply]   preview the merge, and with --apply merge
  *   link-queue resume --as <admin>                       resume the Shopee link queue after the affiliate browser signed in again
+ *   messaging-silent on|off --as <admin>                 turn the quiet mode of notifications on or off (Story 6.10)
  *
  * `--as` signs in as that admin (the password is asked, never an argument) and signs out at the
  * end. The first seed of an empty staff table needs no `--as`. Every new password is asked twice
@@ -25,6 +26,8 @@ import {
   customerMergePreviewSchema,
   LINK_QUEUE_RESUME_PATH,
   linkQueueResumedSchema,
+  MESSAGING_SILENT_PATH,
+  messagingSilentSetSchema,
   STAFF_TOKEN_HEADER,
   staffAccessResponseSchema,
   staffPasswordResponseSchema,
@@ -85,8 +88,8 @@ interface Args {
   readonly flags: ReadonlyMap<string, string | true>;
 }
 
-const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "link-queue"];
-export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | link-queue resume --as <admin>";
+const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "link-queue", "messaging-silent"];
+export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | link-queue resume --as <admin> | messaging-silent on|off --as <admin>";
 
 function parseArgs(argv: readonly string[]): Args | null {
   const [command, target, ...rest] = argv;
@@ -192,6 +195,12 @@ async function linkQueue(io: CliIo, args: Args, token: string | null): Promise<R
   return linkQueueResumedSchema.parse(await ok(io, "POST", LINK_QUEUE_RESUME_PATH, {}, token));
 }
 
+/** Story 6.10 AC4: the owner turns the quiet mode on or off; the server audits it under the admin. */
+async function messagingSilent(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
+  if (args.target !== "on" && args.target !== "off") throw new CliRefusal("usage", { error: CLI_USAGE });
+  return messagingSilentSetSchema.parse(await ok(io, "POST", MESSAGING_SILENT_PATH, { silent: args.target === "on" }, token));
+}
+
 const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promise<Record<string, unknown>>> = {
   "staff-seed": staffSeed,
   "staff-password": staffPassword,
@@ -199,6 +208,7 @@ const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promi
   "campaign-create": campaignCreate,
   "customer-merge": customerMerge,
   "link-queue": linkQueue,
+  "messaging-silent": messagingSilent,
 };
 
 /** Runs one command; returns the exit code after printing its one JSON line. */

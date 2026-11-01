@@ -116,13 +116,13 @@ development_status:
   6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace: review
   6-2-registration-from-zalo-assigns-a-customer-code: review
   6-3-a-product-link-pasted-in-zalo-gets-a-share-link-reply: review
-  6-4-notification-outbox-delivered-by-pull-and-acknowledgement: backlog
-  6-5-link-delivered-once-by-chat-or-by-notification: backlog
+  6-4-notification-outbox-delivered-by-pull-and-acknowledgement: review
+  6-5-link-delivered-once-by-chat-or-by-notification: review
   6-6-order-clawback-and-payout-notifications-told-once: backlog
   6-7-chat-commands-for-balance-orders-code-bank-and-help: backlog
   6-8-matkhau-issues-a-new-password-and-ends-other-sessions: backlog
   6-9-bank-account-saved-or-changed-from-the-zalo-private-chat: backlog
-  6-10-quiet-first-run-after-cutover-reports-would-be-sends: backlog
+  6-10-quiet-first-run-after-cutover-reports-would-be-sends: review
   6-11-zalo-account-loss-keeps-customers-served-and-alerts-the-owne: backlog
   epic-6-retrospective: optional
 

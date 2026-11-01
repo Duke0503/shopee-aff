@@ -72,6 +72,8 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       link_queue_state: "linking",
       link_clicks: "linking",
       outbox: "messaging",
+      messaging_settings: "messaging",
+      outbox_cap_days: "messaging",
       audit_entries: "operations",
       alerts: "operations",
       campaigns: "campaigns",

@@ -19,6 +19,8 @@
     "campaign:create": "tsx src/admin/run-admin-command.ts campaign-create",
     "customer:merge": "tsx src/admin/run-admin-command.ts customer-merge",
     "link-queue:resume": "tsx src/admin/run-admin-command.ts link-queue resume",
+    "messaging:silent": "tsx src/admin/run-admin-command.ts messaging-silent",
+    "cutover:first-run": "tsx src/cutover/run-first-run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

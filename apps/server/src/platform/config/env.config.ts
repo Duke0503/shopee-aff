@@ -61,6 +61,8 @@ export interface ServerConfig {
   shopeeReportPath: string | null;
   /** The nightly sweep's pause between day slices (Story 3.8); the job's default when unset. */
   sweepPauseMs: number | null;
+  /** The hard cap on proactive Zalo sends per Vietnam day (AD-16, D46, Story 6.4); 150 by default. */
+  notificationDailyCap: number;
   /**
    * The admin desk behind Cloudflare Access (AD-18, D48, Story 4.2): the admin host the staff
    * routes are registered for, the Access team domain that issues the JWT and the application
@@ -158,6 +160,7 @@ function fileSchema(env: Environment) {
     ACCESSTRADE_API_KEY: z.string().optional(),
     SHOPEE_REPORT_PATH: z.string().refine(isAbsolute).optional(),
     SWEEP_PAUSE_MS: z.coerce.number().int().min(0).max(600_000).optional(),
+    NOTIFICATION_DAILY_CAP: z.coerce.number().int().min(1).max(1_000).default(150),
     ADMIN_HOST: z.string().regex(HOST_NAME).optional(),
     ACCESS_TEAM_DOMAIN: z.string().regex(ACCESS_TEAM_DOMAIN).optional(),
     ACCESS_AUDIENCE: z.string().regex(/^[A-Za-z0-9]{16,128}$/).optional(),
@@ -204,6 +207,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     accesstradeApiKey: file.ACCESSTRADE_API_KEY || null,
     shopeeReportPath: file.SHOPEE_REPORT_PATH || null,
     sweepPauseMs: file.SWEEP_PAUSE_MS ?? null,
+    notificationDailyCap: file.NOTIFICATION_DAILY_CAP,
     staffAccess: staffAccessOf(file),
     assistantToken: file.ASSISTANT_TOKEN ?? null,
     bridgeToken: file.BRIDGE_TOKEN ?? null,

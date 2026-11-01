@@ -296,6 +296,8 @@ describe("Story 2.4: the import as one command", () => {
       { actor_kind: "system", actor_id: "cutover", event: "payouts.payouts.imported", payload: '{"payouts":3,"items":3}' },
       { actor_kind: "system", actor_id: "cutover", event: "payouts.network_settlements.imported", payload: '{"settlements":0}' },
       { actor_kind: "system", actor_id: "cutover", event: "messaging.outbox.seeded", payload: '{"seeded":16}' },
+      // Story 6.10: the import leaves the new ledger quiet for its first run (D46).
+      { actor_kind: "system", actor_id: "cutover", event: "messaging.settings.silent_changed", payload: '{"silent":true}' },
     ]);
   });
 

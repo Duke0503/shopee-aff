@@ -5,6 +5,9 @@
  *   POST /internal/assistant/registrations   a private message: register the sender, or find them again
  *   POST /internal/assistant/link-requests   a pasted link: register the sender when due, queue the request
  *   POST /internal/assistant/link-replies    what the reply to one of the sender's requests says
+ *   POST /internal/assistant/link-replies/claim    the reply is about to hand the link over (Story 6.5)
+ *   POST /internal/assistant/link-replies/confirm  the reply was sent: the link is DELIVERED
+ *   POST /internal/assistant/link-replies/release  that send failed: the link goes by notification
  *
  * These are the only callers of `registerCustomer`, so only the assistant creates customers (D10).
  * A private message registers its sender whatever it says (with a link, the link-request route
@@ -19,12 +22,23 @@
  * The reply carries the share link `/s/<code>` on the public origin, never the affiliate link, and
  * the estimate from the product snapshot under the current Shopee withholding (the share page's
  * rule). It is answered only for a request of the customer named, through the same aliases.
+ * The claim holds the link for 2 minutes so the delivery check of Story 6.5 leaves it to the reply;
+ * the confirm makes it DELIVERED (and withdraws a notification enqueued after a lapsed claim, if
+ * it is not being sent); a failed send releases it, and a claim never confirmed lapses, so the
+ * check sends it by notification (linking/link-delivery.command.ts).
  */
 import {
+  ASSISTANT_LINK_CLAIM_PATH,
+  ASSISTANT_LINK_CONFIRM_PATH,
+  ASSISTANT_LINK_RELEASE_PATH,
   ASSISTANT_LINK_REPLY_PATH,
   ASSISTANT_LINK_REQUEST_PATH,
   ASSISTANT_REGISTRATION_PATH,
   assistantLinkAnswerSchema,
+  assistantLinkClaimedSchema,
+  assistantLinkClaimSchema,
+  assistantLinkConfirmedSchema,
+  assistantLinkReleasedSchema,
   assistantLinkReplyQuerySchema,
   assistantLinkReplySchema,
   assistantLinkRequestSchema,
@@ -36,8 +50,9 @@ import {
 import type { Clock } from "@cashback/core";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
-import { CustomerRegisterError, isGuestCustomer, registerCustomer, resolveCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
-import { isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink } from "../modules/linking/index";
+import { CustomerRegisterError, isGuestCustomer, registerCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
+import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery } from "../modules/linking/index";
+import { isSilent, keyState, withdrawPendingNotification } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { periodWithheld, settlementPeriodOf } from "../modules/orders/index";
 import type { Ledger, LedgerDb } from "../platform/db/ledger";
@@ -67,10 +82,10 @@ function register(deps: AssistantChatRouteDeps, log: FastifyBaseLogger, zaloUser
   }
 }
 
-function replyOf(db: LedgerDb, deps: AssistantChatRouteDeps, requestId: string, customerId: string): AssistantLinkReply | null {
+/** What a reply (or a "link ready" notification, Story 6.5) to one request says, for the customer named; null for another customer's request. */
+export function linkReplyOf(db: LedgerDb, deps: Pick<AssistantChatRouteDeps, "clock" | "shareBaseUrl">, requestId: string, customerId: string): AssistantLinkReply | null {
   const facts = linkReplyFactsOf(db, requestId);
-  const asker = resolveCustomer(db, customerId);
-  if (facts === null || asker === null || resolveCustomer(db, facts.customerId)?.customerId !== asker.customerId) return null;
+  if (facts === null || !isLinkRequestOf(db, facts.customerId, customerId)) return null;
   const withheld = periodWithheld(db, "shopee", settlementPeriodOf(deps.clock.now()));
   const reply = linkReplyData(facts, { guest: isGuestCustomer(db, facts.customerId), withheld });
   const made = facts.shareCode !== null && facts.status !== "QUEUED" && facts.status !== "FAILED";
@@ -120,9 +135,42 @@ export function assistantChatRoutes(deps: AssistantChatRouteDeps): (app: Fastify
     app.post(ASSISTANT_LINK_REPLY_PATH, { config: ASSISTANT_ROUTE }, async (request) => {
       const body = assistantLinkReplyQuerySchema.safeParse(request.body);
       if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
-      const reply = deps.ledger.tx((db) => replyOf(db, deps, body.data.requestId, body.data.customerId));
+      const reply = deps.ledger.tx((db) => linkReplyOf(db, deps, body.data.requestId, body.data.customerId));
       if (reply === null) throw new HttpError("not_found", "error.link.request_not_found");
       return assistantLinkReplySchema.parse(reply);
     });
+
+    handOverRoutes(deps, app);
   };
+}
+
+/** The reply's claim, confirm and release of a made link (Story 6.5). */
+function handOverRoutes(deps: AssistantChatRouteDeps, app: FastifyInstance): void {
+  app.post(ASSISTANT_LINK_CLAIM_PATH, { config: ASSISTANT_ROUTE }, async (request) => {
+    const body = assistantLinkClaimSchema.safeParse(request.body);
+    if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
+    const claim = deps.ledger.tx((db) => claimLinkDelivery(db, body.data.requestId, body.data.customerId, deps.clock.now(), { state: (key) => keyState(db, key), silent: () => isSilent(db) }));
+    if (claim === "not_found") throw new HttpError("not_found", "error.link.request_not_found");
+    return assistantLinkClaimedSchema.parse({ claim });
+  });
+
+  app.post(ASSISTANT_LINK_CONFIRM_PATH, { config: ASSISTANT_ROUTE }, async (request) => {
+    const body = assistantLinkClaimSchema.safeParse(request.body);
+    if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
+    const confirmed = deps.ledger.tx((db) => {
+      const now = deps.clock.now();
+      const key = confirmLinkDelivery(db, body.data.requestId, body.data.customerId, now);
+      if (key !== null && withdrawPendingNotification(db, key, now)) request.log.warn({ requestId: body.data.requestId }, "linking.link_delivery.notification_withdrawn");
+      return key !== null;
+    });
+    if (!confirmed) throw new HttpError("not_found", "error.link.request_not_found");
+    return assistantLinkConfirmedSchema.parse({ confirmed });
+  });
+
+  app.post(ASSISTANT_LINK_RELEASE_PATH, { config: ASSISTANT_ROUTE }, async (request) => {
+    const body = assistantLinkClaimSchema.safeParse(request.body);
+    if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
+    const released = deps.ledger.tx((db) => releaseLinkDelivery(db, body.data.requestId, body.data.customerId));
+    return assistantLinkReleasedSchema.parse({ released });
+  });
 }

@@ -4,9 +4,11 @@
  * platform/jobs/job-schedules.ts. AccessTrade is read from its API when its key is set. Shopee is
  * read in production from its report pages through the affiliate browser (`shopeeBridgeSource`,
  * Story 5.9), when the real bridge runs; outside production a saved report (SHOPEE_REPORT_PATH)
- * takes its place when set, so rehearsals and dev never need the browser.
+ * takes its place when set, so rehearsals and dev never need the browser. While
+ * `messaging.silent` is on (after the cutover import, Story 6.10) each run ends with one log line
+ * of its would-be sends, counted per event and message key.
  */
-import type { Clock } from "@cashback/core";
+import type { Clock, Instant } from "@cashback/core";
 
 import { accessTradeWindowSource, ReportSourceError, shopeeBridgeSource, shopeeFileWindowSource, type WindowedReportSource } from "../modules/linking/index";
 import { alertsFor } from "../modules/operations/index";
@@ -16,6 +18,7 @@ import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
 import type { Job, JobTimer } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
 import type { BridgePort } from "../platform/ports/bridge.port";
+import { isSilent, wouldBeSends } from "../modules/messaging/index";
 import { runHourlyReconcile, type ReconcileContext } from "./hourly-reconcile.job";
 import { runNightlySweep, SWEEP_PACING, timerWait, type Wait } from "./nightly-sweep.job";
 
@@ -65,6 +68,22 @@ export interface ReconcileJobsInput {
   readonly bridge?: BridgePort;
 }
 
+/** The would-be sends of one run, while quiet: one log line of counts, no customer (Story 6.10). */
+export function logWouldBeSends(ctx: Pick<ReconcileContext, "ledger" | "logger">, since: Instant, job: string): void {
+  if (!isSilent(ctx.ledger.db)) return;
+  ctx.logger.warn({ job, ...wouldBeSends(ctx.ledger.db, since) }, "messaging.outbox.would_be_sends");
+}
+
+/** Runs one job and then logs its would-be sends, also when the run failed (what it recorded still counts). */
+export async function reportingWouldBeSends(ctx: Pick<ReconcileContext, "ledger" | "logger" | "clock">, job: string, run: () => Promise<unknown>): Promise<void> {
+  const since = ctx.clock.now();
+  try {
+    await run();
+  } finally {
+    logWouldBeSends(ctx, since, job);
+  }
+}
+
 export function reconcileJobs(input: ReconcileJobsInput): Job[] {
   const ctx: ReconcileContext = {
     ledger: input.ledger,
@@ -83,12 +102,12 @@ export function reconcileJobs(input: ReconcileJobsInput): Job[] {
     {
       name: "reconcile",
       ...JOB_SCHEDULES.reconcile,
-      run: async (signal) => void (await runHourlyReconcile({ ...ctx, signal })),
+      run: (signal) => reportingWouldBeSends(ctx, "reconcile", () => runHourlyReconcile({ ...ctx, signal })),
     },
     {
       name: "nightlySweep",
       ...JOB_SCHEDULES.nightlySweep,
-      run: async (signal) => void (await runNightlySweep({ ...ctx, signal, pacing, wait })),
+      run: (signal) => reportingWouldBeSends(ctx, "nightlySweep", () => runNightlySweep({ ...ctx, signal, pacing, wait })),
     },
   ];
 }

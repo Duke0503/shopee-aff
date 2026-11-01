@@ -111,3 +111,22 @@ export { linkRequestDeskRoutes, type LinkRequestDeskRouteDeps } from "./http/lin
 export { linkReplyFactsOf, type LinkReplyFacts } from "./link-reply.query";
 export { readShopeePayoutRecords, SHOPEE_PAYOUT_STATUS_MAP, type PayoutRecordRead, type ShopeePayoutBatch } from "./domain/shopee-payout-record";
 export { PayoutRecordError, readShopeePayouts, type PayoutRecordErrorCode, type ShopeePayoutSourceDeps } from "./shopee-payout.adapter";
+export {
+  checkLinkDeliveries,
+  claimLinkDelivery,
+  confirmLinkDelivery,
+  isLinkRequestOf,
+  LINK_CLAIM_MS,
+  LINK_DELIVERY_MAX_ATTEMPTS,
+  LINK_READY_MESSAGE,
+  LINK_REPLY_WAIT_MS,
+  LINK_STALE_AFTER_MS,
+  LINK_UNDELIVERABLE_ALERT,
+  linkDeliveredKey,
+  markLinkDelivered,
+  releaseLinkDelivery,
+  requestOfDeliveredKey,
+  type LinkClaim,
+  type LinkDeliveryCheck,
+  type LinkDeliveryEffects,
+} from "./link-delivery.command";

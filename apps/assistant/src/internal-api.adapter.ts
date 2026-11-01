@@ -6,6 +6,9 @@
  */
 import {
   ASSISTANT_HEARTBEAT_PATH,
+  ASSISTANT_LINK_CLAIM_PATH,
+  ASSISTANT_LINK_CONFIRM_PATH,
+  ASSISTANT_LINK_RELEASE_PATH,
   ASSISTANT_LINK_REPLY_PATH,
   ASSISTANT_LINK_REQUEST_PATH,
   ASSISTANT_REGISTRATION_PATH,
@@ -13,20 +16,34 @@ import {
   assistantHeartbeatReceivedSchema,
   assistantHeartbeatSchema,
   assistantLinkAnswerSchema,
+  assistantLinkClaimedSchema,
+  assistantLinkClaimSchema,
+  assistantLinkConfirmedSchema,
+  assistantLinkReleasedSchema,
   assistantLinkReplyQuerySchema,
   assistantLinkReplySchema,
   assistantLinkRequestSchema,
   assistantRegisteredSchema,
   assistantRegistrationSchema,
   errorEnvelopeSchema,
+  NOTIFICATION_NEXT_PATH,
+  notificationAckedSchema,
+  notificationAckPath,
+  notificationAckSchema,
+  notificationNextSchema,
   type AssistantHeartbeat,
   type AssistantHeartbeatReceived,
   type AssistantLinkAnswer,
+  type AssistantLinkClaim,
+  type AssistantLinkClaimed,
+  type AssistantNotification,
   type AssistantLinkReply,
   type AssistantLinkReplyQuery,
   type AssistantLinkRequest,
   type AssistantRegistered,
   type AssistantRegistration,
+  type NotificationAck,
+  type NotificationAcked,
 } from "@cashback/contracts";
 
 export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{ status: number; json(): Promise<unknown> }>;
@@ -54,6 +71,15 @@ export interface InternalApi {
   requestLink(request: AssistantLinkRequest): Promise<AssistantLinkAnswer>;
   /** What the reply to one of the sender's requests says now. */
   linkReply(query: AssistantLinkReplyQuery): Promise<AssistantLinkReply>;
+  /** The chat reply hands the link over now (Story 6.5); `delivered_before` when a notification already did. */
+  claimLink(claim: AssistantLinkClaim): Promise<AssistantLinkClaimed>;
+  /** The claimed reply could not be sent: the link goes by notification instead. */
+  releaseLink(claim: AssistantLinkClaim): Promise<boolean>;
+  /** The chat reply was sent: the claimed link is DELIVERED (Story 6.5). */
+  confirmLink(claim: AssistantLinkClaim): Promise<boolean>;
+  /** The next due notification, leased to this assistant, or null (Story 6.4). */
+  nextNotification(signal?: AbortSignal): Promise<AssistantNotification | null>;
+  acknowledgeNotification(id: number, ack: NotificationAck, signal?: AbortSignal): Promise<NotificationAcked>;
 }
 
 export interface InternalApiOptions {
@@ -74,13 +100,14 @@ const messageKeyOf = async (response: { json(): Promise<unknown> }): Promise<str
 
 export function internalApi(options: InternalApiOptions): InternalApi {
   if (!isLoopbackBaseUrl(options.baseUrl)) throw new RangeError("the internal api base url must be http://127.0.0.1:<port>");
-  const post = async (path: string, body: unknown, signal?: AbortSignal): Promise<unknown> => {
+  const call = async (method: "GET" | "POST", path: string, body: unknown, signal?: AbortSignal): Promise<unknown> => {
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const headers: Record<string, string> = { [ASSISTANT_TOKEN_HEADER]: options.token, ...(method === "POST" ? { "content-type": "application/json" } : {}) };
     const response = await options
       .fetch(`${options.baseUrl}${path}`, {
-        method: "POST",
-        headers: { "content-type": "application/json", [ASSISTANT_TOKEN_HEADER]: options.token },
-        body: JSON.stringify(body),
+        method,
+        headers,
+        ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       })
       .catch(() => {
@@ -89,10 +116,16 @@ export function internalApi(options: InternalApiOptions): InternalApi {
     if (response.status < 200 || response.status > 299) throw new InternalApiError(path, response.status, await messageKeyOf(response));
     return response.json();
   };
+  const post = (path: string, body: unknown, signal?: AbortSignal): Promise<unknown> => call("POST", path, body, signal);
   return {
     heartbeat: async (beat, signal) => assistantHeartbeatReceivedSchema.parse(await post(ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatSchema.parse(beat), signal)),
     register: async (person) => assistantRegisteredSchema.parse(await post(ASSISTANT_REGISTRATION_PATH, assistantRegistrationSchema.parse(person))),
     requestLink: async (request) => assistantLinkAnswerSchema.parse(await post(ASSISTANT_LINK_REQUEST_PATH, assistantLinkRequestSchema.parse(request))),
     linkReply: async (query) => assistantLinkReplySchema.parse(await post(ASSISTANT_LINK_REPLY_PATH, assistantLinkReplyQuerySchema.parse(query))),
+    claimLink: async (claim) => assistantLinkClaimedSchema.parse(await post(ASSISTANT_LINK_CLAIM_PATH, assistantLinkClaimSchema.parse(claim))),
+    releaseLink: async (claim) => assistantLinkReleasedSchema.parse(await post(ASSISTANT_LINK_RELEASE_PATH, assistantLinkClaimSchema.parse(claim))).released,
+    confirmLink: async (claim) => assistantLinkConfirmedSchema.parse(await post(ASSISTANT_LINK_CONFIRM_PATH, assistantLinkClaimSchema.parse(claim))).confirmed,
+    nextNotification: async (signal) => notificationNextSchema.parse(await call("GET", NOTIFICATION_NEXT_PATH, undefined, signal)).notification,
+    acknowledgeNotification: async (id, ack, signal) => notificationAckedSchema.parse(await post(notificationAckPath(id), notificationAckSchema.parse(ack), signal)),
   };
 }

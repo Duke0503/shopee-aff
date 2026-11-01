@@ -2,7 +2,19 @@
  * A fake internal listener for the chat tests: a `fetch` that answers the assistant's routes from
  * handlers the test sets, and records every call. Nothing here opens a connection.
  */
-import { ASSISTANT_HEARTBEAT_PATH, ASSISTANT_LINK_REPLY_PATH, ASSISTANT_LINK_REQUEST_PATH, ASSISTANT_REGISTRATION_PATH, type AssistantLinkReply, type LinkRefusal } from "@cashback/contracts";
+import {
+  ASSISTANT_HEARTBEAT_PATH,
+  ASSISTANT_LINK_CLAIM_PATH,
+  ASSISTANT_LINK_CONFIRM_PATH,
+  ASSISTANT_LINK_RELEASE_PATH,
+  ASSISTANT_LINK_REPLY_PATH,
+  ASSISTANT_LINK_REQUEST_PATH,
+  ASSISTANT_REGISTRATION_PATH,
+  NOTIFICATION_ACK_ROUTE,
+  NOTIFICATION_NEXT_PATH,
+  type AssistantLinkReply,
+  type LinkRefusal,
+} from "@cashback/contracts";
 import { systemClock } from "@cashback/core";
 
 import type { FetchLike } from "../src/internal-api.adapter";
@@ -54,12 +66,21 @@ export function fakeServer(): FakeServer {
       return ok({ outcome: "queued", customerId: id, customerCode: code, registered: created, requestId: "26110100001", reused: false });
     },
     [ASSISTANT_LINK_REPLY_PATH]: (body) => ok(replyOf(String(body["requestId"]))),
+    // Story 6.5: the reply claims its link; nothing is due in the outbox unless a test says so.
+    [ASSISTANT_LINK_CLAIM_PATH]: () => ok({ claim: "claimed" }),
+    [ASSISTANT_LINK_RELEASE_PATH]: () => ok({ released: true }),
+    [ASSISTANT_LINK_CONFIRM_PATH]: () => ok({ confirmed: true }),
+    [NOTIFICATION_NEXT_PATH]: () => ok({ notification: null }),
+    [NOTIFICATION_ACK_ROUTE]: (body) => ok({ id: body["id"], outcome: "sent" }),
   };
   const fetch: FetchLike = async (url, init) => {
     const path = url.slice(BASE.length);
     const body = JSON.parse(init.body ?? "{}") as Record<string, unknown>;
     calls.push({ path, body });
-    const handler = routes[path];
+    // An ack names its notification in the path; its handler gets the id in the body.
+    const ack = /^\/internal\/notifications\/(\d+)\/ack$/.exec(path);
+    if (ack) body["id"] = Number(ack[1]);
+    const handler = routes[ack ? NOTIFICATION_ACK_ROUTE : path];
     const answer = handler === undefined ? { status: 404, body: { error: { code: "not_found", messageKey: "error.not_found" } } } : handler(body);
     return { status: answer.status, json: async () => answer.body };
   };

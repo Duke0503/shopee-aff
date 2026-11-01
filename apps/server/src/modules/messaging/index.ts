@@ -9,6 +9,7 @@ export {
   dedupKeyParts,
   encodeDedupKeyId,
   enqueue,
+  keyState,
   outboxFor,
   OutboxSeedError,
   seedSentNotifications,
@@ -17,3 +18,22 @@ export {
   type EnqueueResult,
   type SeededNotification,
 } from "./outbox.command";
+export { isSilent, setSilent, silentFlag, type SilentFlag } from "./messaging-settings.command";
+export {
+  acknowledgeNotification,
+  DAILY_CAP_ALERT,
+  droppedNotifications,
+  dropExpiredNotifications,
+  handOutNext,
+  holdsCutoverSeeds,
+  sendsToday,
+  UNDELIVERABLE_ALERT,
+  withdrawPendingNotification,
+  type AckOutcome,
+  type HandedOutNotification,
+  type Handout,
+  type HandoutOptions,
+} from "./notification-delivery.command";
+export { ACK_WINDOW_MS, DEFAULT_DAILY_CAP, dueAgainAfterMs, NOTIFICATION_MAX_AGE_MS, redeliveryDelayMs, REDELIVERY_FIRST_MS, REDELIVERY_MAX_MS } from "./domain/delivery-timing";
+export { dueCreatedSince, wouldBeSends, type WouldBeSends } from "./would-be-sends.query";
+export { OUTBOX_DROP_REASONS, type OutboxDropReason } from "./schema";

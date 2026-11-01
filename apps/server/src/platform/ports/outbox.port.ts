@@ -59,3 +59,16 @@ export interface OutboxPort {
 export interface OutboxLookup {
   told(dedupKey: string): boolean;
 }
+
+/**
+ * Where one notification stands (Story 6.5): `none` (no row), `pending` (waiting or being sent),
+ * `sent`, `silenced` (a would-be send recorded while quiet, never sent) or `dropped` (never sent).
+ * A producer that must not lose what it tells uses it to tell again under a new key.
+ */
+export type OutboxKeyState = "none" | "pending" | "sent" | "silenced" | "dropped";
+
+export interface OutboxDeliveryLookup {
+  state(dedupKey: string): OutboxKeyState;
+  /** True while `messaging.silent` is on: a new notification would only be recorded. */
+  silent(): boolean;
+}

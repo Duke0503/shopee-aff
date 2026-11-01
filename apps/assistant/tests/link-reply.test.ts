@@ -186,7 +186,7 @@ describe("Story 6.3: Sprint 25 review", () => {
     const done = zalo.deliver(privateFrom("70001", PRODUCT));
     await vi.advanceTimersByTimeAsync(30_000);
     await done;
-    expect(server.calls.filter((c) => c.path !== ASSISTANT_LINK_REPLY_PATH && !c.path.includes("heartbeat")).map((c) => c.path)).toEqual([ASSISTANT_LINK_REQUEST_PATH]);
+    expect(server.calls.filter((c) => c.path !== ASSISTANT_LINK_REPLY_PATH && !c.path.includes("heartbeat") && !c.path.includes("notifications") && !c.path.includes("/link-replies/")).map((c) => c.path)).toEqual([ASSISTANT_LINK_REQUEST_PATH]);
     expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), expect.stringContaining(SHARE)]);
     expect(toMs(zalo.sent[1]!.at) - toMs(parseInstant(START))).toBeLessThanOrEqual(12_000);
     expect(toMs(zalo.sent[1]!.at) - toMs(zalo.sent[0]!.at)).toBeGreaterThanOrEqual(12_000);

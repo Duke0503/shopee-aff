@@ -5,7 +5,9 @@
  * resolve (erased) are refused: nothing is ever told to them (D5); so is a netting-only payout,
  * whose transfer is 0 (AD-16, D42). An enqueue that adds a row, and
  * the cutover seed, each write one audit entry in the same transaction (AD-17); a no-op writes
- * none. Delivery, retries, the daily cap and `messaging.silent` come with Stories 6.4 and 6.10.
+ * none. While `messaging.silent` is on (Story 6.10) a new row is a would-be send: recorded with
+ * `silenced_at`, never due, also after the flag is turned off. Delivery is
+ * notification-delivery.command.ts (Story 6.4).
  */
 import type { Clock, Instant } from "@cashback/core";
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -13,13 +15,14 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
-import { DEDUP_KEY_PATTERN, type OutboxLookup, type OutboxMessage, type OutboxPort } from "../../platform/ports/outbox.port";
+import { DEDUP_KEY_PATTERN, type OutboxDeliveryLookup, type OutboxKeyState, type OutboxLookup, type OutboxMessage, type OutboxPort } from "../../platform/ports/outbox.port";
 import { resolveCustomer } from "../identity/index";
+import { isSilent } from "./messaging-settings.command";
 import { outbox } from "./schema";
 
 export { DEDUP_KEY_PATTERN, dedupKey, dedupKeyParts, encodeDedupKeyId } from "../../platform/ports/outbox.port";
 
-export type EnqueueResult = "enqueued" | "duplicate" | "refused_guest" | "refused_unknown_customer" | "refused_netting_only";
+export type EnqueueResult = "enqueued" | "silenced" | "duplicate" | "refused_guest" | "refused_unknown_customer" | "refused_netting_only";
 
 export function enqueue(db: LedgerDb, clock: Clock, message: OutboxMessage, by: CommandAudit): EnqueueResult {
   if (!DEDUP_KEY_PATTERN.test(message.dedupKey)) throw new RangeError(`not a dedup key: ${message.dedupKey}`);
@@ -28,24 +31,39 @@ export function enqueue(db: LedgerDb, clock: Clock, message: OutboxMessage, by: 
   if (customer === null) return "refused_unknown_customer";
   if (customer.role === "HOUSE") return "refused_guest";
   const now = clock.now();
+  const silent = isSilent(db);
   const result = db
     .insert(outbox)
-    .values({ dedupKey: message.dedupKey, customerId: customer.customerId, messageKey: message.messageKey, params: JSON.stringify(message.params), createdAt: now, dueAt: now, origin: "EVENT" })
+    .values({ dedupKey: message.dedupKey, customerId: customer.customerId, messageKey: message.messageKey, params: JSON.stringify(message.params), createdAt: now, dueAt: silent ? null : now, silencedAt: silent ? now : null, origin: "EVENT" })
     .onConflictDoNothing({ target: outbox.dedupKey })
     .run();
   if (result.changes !== 1) return "duplicate";
-  by.audit.record({ actor: by.actor, event: "messaging.outbox.enqueued", entityId: message.dedupKey, payload: { customerId: customer.customerId, messageKey: message.messageKey } });
-  return "enqueued";
+  by.audit.record({ actor: by.actor, event: silent ? "messaging.outbox.silenced" : "messaging.outbox.enqueued", entityId: message.dedupKey, payload: { customerId: customer.customerId, messageKey: message.messageKey } });
+  return silent ? "silenced" : "enqueued";
 }
 
-/** True when the outbox holds the key, enqueued or seeded as already sent. */
+/**
+ * True when the outbox holds the key, enqueued or seeded as already sent, and the customer heard it
+ * or will: a would-be send recorded while silent, or a row dropped unsent, was never told, so no
+ * correction follows it.
+ */
 export function wasTold(db: LedgerDb, dedupKey: string): boolean {
-  return db.select({ key: outbox.dedupKey }).from(outbox).where(eq(outbox.dedupKey, dedupKey)).get() !== undefined;
+  const row = db.select({ sentAt: outbox.sentAt, silencedAt: outbox.silencedAt, droppedAt: outbox.droppedAt }).from(outbox).where(eq(outbox.dedupKey, dedupKey)).get();
+  return row !== undefined && (row.sentAt !== null || (row.silencedAt === null && row.droppedAt === null));
 }
 
 /** The outbox port bound to one transaction's handle (platform/ports/outbox.port.ts). */
-export function outboxFor(db: LedgerDb, clock: Clock, by: CommandAudit): OutboxPort & OutboxLookup & { enqueue(message: OutboxMessage): EnqueueResult } {
-  return { enqueue: (message) => enqueue(db, clock, message, by), told: (key) => wasTold(db, key) };
+/** Where one key stands; a sent row is `sent` even if it had been dropped (the ack wins). */
+export function keyState(db: LedgerDb, dedupKey: string): OutboxKeyState {
+  const row = db.select({ sentAt: outbox.sentAt, silencedAt: outbox.silencedAt, droppedAt: outbox.droppedAt }).from(outbox).where(eq(outbox.dedupKey, dedupKey)).get();
+  if (row === undefined) return "none";
+  if (row.sentAt !== null) return "sent";
+  if (row.droppedAt !== null) return "dropped";
+  return row.silencedAt !== null ? "silenced" : "pending";
+}
+
+export function outboxFor(db: LedgerDb, clock: Clock, by: CommandAudit): OutboxPort & OutboxLookup & OutboxDeliveryLookup & { enqueue(message: OutboxMessage): EnqueueResult } {
+  return { enqueue: (message) => enqueue(db, clock, message, by), told: (key) => wasTold(db, key), state: (key) => keyState(db, key), silent: () => isSilent(db) };
 }
 
 export interface SeededNotification {

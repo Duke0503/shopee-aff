@@ -14,10 +14,13 @@ import { systemClock } from "@cashback/core";
 
 import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { linkQueueRoutes } from "./admin/link-queue.routes";
+import { messagingSilentRoutes } from "./admin/messaging-silent.routes";
 import { adminDesk } from "./admin/admin-desk";
-import { environmentModes, linkBridge, linkJobs, linkRoutes, type LinkBridge } from "./links/link-jobs";
+import { environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, type LinkBridge } from "./links/link-jobs";
 import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
+import { notificationJobs } from "./notifications/notification-expiry.job";
+import { notificationRoutes } from "./notifications/notification.routes";
 import { receiptPageRoutes } from "./pages/receipt.page";
 import { sharePageRoutes } from "./pages/share.page";
 import { ConfigError, loadConfig, type ServerConfig } from "./platform/config/env.config";
@@ -48,7 +51,7 @@ function readConfig(): ServerConfig | null {
 function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger, bridge: LinkBridge): Job[] {
   const claimExpiry: Job = { name: "claimExpiry", ...JOB_SCHEDULES.claimExpiry, run: () => void runClaimExpiry({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }) };
   const payoutRecords = payoutRecordJobs({ ledger, clock: systemClock, bridge: bridge.port, logger });
-  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge), ...payoutRecords];
+  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge), ...payoutRecords, ...notificationJobs(ledger, systemClock, logger)];
 }
 
 /** The one stop of this process, whichever asks first: a signal, or the dev shutdown route. */
@@ -76,10 +79,14 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const heartbeats = assistantHeartbeats();
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, heartbeats }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
     if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
-    if (config.assistantToken !== null) internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats }));
+    if (config.assistantToken !== null) {
+      internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats }));
+      // The assistant pulls the outbox one row at a time and acknowledges each send (Story 6.4).
+      internal.push(notificationRoutes({ ledger, clock: systemClock, dailyCap: config.notificationDailyCap, shareBaseUrl: shareBaseUrlFor(config), production: config.env === "prod" }));
+    }
     const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
