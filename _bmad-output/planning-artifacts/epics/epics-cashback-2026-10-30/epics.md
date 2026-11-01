@@ -254,7 +254,23 @@ As the operator, I want every Shopee and AccessTrade payout matched to the exact
 A customer's link request becomes an affiliate link that carries only that customer's id, created through the operator's real browser for Shopee or the AccessTrade API for TikTok Shop, and opened through the share page in a real browser.
 **FRs covered:** FR-1, FR-3, FR-5, FR-6, FR-7, FR-12 (Shopee report pages), FR-37 (basic link requests list).
 
-### Epic 6: Zalo assistant and notifications
+#### Story 5.11: ShopeeFood links through the bridge
+
+As a customer, I want a ShopeeFood shop or dish link to earn cashback like a Shopee link, so that food orders count too.
+
+**Context:** ShopeeFood links (`shopeefood.vn`, `food.shopee.vn`, `shopee.vn/now-food`, `/u/` and `/share/` short links, group-order invites) are a Shopee-network link source (D60). The link is made by the same bridge job as a Shopee product (custom-link page, sub_id1 = customer, sub_id2 = request id) and passes the same returned-link checks (Story 5.4); short links and invite pages are resolved in the real browser (D8). The reuse key is the shop, `shopeefood:<shopId>`. No amount estimate: the reply says cashback is counted per shop once approved. Orders arrive in the Shopee report and follow the Shopee money rules. Realises FR-1. Follows AD-14, AD-22. Decisions: D6, D8, D17, D60.
+**Screens:** none. **Skills:** none.
+**Blocked by:** Story 5.4, Story 5.2.
+**Size:** S
+
+**Acceptance criteria**
+1. Given a ShopeeFood shop link, when the request is served, then a bridge link job is made with sub_id1 = customer and sub_id2 = request id, and the returned link is attached only after the Story 5.4 checks pass.
+2. Given a `/u/` short link or a group-order invite, when it is read, then the shop id is found in the real browser (never a server call to Shopee) and the reuse key is `shopeefood:<shopId>`; two links to one shop from one customer reuse one request.
+3. Given a ShopeeFood request, when the reply is written, then it carries no amount and uses the label saying cashback is counted per shop once approved.
+4. Given an unsupported network, when it is refused, then the message names Shopee, ShopeeFood and TikTok Shop.
+5. Given a report row for a ShopeeFood order, when it is reconciled, then it is attributed by its sub_ids and follows the Shopee money rules (fixture from the live provider's shape until a real row exists).
+
+## Epic 6: Zalo assistant and notifications
 A customer can register, get links, check balance and orders, set a bank account and receive each notification once in Zalo, at a human pace, with a silent first run after cutover.
 **FRs covered:** FR-1, FR-4, FR-8, FR-9 (/matkhau), FR-10 (chat), FR-15 (chat), FR-20, FR-21, FR-22, FR-33 (quiet first run), FR-36.
 

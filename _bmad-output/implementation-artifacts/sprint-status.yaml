@@ -108,6 +108,7 @@ development_status:
   5-8-share-page-opens-a-real-browser-and-records-clicks: backlog
   5-9-shopee-report-pages-through-the-bridge-feed-reconciliation: backlog
   5-10-basic-link-requests-list-for-staff: backlog
+  5-11-shopeefood-links-through-the-bridge: backlog
   epic-5-retrospective: optional
 
   epic-6: backlog
@@ -312,11 +313,12 @@ sprint_plan:
       - 5-6-product-lookup-reads-page-1-and-shows-the-estimated-cashback
       - 5-8-share-page-opens-a-real-browser-and-records-clicks
   - sprint: 24
-    goal: "Shopee report via bridge; link requests list; assistant process"
-    points: 5
+    goal: "Shopee report via bridge; link requests list; ShopeeFood links; assistant process"
+    points: 6
     stories:
       - 5-9-shopee-report-pages-through-the-bridge-feed-reconciliation
       - 5-10-basic-link-requests-list-for-staff
+      - 5-11-shopeefood-links-through-the-bridge
       - 6-1-assistant-process-on-the-internal-api-with-a-human-pace-pace
   - sprint: 25
     goal: "Zalo registration; link reply in chat"
