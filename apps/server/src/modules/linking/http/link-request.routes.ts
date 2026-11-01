@@ -22,6 +22,8 @@ export interface LinkRequestRouteDeps {
   readonly clock: Clock;
   /** `DEV` in dev, empty in production (AD-25). */
   readonly requestIdPrefix: string;
+  /** False when no AccessTrade link creator is configured: TikTok Shop links are refused (Story 5.7). */
+  readonly tikTok?: boolean;
 }
 
 const STATUS: Record<LinkRequestErrorCode, "not_found" | "forbidden" | "invalid_request" | "busy"> = {
@@ -29,6 +31,7 @@ const STATUS: Record<LinkRequestErrorCode, "not_found" | "forbidden" | "invalid_
   customer_disabled: "forbidden",
   customer_id_unusable: "invalid_request",
   network_unsupported: "invalid_request",
+  tiktok_unavailable: "invalid_request",
   url_too_long: "invalid_request",
   day_full: "busy",
 };
@@ -39,7 +42,7 @@ export function linkRequestInternalRoutes(deps: LinkRequestRouteDeps): (app: Fas
       const body = linkRequestCreateSchema.safeParse(request.body);
       if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
       try {
-        const queued = deps.ledger.tx((db) => queueLinkRequest(db, { ...body.data, channel: "zalo" }, deps.clock, deps.requestIdPrefix, (event, detail) => request.log.warn(detail, event)));
+        const queued = deps.ledger.tx((db) => queueLinkRequest(db, { ...body.data, channel: "zalo" }, deps.clock, deps.requestIdPrefix, (event, detail) => request.log.warn(detail, event), deps.tikTok ?? true));
         return linkRequestCreatedSchema.parse({ requestId: queued.requestId, status: queued.status, reused: queued.reused, shareCode: queued.shareCode });
       } catch (error) {
         if (error instanceof LinkRequestError) throw new HttpError(STATUS[error.code], `error.link.${error.code}`);

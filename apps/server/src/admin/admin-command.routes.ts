@@ -77,7 +77,7 @@ const staffToken = (request: FastifyRequest): string | null => {
 };
 
 /** The signed-in admin behind the staff token; an employee is refused, no token is unauthorized. */
-function adminActor(deps: AdminCommandDeps, request: FastifyRequest): Actor {
+export function adminActor(deps: AdminCommandDeps, request: FastifyRequest): Actor {
   const staff = staffSessionOf(deps.ledger.db, staffToken(request), deps.clock);
   if (staff === null) throw new HttpError("unauthorized", "error.unauthorized");
   if (staff.role !== "ADMIN") throw new HttpError("forbidden", "error.staff.admin_only");

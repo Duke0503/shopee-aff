@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
+import { hostOnDomain } from "@cashback/core";
 
 import IDENTIFIERS from "./production-identifiers.json" with { type: "json" };
 
@@ -131,7 +132,7 @@ function pathConflicts(dev: string, prod: ProductionPath, caseInsensitive: boole
 
 const onHost = (host: string, ids: ProductionIdentifiers): boolean => {
   const h = host.toLowerCase();
-  return ids.hostnames.includes(h) || ids.zones.some((zone) => h === zone || h.endsWith(`.${zone}`));
+  return ids.hostnames.includes(h) || hostOnDomain(h, ids.zones);
 };
 
 /** Secrets compared with the production env file's values; equal means a copied secret. */

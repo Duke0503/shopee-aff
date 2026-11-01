@@ -74,7 +74,8 @@
   "error.link.customer_not_found": "Không tìm thấy mã khách này.",
   "error.link.customer_disabled": "Tài khoản này đang tạm khoá nên chưa tạo được link. Vui lòng nhắn quản trị viên.",
   "error.link.customer_id_unusable": "Tài khoản này chưa tạo được link. Vui lòng nhắn quản trị viên.",
-  "error.link.network_unsupported": "Link này chưa được hỗ trợ. Hãy gửi link sản phẩm Shopee.",
-  "error.link.url_too_long": "Link này quá dài. Hãy gửi link sản phẩm Shopee ngắn hơn.",
-  "error.link.day_full": "Hôm nay đã có quá nhiều yêu cầu link. Vui lòng thử lại sau."
+  "error.link.network_unsupported": "Link này chưa được hoàn tiền. Hiện mình chỉ hoàn tiền cho sản phẩm Shopee và TikTok Shop.",
+  "error.link.url_too_long": "Link này quá dài. Hãy gửi link sản phẩm Shopee hoặc TikTok Shop ngắn hơn.",
+  "error.link.day_full": "Hôm nay đã có quá nhiều yêu cầu link. Vui lòng thử lại sau.",
+  "error.link.tiktok_unavailable": "Hiện mình chưa tạo được link TikTok Shop. Bạn gửi link sản phẩm Shopee nhé."
 }

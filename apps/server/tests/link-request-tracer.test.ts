@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { fixedClock, instantFromMs, parseInstant, toMs, type Clock } from "@cashback/core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { linkBridge, linkJobs, linkRoutes, subIdPrefixFor } from "../src/links/link-jobs";
+import { linkBridge, linkEffectsFor, linkJobs, linkRoutes, subIdPrefixFor } from "../src/links/link-jobs";
 import { checkReturnedLink, claimLinkJob, fakeBridge, FAKE_BRIDGE_HOST, findShareCode, LinkRequestError, linkRequestInternalRoutes, nextRequestId, queueLinkRequest, recordLinkResult, retryDelayMs, runLinkJob, shopeeProductUrl, type LinkChannel, type RecordedBridgeAnswer } from "../src/modules/linking/index";
 import { parseConfig } from "../src/platform/config/env.config";
 import { openLedger, type Ledger } from "../src/platform/db/ledger";
@@ -80,7 +80,7 @@ function movingClock(start = START): Clock & { advance(ms: number): void } {
   return { now: () => instantFromMs(now), advance: (ms) => void (now += ms) };
 }
 
-const run = (ledger: Ledger, bridge: BridgePort, clock: Clock = CLOCK, signal: AbortSignal = new AbortController().signal) => runLinkJob({ ledger, clock, bridge, subIdPrefix: "", logger: SILENT }, signal);
+const run = (ledger: Ledger, bridge: BridgePort, clock: Clock = CLOCK, signal: AbortSignal = new AbortController().signal) => runLinkJob({ ledger, clock, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(clock) }, signal);
 
 describe("Story 5.1: link request to share link through the fake bridge", () => {
   it("AC1: a known customer's Shopee link is QUEUED by the assistant, then ISSUED with a 10-character base62 share code", async () => {
@@ -135,7 +135,7 @@ describe("Story 5.1: link request to share link through the fake bridge", () => 
       const job = ledger.tx((db) => claimLinkJob(db, CLOCK, NO_GUESTS));
       if (job === null) throw new Error("expected a job");
       served.push(job.requestId);
-      ledger.tx((db) => recordLinkResult(db, job, fakeBridgeAnswer(job), CLOCK, { acceptFakeHost: true }));
+      ledger.tx((db) => recordLinkResult(db, job, fakeBridgeAnswer(job), CLOCK, { acceptFakeHost: true, effects: linkEffectsFor(CLOCK) }));
     }
     expect(served).toEqual([zalo, web, guest]);
     expect(ledger.tx((db) => claimLinkJob(db, CLOCK, NO_GUESTS))).toBeNull();
@@ -196,7 +196,7 @@ describe("Story 5.1: link request to share link through the fake bridge", () => 
   it("recognises Shopee product links on every Shopee domain and nothing else", () => {
     for (const url of [PRODUCT, "https://s.shopee.vn/AbC123", "https://shope.ee/x", "https://vn.shp.ee/y", "http://shopee.vn/product/1/2"]) expect(shopeeProductUrl(url)).not.toBeNull();
     for (const url of ["https://food.shopee.vn/x", "https://shopee.vn/now-food/x", "https://shopee.vn.evil.com/x", "https://notshopee.vn/x", "javascript:alert(1)", "ftp://shopee.vn/x", "https://u:p@shopee.vn/x", ""]) expect(shopeeProductUrl(url)).toBeNull();
-    expect(() => ledgerWithCustomers().tx((db) => queueLinkRequest(db, { customer: "DP00001", url: "https://vt.tiktok.com/ZS1/", channel: "zalo" }, CLOCK))).toThrow(LinkRequestError);
+    expect(() => ledgerWithCustomers().tx((db) => queueLinkRequest(db, { customer: "DP00001", url: "https://www.lazada.vn/products/x-i1.html", channel: "zalo" }, CLOCK))).toThrow(LinkRequestError);
   });
 });
 
@@ -284,7 +284,7 @@ describe("Story 5.1 review: no customer's link is lost or given to someone else"
     const wrongCustomer = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://${FAKE_BRIDGE_HOST}/l/x?sub_id1=${C2}&sub_id2=${job.subId2}` });
     const wrongRequest = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://${FAKE_BRIDGE_HOST}/l/x?sub_id1=${job.subId1}&sub_id2=26110199999` });
     const shopeeMismatch = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://shopee.vn/p-i.1.2?utm_content=${C2}-${job.subId2}---` });
-    const shortUnresolved = (): BridgeLinkResult => ({ outcome: "link", url: "https://s.shopee.vn/AbC123" });
+    const shortUnresolved = (): BridgeLinkResult => ({ outcome: "link", url: "https://s.shopee.vn/AbC123", resolvedUrl: "https://shopee.vn/p-i.1.2" });
     const otherHost = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://evil.example/l?sub_id1=${job.subId1}&sub_id2=${job.subId2}` });
     const cases: [string, (job: LinkBridgeJob) => BridgeLinkResult, BridgePort["mode"]][] = [
       ["link_sub_ids_mismatch", wrongCustomer, "fake"],
@@ -306,6 +306,7 @@ describe("Story 5.1 review: no customer's link is lost or given to someone else"
 
   it("review 4: a Shopee link is attached when it, or its resolved short link, carries the job's sub_ids in utm_content", async () => {
     const long = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://shopee.vn/p-i.1.2?utm_source=an&utm_content=${job.subId1}-${job.subId2}---` });
+    // The bridge answers a short link with its target as the real browser resolved it (Story 5.4 review item 3).
     const resolvedShort = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: "https://s.shopee.vn/AbC123", resolvedUrl: `https://shopee.vn/p-i.1.2?utm_content=${job.subId1}-${job.subId2}---` });
     for (const answer of [long, resolvedShort]) {
       const ledger = ledgerWithCustomers();

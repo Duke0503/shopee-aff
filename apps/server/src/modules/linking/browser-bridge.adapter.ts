@@ -56,7 +56,7 @@ const SERVICE_ORDER: Record<BridgeJobKind, number> = { link: 0, lookup: 1, repor
 /** What is asked of the browser, before the queue gives it a ticket and a timeout. */
 export type BridgeWork = { kind: "link"; sourceUrl: string; subId1: string; subId2: string } | { kind: "lookup"; url: string } | { kind: "report"; page: number };
 
-export type BridgeAnswer = { outcome: "link"; url: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
+export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
 
 export interface BrowserBridge extends BridgePort {
   readonly mode: "browser";
@@ -93,7 +93,7 @@ const newTicket = (): string => randomBytes(16).toString("hex");
 
 /** The answer to a link job in the port's terms; a lookup or report answer to a link job is a failure. */
 function linkResultOf(answer: BridgeAnswer): BridgeLinkResult {
-  if (answer.outcome === "link") return { outcome: "link", url: answer.url };
+  if (answer.outcome === "link") return { outcome: "link", url: answer.url, resolvedUrl: answer.resolvedUrl ?? null };
   if (answer.outcome === "unavailable") return answer;
   return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
 }

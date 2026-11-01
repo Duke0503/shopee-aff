@@ -101,10 +101,10 @@ development_status:
   5-1-link-request-to-share-link-through-the-fake-bridge-tracer-bu: review
   5-2-link-reuse-only-for-the-same-customer-and-one-guest-link-per: review
   5-3-browser-bridge-extension-takes-one-job-at-a-time-over-the-in: review
-  5-4-returned-links-are-checked-before-they-are-attached: backlog
-  5-5-captcha-page-errors-and-a-lost-login-pause-or-fail-requests: backlog
+  5-4-returned-links-are-checked-before-they-are-attached: review
+  5-5-captcha-page-errors-and-a-lost-login-pause-or-fail-requests: review
   5-6-product-lookup-reads-page-1-and-shows-the-estimated-cashback: backlog
-  5-7-tiktok-shop-links-through-accesstrade-and-a-polite-lazada-re: backlog
+  5-7-tiktok-shop-links-through-accesstrade-and-a-polite-lazada-re: review
   5-8-share-page-opens-a-real-browser-and-records-clicks: backlog
   5-9-shopee-report-pages-through-the-bridge-feed-reconciliation: backlog
   5-10-basic-link-requests-list-for-staff: backlog

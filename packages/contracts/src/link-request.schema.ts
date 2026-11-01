@@ -25,3 +25,12 @@ export const linkRequestCreatedSchema = z.object({
   shareCode: z.string().regex(/^[A-Za-z0-9]{8}([A-Za-z0-9]{2})?$/).nullable(),
 });
 export type LinkRequestCreated = z.infer<typeof linkRequestCreatedSchema>;
+
+/**
+ * The owner's resume of the Shopee link queue (Story 5.5 AC4), on the internal listener through the
+ * internal CLI (`link-queue resume --as <admin>`): whether a pause or a hold was cleared, and why
+ * the queue was paused.
+ */
+export const LINK_QUEUE_RESUME_PATH = "/internal/admin/link-queue/resume";
+export const linkQueueResumedSchema = z.object({ resumed: z.boolean(), pausedReason: z.enum(["login_redirect"]).nullable() });
+export type LinkQueueResumed = z.infer<typeof linkQueueResumedSchema>;

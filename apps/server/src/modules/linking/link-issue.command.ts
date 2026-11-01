@@ -1,43 +1,30 @@
 /**
- * The two writes around one bridge submission (AD-14, D6, D47, INV-1; Story 5.1), each its own
- * transaction so the bridge is awaited with no transaction open (code.md §5).
+ * Claiming the next link submission (AD-14, D6, D47, INV-1; Stories 5.1, 5.5, 5.7), in its own
+ * transaction, so the bridge or the AccessTrade API is awaited with no transaction open (code.md
+ * §5). The result side is link-result.command.ts.
  *
- * `claimLinkJob` hands out the open LINK job an interrupted run left first, but only after
+ * `claimLinkWork` hands out the open LINK job an interrupted run left first, but only after
  * checking again that its request is still QUEUED and its customer still resolves to the same
  * sub_id1; a job that no longer holds is closed without reaching the bridge. Otherwise it takes
- * the oldest QUEUED request that is due, by priority (Zalo, then web, then the guest account), and
- * writes one LINK bridge job for it: one request, so one customer, with sub_id1 = that customer's
- * id (the `DEV` prefix in dev, AD-25) and sub_id2 = the request id. A request whose customer no
- * longer resolves (erased since) is FAILED instead. Imported (CUTOVER) requests are history and
- * are not served again.
+ * the oldest QUEUED request that is due, by priority (Zalo, then web, then the guest account). A
+ * Shopee request gets one LINK bridge job: one request, so one customer, with sub_id1 = that
+ * customer's id (the `DEV` prefix in dev, AD-25) and sub_id2 = the request id. A TikTok Shop
+ * request is handed back as AccessTrade API work with the same two sub_ids and no bridge job. A
+ * request whose customer no longer resolves (erased since) is FAILED instead. Imported (CUTOVER)
+ * requests are history and are not served again.
  *
- * `recordLinkResult` closes the job. A returned link is attached only when it is on an allowed
- * host and carries exactly the job's sub_id1 and sub_id2; then the request becomes ISSUED with a
- * new 10-character base62 share code. A failure or a link that fails the check counts one attempt
- * and puts the request back with a growing delay, so a failing request never holds up the ones
- * behind it (the three-failure rule is Story 5.5). `recordSilentBridge` counts a browser that took
- * the job and went silent: uncounted once, a failed attempt the second time in a row.
+ * While the Shopee queue is held or paused (Story 5.5) no Shopee job is handed out, open or new;
+ * AccessTrade requests, which never reach the browser, are still served.
  */
-import { randomInt } from "node:crypto";
-import { instantFromMs, toMs, type Clock, type Instant } from "@cashback/core";
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
+import type { Clock } from "@cashback/core";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
-import type { BridgeLinkResult, LinkBridgeJob } from "../../platform/ports/bridge.port";
+import type { LinkBridgeJob } from "../../platform/ports/bridge.port";
 import { resolveCustomer } from "../identity/index";
-import { checkReturnedLink, retryDelayMs } from "./domain/link-check";
 import { SUB_ID_PATTERN } from "./domain/product-url";
-import { bridgeJobs, linkRequests, shareCodes } from "./schema";
-
-const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-export const SHARE_CODE_LENGTH = 10;
-
-/** A new share code: 10 base62 characters, each drawn uniformly. */
-export function randomShareCode(): string {
-  let code = "";
-  for (let i = 0; i < SHARE_CODE_LENGTH; i++) code += BASE62[randomInt(BASE62.length)];
-  return code;
-}
+import { shopeeQueueGate } from "./link-queue.command";
+import { bridgeJobs, linkRequests, type LinkNetwork } from "./schema";
 
 export interface ClaimOptions {
   /** `DEV` in dev, empty in production (AD-25). */
@@ -46,7 +33,18 @@ export interface ClaimOptions {
   readonly guestIds: readonly string[];
 }
 
-const closeJob = (db: LedgerDb, jobId: number, failure: string, at: string): void => {
+/** One AccessTrade link to make over its API (Story 5.7): sub1 = sub_id1, sub2 = the request id. */
+export interface ApiLinkRequest {
+  readonly network: "accesstrade";
+  readonly requestId: string;
+  readonly sourceUrl: string;
+  readonly subId1: string;
+  readonly subId2: string;
+}
+
+export type LinkWork = { readonly kind: "bridge"; readonly job: LinkBridgeJob } | { readonly kind: "api"; readonly request: ApiLinkRequest };
+
+export const closeJob = (db: LedgerDb, jobId: number, failure: string, at: string): void => {
   db.update(bridgeJobs).set({ status: "FAILED", failure, finishedAt: at }).where(eq(bridgeJobs.jobId, jobId)).run();
 };
 
@@ -82,121 +80,56 @@ function resumableJob(db: LedgerDb, clock: Clock, prefix: string): LinkBridgeJob
   }
 }
 
-/** The next due QUEUED request in service order: Zalo (and the live private chat) 0, web 1, guest 2. */
-function nextQueued(db: LedgerDb, guestIds: readonly string[], now: string): { requestId: string; customerId: string; sourceUrl: string } | null {
+interface QueuedRow {
+  readonly requestId: string;
+  readonly customerId: string;
+  readonly sourceUrl: string;
+  readonly network: LinkNetwork;
+}
+
+/** The next due QUEUED request of `networks` in service order: Zalo (and the live private chat) 0, web 1, guest 2. */
+function nextQueued(db: LedgerDb, guestIds: readonly string[], now: string, networks: readonly LinkNetwork[]): QueuedRow | null {
   const guest = guestIds.length === 0 ? sql`0` : sql`${linkRequests.customerId} IN (${sql.join(guestIds.map((g) => sql`${g}`), sql`, `)})`;
   const priority = sql`CASE WHEN ${guest} THEN 2 WHEN ${linkRequests.channel} = 'web' THEN 1 ELSE 0 END`;
+  const network = sql<LinkNetwork>`coalesce(${linkRequests.network}, 'shopee')`;
   const row = db
-    .select({ requestId: linkRequests.requestId, customerId: linkRequests.customerId, sourceUrl: linkRequests.sourceUrl })
+    .select({ requestId: linkRequests.requestId, customerId: linkRequests.customerId, sourceUrl: linkRequests.sourceUrl, network })
     .from(linkRequests)
-    .where(and(eq(linkRequests.status, "QUEUED"), eq(linkRequests.origin, "REQUEST"), or(isNull(linkRequests.nextAttemptAt), lte(linkRequests.nextAttemptAt, now))))
+    .where(and(eq(linkRequests.status, "QUEUED"), eq(linkRequests.origin, "REQUEST"), inArray(network, [...networks]), or(isNull(linkRequests.nextAttemptAt), lte(linkRequests.nextAttemptAt, now))))
     .orderBy(priority, asc(linkRequests.createdAt), asc(linkRequests.requestId))
     .get();
   return row ?? null;
 }
 
-/** Claims the next submission; call inside `tx`. Null when nothing is due. */
-export function claimLinkJob(db: LedgerDb, clock: Clock, options: ClaimOptions): LinkBridgeJob | null {
-  const open = resumableJob(db, clock, options.subIdPrefix);
-  if (open !== null) return open;
+/** Claims the next submission, bridge or API; call inside `tx`. Null when nothing is due. */
+export function claimLinkWork(db: LedgerDb, clock: Clock, options: ClaimOptions, networks: readonly LinkNetwork[] = ["shopee", "accesstrade"]): LinkWork | null {
   const now = clock.now();
-  for (let request = nextQueued(db, options.guestIds, now); request !== null; request = nextQueued(db, options.guestIds, now)) {
+  const shopeeOpen = networks.includes("shopee") && shopeeQueueGate(db, now) === "open";
+  if (shopeeOpen) {
+    const open = resumableJob(db, clock, options.subIdPrefix);
+    if (open !== null) return { kind: "bridge", job: open };
+  }
+  const served = networks.filter((n) => n !== "shopee" || shopeeOpen);
+  if (served.length === 0) return null;
+  for (let request = nextQueued(db, options.guestIds, now, served); request !== null; request = nextQueued(db, options.guestIds, now, served)) {
     const owner = subId1Of(db, request.customerId, options.subIdPrefix);
     if (owner === null) {
       failRequest(db, request.requestId);
       continue;
     }
+    if (request.network === "accesstrade") return { kind: "api", request: { network: "accesstrade", requestId: request.requestId, sourceUrl: request.sourceUrl, subId1: owner.subId1, subId2: request.requestId } };
     const inserted = db
       .insert(bridgeJobs)
       .values({ kind: "LINK", status: "PENDING", requestId: request.requestId, customerId: owner.customerId, subId1: owner.subId1, subId2: request.requestId, sourceUrl: request.sourceUrl, createdAt: now })
       .returning({ jobId: bridgeJobs.jobId })
       .get();
-    return { jobId: inserted.jobId, requestId: request.requestId, sourceUrl: request.sourceUrl, subId1: owner.subId1, subId2: request.requestId };
+    return { kind: "bridge", job: { jobId: inserted.jobId, requestId: request.requestId, sourceUrl: request.sourceUrl, subId1: owner.subId1, subId2: request.requestId } };
   }
   return null;
 }
 
-function newShareCode(db: LedgerDb, makeCode: () => string): string {
-  for (let tries = 0; tries < 5; tries++) {
-    const code = makeCode();
-    if (!db.select({ code: shareCodes.code }).from(shareCodes).where(eq(shareCodes.code, code)).get()) return code;
-  }
-  throw new Error("linking: no free share code after 5 tries");
-}
-
-export interface LinkResultRecorded {
-  readonly requestId: string;
-  readonly outcome: "issued" | "failed" | "stale";
-  /** Why a submission failed: the bridge's reason or the link check's. */
-  readonly reason: string | null;
-  readonly shareCode: string | null;
-}
-
-export interface RecordOptions {
-  /** True only for the fake bridge's own links (AD-25). */
-  readonly acceptFakeHost: boolean;
-  readonly makeCode?: () => string;
-}
-
-/** Counts one failed attempt and puts the request back after its delay. */
-function backOff(db: LedgerDb, requestId: string, at: Instant): void {
-  const row = db.select({ attempts: linkRequests.attempts }).from(linkRequests).where(eq(linkRequests.requestId, requestId)).get();
-  const attempts = (row?.attempts ?? 0) + 1;
-  db.update(linkRequests).set({ attempts, nextAttemptAt: instantFromMs(toMs(at) + retryDelayMs(attempts)) }).where(eq(linkRequests.requestId, requestId)).run();
-}
-
-/** Times in a row the browser may take one job and go silent before that counts as a failed attempt. */
-export const SILENT_ANSWERS_BEFORE_FAILURE = 2;
-
-/**
- * The browser took this job and never answered (Story 5.3 review item 2); call inside `tx`. The
- * first time the job stays open and uncounted (a browser restart is not the request's fault); the
- * second time in a row it is closed `bridge_no_answer` and the request backs off like any failure,
- * so a page that always silences the bridge cannot hold the queue.
- */
-export function recordSilentBridge(db: LedgerDb, job: LinkBridgeJob, clock: Clock): "retry" | "failed" {
-  const row = db.select({ status: bridgeJobs.status, noAnswers: bridgeJobs.noAnswers }).from(bridgeJobs).where(eq(bridgeJobs.jobId, job.jobId)).get();
-  if (row?.status !== "PENDING") return "retry";
-  const noAnswers = row.noAnswers + 1;
-  db.update(bridgeJobs).set({ noAnswers }).where(eq(bridgeJobs.jobId, job.jobId)).run();
-  if (noAnswers < SILENT_ANSWERS_BEFORE_FAILURE) return "retry";
-  const at = clock.now();
-  closeJob(db, job.jobId, "bridge_no_answer", at);
-  backOff(db, job.requestId, at);
-  return "failed";
-}
-
-/** An answer that closes the job; `unavailable` leaves it open and is never recorded. */
-export type RecordedBridgeAnswer = Exclude<BridgeLinkResult, { outcome: "unavailable" }>;
-
-/** Closes a claimed job with the bridge's answer; call inside `tx`. */
-export function recordLinkResult(db: LedgerDb, job: LinkBridgeJob, result: RecordedBridgeAnswer, clock: Clock, options: RecordOptions): LinkResultRecorded {
-  const at = clock.now();
-  const done = (outcome: LinkResultRecorded["outcome"], reason: string | null = null, shareCode: string | null = null): LinkResultRecorded => ({ requestId: job.requestId, outcome, reason, shareCode });
-  const open = db.select({ status: bridgeJobs.status }).from(bridgeJobs).where(eq(bridgeJobs.jobId, job.jobId)).get();
-  const request = db.select({ status: linkRequests.status }).from(linkRequests).where(eq(linkRequests.requestId, job.requestId)).get();
-  if (open?.status !== "PENDING") return done("stale");
-  if (request?.status !== "QUEUED") {
-    // The request was settled meanwhile; the answer is dropped and the job closed so it is not handed out again.
-    closeJob(db, job.jobId, "stale", at);
-    return done("stale");
-  }
-  const reason = result.outcome === "failed" ? result.reason : linkFailure(job, result, options);
-  if (reason !== null || result.outcome === "failed") {
-    const why = reason ?? "failed";
-    closeJob(db, job.jobId, why, at);
-    backOff(db, job.requestId, at);
-    return done("failed", why);
-  }
-  const url = result.url;
-  const shareCode = newShareCode(db, options.makeCode ?? randomShareCode);
-  db.update(bridgeJobs).set({ status: "DONE", resultUrl: url, finishedAt: at }).where(eq(bridgeJobs.jobId, job.jobId)).run();
-  db.update(linkRequests).set({ status: "ISSUED", affiliateUrl: url, attempts: sql`${linkRequests.attempts} + 1`, nextAttemptAt: null }).where(eq(linkRequests.requestId, job.requestId)).run();
-  db.insert(shareCodes).values({ code: shareCode, requestId: job.requestId, createdAt: at }).run();
-  return done("issued", null, shareCode);
-}
-
-function linkFailure(job: LinkBridgeJob, result: Extract<RecordedBridgeAnswer, { outcome: "link" }>, options: RecordOptions): string | null {
-  const check = checkReturnedLink({ url: result.url, resolvedUrl: result.resolvedUrl ?? null, subId1: job.subId1, subId2: job.subId2, acceptFakeHost: options.acceptFakeHost });
-  return check.ok ? null : `link_${check.reason}`;
+/** The next Shopee bridge job only; call inside `tx`. Null when nothing is due or the queue is held or paused. */
+export function claimLinkJob(db: LedgerDb, clock: Clock, options: ClaimOptions): LinkBridgeJob | null {
+  const work = claimLinkWork(db, clock, options, ["shopee"]);
+  return work?.kind === "bridge" ? work.job : null;
 }

@@ -28,8 +28,8 @@ export interface LinkBridgeJob {
 
 /**
  * The bridge's answer. A link is attached only after the server checks it carries this job's
- * sub_ids; `resolvedUrl` is a short link's redirect target, resolved outside any transaction
- * (Story 5.4).
+ * sub_ids; `resolvedUrl` is a short link's target as the bridge resolved it in the real browser
+ * (Story 5.4), answered on the same job's ticket.
  */
 export type BridgeLinkResult =
   | { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null }

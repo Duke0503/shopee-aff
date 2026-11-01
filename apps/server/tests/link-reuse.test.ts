@@ -10,6 +10,7 @@ import { fixedClock, instantFromMs, parseInstant, toMs, type Clock } from "@cash
 import { loadLinkReuseFixtures, type ReuseExistingRequest } from "@cashback/golden/link-reuse";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { linkEffectsFor } from "../src/links/link-jobs";
 import { chooseReusable, claimLinkJob, fakeBridge, isReusable, LINK_REUSE_WINDOW_DAYS, linkRequestInternalRoutes, queueLinkRequest, readShopeeProduct, runLinkJob, shopeeProductKey, unreadableTimes, type ReuseCandidate } from "../src/modules/linking/index";
 import { openLedger, type Ledger } from "../src/platform/db/ledger";
 import { MIGRATIONS_DIR, readMigrations, runMigrations } from "../src/platform/db/migrations";
@@ -67,7 +68,7 @@ function watchingBridge(): BridgePort & { jobs: LinkBridgeJob[] } {
   return { mode: "fake", jobs, createLink: async (job, signal) => (jobs.push(job), fake.createLink(job, signal)) };
 }
 
-const serve = (ledger: Ledger, bridge: BridgePort, clock: Clock = CLOCK) => runLinkJob({ ledger, clock, bridge, subIdPrefix: "", logger: SILENT }, new AbortController().signal);
+const serve = (ledger: Ledger, bridge: BridgePort, clock: Clock = CLOCK) => runLinkJob({ ledger, clock, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(clock) }, new AbortController().signal);
 const later = (ms: number): Clock => fixedClock(instantFromMs(toMs(parseInstant(NOW)) + ms));
 
 describe("Story 5.2: golden link reuse cases", () => {

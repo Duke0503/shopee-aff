@@ -6,16 +6,22 @@
  * result box is read until a new link or a Shopee error shows, within the job's own timeout.
  *
  * The answer is a link or a reason; the server checks the link (host and sub_ids) before it is
- * attached, so nothing here is trusted beyond "it is an https Shopee link". Every pause is in the
+ * attached, so nothing here is trusted beyond "it is an https Shopee link". A short link is
+ * answered with its target, resolved in this browser (short-link.ts, Story 5.4), so the server can
+ * read its sub_ids without calling Shopee itself. Every pause is in the
  * service worker; the page scripts look once and return.
  */
 import type { BridgeFailure, BridgeLinkJob } from "@cashback/contracts";
 
 import type { PageDriver, Wait } from "./bridge-tab";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FormSelectors } from "./page-scripts";
+import { type ResolveLink } from "./short-link";
 import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, pageBlock, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
 
-export type LinkAnswer = { outcome: "link"; url: string } | { outcome: "failed"; reason: BridgeFailure };
+export type LinkAnswer = { outcome: "link"; url: string; resolvedUrl?: string } | { outcome: "failed"; reason: BridgeFailure };
+
+/** No resolution: every short link is answered unresolved (the server retries it uncounted). */
+const NO_RESOLUTION: ResolveLink = async () => null;
 
 /** How long to wait for the form: first as the page stands, then after one reload (as live). */
 export const FORM_WAITS_MS = [12_000, 20_000] as const;
@@ -84,7 +90,13 @@ async function awaitResult(page: PageDriver, wait: Wait, previous: string, limit
   return { outcome: "failed", reason: "no_link" };
 }
 
-export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wait): Promise<LinkAnswer> {
+async function withTarget(answer: LinkAnswer, resolve: ResolveLink): Promise<LinkAnswer> {
+  if (answer.outcome !== "link") return answer;
+  const resolvedUrl = await resolve(answer.url);
+  return resolvedUrl === null ? answer : { ...answer, resolvedUrl };
+}
+
+export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wait, resolve: ResolveLink = NO_RESOLUTION): Promise<LinkAnswer> {
   if (!isShopeeLink(job.sourceUrl)) return { outcome: "failed", reason: "bad_job" };
   try {
     await openForm(page, wait);
@@ -96,7 +108,7 @@ export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wai
     if (!pressed.ok) return { outcome: "failed", reason: "submit_failed" };
     // The form waits may already have used their share of the server's timeout.
     const left = job.timeoutMs - FORM_WAITS_MS[0] - FORM_WAITS_MS[1] - BEFORE_SUBMIT_MS - ANSWER_MARGIN_MS;
-    return await awaitResult(page, wait, previous, Math.max(RESULT_POLL_MS * 10, left));
+    return await withTarget(await awaitResult(page, wait, previous, Math.max(RESULT_POLL_MS * 10, left)), resolve);
   } catch (error) {
     if (error instanceof StepFailure) return { outcome: "failed", reason: error.reason };
     return { outcome: "failed", reason: "script_error" };

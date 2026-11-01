@@ -18,6 +18,7 @@
     "staff:access": "tsx src/admin/run-admin-command.ts staff-access",
     "campaign:create": "tsx src/admin/run-admin-command.ts campaign-create",
     "customer:merge": "tsx src/admin/run-admin-command.ts customer-merge",
+    "link-queue:resume": "tsx src/admin/run-admin-command.ts link-queue resume",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

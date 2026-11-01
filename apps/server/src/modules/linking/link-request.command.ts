@@ -14,6 +14,10 @@
  * only, so another customer's link can never match (INV-1). A product link is kept in its short
  * canonical form (packages/core `readShopeeProduct`), so it always fits a bridge job; any other
  * Shopee link longer than a bridge job allows is refused here (`url_too_long`), never queued.
+ *
+ * A TikTok Shop link is queued for AccessTrade (Story 5.7); a Lazada link, or any other, is refused
+ * as `network_unsupported`, whose message names the supported networks (D17). Without an AccessTrade
+ * link creator (production with no key) a TikTok Shop link is refused as `tiktok_unavailable`.
  */
 import { vnToday, type Clock } from "@cashback/core";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -21,14 +25,14 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { LedgerDb } from "../../platform/db/ledger";
 import { customerKeys, resolveCustomer } from "../identity/index";
 import { chooseReusable, unreadableTimes, type ReuseCandidate } from "./domain/link-reuse";
-import { readShopeeProduct, SUB_ID_PATTERN } from "./domain/product-url";
+import { readProductLink, SUB_ID_PATTERN } from "./domain/product-url";
 import { linkRequests, shareCodes } from "./schema";
 
 /** Where a request came from; the link job serves Zalo first, then the web, then guests (AD-14). */
 export const LINK_CHANNELS = ["zalo", "web"] as const;
 export type LinkChannel = (typeof LINK_CHANNELS)[number];
 
-export type LinkRequestErrorCode = "customer_not_found" | "customer_disabled" | "network_unsupported" | "customer_id_unusable" | "url_too_long" | "day_full";
+export type LinkRequestErrorCode = "customer_not_found" | "customer_disabled" | "network_unsupported" | "tiktok_unavailable" | "customer_id_unusable" | "url_too_long" | "day_full";
 
 export class LinkRequestError extends Error {
   constructor(readonly code: LinkRequestErrorCode) {
@@ -101,20 +105,22 @@ function reusableRequest(db: LedgerDb, requester: Requester, productKey: string,
  * Writes one QUEUED request, or hands back the requester's own reusable one; call inside `tx`.
  * `requestIdPrefix` is `DEV` in dev, empty in production.
  */
-export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: Clock, requestIdPrefix = "", note: LinkRequestNote = () => undefined): QueuedLinkRequest {
+export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: Clock, requestIdPrefix = "", note: LinkRequestNote = () => undefined, tikTok = true): QueuedLinkRequest {
   const customer = resolveCustomer(db, input.customer);
   if (customer === null) throw new LinkRequestError("customer_not_found");
   if (customer.status === "DISABLED") throw new LinkRequestError("customer_disabled");
   if (!SUB_ID_PATTERN.test(customer.customerId)) throw new LinkRequestError("customer_id_unusable");
-  const product = readShopeeProduct(input.url);
+  const product = readProductLink(input.url);
   if (!product.ok) throw new LinkRequestError(product.reason === "too_long" ? "url_too_long" : "network_unsupported");
-  const { sourceUrl, productKey } = product;
+  // Production without an AccessTrade key cannot make a TikTok Shop link, so it says so at once (owner decision, Sprint 22 review).
+  if (product.network === "accesstrade" && !tikTok) throw new LinkRequestError("tiktok_unavailable");
+  const { sourceUrl, productKey, network, platform } = product;
   // Only a link that names one product is ever reused (Story 5.2); a search or shop link is always new.
   const reused = productKey === null ? null : reusableRequest(db, { customerId: customer.customerId, guest: customer.role === "HOUSE" }, productKey, clock, requestIdPrefix, note);
   if (reused !== null) return reused;
   const requestId = nextRequestId(db, clock, requestIdPrefix);
   db.insert(linkRequests)
-    .values({ requestId, customerId: customer.customerId, network: "shopee", platform: "shopee", channel: input.channel, status: "QUEUED", sourceUrl, productKey, createdAt: clock.now(), origin: "REQUEST" })
+    .values({ requestId, customerId: customer.customerId, network, platform, channel: input.channel, status: "QUEUED", sourceUrl, productKey, createdAt: clock.now(), origin: "REQUEST" })
     .run();
   return { requestId, customerId: customer.customerId, status: "QUEUED", reused: false, shareCode: null };
 }

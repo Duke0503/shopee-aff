@@ -9,11 +9,13 @@ import { describe, expect, it } from "vitest";
 import { bridgeService, KEEPALIVE_ALARM, KEEPALIVE_MINUTES } from "../src/bridge-service";
 import { chromePageDriver } from "../src/bridge-tab";
 import type { Fetch } from "../src/server-client";
+import type { FollowLink } from "../src/short-link";
 import { CUSTOM_LINK_URL } from "../src/shopee-page";
 import { fakeChrome, recordingWait } from "./fakes";
 
 const SETTINGS = { serverUrl: "http://127.0.0.1:9081", token: "b".repeat(40) };
 /** Not random: the bytes 0, 1, 2 ... so the instance id is known. */
+const NO_FOLLOW: FollowLink = () => Promise.reject(new Error("no short link is followed here"));
 const SEQUENCE = (length: number) => Uint8Array.from({ length }, (_, i) => i);
 
 describe("Story 5.3 AC5: the bridge tab is kept alive", () => {
@@ -52,7 +54,7 @@ describe("Story 5.3: the service worker survives restarts", () => {
       if (polls >= 2) stop.stopped = true;
       return { status: 204, json: async () => null };
     };
-    const service = bridgeService({ chrome, fetch, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined }, stop);
+    const service = bridgeService({ chrome, fetch, follow: NO_FOLLOW, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined }, stop);
     service.install();
     expect(Object.keys(chrome.listeners).sort()).toEqual(["action.onClicked", "alarms.onAlarm", "runtime.onInstalled", "runtime.onStartup", "storage.onChanged"]);
     expect(chrome.alarmsCreated).toEqual([{ name: KEEPALIVE_ALARM, periodInMinutes: KEEPALIVE_MINUTES }]);
@@ -71,7 +73,7 @@ describe("Story 5.3: the service worker survives restarts", () => {
 
   it("never runs two loops at once, and ends without settings until they are saved", async () => {
     const chrome = fakeChrome();
-    const service = bridgeService({ chrome, fetch: idleFetch, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined });
+    const service = bridgeService({ chrome, fetch: idleFetch, follow: NO_FOLLOW, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined });
     const first = service.start();
     expect(service.start()).toBe(first);
     expect(await first).toBe("no_settings");
@@ -88,7 +90,7 @@ describe("Story 5.3 review 5: one stable instance id per profile", () => {
       stop.stopped = true;
       return { status: 204, json: async () => null };
     };
-    const deps = { chrome, fetch, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined };
+    const deps = { chrome, fetch, follow: NO_FOLLOW, wait: recordingWait(), randomBytes: SEQUENCE, log: () => undefined };
     await bridgeService(deps, stop).start();
     const id = "000102030405060708090a0b0c0d0e0f";
     expect(chrome.store["instanceId"]).toBe(id);

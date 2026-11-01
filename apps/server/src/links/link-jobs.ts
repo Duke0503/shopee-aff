@@ -5,18 +5,23 @@
  * attribution never credits, and dev request ids carry it too. The fake bridge is never built
  * for production, whatever the config says. With `BRIDGE_MODE=browser` the real bridge (Story 5.3)
  * is built once: its long-poll routes go on the internal listener behind the bridge token, and the
- * link job hands it one submission at a time.
+ * link job hands it one submission at a time. The job also gets the outbox and alerts of its
+ * results (Story 5.5) and the AccessTrade creator (Story 5.7); without a creator the assistant's
+ * route refuses TikTok Shop links when they are submitted.
  */
 import type { Clock } from "@cashback/core";
 
-import { bridgeInternalRoutes, browserBridge, fakeBridge, linkRequestInternalRoutes, runLinkJob } from "../modules/linking/index";
+import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, type LinkCreator, type LinkEffects } from "../modules/linking/index";
+import { outboxFor } from "../modules/messaging/index";
+import { alertsFor, commandAudit } from "../modules/operations/index";
 import { DEV_SUB_ID_PREFIX } from "../modules/orders/index";
 import type { ServerConfig } from "../platform/config/env.config";
-import type { Ledger } from "../platform/db/ledger";
+import type { Ledger, LedgerDb } from "../platform/db/ledger";
 import type { InternalRoutes } from "../platform/http/servers";
 import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
 import { systemTimer, type Job } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
+import type { Actor } from "../platform/ports/audit.port";
 import type { BridgePort } from "../platform/ports/bridge.port";
 
 export const subIdPrefixFor = (env: ServerConfig["env"]): string => (env === "dev" ? DEV_SUB_ID_PREFIX : "");
@@ -67,10 +72,37 @@ export function linkRoutes(input: LinkWiringInput, bridge: LinkBridge): Internal
     input.logger.warn({ env: input.config.env }, "linking.assistant_routes.absent");
     return [...bridge.routes];
   }
-  return [...bridge.routes, linkRequestInternalRoutes({ ledger: input.ledger, clock: input.clock, requestIdPrefix: subIdPrefixFor(input.config.env) })];
+  return [...bridge.routes, linkRequestInternalRoutes({ ledger: input.ledger, clock: input.clock, requestIdPrefix: subIdPrefixFor(input.config.env), tikTok: accessTradeLinksFor(input.config) !== null })];
+}
+
+/** The actor of the link job's own writes: the "link failed" outbox rows (AD-17). */
+export const LINKS_ACTOR: Actor = { kind: "system", id: "links" };
+
+/** The outbox and the owner alerts, bound to one result transaction (Story 5.5). */
+export function linkEffectsFor(clock: Clock, logger?: Logger): (db: LedgerDb) => LinkEffects {
+  return (db) => ({ outbox: outboxFor(db, clock, commandAudit(db, clock, LINKS_ACTOR)), alerts: alertsFor(db, clock, logger) });
+}
+
+/**
+ * The AccessTrade link creator (Story 5.7): the API with the configured key (dev may hold the
+ * production key only with ALLOW_PROD_ACCESSTRADE_KEY=1, checked at startup, Story 8.1); in dev
+ * without a key the fake creator; in production without one none, and TikTok Shop links are
+ * refused when submitted (`tiktok_unavailable`).
+ */
+export function accessTradeLinksFor(config: Pick<ServerConfig, "env" | "accesstradeApiKey">): LinkCreator | null {
+  if (config.accesstradeApiKey !== null) return accessTradeLinkCreator({ apiKey: config.accesstradeApiKey });
+  return config.env === "dev" ? fakeAccessTradeLinks() : null;
 }
 
 export function linkJobs(input: LinkWiringInput, bridge: LinkBridge): Job[] {
-  const deps = { ledger: input.ledger, clock: input.clock, bridge: bridge.port, subIdPrefix: subIdPrefixFor(input.config.env), logger: input.logger };
+  const deps = {
+    ledger: input.ledger,
+    clock: input.clock,
+    bridge: bridge.port,
+    subIdPrefix: subIdPrefixFor(input.config.env),
+    logger: input.logger,
+    effects: linkEffectsFor(input.clock, input.logger),
+    accessTrade: accessTradeLinksFor(input.config),
+  };
   return [{ name: "links", ...JOB_SCHEDULES.links, run: async (signal) => void (await runLinkJob(deps, signal)) }];
 }

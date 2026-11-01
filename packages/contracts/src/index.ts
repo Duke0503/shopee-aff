@@ -213,7 +213,7 @@ export {
   type OverviewWeek,
   type Ratio,
 } from "./overview.schema";
-export { ASSISTANT_TOKEN_HEADER, linkRequestCreatedSchema, linkRequestCreateSchema, type LinkRequestCreate, type LinkRequestCreated } from "./link-request.schema";
+export { ASSISTANT_TOKEN_HEADER, LINK_QUEUE_RESUME_PATH, linkQueueResumedSchema, linkRequestCreatedSchema, linkRequestCreateSchema, type LinkQueueResumed, type LinkRequestCreate, type LinkRequestCreated } from "./link-request.schema";
 export {
   BRIDGE_FAILURES,
   BRIDGE_INSTANCE_HEADER,

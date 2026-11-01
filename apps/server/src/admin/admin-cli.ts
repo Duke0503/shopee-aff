@@ -7,6 +7,7 @@
  *   staff-access <staffId> --as <admin> [--role R] [--status S]
  *   campaign-create <campaign.json> --as <admin> [--apply]   preview, and with --apply create
  *   customer-merge <merged> --into <survivor> --as <admin> [--apply]   preview the merge, and with --apply merge
+ *   link-queue resume --as <admin>                       resume the Shopee link queue after the affiliate browser signed in again
  *
  * `--as` signs in as that admin (the password is asked, never an argument) and signs out at the
  * end. The first seed of an empty staff table needs no `--as`. Every new password is asked twice
@@ -22,6 +23,8 @@ import {
   campaignPreviewResponseSchema,
   customerMergedResponseSchema,
   customerMergePreviewSchema,
+  LINK_QUEUE_RESUME_PATH,
+  linkQueueResumedSchema,
   STAFF_TOKEN_HEADER,
   staffAccessResponseSchema,
   staffPasswordResponseSchema,
@@ -82,8 +85,8 @@ interface Args {
   readonly flags: ReadonlyMap<string, string | true>;
 }
 
-const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge"];
-export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply]";
+const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "link-queue"];
+export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | link-queue resume --as <admin>";
 
 function parseArgs(argv: readonly string[]): Args | null {
   const [command, target, ...rest] = argv;
@@ -183,12 +186,19 @@ async function customerMerge(io: CliIo, args: Args, token: string | null): Promi
   return { applied: true, preview, merged };
 }
 
+/** Story 5.5 AC4: the owner resumes a paused (or held) Shopee link queue. */
+async function linkQueue(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
+  if (args.target !== "resume") throw new CliRefusal("usage", { error: CLI_USAGE });
+  return linkQueueResumedSchema.parse(await ok(io, "POST", LINK_QUEUE_RESUME_PATH, {}, token));
+}
+
 const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promise<Record<string, unknown>>> = {
   "staff-seed": staffSeed,
   "staff-password": staffPassword,
   "staff-access": staffAccess,
   "campaign-create": campaignCreate,
   "customer-merge": customerMerge,
+  "link-queue": linkQueue,
 };
 
 /** Runs one command; returns the exit code after printing its one JSON line. */

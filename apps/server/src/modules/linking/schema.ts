@@ -51,6 +51,9 @@ export const linkRequests = sqliteTable("link_requests", {
   nextAttemptAt: text("next_attempt_at"),
   // The product the request is for (migration 0023, Story 5.2); the reuse lookup's key.
   productKey: text("product_key"),
+  // A request's own page errors in a row and the first one's time (migration 0024, Story 5.5).
+  pageErrors: integer("page_errors").notNull().default(0),
+  pageErrorSince: text("page_error_since"),
 });
 
 export const shareCodes = sqliteTable("share_codes", {
@@ -85,3 +88,13 @@ export const bridgeJobs = sqliteTable("bridge_jobs", {
 
 export type ProductOfferRow = typeof productOffers.$inferInsert;
 export type LinkRequestRow = typeof linkRequests.$inferInsert;
+
+/** Whether the Shopee link queue is held (captcha, page error) or paused (login lost) (migration 0024, Story 5.5). */
+export const linkQueueState = sqliteTable("link_queue_state", {
+  queue: text("queue", { enum: ["shopee"] }).primaryKey().notNull(),
+  pausedReason: text("paused_reason", { enum: ["login_redirect"] }),
+  pausedAt: text("paused_at"),
+  heldReason: text("held_reason", { enum: ["captcha", "page_error"] }),
+  heldUntil: text("held_until"),
+  lastPageErrorRequest: text("last_page_error_request"),
+});

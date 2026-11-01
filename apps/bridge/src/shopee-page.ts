@@ -7,6 +7,8 @@
  * `sub1-sub2---`.
  */
 
+import { hostOnDomain, SHOPEE_LINK_DOMAINS } from "@cashback/core";
+
 export const CUSTOM_LINK_URL = "https://affiliate.shopee.vn/offer/custom_link";
 /** The tab list query that finds the bridge tab again after a restart. */
 export const AFFILIATE_TAB_PATTERN = "https://affiliate.shopee.vn/*";
@@ -23,9 +25,7 @@ export const PAGE_ERROR = ".ant-form-item-explain-error, .ant-message-error, .an
 export const VERIFICATION_MARKERS = ["/verify/"] as const;
 export const LOGIN_MARKERS = ["/login", "/signin", "passport", "/account"] as const;
 
-const SHOPEE_DOMAINS = ["shopee.vn", "shope.ee", "shp.ee"] as const;
-
-export const onShopee = (host: string): boolean => SHOPEE_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+export const onShopee = (host: string): boolean => hostOnDomain(host, SHOPEE_LINK_DOMAINS);
 
 /** True for an http(s) link on a Shopee domain: the only kind of source a link job may carry. */
 export function isShopeeLink(text: string, httpsOnly = false): boolean {

@@ -30,10 +30,10 @@ describe("Story 5.3 AC4: no Shopee signature and no direct Shopee API call", () 
     expect(code(page)).not.toMatch(/fetch|XMLHttpRequest|chrome\./);
   });
 
-  it("the manifest reaches only the affiliate dashboard and 127.0.0.1, with no debugger permission", () => {
+  it("the manifest reaches only the affiliate dashboard, 127.0.0.1 and the Shopee hosts a short link resolves through (Story 5.4), with no debugger permission", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, "public", "manifest.json"), "utf8")) as { manifest_version: number; permissions: string[]; host_permissions: string[]; background: { type: string } };
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.host_permissions).toEqual(["https://affiliate.shopee.vn/*", "http://127.0.0.1/*"]);
+    expect(manifest.host_permissions).toEqual(["https://affiliate.shopee.vn/*", "http://127.0.0.1/*", "https://s.shopee.vn/*", "https://shopee.vn/*", "https://shope.ee/*", "https://*.shp.ee/*"]);
     expect(manifest.permissions.sort()).toEqual(["alarms", "scripting", "storage", "tabs"]);
     expect(manifest.background.type).toBe("module");
   });

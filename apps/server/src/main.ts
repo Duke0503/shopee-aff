@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { systemClock } from "@cashback/core";
 
 import { adminCommandRoutes } from "./admin/admin-command.routes";
+import { linkQueueRoutes } from "./admin/link-queue.routes";
 import { adminDesk } from "./admin/admin-desk";
 import { environmentModes, linkBridge, linkJobs, linkRoutes, type LinkBridge } from "./links/link-jobs";
 import { commandAudit } from "./modules/operations/index";
@@ -70,7 +71,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const bridge = linkBridge(config);
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
     if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), customerProofRoutes({ ledger, clock: systemClock, proofs })];

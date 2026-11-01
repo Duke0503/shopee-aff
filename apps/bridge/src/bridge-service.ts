@@ -11,6 +11,7 @@ import { runBridgeLoop, jobWorker, type LoopDeps, type LoopEnd } from "./bridge-
 import { chromePageDriver, keepAlive, type Wait } from "./bridge-tab";
 import type { ChromeApi } from "./chrome-api.types";
 import { serverClient, type Fetch } from "./server-client";
+import { shortLinkResolver, type FollowLink } from "./short-link";
 
 export const KEEPALIVE_ALARM = "cashback-bridge-keepalive";
 /** Chrome's shortest alarm period. */
@@ -19,6 +20,8 @@ export const KEEPALIVE_MINUTES = 0.5;
 export interface ServiceDeps {
   readonly chrome: ChromeApi;
   readonly fetch: Fetch;
+  /** The browser's own request to a returned short link, followed to its target (Story 5.4). */
+  readonly follow: FollowLink;
   readonly wait: Wait;
   /** `crypto.getRandomValues` in the worker. */
   readonly randomBytes: (length: number) => Uint8Array;
@@ -52,7 +55,7 @@ export function bridgeService(deps: ServiceDeps, stop: { readonly stopped: boole
   const loop: LoopDeps = {
     loadSettings: () => loadConnected(deps),
     client: (settings) => serverClient(settings, deps.fetch),
-    work: jobWorker(page, wait),
+    work: jobWorker(page, wait, shortLinkResolver(deps.follow)),
     wait,
     log: deps.log,
   };

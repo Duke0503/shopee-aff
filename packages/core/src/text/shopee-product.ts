@@ -16,6 +16,8 @@
  * names one product, so it is never reused.
  */
 
+import { hostOnDomain, SHOPEE_LINK_DOMAINS } from "./host-domain";
+
 /** The parts of a WHATWG URL read here. */
 interface ParsedUrl {
   readonly protocol: string;
@@ -37,7 +39,6 @@ export const SHOPEE_SOURCE_MAX_LENGTH = 2048;
 
 /** The longest paste a link request accepts; a product link is cut down to its ids. */
 export const SHOPEE_PASTE_MAX_LENGTH = 8 * SHOPEE_SOURCE_MAX_LENGTH;
-const SHOPEE_DOMAINS = ["shopee.vn", "shope.ee", "shp.ee"] as const;
 const NOT_SHOPEE_PRODUCTS = ["food.shopee.vn", "shopeefood.vn"] as const;
 const ITEM_IN_NAME = /-i\.(\d+)\.(\d+)(?:[/?#]|$)/;
 const ITEM_IN_PATH = /\/(\d{5,})\/(\d{5,})(?:[/?#]|$)/;
@@ -45,7 +46,6 @@ const URL_IN_TEXT = /https?:\/\/[^\s<>"']+/i;
 
 export type ShopeeProduct = { readonly ok: true; readonly sourceUrl: string; readonly productKey: string | null } | { readonly ok: false; readonly reason: "not_shopee" | "too_long" };
 
-const onDomain = (host: string, domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
 
 /** The link as a request keeps it and its product key, or why it cannot be a link request. */
 export function readShopeeProduct(text: string): ShopeeProduct {
@@ -57,8 +57,8 @@ export function readShopeeProduct(text: string): ShopeeProduct {
   if (url.protocol !== "https:" && url.protocol !== "http:") return { ok: false, reason: "not_shopee" };
   if (url.username !== "" || url.password !== "") return { ok: false, reason: "not_shopee" };
   const host = url.hostname.toLowerCase();
-  if (NOT_SHOPEE_PRODUCTS.some((d) => onDomain(host, d)) || url.pathname.startsWith("/now-food")) return { ok: false, reason: "not_shopee" };
-  if (!SHOPEE_DOMAINS.some((d) => onDomain(host, d))) return { ok: false, reason: "not_shopee" };
+  if (hostOnDomain(host, NOT_SHOPEE_PRODUCTS) || url.pathname.startsWith("/now-food")) return { ok: false, reason: "not_shopee" };
+  if (!hostOnDomain(host, SHOPEE_LINK_DOMAINS)) return { ok: false, reason: "not_shopee" };
   const ids = ITEM_IN_NAME.exec(url.pathname) ?? ITEM_IN_PATH.exec(url.pathname);
   if (ids) return { ok: true, sourceUrl: `https://shopee.vn/product/${ids[1]}/${ids[2]}`, productKey: `shopee:${ids[1]}.${ids[2]}` };
   if (url.href.length > SHOPEE_SOURCE_MAX_LENGTH) return { ok: false, reason: "too_long" };

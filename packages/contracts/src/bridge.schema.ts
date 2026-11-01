@@ -55,7 +55,11 @@ export const BRIDGE_FAILURES = ["captcha", "login_redirect", "page_not_ready", "
 export type BridgeFailure = (typeof BRIDGE_FAILURES)[number];
 
 export const bridgeResultSchema = z.discriminatedUnion("outcome", [
-  z.strictObject({ ticket, outcome: z.literal("link"), url: httpsUrl }),
+  /**
+   * A link, and for a short link its target as the real browser resolved it (Story 5.4): the server
+   * never calls Shopee, so it reads the sub_ids from `resolvedUrl` and attaches `url`.
+   */
+  z.strictObject({ ticket, outcome: z.literal("link"), url: httpsUrl, resolvedUrl: httpsUrl.optional() }),
   z.strictObject({ ticket, outcome: z.literal("failed"), reason: z.enum(BRIDGE_FAILURES) }),
   z.strictObject({ ticket, outcome: z.literal("value"), value: z.json() }),
 ]);

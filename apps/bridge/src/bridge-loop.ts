@@ -13,6 +13,7 @@ import type { ConnectedSettings } from "./bridge-settings";
 import type { PageDriver, Wait } from "./bridge-tab";
 import { runLinkJob } from "./link-job";
 import type { ServerClient } from "./server-client";
+import type { ResolveLink } from "./short-link";
 
 type WithoutTicket<T> = T extends unknown ? Omit<T, "ticket"> : never;
 /** An answer before the loop puts the job's ticket on it. */
@@ -33,8 +34,8 @@ export const RETRY_MAX_MS = 30_000;
 export const POST_TRIES = 3;
 
 /** The work for one job: a link on the custom link page; lookups and report pages come with Stories 5.6 and 5.9. */
-export function jobWorker(page: PageDriver, wait: Wait): (job: BridgeJob) => Promise<Answer> {
-  return async (job) => (job.kind === "link" ? runLinkJob(job, page, wait) : { outcome: "failed", reason: "unsupported" });
+export function jobWorker(page: PageDriver, wait: Wait, resolve?: ResolveLink): (job: BridgeJob) => Promise<Answer> {
+  return async (job) => (job.kind === "link" ? runLinkJob(job, page, wait, resolve) : { outcome: "failed", reason: "unsupported" });
 }
 
 async function postAnswer(deps: LoopDeps, client: ServerClient, result: BridgeResult): Promise<void> {

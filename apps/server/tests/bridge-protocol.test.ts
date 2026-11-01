@@ -9,7 +9,7 @@ import { BRIDGE_INSTANCE_HEADER, BRIDGE_TOKEN_HEADER, type BridgeJob, type Bridg
 import { fixedClock } from "@cashback/core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { linkBridge, linkRoutes } from "../src/links/link-jobs";
+import { linkBridge, linkEffectsFor, linkRoutes } from "../src/links/link-jobs";
 import { bridgeInternalRoutes, browserBridge, queueLinkRequest, runLinkJob, type BridgeTimer, type BrowserBridge } from "../src/modules/linking/index";
 import { parseConfig } from "../src/platform/config/env.config";
 import { isolationProblems, productionIdentifiers } from "../src/platform/config/isolation.config";
@@ -114,7 +114,7 @@ describe("Story 5.3: the browser bridge takes one job at a time over the interna
     const { bridge } = bridgeWith();
     const s = internal(bridge);
     const { requestId } = ledger.tx((db) => queueLinkRequest(db, { customer: "DP00001", url: PRODUCT, channel: "zalo" }, CLOCK));
-    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
     const job = (await poll(s)).json() as BridgeJob;
     expect(job).toMatchObject({ kind: "link", subId1: C1, subId2: requestId });
     await answer(s, { ticket: job.ticket, outcome: "link", url: `https://shopee.vn/p-i.11001.22001?utm_content=${C1}-${requestId}---` });
@@ -180,7 +180,7 @@ describe("Story 5.3: the bridge survives the server or the browser restarting", 
     const { bridge, timer } = bridgeWith();
     const s = internal(bridge);
     const { requestId } = ledger.tx((db) => queueLinkRequest(db, { customer: "DP00001", url: PRODUCT, channel: "zalo" }, CLOCK));
-    const run = () => runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+    const run = () => runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
     const first = run();
     const lost = (await poll(s)).json() as BridgeJob;
     timer.advance(105_000);
@@ -268,7 +268,7 @@ describe("Story 5.3 review: nothing blocks the line or hands a link out twice", 
     expect(requestRow(ledger, requestId).source_url).toBe("https://shopee.vn/product/11001/22001");
     const { bridge } = bridgeWith();
     const s = internal(bridge);
-    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
     const res = await poll(s);
     expect(res.statusCode).toBe(200);
     const job = res.json() as BridgeJob;
@@ -286,7 +286,7 @@ describe("Story 5.3 review: nothing blocks the line or hands a link out twice", 
     const behind = queue(ledger, OTHER);
     const { bridge } = bridgeWith();
     const s = internal(bridge);
-    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+    const running = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
     const res = await poll(s);
     expect(res.statusCode).toBe(200);
     const job = res.json() as BridgeJob;
@@ -314,7 +314,7 @@ describe("Story 5.3 review: nothing blocks the line or hands a link out twice", 
     const behind = queue(ledger, OTHER, fixedClock("2026-11-01T02:00:00.000Z"));
     const { bridge, timer } = bridgeWith();
     const s = internal(bridge);
-    const run = () => runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+    const run = () => runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
 
     const first = run();
     expect(((await poll(s)).json() as BridgeLinkJob).subId2).toBe(silent);
@@ -341,7 +341,7 @@ describe("Story 5.3 review: nothing blocks the line or hands a link out twice", 
     const requestId = queue(ledger, PRODUCT);
     const { bridge, timer } = bridgeWith();
     for (let i = 0; i < 3; i++) {
-      const run = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT }, NEVER);
+      const run = runLinkJob({ ledger, clock: CLOCK, bridge, subIdPrefix: "", logger: SILENT, effects: linkEffectsFor(CLOCK) }, NEVER);
       await settle();
       timer.advance(60_000);
       expect(await run).toEqual({ issued: 0, failed: 0, interrupted: true });

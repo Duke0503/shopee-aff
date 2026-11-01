@@ -149,3 +149,16 @@ profile, so a second browser never gets the same job), gives up a job nobody ans
 seconds, and the link job sends it again on a later run. The first silence is not counted; a
 second silence in a row on the same job counts as a failed attempt and backs the request off, so
 the requests behind it go first. With no bridge polling at all nothing is ever counted.
+
+Returned links, captcha and a lost login (Stories 5.4, 5.5): the custom-link page returns a short
+link only, so the extension follows it in the browser (from its service worker, without cookies)
+and answers the short link with its target; the server never calls Shopee and attaches the short
+link only when the target carries the request's own sub_ids. A short link the browser could not
+resolve is retried after a minute, uncounted (`bridge_short_link_unresolved`). The extension's
+host permissions therefore include `s.shopee.vn`, `shopee.vn`, `shope.ee` and `shp.ee`. A captcha or page error holds the queue
+uncounted; signing the dev profile out makes the next job pause the queue (`bridge_login_lost`).
+Resume it with `pnpm link-queue:resume --as <admin>`; see `docs/operations/bridge-runbook.md`.
+
+TikTok Shop links (Story 5.7): without `ACCESSTRADE_API_KEY` dev makes them with the fake creator
+(links on `fake-bridge.invalid`). With a key dev calls the real AccessTrade API; the production key
+is refused unless `ALLOW_PROD_ACCESSTRADE_KEY=1`.
