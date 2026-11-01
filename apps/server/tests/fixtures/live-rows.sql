@@ -104,3 +104,11 @@ INSERT INTO payment_transfers (id, customer_id, amount, transfer_code, note, pro
   (1, '1000000000000000001', 6232, 'DP00001', 'Chuyển khoản tháng 10', 'https://drive.google.com/file/d/fakeproof1/view', '260911AAAA0001,NOPE00000001', 'both', '2026-10-05 03:00:05', 'main', '2026-10-05 03:00:05', 'admin', 'Rk3vQ9xZtYw2mN8pL4sH6dF1gJ0aBcDe'),
   (2, '9000000000000000002', 30000, NULL, NULL, NULL, '260919IIII0009', NULL, NULL, NULL, '2026-10-07 02:00:00', 'nv01', 'Zq8wE7rT6yU5iO4p-3sD2fG1hJ0kL9m_'),
   (3, '1000000000000000009', 7000, 'DP00010', NULL, NULL, '', 'none', '2026-10-08 02:00:00', 'test', '2026-10-08 02:00:00', 'admin', 'Mn0bV9cX8zL7kJ6hG5fD4sA3qW2eR1tY');
+-- Share-link visits (share_links.py:73-81, Story 5.8): a view and a buy tap on an imported code, a
+-- Zalo view, a click on the request whose share code is malformed (listed) and an unknown kind (listed).
+INSERT INTO link_clicks (id, request_id, clicked_at, agent) VALUES
+  (1, '26091100001', '2026-09-11T10:00:00+07:00', 'browser'),
+  (2, '26091100001', '2026-09-11T10:00:05+07:00', 'buy'),
+  (3, '26091200002', '2026-09-12T09:00:00+07:00', 'in_app'),
+  (4, '26091900009', '2026-09-19T08:00:00+07:00', 'browser'),
+  (5, '26091100001', '2026-09-11T11:00:00+07:00', 'bot');

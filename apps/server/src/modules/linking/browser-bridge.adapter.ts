@@ -25,7 +25,7 @@
 import { randomBytes } from "node:crypto";
 import { bridgeJobSchema, type BridgeFailure, type BridgeJob, type BridgeJobKind, type BridgeResult } from "@cashback/contracts";
 
-import type { BridgeLinkResult, BridgePort, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob } from "../../platform/ports/bridge.port";
+import type { BridgeLinkResult, BridgeLookupResult, BridgePort, BridgeUnavailable, BridgeWorkQueue, LinkBridgeJob, LookupBridgeJob } from "../../platform/ports/bridge.port";
 
 /** Seconds-scale timers, injected so tests run without waiting. */
 export interface BridgeTimer {
@@ -95,6 +95,12 @@ const newTicket = (): string => randomBytes(16).toString("hex");
 function linkResultOf(answer: BridgeAnswer): BridgeLinkResult {
   if (answer.outcome === "link") return { outcome: "link", url: answer.url, resolvedUrl: answer.resolvedUrl ?? null };
   if (answer.outcome === "unavailable") return answer;
+  return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
+}
+
+/** The answer to a lookup job in the port's terms; a link answer to a lookup is a failure. */
+function lookupResultOf(answer: BridgeAnswer): BridgeLookupResult {
+  if (answer.outcome === "value" || answer.outcome === "unavailable") return answer;
   return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
 }
 
@@ -227,5 +233,6 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
     work: { next: (instance, signal) => list.next(instance, signal), deliver: (result, instance) => list.deliver(result, instance) },
     submit,
     createLink: async (job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult> => linkResultOf(await submit({ kind: "link", sourceUrl: job.sourceUrl, subId1: job.subId1, subId2: job.subId2 }, signal)),
+    lookupProduct: async (job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult> => lookupResultOf(await submit({ kind: "lookup", url: job.url }, signal)),
   };
 }

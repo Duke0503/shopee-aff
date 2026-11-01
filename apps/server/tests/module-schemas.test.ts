@@ -70,6 +70,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       share_codes: "linking",
       bridge_jobs: "linking",
       link_queue_state: "linking",
+      link_clicks: "linking",
       outbox: "messaging",
       audit_entries: "operations",
       alerts: "operations",

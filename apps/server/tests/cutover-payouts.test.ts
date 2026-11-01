@@ -290,7 +290,7 @@ describe("Story 2.4: the import as one command", () => {
   it("writes one audit entry per module import, by the system actor cutover, ids and counts only (AD-17)", () => {
     expect(rows(run.targetPath, "SELECT actor_kind, actor_id, event, payload FROM audit_entries ORDER BY id")).toEqual([
       { actor_kind: "system", actor_id: "cutover", event: "identity.customers.imported", payload: '{"customers":9,"aliases":2,"bankAccounts":3,"counterLast":412}' },
-      { actor_kind: "system", actor_id: "cutover", event: "linking.link_requests.imported", payload: '{"productOffers":3,"linkRequests":8,"shareCodes":3}' },
+      { actor_kind: "system", actor_id: "cutover", event: "linking.link_requests.imported", payload: '{"productOffers":3,"linkRequests":8,"shareCodes":3,"clicks":3}' },
       { actor_kind: "system", actor_id: "cutover", event: "orders.orders.imported", payload: '{"orders":10,"items":10,"history":10,"settlementPeriods":2}' },
       { actor_kind: "system", actor_id: "cutover", event: "campaigns.campaigns.imported", payload: '{"campaigns":2,"awards":4}' },
       { actor_kind: "system", actor_id: "cutover", event: "payouts.payouts.imported", payload: '{"payouts":3,"items":3}' },

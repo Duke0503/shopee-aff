@@ -17,6 +17,9 @@ export type FollowLink = (url: string, signal: AbortSignal) => Promise<{ readonl
 
 export type ResolveLink = (url: string) => Promise<string | null>;
 
+/** No resolution: every short link is answered unresolved (the server retries a link job uncounted). */
+export const NO_RESOLUTION: ResolveLink = async () => null;
+
 export const RESOLVE_TIMEOUT_MS = 15_000;
 
 const parse = (text: string): URL | null => (URL.canParse(text) ? new URL(text) : null);

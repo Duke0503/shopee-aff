@@ -15,13 +15,10 @@ import type { BridgeFailure, BridgeLinkJob } from "@cashback/contracts";
 
 import type { PageDriver, Wait } from "./bridge-tab";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FormSelectors } from "./page-scripts";
-import { type ResolveLink } from "./short-link";
+import { NO_RESOLUTION, type ResolveLink } from "./short-link";
 import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, pageBlock, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
 
 export type LinkAnswer = { outcome: "link"; url: string; resolvedUrl?: string } | { outcome: "failed"; reason: BridgeFailure };
-
-/** No resolution: every short link is answered unresolved (the server retries it uncounted). */
-const NO_RESOLUTION: ResolveLink = async () => null;
 
 /** How long to wait for the form: first as the page stands, then after one reload (as live). */
 export const FORM_WAITS_MS = [12_000, 20_000] as const;

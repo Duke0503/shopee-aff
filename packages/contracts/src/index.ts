@@ -225,6 +225,7 @@ export {
   bridgeJobSchema,
   bridgeLinkJobSchema,
   bridgeLookupJobSchema,
+  bridgeLookupValueSchema,
   bridgeReportJobSchema,
   bridgeResultAcceptedSchema,
   bridgeResultSchema,
@@ -232,6 +233,8 @@ export {
   type BridgeJob,
   type BridgeJobKind,
   type BridgeLinkJob,
+  type BridgeLookupJob,
+  type BridgeLookupValue,
   type BridgeResult,
   type BridgeResultAccepted,
 } from "./bridge.schema";

@@ -222,7 +222,7 @@ describe("Story 5.3: the bridge token in the configuration", () => {
   it("is required with the browser bridge, distinct from the internal and assistant tokens, and never production's", () => {
     expect(keys("dev", { ...browserDev, BRIDGE_TOKEN: BRIDGE })).toEqual([]);
     expect(keys("dev", browserDev)).toEqual(["BRIDGE_TOKEN required"]);
-    expect(keys("prod", { INTERNAL_TOKEN: INTERNAL, ZALO_MODE: "account" })).toEqual(["BRIDGE_TOKEN required"]);
+    expect(keys("prod", { INTERNAL_TOKEN: INTERNAL, ZALO_MODE: "account", PUBLIC_BASE_URL: "https://hoantiendp.com" })).toEqual(["BRIDGE_TOKEN required"]);
     expect(keys("dev", { ...browserDev, BRIDGE_TOKEN: INTERNAL })).toEqual(["BRIDGE_TOKEN same_as_internal_token"]);
     expect(keys("dev", { ...browserDev, ASSISTANT_TOKEN: ASSISTANT, BRIDGE_TOKEN: ASSISTANT })).toEqual(["BRIDGE_TOKEN same_as_assistant_token"]);
     expect(keys("dev", { ...browserDev, BRIDGE_TOKEN: BRIDGE }, { BRIDGE_TOKEN: BRIDGE })).toEqual(["BRIDGE_TOKEN same_as_production"]);

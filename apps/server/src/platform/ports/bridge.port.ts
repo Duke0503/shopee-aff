@@ -38,10 +38,25 @@ export type BridgeLinkResult =
 
 export type BridgeUnavailable = "no_bridge" | "no_answer";
 
+/** One product lookup (Story 5.6): the product link of one request, read on page 1 only; no customer and no sub_ids. */
+export interface LookupBridgeJob {
+  readonly jobId: number;
+  readonly requestId: string;
+  readonly url: string;
+}
+
+/** A lookup's answer: the page texts as `value` (checked by the server), a failure, or nobody answered. */
+export type BridgeLookupResult =
+  | { readonly outcome: "value"; readonly value: unknown }
+  | { readonly outcome: "failed"; readonly reason: string }
+  | { readonly outcome: "unavailable"; readonly reason: BridgeUnavailable };
+
 export interface BridgePort {
   readonly mode: BridgeMode;
   /** Never called inside a transaction; `signal` aborts at shutdown. */
   createLink(job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult>;
+  /** A product lookup (Story 5.6), never inside a transaction; a bridge without it makes no lookups. */
+  lookupProduct?(job: LookupBridgeJob, signal: AbortSignal): Promise<BridgeLookupResult>;
 }
 
 /**

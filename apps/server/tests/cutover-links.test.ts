@@ -242,3 +242,17 @@ describe("Story 2.5: link states, owners and the product snapshot (D56)", () => 
     for (const table of ["product_offers", "link_requests", "share_codes", "outbox"]) expect(rows(second.targetPath, `SELECT * FROM ${table} ORDER BY 1`)).toEqual(rows(run.targetPath, `SELECT * FROM ${table} ORDER BY 1`));
   });
 });
+
+describe("Story 5.8 (review Q3): the live share-link clicks are imported", () => {
+  it("imports each live click with its share code, request, time and browser kind only, and lists one it cannot tie or read", () => {
+    expect(rows(run.targetPath, "SELECT share_code, request_id, clicked_at, agent FROM link_clicks ORDER BY click_id")).toEqual([
+      { share_code: "Ab3dE5gH", request_id: "26091100001", clicked_at: "2026-09-11T03:00:00.000Z", agent: "browser" },
+      { share_code: "Ab3dE5gH", request_id: "26091100001", clicked_at: "2026-09-11T03:00:05.000Z", agent: "buy" },
+      { share_code: "Zx9Yw8Vu", request_id: "26091200002", clicked_at: "2026-09-12T02:00:00.000Z", agent: "in_app" },
+    ]);
+    expect(rows(run.targetPath, "SELECT name FROM pragma_table_info('link_clicks') ORDER BY cid").map((r) => (r as { name: string }).name)).toEqual(["click_id", "share_code", "request_id", "clicked_at", "agent"]);
+    expect(run.report.links?.clicks).toBe(3);
+    expect(run.report.notes).toContainEqual({ kind: "click_request_missing", table: "link_clicks", key: "4", detail: "26091900009" });
+    expect(run.report.notes).toContainEqual({ kind: "click_agent_unknown", table: "link_clicks", key: "5", detail: "bot" });
+  });
+});

@@ -159,6 +159,11 @@ export function erasedIdsOf(db: LedgerDb, customerIds: readonly string[]): Set<s
 }
 
 /** The ids of the guest accounts (role HOUSE, D5): their orders earn no cashback. */
+/** Whether this customer id is the guest account (D5): one lookup by primary key. */
+export function isGuestCustomer(db: LedgerDb, customerId: string): boolean {
+  return db.select({ role: customers.role }).from(customers).where(eq(customers.customerId, customerId)).get()?.role === "HOUSE";
+}
+
 export function guestCustomerIds(db: LedgerDb): string[] {
   return db.select({ customerId: customers.customerId }).from(customers).where(eq(customers.role, "HOUSE")).all().map((r) => r.customerId);
 }

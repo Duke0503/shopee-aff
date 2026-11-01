@@ -12,6 +12,7 @@ export { isWithheld, splitCommission, type Split, type SplitInput } from "./spli
 export { cappedCommission, shopeeCommission, type CommissionParts } from "./commission";
 export { fromNetworkUnits, fromNetworkUnitsTimes } from "./network-units";
 export { clawbackAmount, clawbackOpenAmount, creditOpenAmount, differenceDong, partialClawbackAmount, sumDong, type ClawbackInput, type PartialClawbackInput } from "./clawback";
+export { shopeeEstimate, type ShopeeEstimate, type ShopeeEstimateInput } from "./estimate";
 export { estimatedCashback, openClawbackTotal, payableBalance, type PayableInput } from "./balance";
 export { nettingPlan, type NettingEntry, type NettingPlan, type OpenClawback } from "./netting";
 export { batchCoverage, classifyWithholding, settlementNet, settlementTolerance, type BatchCoverage, type BatchWithholding } from "./settlement";

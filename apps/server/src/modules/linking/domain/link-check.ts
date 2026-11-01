@@ -128,3 +128,16 @@ export const RETRY_MAX_MS = 15 * 60_000;
 export function retryDelayMs(attempts: number): number {
   return Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
 }
+
+/**
+ * Whether a stored link may be a share page's target (Story 5.8): an https link with no
+ * credentials on a Shopee or AccessTrade host (the fake host only for a fake-bridge start). A
+ * stored link that fails is never opened, so `/s/<code>` can never send anyone off the networks.
+ */
+export function isShareTarget(text: string | null, acceptFakeHost: boolean): boolean {
+  const url = text === null ? null : parse(text);
+  if (url === null || url.protocol !== "https:" || url.username !== "" || url.password !== "") return false;
+  const host = url.hostname.toLowerCase();
+  if (host === FAKE_BRIDGE_HOST) return acceptFakeHost;
+  return onShopee(host) || hostOnDomain(host, ACCESSTRADE_LINK_DOMAINS);
+}

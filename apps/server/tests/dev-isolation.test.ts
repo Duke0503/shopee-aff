@@ -80,7 +80,7 @@ describe("Story 8.1: dev environment separated from production", () => {
     const dataDir = join(tmpdir(), "cashback-dev-data");
     expect(keysOf({ DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") })).toEqual(["LIVE_LEDGER_PATH own_ledger"]);
     expect(keysOf({ DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(tmpdir(), "live-copy", "cashback.db") })).toEqual([]);
-    const prod = parseConfig("prod", { INTERNAL_TOKEN: TOKEN, BRIDGE_TOKEN: "k".repeat(40), DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") });
+    const prod = parseConfig("prod", { INTERNAL_TOKEN: TOKEN, BRIDGE_TOKEN: "k".repeat(40), PUBLIC_BASE_URL: "https://hoantiendp.com", DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") });
     expect(isolationProblems(prod, context()).map((p) => `${p.key} ${p.reason}`)).toEqual(["LIVE_LEDGER_PATH own_ledger"]);
   });
 
@@ -206,8 +206,9 @@ describe("Story 8.1: dev environment separated from production", () => {
       await server.exited;
     }
     const prod = (values: Record<string, string>) => isolationProblems(parseConfig("prod", { INTERNAL_TOKEN: TOKEN, BRIDGE_TOKEN: "k".repeat(40), ...values }), context()).map((p) => `${p.key} ${p.reason}`);
-    expect(prod({})).toEqual([]);
-    expect(prod({ BRIDGE_MODE: "fake", ZALO_MODE: "fake" })).toEqual(["BRIDGE_MODE fake_in_production", "ZALO_MODE fake_in_production"]);
+    expect(prod({})).toEqual(["PUBLIC_BASE_URL required"]);
+    expect(prod({ PUBLIC_BASE_URL: "https://hoantiendp.com" })).toEqual([]);
+    expect(prod({ BRIDGE_MODE: "fake", ZALO_MODE: "fake", PUBLIC_BASE_URL: "https://hoantiendp.com" })).toEqual(["BRIDGE_MODE fake_in_production", "ZALO_MODE fake_in_production"]);
   }, 60_000);
 
   it("AC5: no env file and no credential value is committed, and the env files live outside the repository", () => {

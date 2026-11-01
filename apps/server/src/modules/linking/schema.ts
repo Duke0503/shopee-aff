@@ -98,3 +98,20 @@ export const linkQueueState = sqliteTable("link_queue_state", {
   heldUntil: text("held_until"),
   lastPageErrorRequest: text("last_page_error_request"),
 });
+
+/** `buy` is the live buy-button tap, imported only; the share page records `browser` and `in_app`. */
+export const LINK_CLICK_AGENTS = ["browser", "in_app", "buy"] as const;
+export type LinkClickAgent = (typeof LINK_CLICK_AGENTS)[number];
+
+/** One visit to a share link by a person (migration 0025, Story 5.8): code, time and browser kind only. */
+export const linkClicks = sqliteTable("link_clicks", {
+  clickId: integer("click_id").primaryKey({ autoIncrement: true }),
+  shareCode: text("share_code")
+    .notNull()
+    .references(() => shareCodes.code),
+  requestId: text("request_id")
+    .notNull()
+    .references(() => linkRequests.requestId),
+  clickedAt: text("clicked_at").notNull(),
+  agent: text("agent", { enum: LINK_CLICK_AGENTS }).notNull(),
+});

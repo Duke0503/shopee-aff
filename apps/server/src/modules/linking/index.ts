@@ -66,6 +66,7 @@ export {
   isShareCode,
   LinksImportError,
   SHARE_CODE_PATTERN,
+  type ImportedLinkClick,
   type ImportedLinkRequest,
   type ImportedProductOffer,
   type ImportedShareCode,
@@ -96,3 +97,12 @@ export { chooseReusable, isReusable, LINK_REUSE_WINDOW_DAYS, unreadableTimes, ty
 export { linkRequestInternalRoutes, type LinkRequestRouteDeps } from "./http/link-request.routes";
 export { BRIDGE_ANSWER_GRACE_MS, BRIDGE_JOB_TIMEOUT_MS, BRIDGE_PICKUP_MS, BRIDGE_POLL_MS, browserBridge, type BridgeAnswer, type BridgeTimer, type BridgeWork, type BrowserBridge, type BrowserBridgeOptions } from "./browser-bridge.adapter";
 export { bridgeInternalRoutes, type BridgeRouteDeps } from "./http/bridge.routes";
+export { claimLookupJob, linkWorkDue, LOOKUP_RETRY_MS, LOOKUP_WINDOW_MS, LOOKUPS_PER_REQUEST, PRODUCT_FACTS_FRESH_MS, recordLookupResult, recordSilentLookup, SILENT_LOOKUPS_BEFORE_FAILURE, type LookupRecorded, type RecordedLookupAnswer } from "./link-lookup.command";
+export { MAX_LOOKUPS_PER_RUN, runProductLookups, type LookupJobDeps } from "./link-lookup.job";
+export { labelledRate, readLookupFacts, readPriceText, readRateText, splitRates, type LookupPageTexts, type ProductFacts } from "./domain/product-lookup";
+export { linkReplyData, type LinkEstimate, type LinkReplyData, type ProductSnapshotFacts, type RateExample, type ReplyContext } from "./domain/link-reply";
+export { chromeIntentUrl, shareAgentOf, shareDeviceOf, type ShareAgent, type ShareDevice } from "./domain/share-agent";
+export { isShareTarget } from "./domain/link-check";
+export { sharePageLink, type SharePageLink } from "./share-page.query";
+export { recordLinkClick, type LinkVisit } from "./link-click.command";
+export { LINK_CLICK_AGENTS, type LinkClickAgent } from "./schema";

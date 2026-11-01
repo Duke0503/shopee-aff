@@ -1,0 +1,166 @@
+{
+  "rule": "shopeeEstimate",
+  "source": "D2, D3, D12, D59; Story 5.6 (computed with exact fractions, half-up once). The UJ-1 text \"9.263d\" is a commission-based example (11,693 commission, split-commission.json); the estimate from 450,000 at 2.6% is 9,268 (11,700 commission), so both stand.",
+  "cases": [
+    {
+      "name": "UJ-1 rice cooker 450,000 at 2.6% Shopee, latest batch not withheld",
+      "input": {
+        "price": 450000,
+        "shopeeRateBps": 260,
+        "sellerRateBps": 0,
+        "withheld": false
+      },
+      "expected": {
+        "shopeePart": 11700,
+        "sellerPart": 0,
+        "commission": 11700,
+        "capped": false,
+        "fee": 115,
+        "tax": 0,
+        "cashback": 9268,
+        "withheld": false,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "UJ-1 rice cooker 450,000 at 2.6% Shopee, latest batch withheld",
+      "input": {
+        "price": 450000,
+        "shopeeRateBps": 260,
+        "sellerRateBps": 0,
+        "withheld": true
+      },
+      "expected": {
+        "shopeePart": 11700,
+        "sellerPart": 0,
+        "commission": 11700,
+        "capped": false,
+        "fee": 115,
+        "tax": 1170,
+        "cashback": 8332,
+        "withheld": true,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "2,000,000 at 3% Shopee capped at 40,000 plus 1.5% XTRA uncapped, withheld",
+      "input": {
+        "price": 2000000,
+        "shopeeRateBps": 300,
+        "sellerRateBps": 150,
+        "withheld": true
+      },
+      "expected": {
+        "shopeePart": 40000,
+        "sellerPart": 30000,
+        "commission": 70000,
+        "capped": true,
+        "fee": 686,
+        "tax": 7000,
+        "cashback": 49851,
+        "withheld": true,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "Exactly at the cap 1,000,000 at 4%, not withheld",
+      "input": {
+        "price": 1000000,
+        "shopeeRateBps": 400,
+        "sellerRateBps": 0,
+        "withheld": false
+      },
+      "expected": {
+        "shopeePart": 40000,
+        "sellerPart": 0,
+        "commission": 40000,
+        "capped": false,
+        "fee": 392,
+        "tax": 0,
+        "cashback": 31686,
+        "withheld": false,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "199,000 at 3.5% Shopee and 3% XTRA, not withheld",
+      "input": {
+        "price": 199000,
+        "shopeeRateBps": 350,
+        "sellerRateBps": 300,
+        "withheld": false
+      },
+      "expected": {
+        "shopeePart": 6965,
+        "sellerPart": 5970,
+        "commission": 12935,
+        "capped": false,
+        "fee": 127,
+        "tax": 0,
+        "cashback": 10247,
+        "withheld": false,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "Half dong boundary 312,500 at 1%: 2,475.5 rounds up, not withheld",
+      "input": {
+        "price": 312500,
+        "shopeeRateBps": 100,
+        "sellerRateBps": 0,
+        "withheld": false
+      },
+      "expected": {
+        "shopeePart": 3125,
+        "sellerPart": 0,
+        "commission": 3125,
+        "capped": false,
+        "fee": 31,
+        "tax": 0,
+        "cashback": 2476,
+        "withheld": false,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "Half dong boundary 312,500 at 1%: 2,225.5 rounds up, withheld",
+      "input": {
+        "price": 312500,
+        "shopeeRateBps": 100,
+        "sellerRateBps": 0,
+        "withheld": true
+      },
+      "expected": {
+        "shopeePart": 3125,
+        "sellerPart": 0,
+        "commission": 3125,
+        "capped": false,
+        "fee": 31,
+        "tax": 313,
+        "cashback": 2226,
+        "withheld": true,
+        "cashbackShareBps": 8000
+      }
+    },
+    {
+      "name": "A found rate of 0% is an answer: 0 cashback",
+      "input": {
+        "price": 450000,
+        "shopeeRateBps": 0,
+        "sellerRateBps": 0,
+        "withheld": false
+      },
+      "expected": {
+        "shopeePart": 0,
+        "sellerPart": 0,
+        "commission": 0,
+        "capped": false,
+        "fee": 0,
+        "tax": 0,
+        "cashback": 0,
+        "withheld": false,
+        "cashbackShareBps": 8000
+      }
+    }
+  ]
+}

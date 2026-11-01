@@ -132,6 +132,7 @@ export function fillReport(report: ImportReport, live: LiveData, written: Writte
       .map((r) => r.requestId)
       .sort(),
     shareCodes: written.links.shareCodes,
+    clicks: written.links.clicks,
     productOffers: written.links.productOffers,
     snapshots: links.snapshots,
   };

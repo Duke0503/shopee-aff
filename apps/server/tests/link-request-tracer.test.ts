@@ -151,7 +151,8 @@ describe("Story 5.1: link request to share link through the fake bridge", () => 
     expect(requestId).toBe("DEV26110100001");
     const [job] = linkJobs({ config: dev, ledger, clock: CLOCK, logger: SILENT }, bridge);
     await job?.run(new AbortController().signal);
-    expect(jobRows(ledger)).toEqual([expect.objectContaining({ request_id: requestId, sub_id1: `DEV${C1}`, sub_id2: requestId, status: "DONE" })]);
+    // The composed run also makes the product lookup (Story 5.6); the fake bridge finds no product.
+    expect(jobRows(ledger)).toEqual([expect.objectContaining({ kind: "LINK", request_id: requestId, sub_id1: `DEV${C1}`, sub_id2: requestId, status: "DONE" }), expect.objectContaining({ kind: "LOOKUP", request_id: requestId, sub_id1: null, status: "DONE", failure: "not_found" })]);
     expect(requestRow(ledger, requestId).affiliate_url).toContain(`sub_id1=DEV${C1}`);
     expect(subIdPrefixFor("prod")).toBe("");
     expect(() => linkBridge({ env: "prod", bridgeMode: "fake" })).toThrow(/never runs in production/);

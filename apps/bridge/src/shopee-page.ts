@@ -43,3 +43,28 @@ export function pageBlock(href: string, passwordBox: boolean): PageBlock {
   if (passwordBox || LOGIN_MARKERS.some((m) => href.includes(m))) return "login_redirect";
   return null;
 }
+
+/**
+ * The product lookup's two pages (Story 5.6, the live `dashboard_lookup.py` read as reference,
+ * without its API calls): the storefront product page for the name, picture and price, then the
+ * affiliate offer search for the item's commission rates. Both are opened and read like a person
+ * would; only page 1 of the search is ever read (paging sent the live session to Shopee's traffic
+ * check), so the search address carries no page or offset. The search can only find by keyword,
+ * so it searches the leading words of the product's name, as live.
+ */
+export const productPageUrl = (shopId: string, itemId: string): string => `https://shopee.vn/product/${shopId}/${itemId}`;
+export const OFFER_SEARCH_URL = "https://affiliate.shopee.vn/offer/product_offer";
+export const offerSearchUrl = (keyword: string): string => `${OFFER_SEARCH_URL}?keyword=${encodeURIComponent(keyword)}`;
+/** Full names are stuffed with keywords and match nothing; the leading words are the product (live). */
+export const KEYWORD_WORDS = 8;
+
+/** Where the storefront shows the name, the picture and the price; the first that is there counts. */
+export const STOREFRONT_NAME = ['meta[property="og:title"]', "h1"] as const;
+export const STOREFRONT_IMAGE = 'meta[property="og:image"]';
+export const STOREFRONT_PRICE = ['meta[property="product:price:amount"]', '[class*="price"]'] as const;
+/** One product card of the offer search, and its empty state. */
+export const OFFER_CARD = '.product-offer-item, [class*="product-card"], [class*="ProductCard"], .ant-card';
+export const OFFER_EMPTY = ".ant-empty";
+/** The labels of the card's commission and XTRA elements, in Vietnamese (escaped) or English. */
+export const COMMISSION_LABEL = "hoa h\u1ed3ng|commission";
+export const XTRA_LABEL = "xtra";

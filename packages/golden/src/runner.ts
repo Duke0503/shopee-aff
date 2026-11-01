@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { averageDong, classifyWithholding, clawbackAmount, combinedBalance, eventResult, operatorProfit, operatorShareOf, ratioBps, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
+import { averageDong, classifyWithholding, clawbackAmount, combinedBalance, eventResult, operatorProfit, operatorShareOf, ratioBps, clawbackOpenAmount, fromNetworkUnits, nettingPlan, openClawbackTotal, partialClawbackAmount, payableBalance, shopeeCommission, shopeeEstimate, splitCommission, sumDong, type AffiliateNetwork } from "@cashback/money";
 
 export interface GoldenCase {
   name: string;
@@ -14,7 +14,7 @@ export interface GoldenCase {
 }
 
 export interface GoldenFile {
-  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan" | "batchWithholding" | "operatorProfit" | "overviewRatio" | "eventResult" | "combinedBalance";
+  rule: "splitCommission" | "shopeeCommission" | "fromNetworkUnits" | "clawbackAmount" | "clawbackOpenAmount" | "payableBalance" | "nettingPlan" | "batchWithholding" | "operatorProfit" | "overviewRatio" | "eventResult" | "combinedBalance" | "shopeeEstimate";
   source?: string;
   cases: GoldenCase[];
 }
@@ -93,6 +93,8 @@ export function runCase(file: GoldenFile, testCase: GoldenCase): unknown {
       const share = operatorShareOf({ commission: num(input, "commission"), fee: num(input, "fee"), tax: num(input, "tax"), cashback: num(input, "cashback") });
       return { operatorShare: share, result: eventResult(share, num(input, "bonus")) };
     }
+    case "shopeeEstimate":
+      return shopeeEstimate({ price: num(input, "price"), shopeeRateBps: num(input, "shopeeRateBps"), sellerRateBps: num(input, "sellerRateBps"), withheld: input["withheld"] === true });
     case "combinedBalance": {
       const parts = input["parts"];
       if (!Array.isArray(parts)) throw new Error("parts must be an array");

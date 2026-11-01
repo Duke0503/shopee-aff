@@ -6,8 +6,9 @@
  * carries a ticket; an answer counts only for the ticket the server is waiting on, so an answer from
  * before a restart is dropped. Every call also carries `X-Bridge-Instance`, the extension's own id
  * kept in its profile: the job out belongs to that instance, so a second browser never gets it
- * (no duplicate submission) and the same instance polling again after a restart gets it back. Only link jobs are worked today; lookup (Story 5.6) and report page
- * (Story 5.9) jobs travel the same way and are answered `unsupported` until then.
+ * (no duplicate submission) and the same instance polling again after a restart gets it back. Link
+ * and product lookup (Story 5.6) jobs are worked; report page jobs (Story 5.9) travel the same way
+ * and are answered `unsupported` until then.
  */
 import { SHOPEE_SOURCE_MAX_LENGTH } from "@cashback/core";
 import { z } from "zod";
@@ -40,12 +41,18 @@ export const bridgeLinkJobSchema = z.strictObject({
   timeoutMs: z.number().int().min(1_000).max(300_000),
 });
 
+/**
+ * A product lookup (Story 5.6): the product link of one request, read in the real browser. It has
+ * no page parameter on purpose: the bridge reads page 1 of the offer search only, because paging
+ * sent the live session to Shopee's traffic check.
+ */
 export const bridgeLookupJobSchema = z.strictObject({ ticket, kind: z.literal("lookup"), url: z.string().min(1).max(2048), timeoutMs: z.number().int().min(1_000).max(300_000) });
 export const bridgeReportJobSchema = z.strictObject({ ticket, kind: z.literal("report"), page: z.number().int().min(1).max(1_000), timeoutMs: z.number().int().min(1_000).max(300_000) });
 
 export const bridgeJobSchema = z.discriminatedUnion("kind", [bridgeLinkJobSchema, bridgeLookupJobSchema, bridgeReportJobSchema]);
 export type BridgeJob = z.infer<typeof bridgeJobSchema>;
 export type BridgeLinkJob = z.infer<typeof bridgeLinkJobSchema>;
+export type BridgeLookupJob = z.infer<typeof bridgeLookupJobSchema>;
 
 /**
  * Why the bridge could not make a link. `captcha` and `login_redirect` are whole-session states
@@ -64,6 +71,31 @@ export const bridgeResultSchema = z.discriminatedUnion("outcome", [
   z.strictObject({ ticket, outcome: z.literal("value"), value: z.json() }),
 ]);
 export type BridgeResult = z.infer<typeof bridgeResultSchema>;
+
+/**
+ * What a lookup answers as its `value` (Story 5.6), as the pages showed it: raw texts, never
+ * amounts. The browser extracts nothing: the price is the whole text the price element shows (a
+ * range or a "from" price included), and the rates are the whole texts of the card's elements
+ * labelled as the commission and as XTRA. The server reads the amounts itself
+ * (domain/product-lookup.ts) and makes no estimate from a text it cannot read exactly. `rates` is
+ * null when the product was not on page 1 of the offer search; `found: false` when the link names
+ * no product the storefront showed.
+ */
+const pageText = (max: number) => z.string().trim().min(1).max(max).nullable();
+const labelledTexts = z.array(z.string().trim().min(1).max(200)).max(10);
+export const bridgeLookupValueSchema = z.discriminatedUnion("found", [
+  z.strictObject({ found: z.literal(false) }),
+  z.strictObject({
+    found: z.literal(true),
+    shopId: z.string().regex(/^\d{1,20}$/),
+    itemId: z.string().regex(/^\d{1,20}$/),
+    name: pageText(400),
+    imageUrl: httpsUrl.nullable(),
+    priceText: pageText(120),
+    rates: z.strictObject({ commissionTexts: labelledTexts, xtraTexts: labelledTexts }).nullable(),
+  }),
+]);
+export type BridgeLookupValue = z.infer<typeof bridgeLookupValueSchema>;
 
 export const bridgeResultAcceptedSchema = z.object({ accepted: z.boolean() });
 export type BridgeResultAccepted = z.infer<typeof bridgeResultAcceptedSchema>;

@@ -184,6 +184,8 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
   if (config.env === "prod") {
     if (config.bridgeMode === "fake") out.push({ key: "BRIDGE_MODE", reason: "fake_in_production" });
     if (config.zaloMode === "fake") out.push({ key: "ZALO_MODE", reason: "fake_in_production" });
+    // Share links and the share page's hand-off are built on it (Story 5.8); never on a request's own Host.
+    if (config.publicBaseUrl === null) out.push({ key: "PUBLIC_BASE_URL", reason: "required" });
     return out;
   }
   if (context.devFileIsProdFile) out.push({ key: "ENV_FILE", reason: "production_env_file" });

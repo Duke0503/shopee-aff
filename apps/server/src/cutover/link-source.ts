@@ -10,12 +10,17 @@
  * without a link is FAILED and listed. Live `expired` is not a state (D23): it reads
  * like `pending`, except that one that never got its link is FAILED, so no link is made for a
  * request past its window. A request whose customer is gone cannot be imported and is listed.
+ *
+ * The live `link_clicks` rows (share_links.py:73-81) come along (Story 5.8): each keeps its time and
+ * its browser kind (`browser`, `in_app`, or `buy` for a tap on the live buy button) and is tied to
+ * its request's share code; nothing else about the visitor exists to copy. A click whose request
+ * was not imported with a share code, or whose kind is unknown, is listed instead.
  */
 import type { LinkRequestStatus } from "@cashback/core";
 import type BetterSqlite3 from "better-sqlite3";
 
-import type { ImportedLinkRequest, ImportedProductOffer, ImportedShareCode, LinksImport } from "../modules/linking/index";
-import { isShareCode } from "../modules/linking/index";
+import type { ImportedLinkClick, ImportedLinkRequest, ImportedProductOffer, ImportedShareCode, LinksImport } from "../modules/linking/index";
+import { isShareCode, LINK_CLICK_AGENTS, type LinkClickAgent } from "../modules/linking/index";
 import { networkOfPlatform, ownerOf, type CutoverContext } from "./cutover-context";
 import type { ImportReport, LinksSection } from "./import-report";
 import { convertLiveTime } from "./live-time";
@@ -152,5 +157,41 @@ export function readLiveLinks(source: BetterSqlite3.Database, rows: readonly Liv
     }
     shareCodes.push({ code: row.share_code, requestId: row.request_id, createdAt: request.createdAt ?? null });
   }
-  return { links: { productOffers: productOffersOf(cache, report), linkRequests, shareCodes }, snapshots, owners };
+  return { links: { productOffers: productOffersOf(cache, report), linkRequests, shareCodes, clicks: readLiveClicks(source, shareCodes, report) }, snapshots, owners };
+}
+
+interface LiveLinkClick {
+  id: number;
+  request_id: string;
+  clicked_at: unknown;
+  agent: string;
+}
+
+const isAgent = (agent: string): agent is LinkClickAgent => (LINK_CLICK_AGENTS as readonly string[]).includes(agent);
+
+/** The live clicks of the imported share codes, in live order; any other is listed. */
+export function readLiveClicks(source: BetterSqlite3.Database, codes: readonly ImportedShareCode[], report: ImportReport): ImportedLinkClick[] {
+  const table = source.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'link_clicks'").get();
+  if (table === undefined) return [];
+  const codeOf = new Map(codes.map((c) => [c.requestId, c.code]));
+  const clicks: ImportedLinkClick[] = [];
+  for (const row of source.prepare("SELECT id, request_id, clicked_at, agent FROM link_clicks ORDER BY id").all() as LiveLinkClick[]) {
+    const key = String(row.id);
+    const shareCode = codeOf.get(row.request_id);
+    if (shareCode === undefined) {
+      report.notes.push({ kind: "click_request_missing", table: "link_clicks", key, detail: row.request_id });
+      continue;
+    }
+    if (!isAgent(row.agent)) {
+      report.notes.push({ kind: "click_agent_unknown", table: "link_clicks", key, detail: row.agent });
+      continue;
+    }
+    const clickedAt = convertLiveTime(row.clicked_at, { table: "link_clicks", column: "clicked_at", key }, report).instant;
+    if (clickedAt === null) {
+      report.notes.push({ kind: "click_time_missing", table: "link_clicks", key });
+      continue;
+    }
+    clicks.push({ shareCode, requestId: row.request_id, clickedAt, agent: row.agent });
+  }
+  return clicks;
 }

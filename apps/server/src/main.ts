@@ -1,6 +1,6 @@
 /**
  * Composition root: config, logger, the single-instance lock, the ledger (migrated behind a
- * checked local backup, AD-26), then the two listeners (the public one with the receipt page and
+ * checked local backup, AD-26), then the two listeners (the public one with the receipt page, the share page (Story 5.8) and
  * the customer's proof image, Story 4.9) (the internal one with the admin commands
  * of the internal CLI, Story 4.20; the public one with the admin desk's staff routes when
  * the config names the admin host and its Cloudflare Access settings), then the job scheduler (AD-13; each
@@ -19,6 +19,7 @@ import { environmentModes, linkBridge, linkJobs, linkRoutes, type LinkBridge } f
 import { commandAudit } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { receiptPageRoutes } from "./pages/receipt.page";
+import { sharePageRoutes } from "./pages/share.page";
 import { ConfigError, loadConfig, type ServerConfig } from "./platform/config/env.config";
 import { LEDGER_FILE, type Ledger } from "./platform/db/ledger";
 import { openMigratedLedger } from "./platform/db/migration-gate";
@@ -74,7 +75,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
     if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
-    const pages = [receiptPageRoutes({ ledger, clock: systemClock }), customerProofRoutes({ ledger, clock: systemClock, proofs })];
+    const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });
+    const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
     jobs = createScheduler(jobsFor(config, ledger, logger, bridge), { clock: systemClock, timer: systemTimer, logger });

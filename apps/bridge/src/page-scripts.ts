@@ -83,3 +83,88 @@ export function readResult(input: { result: string; previous: string; errors: st
   const message = (error?.textContent ?? "").trim();
   return message === "" ? { state: "waiting" } : { state: "error", message: message.slice(0, 120) };
 }
+
+export interface StorefrontSelectors {
+  readonly name: readonly string[];
+  readonly image: string;
+  readonly price: readonly string[];
+}
+
+export interface StorefrontLook {
+  readonly href: string;
+  readonly passwordBox: boolean;
+  readonly name: string | null;
+  readonly image: string | null;
+  readonly priceText: string | null;
+}
+
+
+
+/**
+ * One look at the storefront product page: its name (without the site suffix), picture and the
+ * whole text of the price element as shown. Nothing is extracted from the price: a range or a
+ * "from" price is sent as it is, and the server refuses it.
+ */
+export function readStorefront(selectors: StorefrontSelectors): StorefrontLook {
+  const valueOf = (selector: string): string => {
+    const el = document.querySelector(selector);
+    if (el === null) return "";
+    return (el instanceof HTMLMetaElement ? el.content : (el.textContent ?? "")).replace(/\s+/g, " ").trim();
+  };
+  const first = (list: readonly string[]): string | null => list.map(valueOf).find((v) => v !== "") ?? null;
+  const name = first(selectors.name)?.replace(/\s*\|\s*shopee.*$/i, "") ?? null;
+  const price = first(selectors.price);
+  const image = valueOf(selectors.image);
+  return {
+    href: location.href,
+    passwordBox: document.querySelector("input[type=password]") !== null,
+    name: name === "" ? null : name,
+    image: image.startsWith("https://") ? image : null,
+    priceText: price !== null && price.length <= 120 ? price : null,
+  };
+}
+
+export interface OfferLookInput {
+  readonly itemId: string;
+  readonly card: string;
+  readonly empty: string;
+  /** The label of the commission element, a regular expression source (case-insensitive). */
+  readonly commissionLabel: string;
+  /** The label of the XTRA element. */
+  readonly xtraLabel: string;
+}
+
+export type OfferLook =
+  | { readonly state: "found"; readonly commissionTexts: string[]; readonly xtraTexts: string[]; readonly priceText: string | null }
+  | { readonly state: "absent" }
+  | { readonly state: "waiting" };
+
+/**
+ * One look at page 1 of the offer search: the card that links to this item, with the whole texts
+ * of its elements labelled as the commission and as XTRA (a label's own text when it holds the
+ * percentage, else its parent's), and its price texts, all as shown; or "absent" once the cards or
+ * the empty state are there without it. Nothing is picked out here: a discount badge carries no
+ * commission label, and a text that holds two percentages is sent whole, so the server can refuse
+ * anything ambiguous. A text too long to send goes as "unreadable".
+ */
+export function readOfferResults(input: OfferLookInput): OfferLook & { href: string; passwordBox: boolean } {
+  const page = { href: location.href, passwordBox: document.querySelector("input[type=password]") !== null };
+  const own = new RegExp(`(^|\\D)${input.itemId}(\\D|$)`);
+  const link = Array.from(document.querySelectorAll("a[href]")).find((a) => own.test(a.getAttribute("href") ?? ""));
+  if (link === undefined) {
+    const loaded = document.querySelector(input.card) !== null || document.querySelector(input.empty) !== null;
+    return { ...page, state: loaded ? "absent" : "waiting" };
+  }
+  const card = link.closest(input.card) ?? link;
+  const textOf = (el: Element | null): string => (el?.textContent ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
+  const leaves = Array.from(card.querySelectorAll("*")).filter((el) => el.children.length === 0 && textOf(el) !== "");
+  const commission = new RegExp(input.commissionLabel, "i");
+  const xtra = new RegExp(input.xtraLabel, "i");
+  const labelled = (label: RegExp, not: RegExp | null): string[] => {
+    const texts = leaves.filter((el) => label.test(textOf(el)) && (not === null || !not.test(textOf(el)))).map((el) => (/\d\s*%/.test(textOf(el)) ? textOf(el) : textOf(el.parentElement)));
+    const distinct = Array.from(new Set(texts));
+    return distinct.length > 10 || distinct.some((t) => t.length > 200) ? ["unreadable"] : distinct;
+  };
+  const prices = leaves.map(textOf).filter((t) => t.includes("\u20ab")).join(" ");
+  return { ...page, state: "found", commissionTexts: labelled(commission, xtra), xtraTexts: labelled(xtra, null), priceText: prices !== "" && prices.length <= 120 ? prices : null };
+}

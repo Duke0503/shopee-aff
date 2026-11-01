@@ -1,6 +1,6 @@
 /**
  * The cutover import of links (AD-24, AD-14, Story 2.5): product offers, link requests with
- * their product snapshot (D56), and share codes, written exactly as given into empty tables
+ * their product snapshot (D56), share codes and the live share-link clicks (Story 5.8), written exactly as given into empty tables
  * inside the caller's `tx`. Request ids and share codes pass through unchanged, so every old
  * `/s/<code>` link still opens its own customer's affiliate link. Rows are written in key order
  * so two imports of one source give identical ledgers. The import writes one audit entry with its
@@ -13,7 +13,7 @@ import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import { shopeeProductKeyOf } from "./domain/product-url";
-import { linkRequests, productOffers, shareCodes, type LinkRequestRow, type ProductOfferRow } from "./schema";
+import { linkClicks, linkRequests, productOffers, shareCodes, type LinkClickAgent, type LinkRequestRow, type ProductOfferRow } from "./schema";
 
 export type ImportedProductOffer = Omit<ProductOfferRow, "origin">;
 export type ImportedLinkRequest = Omit<LinkRequestRow, "origin" | "searchText"> & { requestId: string; customerId: string };
@@ -24,16 +24,26 @@ export interface ImportedShareCode {
   createdAt: string | null;
 }
 
+/** One live visit to a share link: its code, request, time and browser kind only. */
+export interface ImportedLinkClick {
+  shareCode: string;
+  requestId: string;
+  clickedAt: string;
+  agent: LinkClickAgent;
+}
+
 export interface LinksImport {
   productOffers: readonly ImportedProductOffer[];
   linkRequests: readonly ImportedLinkRequest[];
   shareCodes: readonly ImportedShareCode[];
+  clicks?: readonly ImportedLinkClick[];
 }
 
 export interface LinksImportResult {
   productOffers: number;
   linkRequests: number;
   shareCodes: number;
+  clicks: number;
 }
 
 export class LinksImportError extends Error {
@@ -49,7 +59,7 @@ export const SHARE_CODE_PATTERN = /^(?:[A-Za-z0-9]{8}|[A-Za-z0-9]{10})$/;
 export const isShareCode = (code: string): boolean => SHARE_CODE_PATTERN.test(code);
 
 function refuseUnlessEmpty(db: LedgerDb): void {
-  assertTablesEmpty(db, ["product_offers", "link_requests", "share_codes"], (table, n) => new LinksImportError(`links import needs empty tables; ${table} has ${n} rows`));
+  assertTablesEmpty(db, ["product_offers", "link_requests", "share_codes", "link_clicks"], (table, n) => new LinksImportError(`links import needs empty tables; ${table} has ${n} rows`));
 }
 
 /** Imports links into empty tables; call inside `tx`. */
@@ -61,7 +71,10 @@ export function importLinks(db: LedgerDb, data: LinksImport, by: CommandAudit): 
     if (!isShareCode(s.code)) throw new LinksImportError(`not a share code: ${s.code}`);
     db.insert(shareCodes).values(s).run();
   }
-  const result = { productOffers: data.productOffers.length, linkRequests: data.linkRequests.length, shareCodes: data.shareCodes.length };
+  // Live order: clicks keep the order the live system recorded them in.
+  const clicks = data.clicks ?? [];
+  for (const c of clicks) db.insert(linkClicks).values(c).run();
+  const result = { productOffers: data.productOffers.length, linkRequests: data.linkRequests.length, shareCodes: data.shareCodes.length, clicks: clicks.length };
   by.audit.record({ actor: by.actor, event: "linking.link_requests.imported", entityId: by.actor.id, payload: result });
   return result;
 }

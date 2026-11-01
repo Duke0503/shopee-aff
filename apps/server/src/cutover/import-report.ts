@@ -41,6 +41,9 @@ export interface ReportNote {
     | "unknown_link_status"
     | "expired_without_link"
     | "share_code_invalid"
+    | "click_request_missing"
+    | "click_agent_unknown"
+    | "click_time_missing"
     | "rate_not_whole_bps"
     | "estimate_unreadable"
     | "unknown_notified_status"
@@ -194,6 +197,8 @@ export interface LinksSection {
   /** Live requests still waiting for their link, imported as QUEUED (Story 2.5 AC3). */
   queued: string[];
   shareCodes: number;
+  /** Live share-link clicks imported (Story 5.8). */
+  clicks: number;
   productOffers: number;
   /** Where each request's product name came from (D56). */
   snapshots: Record<"estimate" | "product_cache" | "none", number>;

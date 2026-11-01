@@ -7,11 +7,12 @@
  * is built once: its long-poll routes go on the internal listener behind the bridge token, and the
  * link job hands it one submission at a time. The job also gets the outbox and alerts of its
  * results (Story 5.5) and the AccessTrade creator (Story 5.7); without a creator the assistant's
- * route refuses TikTok Shop links when they are submitted.
+ * route refuses TikTok Shop links when they are submitted. After its links the run makes the
+ * product lookups (Story 5.6) through the same bridge.
  */
 import type { Clock } from "@cashback/core";
 
-import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, type LinkCreator, type LinkEffects } from "../modules/linking/index";
+import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkEffects } from "../modules/linking/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
 import { DEV_SUB_ID_PREFIX } from "../modules/orders/index";
@@ -104,5 +105,10 @@ export function linkJobs(input: LinkWiringInput, bridge: LinkBridge): Job[] {
     effects: linkEffectsFor(input.clock, input.logger),
     accessTrade: accessTradeLinksFor(input.config),
   };
-  return [{ name: "links", ...JOB_SCHEDULES.links, run: async (signal) => void (await runLinkJob(deps, signal)) }];
+  // Product lookups (Story 5.6) follow the run's link submissions and yield to any link that comes due.
+  const run = async (signal: AbortSignal): Promise<void> => {
+    const links = await runLinkJob(deps, signal);
+    if (!links.interrupted && !signal.aborted) await runProductLookups(deps, signal);
+  };
+  return [{ name: "links", ...JOB_SCHEDULES.links, run }];
 }
