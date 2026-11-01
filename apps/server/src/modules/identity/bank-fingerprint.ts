@@ -5,10 +5,9 @@
  */
 import { createHmac } from "node:crypto";
 
-/** Spaces and dashes removed, letters upper case (FR-10). */
-export function normaliseAccountNumber(number: string): string {
-  return number.replace(/[\s-]/g, "").toUpperCase();
-}
+import { normaliseAccountNumber } from "./domain/account-number";
+
+export { normaliseAccountNumber };
 
 export function bankFingerprint(fingerprintKey: string, accountNumber: string): string {
   if (fingerprintKey.length < 32) throw new RangeError("fingerprint key must be at least 32 characters");

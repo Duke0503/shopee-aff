@@ -7,6 +7,7 @@
  *   staff-access <staffId> --as <admin> [--role R] [--status S]
  *   campaign-create <campaign.json> --as <admin> [--apply]   preview, and with --apply create
  *   customer-merge <merged> --into <survivor> --as <admin> [--apply]   preview the merge, and with --apply merge
+ *   merge-proposals latest|<since> --as <admin>          pairs to merge after a new Zalo account (Story 6.11): since the latest account switch, or <since>; merges nothing
  *   link-queue resume --as <admin>                       resume the Shopee link queue after the affiliate browser signed in again
  *   messaging-silent on|off --as <admin>                 turn the quiet mode of notifications on or off (Story 6.10)
  *
@@ -24,6 +25,7 @@ import {
   campaignPreviewResponseSchema,
   customerMergedResponseSchema,
   customerMergePreviewSchema,
+  customerMergeProposalsSchema,
   LINK_QUEUE_RESUME_PATH,
   linkQueueResumedSchema,
   MESSAGING_SILENT_PATH,
@@ -88,8 +90,8 @@ interface Args {
   readonly flags: ReadonlyMap<string, string | true>;
 }
 
-const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "link-queue", "messaging-silent"];
-export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | link-queue resume --as <admin> | messaging-silent on|off --as <admin>";
+const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "merge-proposals", "link-queue", "messaging-silent"];
+export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | merge-proposals latest|<since> --as <admin> | link-queue resume --as <admin> | messaging-silent on|off --as <admin>";
 
 function parseArgs(argv: readonly string[]): Args | null {
   const [command, target, ...rest] = argv;
@@ -189,6 +191,11 @@ async function customerMerge(io: CliIo, args: Args, token: string | null): Promi
   return { applied: true, preview, merged };
 }
 
+/** Story 6.11 AC3: the pairs to preview after a new Zalo account; each is merged only with customer-merge. */
+async function mergeProposalsOf(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
+  return customerMergeProposalsSchema.parse(await ok(io, "POST", "/internal/admin/customers/merge/proposals", args.target === "latest" ? {} : { since: args.target }, token));
+}
+
 /** Story 5.5 AC4: the owner resumes a paused (or held) Shopee link queue. */
 async function linkQueue(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
   if (args.target !== "resume") throw new CliRefusal("usage", { error: CLI_USAGE });
@@ -207,6 +214,7 @@ const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promi
   "staff-access": staffAccess,
   "campaign-create": campaignCreate,
   "customer-merge": customerMerge,
+  "merge-proposals": mergeProposalsOf,
   "link-queue": linkQueue,
   "messaging-silent": messagingSilent,
 };

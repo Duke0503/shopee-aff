@@ -5,7 +5,7 @@
  * orders a ratio is marked "not enough data" (it is still the real value, never a placeholder).
  */
 import type { Overview, OverviewHealth, OverviewNetworkOrders, Ratio } from "@cashback/contracts";
-import { parseInstant, toMs, type Clock, type InstantRange } from "@cashback/core";
+import { parseInstant, toMs, type Clock, type Instant, type InstantRange } from "@cashback/core";
 import { averageDong, ratioBps, sumDong } from "@cashback/money";
 
 import { customerCodeOf, deskCustomers, newCustomerCount } from "../modules/identity/index";
@@ -123,26 +123,17 @@ export function customersOf(db: LedgerDb, range: InstantRange, previous: Instant
   };
 }
 
-/** The assistant is down once no heartbeat came for this long (AD-15). */
-export const ASSISTANT_DOWN_AFTER_MS = 5 * 60_000;
-
-/** The last assistant heartbeat this server received, from the one shared store (Story 6.1). */
-export type LastHeartbeat = () => { readonly receivedAt: string } | null;
+/** Up, down or not known yet, from the one heartbeat store (Stories 6.1, 6.11). */
+export type LastHeartbeat = (now: Instant) => { readonly state: "up" | "down" | "unknown"; readonly at: string | null };
 
 /**
  * Block 8 from the one health model (AD-27): the hourly reconciliation from its runs, the Zalo
- * assistant from its last heartbeat (Story 6.1: up within 5 minutes, down after; not known before
- * the first beat since this server started); the browser bridge and the backup do not report to
+ * assistant from its heartbeats (Stories 6.1, 6.11: up while a beat with the Zalo session connected
+ * came within 5 minutes, down after, the health check's own rule); the browser bridge and the backup do not report to
  * the server yet, so they are "not known yet", never "up".
  */
-export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat: LastHeartbeat = () => null): OverviewHealth[] {
-  return [{ component: "bridge", state: "unknown", at: null }, assistantHealth(clock, lastHeartbeat()), reconciliationHealth(db, clock), { component: "backup", state: "unknown", at: null }];
-}
-
-function assistantHealth(clock: Clock, beat: { readonly receivedAt: string } | null): OverviewHealth {
-  if (beat === null) return { component: "assistant", state: "unknown", at: null };
-  const late = toMs(clock.now()) - toMs(parseInstant(beat.receivedAt)) > ASSISTANT_DOWN_AFTER_MS;
-  return { component: "assistant", state: late ? "down" : "up", at: beat.receivedAt };
+export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat: LastHeartbeat = () => ({ state: "unknown", at: null })): OverviewHealth[] {
+  return [{ component: "bridge", state: "unknown", at: null }, { component: "assistant", ...lastHeartbeat(clock.now()) }, reconciliationHealth(db, clock), { component: "backup", state: "unknown", at: null }];
 }
 
 /**

@@ -65,7 +65,7 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     customerDeskRoutes({ ledger, clock }),
     linkRequestDeskRoutes({ ledger, clock }),
     customerEraseRoutes({ ledger, clock }),
-    overviewRoutes({ ledger, clock, lastHeartbeat: () => deps.heartbeats?.last() ?? null }),
+    overviewRoutes({ ledger, clock, lastHeartbeat: (now) => deps.heartbeats?.liveness(now) ?? { state: "unknown", at: null } }),
   ];
   return { gate, routes };
 }

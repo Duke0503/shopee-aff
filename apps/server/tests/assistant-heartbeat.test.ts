@@ -64,11 +64,11 @@ describe("Story 6.1 review 7: the heartbeat store is the one the Overview's heal
   it("review 7: a beat through the route makes the assistant show as up, and five minutes without one as down", async () => {
     const { heartbeats, post } = build();
     const ledger = freshLedger();
-    expect(healthOf(ledger.db, CLOCK, () => heartbeats.last()).find((h) => h.component === "assistant")).toEqual({ component: "assistant", state: "unknown", at: null });
+    expect(healthOf(ledger.db, CLOCK, (now) => heartbeats.liveness(now)).find((h) => h.component === "assistant")).toEqual({ component: "assistant", state: "unknown", at: null });
     await post({ [ASSISTANT_TOKEN_HEADER]: ASSISTANT });
-    expect(healthOf(ledger.db, CLOCK, () => heartbeats.last()).find((h) => h.component === "assistant")).toEqual({ component: "assistant", state: "up", at: "2026-11-01T03:00:00.000Z" });
+    expect(healthOf(ledger.db, CLOCK, (now) => heartbeats.liveness(now)).find((h) => h.component === "assistant")).toEqual({ component: "assistant", state: "up", at: "2026-11-01T03:00:00.000Z" });
     const later = fixedClock("2026-11-01T03:05:01.000Z");
-    expect(healthOf(ledger.db, later, () => heartbeats.last()).find((h) => h.component === "assistant")?.state).toBe("down");
+    expect(healthOf(ledger.db, later, (now) => heartbeats.liveness(now)).find((h) => h.component === "assistant")?.state).toBe("down");
     closeLedgers();
   });
 });

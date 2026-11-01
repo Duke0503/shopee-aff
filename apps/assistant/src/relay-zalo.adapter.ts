@@ -39,6 +39,7 @@ export function relayZaloSession(options: RelayOptions): ZaloSession {
   return {
     mode: "relay",
     connected: () => open,
+    accountId: () => null,
     onMessage: () => undefined,
     sendText: async (target, text, mentions) => {
       if (target.kind !== "group" || target.groupId !== options.devGroupId) throw new ZaloTargetRefused();

@@ -13,6 +13,10 @@
  * clawbacks and what they still owe after it computed in packages/money; an
  * order's state is its status value, which the assistant writes as the status sentence; a bank
  * account is its bank name and last four digits only, never the number. Amounts are whole dong.
+ *
+ * `/matkhau` (Story 6.8, D21, INV-8) is private only as well: the answer carries the new password
+ * once, for the reply in the private chat, and only its argon2id hash is stored; every open
+ * session of the customer ends. The internal listener is loopback only and logs no body.
  */
 import { z } from "zod";
 
@@ -20,12 +24,16 @@ import { ASSISTANT_CHATS } from "./assistant-chat.schema";
 
 export const ASSISTANT_COMMAND_PATH = "/internal/assistant/commands";
 
-/** What a person can ask: `/id`, `/sodu`, `/donhang`, `/stk`, `/help`. */
-export const ASSISTANT_COMMANDS = ["id", "balance", "orders", "bank", "help"] as const;
+/** What a person can ask: `/id`, `/sodu`, `/donhang`, `/stk`, `/help`, `/matkhau`. */
+export const ASSISTANT_COMMANDS = ["id", "balance", "orders", "bank", "help", "password"] as const;
 export type AssistantCommandName = (typeof ASSISTANT_COMMANDS)[number];
 
 /** The commands answered only in the private chat. */
-export const PRIVATE_ONLY_COMMANDS: readonly AssistantCommandName[] = ["balance", "orders", "bank"];
+export const PRIVATE_ONLY_COMMANDS: readonly AssistantCommandName[] = ["balance", "orders", "bank", "password"];
+
+/** A password `/matkhau` issues: 8 random characters (FR-9). */
+export const ISSUED_PASSWORD_LENGTH = 8;
+export const ISSUED_PASSWORD_PATTERN = /^[A-Za-z0-9]{8}$/;
 
 /** The most recent orders `/donhang` lists. */
 export const CHAT_ORDERS_MAX = 10;
@@ -67,7 +75,9 @@ export const assistantCommandReplySchema = z.discriminatedUnion("kind", [
     bank: z.object({ bankName: z.string().max(120).nullable(), lastFour: z.string().regex(/^[A-Za-z0-9]{1,4}$/), held: z.boolean() }).nullable(),
   }),
   z.object({ kind: z.literal("help") }),
-  /** `/sodu`, `/donhang` or `/stk` in the group: refused, with the pointer to the private chat. */
+  /** `/matkhau`: the new password, shown once; the customer code to sign in with. */
+  z.object({ kind: z.literal("password"), customerCode, password: z.string().regex(ISSUED_PASSWORD_PATTERN) }),
+  /** `/sodu`, `/donhang`, `/stk` or `/matkhau` in the group: refused, with the pointer to the private chat. */
   z.object({ kind: z.literal("private_only") }),
   /** A group member the server does not know. */
   z.object({ kind: z.literal("not_registered") }),

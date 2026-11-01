@@ -188,6 +188,11 @@ export {
   customerMergedResponseSchema,
   customerMergePreviewSchema,
   customerMergeRequestSchema,
+  customerMergeProposalRequestSchema,
+  customerMergeProposalsSchema,
+  MERGE_PROPOSAL_REASONS,
+  type CustomerMergeProposalRequest,
+  type CustomerMergeProposals,
   mergeBalanceSchema,
   mergeSideSchema,
   type CustomerMergedResponse,
@@ -260,6 +265,7 @@ export {
   assistantLinkRequestSchema,
   assistantRegisteredSchema,
   assistantRegistrationSchema,
+  MERGE_CLAIM_RESULTS,
   type AssistantChat,
   type AssistantLinkAnswer,
   type LinkRefusal,
@@ -276,6 +282,8 @@ export {
   assistantCommandReplySchema,
   assistantCommandSchema,
   CHAT_ORDERS_MAX,
+  ISSUED_PASSWORD_LENGTH,
+  ISSUED_PASSWORD_PATTERN,
   PRIVATE_ONLY_COMMANDS,
   type AssistantChatOrder,
   type AssistantCommand,
@@ -283,6 +291,19 @@ export {
   type AssistantCommandName,
   type AssistantCommandReply,
 } from "./assistant-command.schema";
+export {
+  ASSISTANT_BANK_PATH,
+  assistantBankAnswerSchema,
+  assistantBankReplySchema,
+  assistantBankSaveSchema,
+  BANK_CHOICES_MAX,
+  BANK_DETAIL_RULES,
+  BANK_DETAILS_MAX_LENGTH,
+  type AssistantBankAnswer,
+  type AssistantBankReply,
+  type AssistantBankSave,
+  type BankDetailRule,
+} from "./assistant-bank.schema";
 export { ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
 export { DESK_LINK_REQUEST_NETWORKS, DESK_LINK_REQUESTS_PATH, deskLinkRequestRowSchema, deskLinkRequestsResponseSchema, LINK_REQUEST_CHANNELS, type DeskLinkRequestRow } from "./link-request-list.schema";
 export {

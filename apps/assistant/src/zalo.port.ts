@@ -20,6 +20,8 @@ export interface IncomingMessage {
   /** The name the sender shows in Zalo, when the session gives one. */
   readonly senderName?: string | null;
   readonly text: string;
+  /** True when the message quotes an earlier one (a reply in Zalo), when the session says so. */
+  readonly quoted?: boolean;
 }
 
 /**
@@ -36,7 +38,14 @@ export type MessageHandler = (message: IncomingMessage) => Promise<void>;
 
 export interface ZaloSession {
   readonly mode: ZaloMode;
+  /**
+   * False while the session is lost (Zalo closed it, locked or logged out the account): the
+   * heartbeat reports it, the server alerts the owner after 5 minutes (Story 6.11) and no
+   * notification is pulled meanwhile, so none is lost.
+   */
   connected(): boolean;
+  /** The Zalo account the session runs on (its own id), or null when it has none (the relay). */
+  accountId(): string | null;
   /** One handler; a second call replaces the first. */
   onMessage(handler: MessageHandler): void;
   /** Called only by the pacer; `mentions` tag people in a group message. */

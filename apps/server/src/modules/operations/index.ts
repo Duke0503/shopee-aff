@@ -11,5 +11,6 @@ export { ALERT_COOLDOWN_MS, alertText } from "./domain/alert-cooldown";
 export { isIdentifierKey, isPersonalKey, payloadProblems, type AuditProblem } from "./domain/audit-payload";
 export { TelegramSendError, telegramSender, type AlertSender, type FetchLike, type TelegramOptions } from "./telegram.adapter";
 export { ALERT_DELIVERIES } from "./schema";
-export { assistantHeartbeats, type AssistantHeartbeats, type ReceivedHeartbeat } from "./assistant-heartbeat.command";
+export { ASSISTANT_DOWN_AFTER_MS, assistantHeartbeats, type AssistantHeartbeats, type AssistantLiveness, type AssistantState, type ReceivedHeartbeat } from "./assistant-heartbeat.command";
+export { ASSISTANT_DOWN_ALERT, runAssistantHealthCheck, type AssistantHealthDeps, type AssistantHealthStep } from "./assistant-health.job";
 export { assistantHeartbeatRoutes, type AssistantHeartbeatRouteDeps } from "./http/assistant-heartbeat.routes";

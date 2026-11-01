@@ -6,12 +6,14 @@
  * (registration and link replies, Stories 6.2 and 6.3), its sends in the pacer's turn. The
  * notification loop (Story 6.4) pulls the outbox one row at a time through the same pacer; it
  * does not run on the send-only relay, which writes to the Dev group only and has no private chat.
+ * A lost Zalo session (Story 6.11) is seen through the session itself: the beat reports it, the
+ * loss is logged once, and the notification loop pulls nothing until the session is back, so
+ * waiting notifications stay on the server.
  */
-import type { AssistantHeartbeat } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 
 import { chatReplier, type ChatSend, type ChatSendWhenDue, type Tag } from "./chat-reply";
-import { runHeartbeat } from "./heartbeat.job";
+import { runHeartbeat, sessionBeat } from "./heartbeat.job";
 import { friendRequestLimiter, requestFriend, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
 import type { InternalApi } from "./internal-api.adapter";
 import { messageText } from "./messages";
@@ -78,7 +80,7 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
     await answer(message).catch((error: unknown) => deps.onError("assistant.message.failed", error));
   });
 
-  const beat = (): AssistantHeartbeat => ({ zalo: zalo.mode, session: zalo.connected() ? "connected" : "disconnected", startedAt, queuedSends: pacer.queued() });
+  const beat = sessionBeat(zalo, startedAt, () => pacer.queued(), () => deps.onError("assistant.zalo.session_lost", new Error("zalo session closed")));
   const heartbeat = runHeartbeat({
     api: deps.api,
     sleep: deps.sleep,

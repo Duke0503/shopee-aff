@@ -173,7 +173,9 @@ describe("Story 6.7: chat commands for balance, orders, code, bank and help", ()
 
   it("AC4: the live spellings are the same commands; any other word or plain text is no command", () => {
     expect(["/id", "/ma", "/sodu", "/donhang", "/don", "/lichsu", "/stk", "/bank", "/tk", "/help", "/huongdan", " /SODU "].map(commandOf)).toEqual(["id", "id", "balance", "orders", "orders", "orders", "bank", "bank", "bank", "help", "help", "balance"]);
-    expect(["/matkhau", "/xyz", "sodu", "hello"].map(commandOf)).toEqual([null, null, null, null]);
+    // Story 6.8: /matkhau and its live spellings are the password command now.
+    expect(["/matkhau", "/pass", "/password"].map(commandOf)).toEqual(["password", "password", "password"]);
+    expect(["/xyz", "sodu", "hello"].map(commandOf)).toEqual([null, null, null]);
   });
 
   it("/stk names the bank and the last four digits only; without an account it shows how to add one", async () => {
@@ -185,8 +187,13 @@ describe("Story 6.7: chat commands for balance, orders, code, bank and help", ()
     expect(await sentFor(held, privately("/stk"))).toEqual([messageText("command_bank_held", { bank: messageText("bank_unnamed"), lastFour: "6789" })]);
     const none = fakeServer();
     answering(none, { kind: "bank", bank: null });
-    expect(await sentFor(none, privately("/stk Vietcombank 0123456789 NGUYEN VAN A"))).toEqual([messageText("command_bank_none")]);
-    expect(JSON.stringify(none.calls)).not.toContain("0123456789");
+    expect(await sentFor(none, privately("/stk"))).toEqual([messageText("command_bank_none")]);
+    // Story 6.9: details after /stk are saved in the private chat (bank-chat.test.ts); in the group they never leave the assistant.
+    const group = fakeServer();
+    answering(group, { kind: "private_only" });
+    expect(await sentFor(group, inGroup("/stk Vietcombank 0123456789 NGUYEN VAN A"))).toEqual([`@Lan
+${messageText("command_private_only")}`]);
+    expect(JSON.stringify(group.calls)).not.toContain("0123456789");
   });
 
   it("a private command from someone new gets the welcome first, then the answer; /id the welcome alone", async () => {

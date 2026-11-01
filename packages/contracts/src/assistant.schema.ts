@@ -1,8 +1,9 @@
 /**
  * The Zalo assistant's heartbeat (AD-15, Story 6.1), on the internal listener only with
  * `X-Assistant-Token`. The assistant posts it every 60 s; the server keeps the last one in memory
- * for the health model. A missing heartbeat raising the owner alert and the website's Zalo-down
- * banner is a later story. The body names no customer and carries no secret.
+ * for the health model. Five minutes without a beat whose session is `connected` raise the owner
+ * alert and the down state the website's banner reads (Story 6.11). The body names no customer and
+ * carries no secret.
  */
 import { INSTANT_PATTERN } from "@cashback/core";
 import { z } from "zod";
@@ -21,6 +22,12 @@ export const assistantHeartbeatSchema = z.strictObject({
   session: z.enum(ZALO_SESSION_STATES),
   /** When this assistant process started. */
   startedAt: z.string().regex(INSTANT_PATTERN),
+  /**
+   * The Zalo account the session runs on (its own id), or null when the session has none (the
+   * relay). The server keeps the first time it sees each account: a new one is a switch, after
+   * which known customers are registered again under new Zalo ids (Story 6.11).
+   */
+  account: z.string().regex(/^[A-Za-z0-9]{1,40}$/).nullable().optional(),
   /** Sends waiting in the pacer: a growing number means the assistant is behind. */
   queuedSends: z.number().int().min(0).max(100_000),
 });

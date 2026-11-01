@@ -10,7 +10,12 @@
  * it, registers no one. A link to no shop at all gets no reply in the group (owner decision).
  * Group replies tag the sender. Each reply goes out in the pacer's turn. A chat command (`/id`,
  * `/sodu`, `/donhang`, `/stk`, `/help`) without a link is answered in both chats (chat-command.ts,
- * Story 6.7); a link in the same message wins, as it did live.
+ * Story 6.7); a link in the same message wins, as it did live. In the private chat a reply (a
+ * quote) that reads as bank details, the way a customer answers the approved-order message, is
+ * saved like `/stk` with those details (bank-reply.ts, Story 6.9); in the group it is not read.
+ * A private message that names another customer's code (after a new Zalo account, a known
+ * customer writing their old one) is a merge claim the server records for the admin; the person
+ * is told it was noted (Story 6.11). Nothing merges by itself.
  *
  * A link is asked for once, for the sender alone (the server queues it under the sender's own
  * customer id, so it carries their sub_id1), before the welcome is sent, so the wait for the link
@@ -35,10 +40,11 @@ import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply, t
 
 type LinkClaim = (typeof LINK_CLAIMS)[number];
 
+import { looksLikeBankDetails, saveBankFromChat } from "./bank-reply";
 import { answerCommand, commandOf } from "./chat-command";
 import type { InternalApi } from "./internal-api.adapter";
 import { linkReplyMessage, refusalMessage, type ReplyMessage } from "./link-reply-text";
-import { extractFirstUrl } from "./message-parse";
+import { customerCodeIn, extractFirstUrl } from "./message-parse";
 import type { MessageKey } from "./messages";
 import type { Sleep } from "./pacer";
 import type { ChatTarget, IncomingMessage } from "./zalo.port";
@@ -179,8 +185,11 @@ export function chatReplier(deps: ChatReplyDeps): (message: IncomingMessage) => 
       return;
     }
     if (url !== null) return answerLink(deps, message, url, "private");
-    const person = await deps.api.register({ zaloUserId: message.senderId, displayName: displayNameOf(message) });
-    if (person.created) return deps.send(message.chat, "welcome", { customerCode: person.customerCode ?? "" });
-    await askOnceToday(message);
+    if (message.quoted === true && looksLikeBankDetails(message.text) && (await saveBankFromChat(deps, message, message.text.trim(), displayNameOf(message), true))) return;
+    const claimedCode = customerCodeIn(message.text);
+    const person = await deps.api.register({ zaloUserId: message.senderId, displayName: displayNameOf(message), ...(claimedCode === null ? {} : { claimedCode }) });
+    if (person.created) await deps.send(message.chat, "welcome", { customerCode: person.customerCode ?? "" });
+    if (claimedCode !== null && (person.claim === "recorded" || person.claim === "known")) return deps.send(message.chat, "merge_claim_noted", { claimedCode });
+    if (!person.created) await askOnceToday(message);
   };
 }

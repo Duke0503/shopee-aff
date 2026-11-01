@@ -21,8 +21,9 @@ const THREAD_GROUP = 1;
 interface ZcaApi {
   sendMessage(message: { msg: string; mentions?: { uid: string; pos: number; len: number }[] }, threadId: string, threadType: number): Promise<unknown>;
   sendFriendRequest(message: string, userId: string): Promise<unknown>;
+  getOwnId(): string;
   listener: {
-    on(event: "message", handler: (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown } }) => void): void;
+    on(event: "message", handler: (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown; quote?: unknown } }) => void): void;
     on(event: "connected" | "closed", handler: () => void): void;
     start(options?: { retryOnClose?: boolean }): void;
     stop(): void;
@@ -43,11 +44,13 @@ async function loadZca(): Promise<ZcaModule> {
   }
 }
 
-const incoming = (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown } }): IncomingMessage | null => {
+/** A zca-js message as the assistant reads it; a message with a `quote` is a reply. */
+export const incomingOf = (message: { type: number; threadId: string; data: { uidFrom?: string; dName?: unknown; content?: unknown; quote?: unknown } }): IncomingMessage | null => {
   const senderId = message.data.uidFrom;
   if (typeof senderId !== "string" || typeof message.data.content !== "string") return null;
   const chat: ChatTarget = message.type === THREAD_GROUP ? { kind: "group", groupId: String(message.threadId) } : { kind: "private", userId: senderId };
-  return { chat, senderId, senderName: typeof message.data.dName === "string" ? message.data.dName : null, text: message.data.content };
+  const quoted = typeof message.data.quote === "object" && message.data.quote !== null;
+  return { chat, senderId, senderName: typeof message.data.dName === "string" ? message.data.dName : null, text: message.data.content, ...(quoted ? { quoted } : {}) };
 };
 
 export async function openZcaSession(credentialsPath: string, allowedGroupIds: readonly string[], onError: (error: unknown) => void): Promise<ZaloSession> {
@@ -59,13 +62,17 @@ export async function openZcaSession(credentialsPath: string, allowedGroupIds: r
   api.listener.on("connected", () => (open = true));
   api.listener.on("closed", () => (open = false));
   api.listener.on("message", (raw) => {
-    const message = incoming(raw);
+    const message = incomingOf(raw);
     if (message !== null && handler !== null) handler(message).catch(onError);
   });
   api.listener.start({ retryOnClose: true });
   const session: ZaloSession = {
     mode: "account",
     connected: () => open,
+    accountId: () => {
+      const own = String(api.getOwnId());
+      return /^[A-Za-z0-9]{1,40}$/.test(own) ? own : null;
+    },
     onMessage: (next) => {
       handler = next;
     },

@@ -16,9 +16,10 @@ import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { linkQueueRoutes } from "./admin/link-queue.routes";
 import { messagingSilentRoutes } from "./admin/messaging-silent.routes";
 import { adminDesk } from "./admin/admin-desk";
+import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
 import { environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, type LinkBridge } from "./links/link-jobs";
-import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit } from "./modules/operations/index";
+import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit, ledgerAlerts, runAssistantHealthCheck, type AssistantHeartbeats } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { notificationJobs } from "./notifications/notification-expiry.job";
 import { notificationRoutes } from "./notifications/notification.routes";
@@ -55,6 +56,12 @@ function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger, bridge: L
   return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge), ...payoutRecords, ...notificationJobs(ledger, systemClock, logger)];
 }
 
+/** The assistant health check (Story 6.11): the owner alert once no connected heartbeat came for 5 minutes. */
+function assistantHealthJob(ledger: Ledger, logger: Logger, heartbeats: AssistantHeartbeats): Job {
+  const alerts = ledgerAlerts(ledger, systemClock, logger);
+  return { name: "assistantHealth", ...JOB_SCHEDULES.health, run: () => void runAssistantHealthCheck({ heartbeats, clock: systemClock, alerts, logger }) };
+}
+
 /** The one stop of this process, whichever asks first: a signal, or the dev shutdown route. */
 interface Stopper {
   stop(reason: string): void;
@@ -77,24 +84,28 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     // One bridge for the link job and, for the real one, its long-poll routes (Story 5.3).
     const bridge = linkBridge(config);
     // One heartbeat store: the assistant's route writes it, the Overview's health reads it (Story 6.1).
-    const heartbeats = assistantHeartbeats();
+    // Watched from now: with no connected beat 5 minutes after this start, the assistant counts as down (Story 6.11).
+    const heartbeats = assistantHeartbeats(systemClock.now());
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, heartbeats }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
     const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
     if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     if (config.assistantToken !== null) {
-      internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats }));
+      internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats, ledger }));
       // The assistant pulls the outbox one row at a time and acknowledges each send (Story 6.4).
       // Chat commands: /id, /sodu, /donhang, /stk, /help (Story 6.7).
       internal.push(assistantCommandRoutes({ ledger, clock: systemClock }));
+      // A bank account saved from the private chat (Story 6.9).
+      internal.push(assistantBankRoutes({ ledger, clock: systemClock, fingerprintKey: config.fingerprintKey }));
       internal.push(notificationRoutes({ ledger, clock: systemClock, dailyCap: config.notificationDailyCap, shareBaseUrl: shareBaseUrlFor(config), production: config.env === "prod" }));
     }
     const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
-    jobs = createScheduler(jobsFor(config, ledger, logger, bridge), { clock: systemClock, timer: systemTimer, logger });
+    const health = config.assistantToken === null ? [] : [assistantHealthJob(ledger, logger, heartbeats)];
+    jobs = createScheduler([...jobsFor(config, ledger, logger, bridge), ...health], { clock: systemClock, timer: systemTimer, logger });
     jobs.start();
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort, bridge: config.bridgeMode, zalo: config.zaloMode }, "platform.server.started");
     return parts();

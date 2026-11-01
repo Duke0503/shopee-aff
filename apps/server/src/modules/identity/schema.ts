@@ -100,6 +100,27 @@ export const sessions = sqliteTable("sessions", {
   endReason: text("end_reason", { enum: SESSION_END_REASONS }),
 });
 
+/** The Zalo accounts the assistant reported, first seen when (migrations/0028, Story 6.11). */
+export const zaloAccounts = sqliteTable("zalo_accounts", {
+  accountId: text("account_id").primaryKey().notNull(),
+  firstSeenAt: text("first_seen_at").notNull(),
+});
+
+/** A customer who wrote an older customer code in the private chat (migrations/0028, Story 6.11). */
+export const mergeClaims = sqliteTable(
+  "merge_claims",
+  {
+    claimantId: text("claimant_id")
+      .notNull()
+      .references(() => customers.customerId),
+    claimedId: text("claimed_id")
+      .notNull()
+      .references(() => customers.customerId),
+    claimedAt: text("claimed_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.claimantId, t.claimedId] })],
+);
+
 export type StaffRow = typeof staff.$inferSelect;
 export type CustomerRow = typeof customers.$inferInsert;
 export type CustomerAliasRow = typeof customerAliases.$inferInsert;

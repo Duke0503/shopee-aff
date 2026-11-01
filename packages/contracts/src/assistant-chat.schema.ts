@@ -28,10 +28,16 @@ const customerId = z.string().regex(/^[A-Za-z0-9]{1,64}$/);
 const requestId = z.string().regex(/^[A-Za-z0-9]{1,64}$/);
 const customerCode = z.string().regex(/^DP\d{5,}$/).nullable();
 
-export const assistantRegistrationSchema = z.strictObject({ zaloUserId, displayName });
+/**
+ * `claimedCode`: an older customer code the person wrote in the private chat (Story 6.11). It is
+ * recorded as a merge claim for the admin, never merged by itself; `claim` says what became of it.
+ */
+export const assistantRegistrationSchema = z.strictObject({ zaloUserId, displayName, claimedCode: z.string().regex(/^DP\d{5,}$/).optional() });
 export type AssistantRegistration = z.infer<typeof assistantRegistrationSchema>;
 
-export const assistantRegisteredSchema = z.object({ customerId, customerCode, created: z.boolean() });
+export const MERGE_CLAIM_RESULTS = ["recorded", "known", "own", "not_found"] as const;
+
+export const assistantRegisteredSchema = z.object({ customerId, customerCode, created: z.boolean(), claim: z.enum(MERGE_CLAIM_RESULTS).nullable().optional() });
 export type AssistantRegistered = z.infer<typeof assistantRegisteredSchema>;
 
 export const ASSISTANT_CHATS = ["private", "group"] as const;

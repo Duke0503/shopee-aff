@@ -23,6 +23,7 @@ export function guardTargets(session: ZaloSession, allowedGroupIds: readonly str
   return {
     mode: session.mode,
     connected: () => session.connected(),
+    accountId: () => session.accountId(),
     onMessage: (handler) => session.onMessage(async (message) => (isAllowedTarget(message.chat, allowed) ? handler(message) : undefined)),
     sendText: async (target, text, mentions) => {
       if (!isAllowedTarget(target, allowed)) throw new ZaloTargetRefused();

@@ -5,7 +5,13 @@
  */
 export { bankFingerprint, lastFour, normaliseAccountNumber } from "./bank-fingerprint";
 export { accountNumberOf, bankAccountOfCustomer, bankAccountsOf, customerBankState, bankDisplayName, sharedBankFingerprints, type BankAccountFacts } from "./bank-account.query";
-export { distinctiveBankText, findVietQrBank, plainBankText, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
+export { distinctiveBankText, findVietQrBank, plainBankText, vietQrBankMatches, VIETQR_BANKS, type VietQrBank } from "./domain/bank-match";
+export { ACCOUNT_NUMBER_RULE, foldHolderName, holderNameOf, readBankDetails, type BankDetails } from "./domain/bank-details";
+export { BANK_CHANGED_MESSAGE, saveChatBankAccount, type BankSaved, type BankSaveDeps, type ChatBankAccount } from "./bank-account-save.command";
+export { ISSUED_PASSWORD_CHARS, newCustomerPassword, setCustomerPassword } from "./customer-password.command";
+export { MERGE_PROPOSAL_REASONS, mergeProposals, type MergeProposal, type MergeProposalReason, type MergeProposalSide } from "./merge-proposal.query";
+export { CLAIMED_CODE, claimedCodeIn, recordMergeClaim, type MergeClaimResult } from "./merge-claim.command";
+export { latestZaloSwitch, noteZaloAccount, ZALO_ACCOUNT_ID_PATTERN } from "./zalo-account.command";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
 export { CustomerRegisterError, DISPLAY_NAME_MAX, registerCustomer, REGISTRATION_CHANNELS, ZALO_USER_ID_PATTERN, type Registered, type RegistrationChannel, type RegistrationInput } from "./customer-register.command";
 export { earnsNothing, erasedIdsOf, ledgerOwnerOf, type LedgerOwner, customerCardOf, newCustomerCount, customerCardsOf, customerCodeOf, customerProfileOf, deskCustomerOf, deskCustomers, DESK_CUSTOMER_ROLES, isDeskCustomer, guestCustomerIds, isGuestCustomer, customerKeys, resolveCustomer, type CustomerKeys, type CustomerProfile, type DeskCustomer, type ResolvedCustomer } from "./customer.query";

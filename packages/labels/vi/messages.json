@@ -55,6 +55,16 @@
   "bank_unnamed": "Ngân hàng chưa rõ tên",
   "command_private_only": "Lệnh này chỉ dùng trong tin nhắn riêng với mình, để thông tin của bạn không hiện trong nhóm. Bạn nhắn riêng cho mình nhé.",
   "command_not_registered": "Bạn chưa có mã khách. Bạn nhắn riêng cho mình một tin bất kỳ để nhận mã nhé.",
-  "command_help": "Các lệnh của trợ lý Hoàn Tiền DP:\n/id: mã khách của bạn\n/sodu: số dư tiền hoàn (chỉ trong tin nhắn riêng)\n/donhang: các đơn gần đây (chỉ trong tin nhắn riêng)\n/stk: tài khoản ngân hàng nhận tiền (chỉ trong tin nhắn riêng)\n/help: danh sách lệnh này\n\nGửi mình link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop, mình gửi lại link hoàn tiền của riêng bạn.",
-  "command_contact_admin": "Tài khoản của bạn chưa có mã khách. Bạn nhắn quản trị viên giúp mình nhé."
+  "command_help": "Các lệnh của trợ lý Hoàn Tiền DP:\n/id: mã khách của bạn\n/sodu: số dư tiền hoàn (chỉ trong tin nhắn riêng)\n/donhang: các đơn gần đây (chỉ trong tin nhắn riêng)\n/stk: xem hoặc lưu tài khoản ngân hàng nhận tiền (chỉ trong tin nhắn riêng)\n/matkhau: mật khẩu mới để đăng nhập hoantiendp.com (chỉ trong tin nhắn riêng)\n/help: danh sách lệnh này\n\nGửi mình link sản phẩm Shopee, ShopeeFood hoặc TikTok Shop, mình gửi lại link hoàn tiền của riêng bạn.",
+  "command_contact_admin": "Tài khoản của bạn chưa có mã khách. Bạn nhắn quản trị viên giúp mình nhé.",
+  "command_password": "Mật khẩu mới để đăng nhập hoantiendp.com: {password}\nMã khách của bạn: {customerCode}\n\nMình chỉ gửi mật khẩu này một lần, bạn lưu lại nhé. Mọi nơi đang đăng nhập bằng mật khẩu cũ đã được đăng xuất.",
+  "bank_saved": "Mình đã lưu tài khoản nhận tiền của bạn: {bank} •• {lastFour}. Tiền hoàn của bạn sẽ được chuyển vào tài khoản này.",
+  "bank_changed": "Tài khoản nhận tiền của bạn vừa được đổi thành {bank} •• {lastFour}. Nếu không phải bạn đổi, bạn nhắn quản trị viên ngay nhé.",
+  "bank_choose": "Tên ngân hàng bạn gửi khớp với nhiều ngân hàng:\n{banks}\n\nBạn gửi lại, ghi đúng một tên ở trên:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
+  "bank_choice_line": "• {bank}",
+  "bank_rule_format": "Mình chưa đọc được thông tin tài khoản. Bạn gửi theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>\nVí dụ: /stk Vietcombank 0123456789 NGUYEN VAN A",
+  "bank_rule_number": "Số tài khoản phải có từ 4 đến 30 chữ cái hoặc chữ số; khoảng trắng và dấu gạch ngang được bỏ qua. Bạn kiểm tra rồi gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
+  "bank_rule_holder": "Tên chủ tài khoản chỉ gồm chữ cái, ghi đúng như ngân hàng in trên thẻ. Bạn gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
+  "bank_rule_bank": "Mình không tìm thấy ngân hàng này. Bạn ghi tên ngân hàng như Vietcombank, MB, Techcombank rồi gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
+  "merge_claim_noted": "Mình đã ghi nhận mã khách {claimedCode} bạn gửi. Quản trị viên sẽ kiểm tra rồi gộp mã này với tài khoản Zalo bạn đang nhắn, để tiền hoàn của bạn nằm ở một chỗ."
 }

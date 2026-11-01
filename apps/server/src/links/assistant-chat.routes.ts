@@ -9,6 +9,9 @@
  *   POST /internal/assistant/link-replies/confirm  the reply was sent: the link is DELIVERED
  *   POST /internal/assistant/link-replies/release  that send failed: the link goes by notification
  *
+ * A registration may carry an older customer code the person wrote (Story 6.11): it is recorded
+ * as a merge claim for the admin merge command, with the result in `claim`, and nothing merges.
+ *
  * These are the only callers of `registerCustomer`, so only the assistant creates customers (D10).
  * A private message registers its sender whatever it says (with a link, the link-request route
  * registers on the way and says so in `registered`); in the community group only a product link
@@ -50,7 +53,7 @@ import {
 import type { Clock } from "@cashback/core";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
-import { CustomerRegisterError, isGuestCustomer, registerCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
+import { CustomerRegisterError, isGuestCustomer, recordMergeClaim, registerCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
 import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery } from "../modules/linking/index";
 import { isSilent, keyState, withdrawPendingNotification } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
@@ -109,7 +112,11 @@ export function assistantChatRoutes(deps: AssistantChatRouteDeps): (app: Fastify
       const body = assistantRegistrationSchema.safeParse(request.body);
       if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
       const registered = register(deps, request.log, body.data.zaloUserId, body.data.displayName ?? null, "private_message");
-      return assistantRegisteredSchema.parse({ customerId: registered.customerId, customerCode: registered.customerCode, created: registered.created });
+      const code = body.data.claimedCode;
+      // Story 6.11: an older code written in the private chat is a merge claim for the admin, never a merge.
+      const claim = code === undefined ? null : deps.ledger.tx((db) => recordMergeClaim(db, registered.customerId, code, { clock: deps.clock, by: commandAudit(db, deps.clock, { kind: "customer", id: registered.customerId }) }));
+      if (claim !== null) request.log.info({ claim }, "identity.merge_claim.answered");
+      return assistantRegisteredSchema.parse({ customerId: registered.customerId, customerCode: registered.customerCode, created: registered.created, ...(claim === null ? {} : { claim }) });
     });
 
     app.post(ASSISTANT_LINK_REQUEST_PATH, { config: ASSISTANT_ROUTE }, async (request) => {

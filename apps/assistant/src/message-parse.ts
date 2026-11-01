@@ -15,6 +15,14 @@ export function extractFirstUrl(text: string): string | null {
   return match[0].replace(TRAILING_PUNCTUATION, "");
 }
 
+const CUSTOMER_CODE = /\bDP\s?(\d{5,})\b/i;
+
+/** A customer code written in a message ("DP00012", "dp 00012"), upper case, or null (Story 6.11). */
+export function customerCodeIn(text: string): string | null {
+  const digits = CUSTOMER_CODE.exec(text.slice(0, MAX_SCANNED_LENGTH))?.[1];
+  return digits === undefined ? null : `DP${digits}`;
+}
+
 export interface ParsedCommand {
   readonly command: string;
   readonly args: readonly string[];

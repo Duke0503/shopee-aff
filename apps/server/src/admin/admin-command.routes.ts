@@ -17,6 +17,9 @@ import {
   customerMergedResponseSchema,
   customerMergePreviewSchema,
   customerMergeRequestSchema,
+  customerMergeProposalRequestSchema,
+  customerMergeProposalsSchema,
+  type CustomerMergeProposals,
   STAFF_TOKEN_HEADER,
   staffAccessRequestSchema,
   staffParamsSchema,
@@ -30,13 +33,13 @@ import {
   type ErrorCode,
   type StaffSeedInput,
 } from "@cashback/contracts";
-import { formatVnDate, formatVnTime, type Clock } from "@cashback/core";
+import { formatVnDate, formatVnTime, parseInstant, type Clock, type Instant } from "@cashback/core";
 import { combinedBalance } from "@cashback/money";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
 import { CampaignCreateError, createCampaign, previewCampaign, type CampaignInput, type CampaignPreview } from "../modules/campaigns/index";
-import { applyMerge, CustomerMergeError, customerKeys, endSession, hashPassword, planMerge, planStaffSeed, type MergeErrorCode, type MergePlan, type MergeSide, resetStaffPassword, resolveCustomer, seedStaff, setStaffAccess, signInStaff, STAFF_SEED_ACTOR, StaffAdminError, staffSessionOf, type SeedPlan, type StaffSeed } from "../modules/identity/index";
+import { applyMerge, CustomerMergeError, customerKeys, latestZaloSwitch, mergeProposals, endSession, hashPassword, planMerge, planStaffSeed, type MergeErrorCode, type MergePlan, type MergeSide, resetStaffPassword, resolveCustomer, seedStaff, setStaffAccess, signInStaff, STAFF_SEED_ACTOR, StaffAdminError, staffSessionOf, type SeedPlan, type StaffSeed } from "../modules/identity/index";
 import { auditFor, commandAudit } from "../modules/operations/index";
 import { getBalances, hasOpenClaim, NO_BALANCE, type Balance } from "../modules/payouts/index";
 import type { Ledger, LedgerDb } from "../platform/db/ledger";
@@ -62,6 +65,15 @@ function parsed<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
   const result = schema.safeParse(value);
   if (!result.success) throw new HttpError("invalid_request", "error.invalid_request");
   return result.data;
+}
+
+/** A well-formed instant that is no real time (month 13) is a refused request, never a 500. */
+function instantOrRefuse(text: string): Instant {
+  try {
+    return parseInstant(text);
+  } catch {
+    throw new HttpError("invalid_request", "error.invalid_request");
+  }
 }
 
 function refusal(error: unknown): unknown {
@@ -204,8 +216,19 @@ function mergePreview(db: LedgerDb, plan: MergePlan): CustomerMergePreview {
   return { merged, survivor, survivorId: plan.survivor.customerId, bankMoves: plan.bankMoves, result: balanceFigures(combinedBalance([merged.balance, survivor.balance])) };
 }
 
-/** Story 4.19: preview writes nothing; apply re-plans inside its transaction, so it refuses what a fresh preview would. */
+/**
+ * Story 4.19: preview writes nothing; apply re-plans inside its transaction, so it refuses what a
+ * fresh preview would. Story 6.11: the proposals after a new Zalo account are pairs to preview,
+ * read only; nothing is merged without the preview and apply.
+ */
 function mergeRoutes(app: FastifyInstance, deps: AdminCommandDeps): void {
+  app.post("/internal/admin/customers/merge/proposals", async (request): Promise<CustomerMergeProposals> => {
+    adminActor(deps, request);
+    const body = parsed(customerMergeProposalRequestSchema, request.body);
+    const db = deps.ledger.db;
+    const since = body.since === undefined ? latestZaloSwitch(db) : instantOrRefuse(body.since);
+    return customerMergeProposalsSchema.parse({ since, proposals: mergeProposals(db, since) });
+  });
   app.post("/internal/admin/customers/merge/preview", async (request): Promise<CustomerMergePreview> => {
     adminActor(deps, request);
     const body = parsed(customerMergeRequestSchema, request.body);

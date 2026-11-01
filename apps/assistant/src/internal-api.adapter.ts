@@ -5,6 +5,7 @@
  * error names the path, the status and the server's message key, never the token or a body.
  */
 import {
+  ASSISTANT_BANK_PATH,
   ASSISTANT_COMMAND_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
@@ -14,6 +15,8 @@ import {
   ASSISTANT_LINK_REQUEST_PATH,
   ASSISTANT_REGISTRATION_PATH,
   ASSISTANT_TOKEN_HEADER,
+  assistantBankAnswerSchema,
+  assistantBankSaveSchema,
   assistantCommandAnswerSchema,
   assistantCommandSchema,
   assistantHeartbeatReceivedSchema,
@@ -34,6 +37,8 @@ import {
   notificationAckPath,
   notificationAckSchema,
   notificationNextSchema,
+  type AssistantBankAnswer,
+  type AssistantBankSave,
   type AssistantCommand,
   type AssistantCommandAnswer,
   type AssistantHeartbeat,
@@ -84,6 +89,8 @@ export interface InternalApi {
   confirmLink(claim: AssistantLinkClaim): Promise<boolean>;
   /** A chat command answered with its facts; a private one registers its sender first (Story 6.7). */
   command(command: AssistantCommand): Promise<AssistantCommandAnswer>;
+  /** Bank details written after `/stk` in the private chat, read and saved by the server (Story 6.9). */
+  saveBank(save: AssistantBankSave): Promise<AssistantBankAnswer>;
   /** The next due notification, leased to this assistant, or null (Story 6.4). */
   nextNotification(signal?: AbortSignal): Promise<AssistantNotification | null>;
   acknowledgeNotification(id: number, ack: NotificationAck, signal?: AbortSignal): Promise<NotificationAcked>;
@@ -133,6 +140,7 @@ export function internalApi(options: InternalApiOptions): InternalApi {
     releaseLink: async (claim) => assistantLinkReleasedSchema.parse(await post(ASSISTANT_LINK_RELEASE_PATH, assistantLinkClaimSchema.parse(claim))).released,
     confirmLink: async (claim) => assistantLinkConfirmedSchema.parse(await post(ASSISTANT_LINK_CONFIRM_PATH, assistantLinkClaimSchema.parse(claim))).confirmed,
     command: async (command) => assistantCommandAnswerSchema.parse(await post(ASSISTANT_COMMAND_PATH, assistantCommandSchema.parse(command))),
+    saveBank: async (save) => assistantBankAnswerSchema.parse(await post(ASSISTANT_BANK_PATH, assistantBankSaveSchema.parse(save))),
     nextNotification: async (signal) => notificationNextSchema.parse(await call("GET", NOTIFICATION_NEXT_PATH, undefined, signal)).notification,
     acknowledgeNotification: async (id, ack, signal) => notificationAckedSchema.parse(await post(notificationAckPath(id), notificationAckSchema.parse(ack), signal)),
   };

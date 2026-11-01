@@ -8,11 +8,14 @@
  * gets no reply (D5). A group reply tags the sender.
  * A private command from someone new registers them on the server; they get the welcome (which
  * carries their code) and then the answer, the welcome alone for `/id`. Each reply goes out in
- * the pacer's turn. `/stk` with details after it is answered like `/stk` for now: saving an
- * account from the chat is Story 6.9, and the details are never sent to the server or logged.
+ * the pacer's turn. `/stk` with details after it saves the account in the private chat
+ * (bank-reply.ts, Story 6.9); in the group it is answered like `/stk`, with the pointer to the
+ * private chat, and the details are never sent to the server or logged. `/matkhau` (Story 6.8)
+ * answers the new password once in the private chat; the group gets the pointer.
  */
 import type { AssistantChat, AssistantChatOrder, AssistantCommandName, AssistantCommandReply } from "@cashback/contracts";
 
+import { saveBankFromChat } from "./bank-reply";
 import type { InternalApi } from "./internal-api.adapter";
 import { dongText, type ReplyMessage } from "./link-reply-text";
 import { parseCommand } from "./message-parse";
@@ -21,7 +24,7 @@ import { orderStateText } from "./order-text";
 import type { ChatTarget, IncomingMessage } from "./zalo.port";
 
 export interface CommandDeps {
-  readonly api: Pick<InternalApi, "command">;
+  readonly api: Pick<InternalApi, "command" | "saveBank">;
   /** Sends one message by key in the pacer's turn; a tag is written in front of a group message. */
   readonly send: (target: ChatTarget, key: MessageKey, values?: Readonly<Record<string, string>>, tag?: { readonly userId: string; readonly name: string } | null) => Promise<void>;
 }
@@ -33,6 +36,7 @@ export const COMMAND_SPELLINGS: Readonly<Record<AssistantCommandName, readonly s
   orders: ["donhang", "don", "lichsu"],
   bank: ["stk", "bank", "tk"],
   help: ["help", "huongdan"],
+  password: ["matkhau", "pass", "password"],
 };
 
 /** The command a message is, or null for any other text (an unknown `/word` included). */
@@ -79,6 +83,8 @@ export function commandReplyMessage(reply: AssistantCommandReply): ReplyMessage 
     }
     case "help":
       return { key: "command_help", values: {} };
+    case "password":
+      return { key: "command_password", values: { password: reply.password, customerCode: reply.customerCode } };
     case "private_only":
       return { key: "command_private_only", values: {} };
     case "not_registered":
@@ -94,6 +100,8 @@ export function commandReplyMessage(reply: AssistantCommandReply): ReplyMessage 
 export async function answerCommand(deps: CommandDeps, message: IncomingMessage, command: AssistantCommandName, displayName: string | null): Promise<void> {
   const chat: AssistantChat = message.chat.kind === "group" ? "group" : "private";
   const tag = chat === "group" && displayName !== null ? { userId: message.senderId, name: displayName } : null;
+  const details = command === "bank" ? (parseCommand(message.text)?.args ?? []).join(" ") : "";
+  if (chat === "private" && details !== "") return void (await saveBankFromChat(deps, message, details, displayName));
   const answer = await deps.api.command({ zaloUserId: message.senderId, displayName, chat, command });
   if (answer.registered) {
     await deps.send(message.chat, "welcome", { customerCode: answer.customerCode ?? "" });

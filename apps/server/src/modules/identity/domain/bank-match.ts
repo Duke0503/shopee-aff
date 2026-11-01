@@ -54,15 +54,26 @@ function aliasesOf(bank: VietQrBank): Set<string> {
 
 const ALIASES = new Map(VIETQR_BANKS.map((bank) => [bank, aliasesOf(bank)]));
 
-const oneBank = (found: readonly VietQrBank[]): VietQrBank | null => (new Set(found.map((b) => b.bin)).size === 1 ? (found[0] ?? null) : null);
+/** Each bank once, by BIN, in catalogue order. */
+const byBin = (found: readonly VietQrBank[]): VietQrBank[] => found.filter((bank, i) => found.findIndex((b) => b.bin === bank.bin) === i);
 
-/** The one bank a written name means, or null when none or several match. */
-export function findVietQrBank(written: string | null, catalogue: readonly VietQrBank[] = VIETQR_BANKS): VietQrBank | null {
+/**
+ * Every VietQR bank a written name could mean: the banks whose name, code or short name it spells
+ * exactly, or, when none does, the banks one of whose names (4 letters or more) it contains. One
+ * bank is a match; several are a choice for the person who wrote it (Story 6.9).
+ */
+export function vietQrBankMatches(written: string | null, catalogue: readonly VietQrBank[] = VIETQR_BANKS): VietQrBank[] {
   const plain = plainBankText(written ?? "");
-  if (plain === "") return null;
+  if (plain === "") return [];
   const aliases = (bank: VietQrBank): Set<string> => ALIASES.get(bank) ?? aliasesOf(bank);
   const needles = new Set([plain, distinctiveBankText(written ?? "")].filter((n) => n !== ""));
   const exact = catalogue.filter((bank) => [...needles].some((n) => aliases(bank).has(n)));
-  if (exact.length > 0) return oneBank(exact);
-  return oneBank(catalogue.filter((bank) => [...aliases(bank)].some((alias) => alias.length >= 4 && plain.includes(alias))));
+  if (exact.length > 0) return byBin(exact);
+  return byBin(catalogue.filter((bank) => [...aliases(bank)].some((alias) => alias.length >= 4 && plain.includes(alias))));
+}
+
+/** The one bank a written name means, or null when none or several match. */
+export function findVietQrBank(written: string | null, catalogue: readonly VietQrBank[] = VIETQR_BANKS): VietQrBank | null {
+  const found = vietQrBankMatches(written, catalogue);
+  return found.length === 1 ? (found[0] ?? null) : null;
 }

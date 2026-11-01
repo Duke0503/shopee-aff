@@ -3,7 +3,7 @@ import { parseInstant, systemClock, toMs } from "@cashback/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { startAssistant } from "../src/assistant";
-import { fakeZaloSession } from "../src/fake-zalo.adapter";
+import { FAKE_ACCOUNT_ID, fakeZaloSession } from "../src/fake-zalo.adapter";
 import { internalApi, type FetchLike } from "../src/internal-api.adapter";
 import { timerSleep } from "../src/pacer";
 
@@ -65,7 +65,7 @@ describe("Story 6.1: the assistant heartbeat", () => {
     for (const call of calls) {
       expect(call.url).toBe(`${BASE}${ASSISTANT_HEARTBEAT_PATH}`);
       expect(call.headers[ASSISTANT_TOKEN_HEADER]).toBe(TOKEN);
-      expect(assistantHeartbeatSchema.parse(call.body)).toEqual({ zalo: "fake", session: "connected", startedAt: START, queuedSends: 0 });
+      expect(assistantHeartbeatSchema.parse(call.body)).toEqual({ zalo: "fake", session: "connected", account: FAKE_ACCOUNT_ID, startedAt: START, queuedSends: 0 });
     }
     await vi.advanceTimersByTimeAsync(120_000);
     expect(calls).toHaveLength(4);
