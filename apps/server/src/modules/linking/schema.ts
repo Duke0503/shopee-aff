@@ -49,6 +49,8 @@ export const linkRequests = sqliteTable("link_requests", {
   searchText: text("search_text").notNull().default(""),
   // When a failed QUEUED request may be tried again (migration 0022); null means now.
   nextAttemptAt: text("next_attempt_at"),
+  // The product the request is for (migration 0023, Story 5.2); the reuse lookup's key.
+  productKey: text("product_key"),
 });
 
 export const shareCodes = sqliteTable("share_codes", {
@@ -77,6 +79,8 @@ export const bridgeJobs = sqliteTable("bridge_jobs", {
   failure: text("failure"),
   createdAt: text("created_at").notNull(),
   finishedAt: text("finished_at"),
+  // Times in a row the browser took the job and went silent (migration 0023, Story 5.3).
+  noAnswers: integer("no_answers").notNull().default(0),
 });
 
 export type ProductOfferRow = typeof productOffers.$inferInsert;

@@ -15,7 +15,8 @@
  * host and carries exactly the job's sub_id1 and sub_id2; then the request becomes ISSUED with a
  * new 10-character base62 share code. A failure or a link that fails the check counts one attempt
  * and puts the request back with a growing delay, so a failing request never holds up the ones
- * behind it (the three-failure rule is Story 5.5).
+ * behind it (the three-failure rule is Story 5.5). `recordSilentBridge` counts a browser that took
+ * the job and went silent: uncounted once, a failed attempt the second time in a row.
  */
 import { randomInt } from "node:crypto";
 import { instantFromMs, toMs, type Clock, type Instant } from "@cashback/core";
@@ -144,8 +145,32 @@ function backOff(db: LedgerDb, requestId: string, at: Instant): void {
   db.update(linkRequests).set({ attempts, nextAttemptAt: instantFromMs(toMs(at) + retryDelayMs(attempts)) }).where(eq(linkRequests.requestId, requestId)).run();
 }
 
+/** Times in a row the browser may take one job and go silent before that counts as a failed attempt. */
+export const SILENT_ANSWERS_BEFORE_FAILURE = 2;
+
+/**
+ * The browser took this job and never answered (Story 5.3 review item 2); call inside `tx`. The
+ * first time the job stays open and uncounted (a browser restart is not the request's fault); the
+ * second time in a row it is closed `bridge_no_answer` and the request backs off like any failure,
+ * so a page that always silences the bridge cannot hold the queue.
+ */
+export function recordSilentBridge(db: LedgerDb, job: LinkBridgeJob, clock: Clock): "retry" | "failed" {
+  const row = db.select({ status: bridgeJobs.status, noAnswers: bridgeJobs.noAnswers }).from(bridgeJobs).where(eq(bridgeJobs.jobId, job.jobId)).get();
+  if (row?.status !== "PENDING") return "retry";
+  const noAnswers = row.noAnswers + 1;
+  db.update(bridgeJobs).set({ noAnswers }).where(eq(bridgeJobs.jobId, job.jobId)).run();
+  if (noAnswers < SILENT_ANSWERS_BEFORE_FAILURE) return "retry";
+  const at = clock.now();
+  closeJob(db, job.jobId, "bridge_no_answer", at);
+  backOff(db, job.requestId, at);
+  return "failed";
+}
+
+/** An answer that closes the job; `unavailable` leaves it open and is never recorded. */
+export type RecordedBridgeAnswer = Exclude<BridgeLinkResult, { outcome: "unavailable" }>;
+
 /** Closes a claimed job with the bridge's answer; call inside `tx`. */
-export function recordLinkResult(db: LedgerDb, job: LinkBridgeJob, result: BridgeLinkResult, clock: Clock, options: RecordOptions): LinkResultRecorded {
+export function recordLinkResult(db: LedgerDb, job: LinkBridgeJob, result: RecordedBridgeAnswer, clock: Clock, options: RecordOptions): LinkResultRecorded {
   const at = clock.now();
   const done = (outcome: LinkResultRecorded["outcome"], reason: string | null = null, shareCode: string | null = null): LinkResultRecorded => ({ requestId: job.requestId, outcome, reason, shareCode });
   const open = db.select({ status: bridgeJobs.status }).from(bridgeJobs).where(eq(bridgeJobs.jobId, job.jobId)).get();
@@ -171,7 +196,7 @@ export function recordLinkResult(db: LedgerDb, job: LinkBridgeJob, result: Bridg
   return done("issued", null, shareCode);
 }
 
-function linkFailure(job: LinkBridgeJob, result: Extract<BridgeLinkResult, { outcome: "link" }>, options: RecordOptions): string | null {
+function linkFailure(job: LinkBridgeJob, result: Extract<RecordedBridgeAnswer, { outcome: "link" }>, options: RecordOptions): string | null {
   const check = checkReturnedLink({ url: result.url, resolvedUrl: result.resolvedUrl ?? null, subId1: job.subId1, subId2: job.subId2, acceptFakeHost: options.acceptFakeHost });
   return check.ok ? null : `link_${check.reason}`;
 }

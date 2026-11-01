@@ -1,0 +1,81 @@
+{
+  "rule": "reuse_link",
+  "source": "src/cashback/ledger/repository.py::find_own_request and ::find_house_link; tests/test_link_attribution.py (the 2026-09-25 fix: a link reused by product sent customer B's purchase to customer A)",
+  "now": "2026-11-01T03:00:00.000Z",
+  "directory": {
+    "customers": [
+      { "id": "1000000000000000001", "code": "DP00001", "role": "USER", "status": "ACTIVE" },
+      { "id": "1000000000000000002", "code": "DP00002", "role": "USER", "status": "ACTIVE" },
+      { "id": "1000000000000000004", "code": "DP00004", "role": "USER", "status": "MERGED" },
+      { "id": "HOUSE", "code": null, "role": "HOUSE", "status": "ACTIVE" }
+    ],
+    "aliases": { "1000000000000000004": "1000000000000000001" }
+  },
+  "cases": [
+    {
+      "name": "2026-09-25: customer B asks for the product customer A already has a link for, and gets a new request of B's own",
+      "story": "5.2 AC2",
+      "existing": [
+        { "requestId": "26103100001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/FirstOnly", "shareCode": "FirstOnly1" }
+      ],
+      "request": { "customer": "DP00002", "url": "https://shopee.vn/Thing-i.166586877.10096389022" },
+      "expected": { "reused": false, "customerId": "1000000000000000002" }
+    },
+    {
+      "name": "the same customer asks again inside the window and gets their own link back",
+      "story": "5.2 AC1",
+      "existing": [
+        { "requestId": "26103100001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/FirstOnly", "shareCode": "FirstOnly1" }
+      ],
+      "request": { "customer": "DP00001", "url": "https://shopee.vn/Thing-i.166586877.10096389022?sp_atk=x" },
+      "expected": { "reused": true, "requestId": "26103100001", "customerId": "1000000000000000001", "shareCode": "FirstOnly1" }
+    },
+    {
+      "name": "the same customer asks again after the window and gets a fresh request",
+      "story": "5.2 AC3",
+      "existing": [
+        { "requestId": "26102000001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-20T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/FirstOld", "shareCode": "FirstOld01" }
+      ],
+      "request": { "customer": "DP00001", "url": "https://shopee.vn/product/166586877/10096389022" },
+      "expected": { "reused": false, "customerId": "1000000000000000001" }
+    },
+    {
+      "name": "a guest asks for a product the guest account has a link for, months old, and shares it",
+      "story": "5.2 AC4",
+      "existing": [
+        { "requestId": "26060100001", "customer": "HOUSE", "url": "https://shopee.vn/product/166586877/10096389022", "status": "ISSUED", "createdAt": "2026-06-01T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/HouseOne", "shareCode": "HouseOne01" }
+      ],
+      "request": { "customer": "HOUSE", "url": "https://shopee.vn/Thing-i.166586877.10096389022" },
+      "expected": { "reused": true, "requestId": "26060100001", "customerId": "HOUSE", "shareCode": "HouseOne01" }
+    },
+    {
+      "name": "a guest never gets a customer's link, and a customer never gets the guest link",
+      "story": "5.2 AC2",
+      "existing": [
+        { "requestId": "26103100001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/FirstOnly", "shareCode": "FirstOnly1" },
+        { "requestId": "26103100002", "customer": "HOUSE", "url": "https://shopee.vn/product/166586877/10096389099", "status": "ISSUED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/HouseTwo", "shareCode": "HouseTwo01" }
+      ],
+      "request": { "customer": "HOUSE", "url": "https://shopee.vn/product/166586877/10096389022" },
+      "expected": { "reused": false, "customerId": "HOUSE" }
+    },
+    {
+      "name": "a request under a merged customer's old id resolves to the survivor and reuses the survivor's link",
+      "story": "5.2 AC5",
+      "existing": [
+        { "requestId": "26103100001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/FirstOnly", "shareCode": "FirstOnly1" },
+        { "requestId": "26103100002", "customer": "1000000000000000002", "url": "https://shopee.vn/product/166586877/10096389022", "status": "DELIVERED", "createdAt": "2026-10-31T05:00:00.000Z", "affiliateUrl": "https://s.shopee.vn/SecondOnly", "shareCode": "SecondOnl1" }
+      ],
+      "request": { "customer": "1000000000000000004", "url": "https://shopee.vn/product/166586877/10096389022" },
+      "expected": { "reused": true, "requestId": "26103100001", "customerId": "1000000000000000001", "shareCode": "FirstOnly1" }
+    },
+    {
+      "name": "a failed request of the same customer is never handed back",
+      "story": "5.2 AC1",
+      "existing": [
+        { "requestId": "26103100001", "customer": "1000000000000000001", "url": "https://shopee.vn/product/166586877/10096389022", "status": "FAILED", "createdAt": "2026-10-31T02:00:00.000Z", "affiliateUrl": null, "shareCode": null }
+      ],
+      "request": { "customer": "DP00001", "url": "https://shopee.vn/product/166586877/10096389022" },
+      "expected": { "reused": false, "customerId": "1000000000000000001" }
+    }
+  ]
+}

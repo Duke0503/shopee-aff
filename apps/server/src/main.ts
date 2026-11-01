@@ -14,7 +14,7 @@ import { systemClock } from "@cashback/core";
 
 import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { adminDesk } from "./admin/admin-desk";
-import { environmentModes, linkJobs, linkRoutes } from "./links/link-jobs";
+import { environmentModes, linkBridge, linkJobs, linkRoutes, type LinkBridge } from "./links/link-jobs";
 import { commandAudit } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { receiptPageRoutes } from "./pages/receipt.page";
@@ -42,9 +42,9 @@ function readConfig(): ServerConfig | null {
 }
 
 /** The module jobs; Stories 8.2 and 8.3 add theirs here. */
-function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger): Job[] {
+function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger, bridge: LinkBridge): Job[] {
   const claimExpiry: Job = { name: "claimExpiry", ...JOB_SCHEDULES.claimExpiry, run: () => void runClaimExpiry({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }) };
-  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger })];
+  return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge)];
 }
 
 /** The one stop of this process, whichever asks first: a signal, or the dev shutdown route. */
@@ -66,15 +66,17 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
       logger,
     });
     const proofs = fileProofStore(proofFilesDir(config.dataDir));
+    // One bridge for the link job and, for the real one, its long-poll routes (Story 5.3).
+    const bridge = linkBridge(config);
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger })];
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
     if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), customerProofRoutes({ ledger, clock: systemClock, proofs })];
-    servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
+    servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
-    jobs = createScheduler(jobsFor(config, ledger, logger), { clock: systemClock, timer: systemTimer, logger });
+    jobs = createScheduler(jobsFor(config, ledger, logger, bridge), { clock: systemClock, timer: systemTimer, logger });
     jobs.start();
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort, bridge: config.bridgeMode, zalo: config.zaloMode }, "platform.server.started");
     return parts();

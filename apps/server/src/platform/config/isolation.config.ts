@@ -5,7 +5,8 @@
  * Dev group, a production Telegram chat or host name, a public base URL (dev has no tunnel), or a
  * secret shared with the production env file on the same machine, or when the dev env file is the
  * production env file itself. Production is refused when it would run a fake bridge or a fake
- * Zalo client.
+ * Zalo client. In every environment the real browser bridge needs its own token (Story 5.3),
+ * different from the internal and the assistant tokens.
  *
  * The production identifiers are listed in production-identifiers.json (no secrets). Secrets are
  * only compared, never stored, and a problem names the key and the reason, never a value. This
@@ -44,6 +45,7 @@ export interface IsolationSubject {
   readonly shopeeReportPath: string | null;
   readonly staffAccess: { readonly adminHost: string; readonly accessAudience: string } | null;
   readonly assistantToken: string | null;
+  readonly bridgeToken: string | null;
   readonly bridgeMode: "fake" | "browser";
   readonly zaloMode: "fake" | "account";
   readonly zaloGroupIds: readonly string[];
@@ -70,7 +72,7 @@ export interface IsolationContext {
 
 export interface IsolationProblem {
   readonly key: string;
-  readonly reason: "production_port" | "production_path" | "production_value" | "not_the_dev_group" | "required" | "must_be_empty" | "same_as_production" | "production_env_file" | "fake_in_production" | "same_as_internal_token" | "own_ledger";
+  readonly reason: "production_port" | "production_path" | "production_value" | "not_the_dev_group" | "required" | "must_be_empty" | "same_as_production" | "production_env_file" | "fake_in_production" | "same_as_internal_token" | "same_as_assistant_token" | "own_ledger";
 }
 
 /** The committed identifiers with their paths made absolute for this repository and home. */
@@ -95,8 +97,8 @@ const blank = (value: string | undefined): string | null => (value === undefined
 /** `id, id` as ZALO_GROUP_IDS writes it; blanks dropped. The one parser of that key. */
 export const parseIdList = (text: string | null | undefined): string[] => (text ?? "").split(",").map((id) => id.trim()).filter((id) => id !== "");
 
-/** The assistant token must differ from the internal one, or either would open the other's routes. */
-export const tokensClash = (internal: string, assistant: string | null): boolean => assistant !== null && assistant === internal;
+/** Two caller tokens must differ (the assistant or the bridge token from the internal one, and from each other), or one would open the other's routes. */
+export const tokensClash = (one: string, other: string | null): boolean => other !== null && other === one;
 
 /** The production env file's own ports, folders, groups, chat and host join the committed list. */
 function withProductionFile(ids: ProductionIdentifiers, prod: Readonly<Record<string, string | undefined>> | null): ProductionIdentifiers {
@@ -133,12 +135,13 @@ const onHost = (host: string, ids: ProductionIdentifiers): boolean => {
 };
 
 /** Secrets compared with the production env file's values; equal means a copied secret. */
-type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY";
+type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY";
 
 function secretsOf(config: IsolationSubject): Record<SharedSecretKey, string | null> {
   return {
     INTERNAL_TOKEN: config.internalToken,
     ASSISTANT_TOKEN: config.assistantToken,
+    BRIDGE_TOKEN: config.bridgeToken,
     TELEGRAM_BOT_TOKEN: config.telegram?.botToken ?? null,
     ACCESS_AUDIENCE: config.staffAccess?.accessAudience ?? null,
     // Dev never computes production bank fingerprints; a rehearsal passes the key to its own command.
@@ -164,9 +167,18 @@ function resourceProblems(config: IsolationSubject, ids: ProductionIdentifiers, 
   return out;
 }
 
-export function isolationProblems(config: IsolationSubject, context: IsolationContext): IsolationProblem[] {
+/** Each internal caller has its own token (INV-7): one shared would open the other's routes. */
+function tokenProblems(config: IsolationSubject): IsolationProblem[] {
   const out: IsolationProblem[] = [];
   if (tokensClash(config.internalToken, config.assistantToken)) out.push({ key: "ASSISTANT_TOKEN", reason: "same_as_internal_token" });
+  if (tokensClash(config.internalToken, config.bridgeToken)) out.push({ key: "BRIDGE_TOKEN", reason: "same_as_internal_token" });
+  if (config.assistantToken !== null && tokensClash(config.assistantToken, config.bridgeToken)) out.push({ key: "BRIDGE_TOKEN", reason: "same_as_assistant_token" });
+  if (config.bridgeMode === "browser" && config.bridgeToken === null) out.push({ key: "BRIDGE_TOKEN", reason: "required" });
+  return out;
+}
+
+export function isolationProblems(config: IsolationSubject, context: IsolationContext): IsolationProblem[] {
+  const out: IsolationProblem[] = tokenProblems(config);
   if (config.liveLedgerPath !== null && isAbsolute(config.liveLedgerPath) && pathConflicts(config.liveLedgerPath, { path: config.dataDir, tree: true }, context.caseInsensitive)) out.push({ key: "LIVE_LEDGER_PATH", reason: "own_ledger" });
   if (config.env === "prod") {
     if (config.bridgeMode === "fake") out.push({ key: "BRIDGE_MODE", reason: "fake_in_production" });

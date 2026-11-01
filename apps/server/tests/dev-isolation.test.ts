@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { fixedClock } from "@cashback/core";
 import { describe, expect, it } from "vitest";
 
-import { linkJobs } from "../src/links/link-jobs";
+import { linkBridge, linkJobs } from "../src/links/link-jobs";
 import { findLinkRequestOwner, queueLinkRequest } from "../src/modules/linking/index";
 import { attribute, type AttributionDirectory } from "../src/modules/orders/index";
 import { configFilePath, parseConfig, REPOSITORY_ROOT } from "../src/platform/config/env.config";
@@ -35,7 +35,7 @@ const keysOf = (values: Record<string, string>, ctx: IsolationContext = context(
 describe("Story 8.1: dev environment separated from production", () => {
   it("AC1: a dev config on dev's own ports, data and fakes passes; each production port, path, group, host, URL or file is refused by key", () => {
     expect(keysOf({})).toEqual([]);
-    expect(keysOf({ ZALO_MODE: "account", ZALO_GROUP_IDS: DEV_GROUP, BRIDGE_MODE: "browser", BROWSER_PROFILE_DIR: join(REPOSITORY_ROOT, ".browser-profile", "dev") })).toEqual([]);
+    expect(keysOf({ ZALO_MODE: "account", ZALO_GROUP_IDS: DEV_GROUP, BRIDGE_MODE: "browser", BRIDGE_TOKEN: "k".repeat(40), BROWSER_PROFILE_DIR: join(REPOSITORY_ROOT, ".browser-profile", "dev") })).toEqual([]);
 
     for (const port of ["8080", "8081", "8787", "8891", "8899", "80"]) expect(keysOf({ PUBLIC_PORT: port })).toEqual(["PUBLIC_PORT production_port"]);
     expect(keysOf({ INTERNAL_PORT: "8787" })).toEqual(["INTERNAL_PORT production_port"]);
@@ -45,7 +45,7 @@ describe("Story 8.1: dev environment separated from production", () => {
     expect(keysOf({ RUN_DIR: join(REPOSITORY_ROOT, "run", "prod") })).toEqual(["RUN_DIR production_path"]);
     expect(keysOf({ BROWSER_PROFILE_DIR: join(REPOSITORY_ROOT, ".browser-profile") })).toEqual(["BROWSER_PROFILE_DIR production_path"]);
     expect(keysOf({ BROWSER_PROFILE_DIR: join(REPOSITORY_ROOT, ".browser-profile", "prod", "Default") })).toEqual(["BROWSER_PROFILE_DIR production_path"]);
-    expect(keysOf({ BRIDGE_MODE: "browser" })).toEqual(["BROWSER_PROFILE_DIR required"]);
+    expect(keysOf({ BRIDGE_MODE: "browser" })).toEqual(["BRIDGE_TOKEN required", "BROWSER_PROFILE_DIR required"]);
     expect(keysOf({ ZALO_GROUP_IDS: MAIN_GROUP })).toEqual(["ZALO_GROUP_IDS not_the_dev_group"]);
     expect(keysOf({ ZALO_GROUP_IDS: `${DEV_GROUP}, 123` })).toEqual(["ZALO_GROUP_IDS not_the_dev_group"]);
     expect(keysOf({ ZALO_MODE: "account" })).toEqual(["ZALO_GROUP_IDS required"]);
@@ -80,7 +80,7 @@ describe("Story 8.1: dev environment separated from production", () => {
     const dataDir = join(tmpdir(), "cashback-dev-data");
     expect(keysOf({ DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") })).toEqual(["LIVE_LEDGER_PATH own_ledger"]);
     expect(keysOf({ DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(tmpdir(), "live-copy", "cashback.db") })).toEqual([]);
-    const prod = parseConfig("prod", { INTERNAL_TOKEN: TOKEN, DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") });
+    const prod = parseConfig("prod", { INTERNAL_TOKEN: TOKEN, BRIDGE_TOKEN: "k".repeat(40), DATA_DIR: dataDir, LIVE_LEDGER_PATH: join(dataDir, "ledger.sqlite") });
     expect(isolationProblems(prod, context()).map((p) => `${p.key} ${p.reason}`)).toEqual(["LIVE_LEDGER_PATH own_ledger"]);
   });
 
@@ -168,7 +168,7 @@ describe("Story 8.1: dev environment separated from production", () => {
     runMigrations(ledger, readMigrations(MIGRATIONS_DIR), clock);
     ledger.sqlite.exec("INSERT INTO customers (customer_id, customer_code, role, status) VALUES ('1000000000000000001', 'DP00001', 'USER', 'ACTIVE')");
     const requestId = ledger.tx((db) => queueLinkRequest(db, { customer: "DP00001", url: "https://shopee.vn/p-i.1.2", channel: "zalo" }, clock)).requestId;
-    const [job] = linkJobs({ config: dev(), ledger, clock, logger: createLogger({ level: "fatal" }) });
+    const [job] = linkJobs({ config: dev(), ledger, clock, logger: createLogger({ level: "fatal" }) }, linkBridge(dev()));
     await job?.run(new AbortController().signal);
     const { sub_id1, sub_id2 } = ledger.sqlite.prepare("SELECT sub_id1, sub_id2 FROM bridge_jobs").get() as { sub_id1: string; sub_id2: string };
     expect(sub_id1).toBe("DEV1000000000000000001");
@@ -205,7 +205,7 @@ describe("Story 8.1: dev environment separated from production", () => {
       server.child.kill();
       await server.exited;
     }
-    const prod = (values: Record<string, string>) => isolationProblems(parseConfig("prod", { INTERNAL_TOKEN: TOKEN, ...values }), context()).map((p) => `${p.key} ${p.reason}`);
+    const prod = (values: Record<string, string>) => isolationProblems(parseConfig("prod", { INTERNAL_TOKEN: TOKEN, BRIDGE_TOKEN: "k".repeat(40), ...values }), context()).map((p) => `${p.key} ${p.reason}`);
     expect(prod({})).toEqual([]);
     expect(prod({ BRIDGE_MODE: "fake", ZALO_MODE: "fake" })).toEqual(["BRIDGE_MODE fake_in_production", "ZALO_MODE fake_in_production"]);
   }, 60_000);

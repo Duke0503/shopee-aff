@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cashback Bridge settings</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 520px; color: #1a1a1a; background: #fff; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; box-sizing: border-box; padding: 6px; font: inherit; }
+      button { margin-top: 16px; padding: 6px 14px; font: inherit; }
+      p.note { color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>Cashback Bridge</h1>
+    <p class="note">The server's internal listener on this machine and the bridge token from its env file. Only 127.0.0.1 is accepted.</p>
+    <form id="settings">
+      <label for="serverUrl">Server URL</label>
+      <input id="serverUrl" name="serverUrl" placeholder="http://127.0.0.1:9081" autocomplete="off" />
+      <label for="token">Bridge token</label>
+      <input id="token" name="token" type="password" autocomplete="off" />
+      <button type="submit">Save</button>
+    </form>
+    <p id="status" role="status"></p>
+    <script type="module" src="./src/options.ts"></script>
+  </body>
+</html>

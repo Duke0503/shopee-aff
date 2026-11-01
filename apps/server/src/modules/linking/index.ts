@@ -82,10 +82,13 @@ export {
   linkRequestCountOf,
 } from "./link-requests.list";
 export { deliveredLinkCounts, failedLinkCount, type NetworkCount } from "./link-overview.query";
-export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type QueuedLinkRequest } from "./link-request.command";
-export { claimLinkJob, randomShareCode, recordLinkResult, SHARE_CODE_LENGTH, type ClaimOptions, type LinkResultRecorded, type RecordOptions } from "./link-issue.command";
+export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type LinkRequestNote, type QueuedLinkRequest } from "./link-request.command";
+export { claimLinkJob, randomShareCode, recordLinkResult, recordSilentBridge, SHARE_CODE_LENGTH, SILENT_ANSWERS_BEFORE_FAILURE, type ClaimOptions, type LinkResultRecorded, type RecordedBridgeAnswer, type RecordOptions } from "./link-issue.command";
 export { checkReturnedLink, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure } from "./domain/link-check";
 export { MAX_LINKS_PER_RUN, runLinkJob, type LinkJobDeps, type LinkJobRun } from "./link.job";
 export { FAKE_BRIDGE_HOST, fakeBridge, fakeLinkUrl } from "./fake-bridge.adapter";
-export { shopeeProductUrl, SUB_ID_PATTERN } from "./domain/product-url";
+export { readShopeeProduct, shopeeProductKey, shopeeProductKeyOf, shopeeProductUrl, SUB_ID_PATTERN } from "./domain/product-url";
+export { chooseReusable, isReusable, LINK_REUSE_WINDOW_DAYS, unreadableTimes, type ReuseCandidate, type ReuseRule } from "./domain/link-reuse";
 export { linkRequestInternalRoutes, type LinkRequestRouteDeps } from "./http/link-request.routes";
+export { BRIDGE_ANSWER_GRACE_MS, BRIDGE_JOB_TIMEOUT_MS, BRIDGE_PICKUP_MS, BRIDGE_POLL_MS, browserBridge, type BridgeAnswer, type BridgeTimer, type BridgeWork, type BrowserBridge, type BrowserBridgeOptions } from "./browser-bridge.adapter";
+export { bridgeInternalRoutes, type BridgeRouteDeps } from "./http/bridge.routes";

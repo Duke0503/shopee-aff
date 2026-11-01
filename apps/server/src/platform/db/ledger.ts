@@ -3,10 +3,15 @@
  * server. WAL lets readers run beside the one writer; a short busy timeout keeps a
  * waiting write from blocking the event loop (and the bridge long-poll) for long.
  * Every write goes through `tx`.
+ *
+ * Each connection gets the deterministic SQL function `shopee_product_key(text)` (packages/core
+ * `shopeeProductKeyOf`), so a migration can backfill product keys with the very rule new link
+ * requests use (migration 0023, Story 5.2).
  */
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import { shopeeProductKeyOf } from "@cashback/core";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
 import { runTransaction } from "./transaction";
@@ -31,6 +36,7 @@ export function openLedger(path: string): Ledger {
   sqlite.pragma("synchronous = NORMAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`);
+  sqlite.function("shopee_product_key", { deterministic: true }, (text: unknown) => shopeeProductKeyOf(typeof text === "string" ? text : null));
   const db = drizzle({ client: sqlite });
   return {
     sqlite,

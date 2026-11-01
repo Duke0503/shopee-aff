@@ -214,3 +214,24 @@ export {
   type Ratio,
 } from "./overview.schema";
 export { ASSISTANT_TOKEN_HEADER, linkRequestCreatedSchema, linkRequestCreateSchema, type LinkRequestCreate, type LinkRequestCreated } from "./link-request.schema";
+export {
+  BRIDGE_FAILURES,
+  BRIDGE_INSTANCE_HEADER,
+  BRIDGE_INSTANCE_PATTERN,
+  BRIDGE_JOB_KINDS,
+  BRIDGE_NEXT_PATH,
+  BRIDGE_RESULTS_PATH,
+  BRIDGE_TOKEN_HEADER,
+  bridgeJobSchema,
+  bridgeLinkJobSchema,
+  bridgeLookupJobSchema,
+  bridgeReportJobSchema,
+  bridgeResultAcceptedSchema,
+  bridgeResultSchema,
+  type BridgeFailure,
+  type BridgeJob,
+  type BridgeJobKind,
+  type BridgeLinkJob,
+  type BridgeResult,
+  type BridgeResultAccepted,
+} from "./bridge.schema";

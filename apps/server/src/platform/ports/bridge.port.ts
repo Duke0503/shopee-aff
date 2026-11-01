@@ -5,7 +5,12 @@
  * affiliate Chrome over the internal listener's long poll (Story 5.3), which answers the same
  * promise when its result arrives. The composition root picks one by `BRIDGE_MODE`; production
  * never runs the fake.
+ *
+ * `unavailable` means nobody answered: no bridge took the job in time, or the one that took it
+ * went silent (a browser or extension restart). It is not the request's failure, so the link job
+ * leaves the submission open and uncounted and hands it out again on a later run.
  */
+import type { BridgeJob, BridgeResult } from "@cashback/contracts";
 
 export const BRIDGE_MODES = ["fake", "browser"] as const;
 export type BridgeMode = (typeof BRIDGE_MODES)[number];
@@ -26,10 +31,26 @@ export interface LinkBridgeJob {
  * sub_ids; `resolvedUrl` is a short link's redirect target, resolved outside any transaction
  * (Story 5.4).
  */
-export type BridgeLinkResult = { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null } | { readonly outcome: "failed"; readonly reason: string };
+export type BridgeLinkResult =
+  | { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null }
+  | { readonly outcome: "failed"; readonly reason: string }
+  | { readonly outcome: "unavailable"; readonly reason: BridgeUnavailable };
+
+export type BridgeUnavailable = "no_bridge" | "no_answer";
 
 export interface BridgePort {
   readonly mode: BridgeMode;
   /** Never called inside a transaction; `signal` aborts at shutdown. */
   createLink(job: LinkBridgeJob, signal: AbortSignal): Promise<BridgeLinkResult>;
+}
+
+/**
+ * The real bridge's side of the internal listener (Story 5.3): the long poll of one extension
+ * instance takes the next job (or null when the server-side wait ends), and an answer is delivered
+ * by its ticket from the instance that holds the job. `deliver` is false for an answer nobody is
+ * waiting on any more, or from another instance.
+ */
+export interface BridgeWorkQueue {
+  next(instance: string, signal: AbortSignal): Promise<BridgeJob | null>;
+  deliver(result: BridgeResult, instance: string): boolean;
 }

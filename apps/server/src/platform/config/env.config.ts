@@ -69,6 +69,11 @@ export interface ServerConfig {
   staffAccess: StaffAccessConfig | null;
   /** The Zalo assistant's token for its internal routes (AD-15); without it those routes answer 401. */
   assistantToken: string | null;
+  /**
+   * The browser bridge extension's token for its routes (Story 5.3); required with
+   * `BRIDGE_MODE=browser`, and different from the internal and assistant tokens.
+   */
+  bridgeToken: string | null;
   /** `fake` (in-process, dev default) or `browser` (the affiliate Chrome, production; Story 5.3). */
   bridgeMode: BridgeMode;
   /** `fake` (no Zalo session, dev default) or `account` (a real Zalo account, production). */
@@ -156,6 +161,7 @@ function fileSchema(env: Environment) {
     ACCESS_TEAM_DOMAIN: z.string().regex(ACCESS_TEAM_DOMAIN).optional(),
     ACCESS_AUDIENCE: z.string().regex(/^[A-Za-z0-9]{16,128}$/).optional(),
     ASSISTANT_TOKEN: z.string().min(32).optional(),
+    BRIDGE_TOKEN: z.string().min(32).optional(),
     BRIDGE_MODE: z.enum(BRIDGE_MODES).default(DEFAULT_MODES[env].bridge),
     ZALO_MODE: z.enum(ZALO_MODES).default(DEFAULT_MODES[env].zalo),
     // Digits separated by commas; blank entries are dropped by parseIdList.
@@ -199,6 +205,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     sweepPauseMs: file.SWEEP_PAUSE_MS ?? null,
     staffAccess: staffAccessOf(file),
     assistantToken: file.ASSISTANT_TOKEN ?? null,
+    bridgeToken: file.BRIDGE_TOKEN ?? null,
     bridgeMode: file.BRIDGE_MODE,
     zaloMode: file.ZALO_MODE,
     zaloGroupIds: parseIdList(file.ZALO_GROUP_IDS),

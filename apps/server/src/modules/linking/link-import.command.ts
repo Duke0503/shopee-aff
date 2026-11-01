@@ -12,6 +12,7 @@ import { searchText } from "@cashback/core";
 import { assertTablesEmpty, sortByKey } from "../../platform/db/bulk-import";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
+import { shopeeProductKeyOf } from "./domain/product-url";
 import { linkRequests, productOffers, shareCodes, type LinkRequestRow, type ProductOfferRow } from "./schema";
 
 export type ImportedProductOffer = Omit<ProductOfferRow, "origin">;
@@ -55,7 +56,7 @@ function refuseUnlessEmpty(db: LedgerDb): void {
 export function importLinks(db: LedgerDb, data: LinksImport, by: CommandAudit): LinksImportResult {
   refuseUnlessEmpty(db);
   for (const p of sortByKey(data.productOffers, (r) => r.productOfferId)) db.insert(productOffers).values({ ...p, origin: "CUTOVER" }).run();
-  for (const r of sortByKey(data.linkRequests, (r) => r.requestId)) db.insert(linkRequests).values({ ...r, origin: "CUTOVER", searchText: searchText(r.productName) }).run();
+  for (const r of sortByKey(data.linkRequests, (r) => r.requestId)) db.insert(linkRequests).values({ ...r, origin: "CUTOVER", searchText: searchText(r.productName), productKey: shopeeProductKeyOf(r.sourceUrl) }).run();
   for (const s of sortByKey(data.shareCodes, (r) => r.code)) {
     if (!isShareCode(s.code)) throw new LinksImportError(`not a share code: ${s.code}`);
     db.insert(shareCodes).values(s).run();

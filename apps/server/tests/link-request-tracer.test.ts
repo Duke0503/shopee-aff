@@ -9,7 +9,7 @@ import { fixedClock, instantFromMs, parseInstant, toMs, type Clock } from "@cash
 import { afterEach, describe, expect, it } from "vitest";
 
 import { linkBridge, linkJobs, linkRoutes, subIdPrefixFor } from "../src/links/link-jobs";
-import { checkReturnedLink, claimLinkJob, fakeBridge, FAKE_BRIDGE_HOST, findShareCode, LinkRequestError, linkRequestInternalRoutes, nextRequestId, queueLinkRequest, recordLinkResult, retryDelayMs, runLinkJob, shopeeProductUrl, type LinkChannel } from "../src/modules/linking/index";
+import { checkReturnedLink, claimLinkJob, fakeBridge, FAKE_BRIDGE_HOST, findShareCode, LinkRequestError, linkRequestInternalRoutes, nextRequestId, queueLinkRequest, recordLinkResult, retryDelayMs, runLinkJob, shopeeProductUrl, type LinkChannel, type RecordedBridgeAnswer } from "../src/modules/linking/index";
 import { parseConfig } from "../src/platform/config/env.config";
 import { openLedger, type Ledger } from "../src/platform/db/ledger";
 import { MIGRATIONS_DIR, readMigrations, runMigrations } from "../src/platform/db/migrations";
@@ -144,10 +144,12 @@ describe("Story 5.1: link request to share link through the fake bridge", () => 
   it("AC4: with the dev configuration the link's sub_id1 starts with DEV, and so does the request id", async () => {
     const ledger = ledgerWithCustomers();
     const dev = parseConfig("dev", { INTERNAL_TOKEN: INTERNAL, ASSISTANT_TOKEN: ASSISTANT });
-    const res = await post(internalApp(ledger, ASSISTANT, linkRoutes({ config: dev, ledger, clock: CLOCK, logger: SILENT })), { [ASSISTANT_TOKEN_HEADER]: ASSISTANT });
+    // One bridge for the routes and the job, as the composition root builds it.
+    const bridge = linkBridge(dev);
+    const res = await post(internalApp(ledger, ASSISTANT, linkRoutes({ config: dev, ledger, clock: CLOCK, logger: SILENT }, bridge)), { [ASSISTANT_TOKEN_HEADER]: ASSISTANT });
     const { requestId } = res.json() as { requestId: string };
     expect(requestId).toBe("DEV26110100001");
-    const [job] = linkJobs({ config: dev, ledger, clock: CLOCK, logger: SILENT });
+    const [job] = linkJobs({ config: dev, ledger, clock: CLOCK, logger: SILENT }, bridge);
     await job?.run(new AbortController().signal);
     expect(jobRows(ledger)).toEqual([expect.objectContaining({ request_id: requestId, sub_id1: `DEV${C1}`, sub_id2: requestId, status: "DONE" })]);
     expect(requestRow(ledger, requestId).affiliate_url).toContain(`sub_id1=DEV${C1}`);
@@ -198,7 +200,7 @@ describe("Story 5.1: link request to share link through the fake bridge", () => 
   });
 });
 
-const fakeBridgeAnswer = (job: LinkBridgeJob): BridgeLinkResult => ({ outcome: "link", url: `https://${FAKE_BRIDGE_HOST}/l/${job.subId2}?sub_id1=${job.subId1}&sub_id2=${job.subId2}` });
+const fakeBridgeAnswer = (job: LinkBridgeJob): RecordedBridgeAnswer => ({ outcome: "link", url: `https://${FAKE_BRIDGE_HOST}/l/${job.subId2}?sub_id1=${job.subId1}&sub_id2=${job.subId2}` });
 
 describe("Story 5.1 review: no customer's link is lost or given to someone else", () => {
   it("review 1: a request that keeps failing backs off with a growing delay and never starves the requests behind it", async () => {
@@ -221,7 +223,8 @@ describe("Story 5.1 review: no customer's link is lost or given to someone else"
     expect(retryDelayMs(50)).toBe(15 * 60_000);
 
     // A new request queued while the first is backing off is served at once.
-    const later = queue(ledger, "DP00002", "zalo", clock);
+    // Another product: the same product would hand back DP00002's own issued link (Story 5.2).
+    const later = ledger.tx((db) => queueLinkRequest(db, { customer: "DP00002", url: "https://shopee.vn/Quan-i.11001.22002", channel: "zalo" }, clock)).requestId;
     expect(await run(ledger, bridge, clock)).toEqual({ issued: 1, failed: 0, interrupted: false });
     expect(requestRow(ledger, later).status).toBe("ISSUED");
   });

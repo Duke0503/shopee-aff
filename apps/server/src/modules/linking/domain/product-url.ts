@@ -1,27 +1,23 @@
 /**
- * Which network a pasted product link belongs to (FR-1, AD-22). Shopee hands out links on
- * shopee.vn, shope.ee and shp.ee and any subdomain of them (s.shopee.vn, vn.shp.ee), as the live
- * `dashboard_lookup.py` lists them in one place; ShopeeFood is a different programme and is not a
- * Shopee product. Only http and https links count. TikTok Shop and the polite refusal of other
- * networks come with Story 5.7.
+ * Which network a pasted product link belongs to (FR-1, AD-22). The Shopee reading (domains,
+ * canonical product URL, product key) is `readShopeeProduct` in packages/core, shared with the
+ * ledger's backfill function so stored and new requests are keyed by one rule (Story 5.2). TikTok
+ * Shop and the polite refusal of other networks come with Story 5.7.
  */
+import { readShopeeProduct, shopeeProductKeyOf, type ShopeeProduct } from "@cashback/core";
 
-const SHOPEE_DOMAINS = ["shopee.vn", "shope.ee", "shp.ee"] as const;
-const NOT_SHOPEE_PRODUCTS = ["food.shopee.vn", "shopeefood.vn"] as const;
-const MAX_URL_LENGTH = 2048;
+export { readShopeeProduct, shopeeProductKeyOf, type ShopeeProduct };
 
-const onDomain = (host: string, domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
-
-/** The product link as the request keeps it, or null when it is not a Shopee product link. */
+/** The link as a request keeps it, or null when it is not a usable Shopee link. */
 export function shopeeProductUrl(text: string): string | null {
-  const trimmed = text.trim();
-  if (trimmed.length === 0 || trimmed.length > MAX_URL_LENGTH || !URL.canParse(trimmed)) return null;
-  const url = new URL(trimmed);
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  if (url.username !== "" || url.password !== "") return null;
-  const host = url.hostname.toLowerCase();
-  if (NOT_SHOPEE_PRODUCTS.some((d) => onDomain(host, d)) || url.pathname.startsWith("/now-food")) return null;
-  return SHOPEE_DOMAINS.some((d) => onDomain(host, d)) ? url.href : null;
+  const product = readShopeeProduct(text);
+  return product.ok ? product.sourceUrl : null;
+}
+
+/** `shopee:<shop>.<item>` for a link that names one product; null for anything else. */
+export function shopeeProductKey(text: string): string | null {
+  const product = readShopeeProduct(text);
+  return product.ok ? product.productKey : null;
 }
 
 /** Letters and digits only, never empty (D7). */
