@@ -1,19 +1,25 @@
 """One way to ask "what is this product's commission", two sources behind it.
 
-Order matters and is not configurable:
+Order matters and is not configurable (the owner's call, 17 Oct 2026):
 
-    1. shopee_lookup   Shopee's own data, read through the operator's own
-                       logged-in session. Authoritative, free, no terms to
-                       argue about -- but its product search does not index
-                       the whole catalogue, so it answers most links and
-                       not all.
+    1. product_info    A third party (addlivetag), tried first when
+                       THIRD_PARTY_FALLBACK is on. Near-perfect agreement
+                       with Shopee (19/20 rates, 20/20 prices) and it knows
+                       products Shopee's own search never lists, but it is
+                       cached by about a day and offered by its provider for
+                       non-commercial use only. Off in one line.
 
-    2. product_info    A third party, tried only when Shopee's own data
-                       came back empty. Near-perfect agreement when both
-                       answer (19/20 rates, 20/20 prices), but cached by
-                       about a day and offered by its provider for
-                       non-commercial use only. Off in one line via
-                       THIRD_PARTY_FALLBACK.
+    2. shopee_lookup   Shopee's own data, read through the operator's own
+                       logged-in session. Asked only when the third party
+                       has no answer, so the logged-in Shopee session is
+                       searched far less often. Its product search does
+                       not index the whole catalogue: on 17 Oct 2026, 13 of
+                       18 links from the previous two days had no estimate
+                       because the product was never on page one.
+
+A product Shopee's search does not list comes back with a price and no
+rates. That is "not found", not "0%": it is used only when the third
+party had nothing either, and it never stops the third party being asked.
 
 Every result says which source produced it, and carries the same
 breakdown whichever source it came from, so the customer sees identical
@@ -125,31 +131,34 @@ def lookup(url: str, bridge=None, third_party: bool = False, api_key: str = "") 
     still delivered, just without a number. Quoting a figure that later
     disagrees with the payout is worse than quoting none.
     """
-    if bridge is not None:
-        from ..shopee import dashboard_lookup as shopee_lookup
+    if third_party:
+        from ..shopee import third_party_lookup as product_info
 
         try:
-            found = shopee_lookup.lookup(bridge, url)
+            other = product_info.lookup(url, api_key=api_key)
         except Exception:
-            found = None
-        # A rate of zero is an ANSWER, not a failure. Discarding it made
-        # the bot fall through to 'we could not look this up' and then
-        # promise a share of a commission that does not exist.
-        if found and found.price > 0:
-            return _build(found.price, found.base_rate, found.seller_rate,
-                          found.name, SOURCE_SHOPEE, image_url=getattr(found, "image_url", "") or "")
+            other = None
+        if other and other.price > 0:
+            return _build(other.price, other.shopee_rate, other.seller_rate,
+                          other.name, SOURCE_THIRD_PARTY, image_url=other.image_url)
 
-    if not third_party:
+    if bridge is None:
         return None
 
-    from ..shopee import third_party_lookup as product_info
+    from ..shopee import dashboard_lookup as shopee_lookup
 
     try:
-        other = product_info.lookup(url, api_key=api_key)
+        found = shopee_lookup.lookup(bridge, url)
     except Exception:
-        other = None
-    if other and other.price > 0:
-        return _build(other.price, other.shopee_rate, other.seller_rate,
-                      other.name, SOURCE_THIRD_PARTY, image_url=other.image_url)
+        found = None
+    # A rate of zero from the search is an ANSWER, not a failure. Discarding
+    # it made the bot fall through to 'we could not look this up' and then
+    # promise a share of a commission that does not exist. A product the
+    # search never listed also comes back with zero rates; by now the third
+    # party has already been asked, so the price and name are still worth
+    # returning.
+    if found and found.price > 0:
+        return _build(found.price, found.base_rate, found.seller_rate,
+                      found.name, SOURCE_SHOPEE, image_url=getattr(found, "image_url", "") or "")
 
     return None

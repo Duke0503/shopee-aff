@@ -109,6 +109,56 @@ def run_one_pass(
 
 FAILING_ALERT_AFTER = 3
 
+# sub_id1 of a canary link. Letters and digits only, like every sub_id, and
+# never a customer: an order on it (nobody is ever sent the link) would land
+# in manual review instead of on someone's balance.
+CANARY_SUB_ID = "CANARY"
+
+
+def _canary_url(db_path: Path) -> str | None:
+    """A random Shopee product this system has already made a link for."""
+    with ledger.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT canonical_url FROM products_cache "
+            "WHERE canonical_url LIKE 'https://shopee.vn/%' "
+            "ORDER BY RANDOM() LIMIT 1"
+        ).fetchone()
+    return row[0] if row else None
+
+
+def run_canary(db_path: Path, bridge: Bridge, totals: Totals) -> bool | None:
+    """Make one link nobody receives, to prove the Chrome tab still works.
+
+    Days with few customers let the tab sit idle for hours, and a page that
+    broke in the meantime (Shopee switching the form to English, a logged-out
+    session, a slider check) was found by the next customer, as a failed link.
+    This finds it first. The link is only logged: no request row, no message,
+    nothing a customer or the reconciliation can ever see.
+
+    Returns True when a link came back, False when the page failed, None when
+    there was no product to try.
+    """
+    url = _canary_url(db_path)
+    if not url:
+        return None
+    job = {"request_id": "canary", "source_url": url,
+           "sub_ids": [CANARY_SUB_ID, "canary"]}
+    try:
+        results = shopee_script.generate(bridge, [job])
+    except RuntimeError as exc:
+        results = [{"error": str(exc)}]
+    result = results[0] if results else {"error": "no result"}
+    if result.get("affiliate_url"):
+        log.info(f"[canary] link works: {url}")
+        if totals.failing_streak >= FAILING_ALERT_AFTER:
+            log.warning(f"LINKS WORKING AGAIN after {totals.failing_streak} failed pass(es)")
+        totals.failing_streak = 0
+        return True
+    log.warning(f"[canary] test link FAILED, customers' links will fail too: "
+                f"{result.get('error', '?')}")
+    _note_failure(totals, str(result.get("error", "?")))
+    return False
+
 
 def _note_failure(totals: Totals, error: str) -> None:
     totals.failing_streak += 1

@@ -19,7 +19,10 @@ SUB_ID_FIELDS = [f"#customLink_sub_id{n}" for n in range(1, 6)]
 
 # The submit button is matched by its label rather than a class chain: antd
 # regenerates those classes, but the wording is stable and human-visible.
-SUBMIT_BUTTON_TEXT = r"l.y link"
+# Both languages: on 2026-10-16 the bot's profile came back with the
+# language=en cookie, the button read "Get Link", and every link failed at
+# step 1 until the label matched again.
+SUBMIT_BUTTON_TEXT = r"l.y link|get link"
 
 # Where the generated link lands. It is a disabled textarea, so it is read
 # through .value rather than .innerText.

@@ -20,6 +20,8 @@ def server(db):
         ledger.add_customer(conn, MEMBER, zalo_user_id=MEMBER, display_name="Khang")
         ledger.add_order(conn, "260924TQXXU92B", MEMBER, None,
                          order_value=1_315_860, estimated_commission=32_896)
+        conn.execute("UPDATE orders SET recorded_at='2026-09-24T10:00:00+07:00'"
+                     " WHERE order_id='260924TQXXU92B'")
         conn.execute("INSERT INTO customers (customer_id, display_name, role, status, created_at)"
                      " VALUES ('admin', 'Admin', 'admin', 'active', ?)", (ledger.now(),))
         password = accounts.issue_password(conn, "admin")
@@ -65,3 +67,17 @@ def test_customers_can_be_found_by_code(server):
 def test_the_order_list_carries_the_code_and_finds_by_it(server):
     rows = _rows(_get(f"{server}/api/admin/orders?search=DP00001"), "orders", "items", "data")
     assert [(r["order_id"], r["customer_code"]) for r in rows] == [("260924TQXXU92B", "DP00001")]
+
+
+@pytest.mark.parametrize("dates, found", [
+    ("from_date=2026-09-24&to_date=2026-09-24", True),     # the one day
+    ("to_date=2026-09-24", True),                          # the "to" day counts
+    ("from_date=2026-09-24", True),
+    ("from_date=2026-09-25&to_date=2026-09-25", False),
+    ("to_date=2026-09-23", False),
+])
+def test_the_date_filter_keeps_orders_on_the_last_day(server, dates, found):
+    """Order times are stored as 2026-09-24T10:00:00+07:00. A filter that
+    compared them with '2026-09-24 23:59:59' showed nothing for 24/09."""
+    rows = _rows(_get(f"{server}/api/admin/orders?{dates}"), "orders", "items", "data")
+    assert bool(rows) is found

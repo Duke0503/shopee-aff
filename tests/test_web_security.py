@@ -141,3 +141,36 @@ def test_the_window_forgets_old_attempts():
         assert limiter.allow("/api/auth/login", "a", now=0.0)
     assert not limiter.allow("/api/auth/login", "a", now=1.0)
     assert limiter.allow("/api/auth/login", "a", now=window + 1.0)
+
+
+OTHER = "7000000000000000002"
+
+
+def _signed_in(db, customer_id):
+    from cashback.core import accounts
+    with ledger.connect(db) as conn:
+        password = accounts.issue_password(conn, customer_id)
+        token = accounts.login(conn, customer_id, password).token
+    return {**INTERNET, "Cookie": f"{dashboard.SESSION_COOKIE}={token}"}
+
+
+def _owner(db):
+    with ledger.connect(db) as conn:
+        return conn.execute("SELECT customer_id FROM link_requests").fetchone()[0]
+
+
+def test_a_signed_in_customer_gets_the_link_under_their_own_id(server, db):
+    """sub_id1 is this id, and reconciliation credits every order on the link to it."""
+    res = _post(f"{server}/api/shopee/convert", {"url": PRODUCT}, _signed_in(db, MEMBER))
+    assert res["_status"] == 200 and not res.get("house")
+    assert _owner(db) == MEMBER
+
+
+def test_the_session_wins_over_a_code_typed_in_the_box(server, db):
+    """Signed in as one customer, a link is never filed under another code."""
+    with ledger.connect(db) as conn:
+        ledger.add_customer(conn, OTHER, zalo_user_id=OTHER)
+    res = _post(f"{server}/api/shopee/convert",
+                {"url": PRODUCT, "customer_id": OTHER}, _signed_in(db, MEMBER))
+    assert res["_status"] == 200
+    assert _owner(db) == MEMBER

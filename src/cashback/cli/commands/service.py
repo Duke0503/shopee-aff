@@ -188,10 +188,18 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
 
     def link_loop() -> None:
         totals = worker.Totals()
+        # The canary runs in this thread, between passes, so it can never
+        # drive the tab while a customer's pass is using it.
+        canary_every = cfg.link_canary_minutes * 60
+        last_used = time.monotonic()
         while not stop.is_set():
             if bridge.connected():
                 try:
-                    worker.run_one_pass(cfg.db_path, bridge, settings, totals)
+                    if worker.run_one_pass(cfg.db_path, bridge, settings, totals):
+                        last_used = time.monotonic()
+                    elif canary_every and time.monotonic() - last_used >= canary_every:
+                        last_used = time.monotonic()
+                        worker.run_canary(cfg.db_path, bridge, totals)
                 except Exception as exc:
                     print(f"[links] pass error: {exc}")
             time.sleep(5)
@@ -211,7 +219,7 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
         remembers to run a command. One pass is a page load and a couple
         of reads, which is nothing next to link generation.
         """
-        from ...shopee import reconciliation as reconcile, report_reader
+        from ...shopee import link_generator, reconciliation as reconcile, report_reader
 
         # Wait before the first pass: the extension has just connected and
         # the browser is more useful to a waiting customer than to a report.
@@ -227,6 +235,9 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                 rows = report_reader.read(bridge, days=cfg.reconcile_days)
             except Exception as exc:
                 log.info(f"[reconcile] could not read the report: {exc}")
+                found = link_generator.recover_frozen_page(bridge, str(exc))
+                if found:
+                    log.warning(f"[reconcile] the Shopee tab had stopped answering: {found}")
                 continue
             if not rows:
                 continue
@@ -259,6 +270,9 @@ def cmd_serve(cfg: Config, args: argparse.Namespace) -> int:
                     log.info(f"[reconcile] {payout_res['orders_settled']} order(s) marked settled by Shopee payout")
             except Exception as exc:
                 log.info(f"[reconcile] payout sync skipped: {exc}")
+                found = link_generator.recover_frozen_page(bridge, str(exc))
+                if found:
+                    log.warning(f"[reconcile] the Shopee tab had stopped answering: {found}")
 
     def accesstrade_loop() -> None:
         """Pull TikTok orders in from AccessTrade, on the same timer as the
