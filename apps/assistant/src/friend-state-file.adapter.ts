@@ -24,6 +24,7 @@ const stateSchema = z.strictObject({
   day: z.string().transform((day) => parseVnDate(day)),
   count: z.number().int().min(0),
   requested: z.array(z.string().min(1)),
+  accepted: z.array(z.string().min(1)).optional(),
 });
 
 export function fileFriendStateStore(dataDir: string, files: StateFiles, warn: (event: string) => void): FriendStateStore {

@@ -30,6 +30,12 @@ export const assistantHeartbeatSchema = z.strictObject({
   account: z.string().regex(/^[A-Za-z0-9]{1,40}$/).nullable().optional(),
   /** Sends waiting in the pacer: a growing number means the assistant is behind. */
   queuedSends: z.number().int().min(0).max(100_000),
+  /**
+   * True once Zalo closed the session because another login took the account (one account, one
+   * session): the assistant stops reconnecting, and the server raises `assistant_session_conflict`
+   * at once instead of waiting 5 minutes for `assistant_down`. Left out otherwise.
+   */
+  sessionConflict: z.boolean().optional(),
 });
 export type AssistantHeartbeat = z.infer<typeof assistantHeartbeatSchema>;
 

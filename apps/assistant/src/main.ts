@@ -13,6 +13,7 @@ import { fileFriendStateStore, type StateFiles } from "./friend-state-file.adapt
 import { internalApi } from "./internal-api.adapter";
 import { fileSentNotifications } from "./sent-notifications-file.adapter";
 import { timerSleep } from "./pacer";
+import { fileWelcomeStore } from "./welcome-state-file.adapter";
 import { openZaloSession } from "./zalo-session";
 
 const NODE_FILES: StateFiles = {
@@ -43,6 +44,8 @@ async function main(): Promise<void> {
     sleep: timerSleep,
     sendDelay: config.sendDelay,
     zaloGroupIds: config.zaloGroupIds,
+    welcomeGroupIds: config.welcomeGroupIds,
+    welcomeState: fileWelcomeStore(config.dataDir, NODE_FILES, (event) => log.warn({}, event)),
     friendRequestsPerDay: config.friendRequestsPerDay,
     friendState,
     sentNotifications,

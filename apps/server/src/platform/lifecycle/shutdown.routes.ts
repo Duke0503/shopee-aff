@@ -1,9 +1,9 @@
 /**
  * A graceful stop over the internal listener (Story 8.1 review item 7, AD-25). On Windows a
  * signal ends a process at once, skipping the ordered shutdown (jobs, listeners, ledger, lock), so
- * `pnpm dev:stop` asks the dev server to stop itself here first. The route sits behind the
- * internal token like every internal route, on 127.0.0.1 only, and the composition root registers
- * it in dev only. The stop starts once the answer is sent.
+ * `pnpm dev:stop` and the production host's `pnpm host stop` (Story 8.5) ask the server to stop
+ * itself here first. The route sits behind the internal token like every internal route, on
+ * 127.0.0.1 only, in every environment. The stop starts once the answer is sent.
  */
 import type { FastifyInstance } from "fastify";
 

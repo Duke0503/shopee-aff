@@ -84,6 +84,7 @@ ASSISTANT_TOKEN=<at least 32 random characters, different from INTERNAL_TOKEN>
 # TELEGRAM_BOT_TOKEN=<a dev bot token>
 # TELEGRAM_CHAT_ID=<a dev chat id, never a production chat>
 # FINGERPRINT_KEY=<a dev key, never the production key>
+# HEARTBEAT_URL=<a heartbeat check of dev's own, https; production's URL is refused at start (Story 8.4)>
 # ACCESSTRADE_API_KEY=<a dev key; the production key also needs ALLOW_PROD_ACCESSTRADE_KEY=1>
 # LIVE_LEDGER_PATH=<absolute path of the live copy a rehearsal reads, outside data/dev>
 # PUBLIC_BASE_URL stays unset in dev. Production requires it; the website accepts sign-ins from it

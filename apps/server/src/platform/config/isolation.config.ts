@@ -4,7 +4,8 @@
  * live or the new production data, PID or browser-profile folders, a Zalo group other than the
  * Dev group, a production Telegram chat or host name, a public base URL (dev has no tunnel), or a
  * secret or the off-site backup folder (Story 8.2) shared with the production env file on the
- * same machine, or when the dev env file is the
+ * same machine (the external heartbeat URL included, Story 8.4: a dev ping would keep production's
+ * check green), or when the dev env file is the
  * production env file itself. Production is refused when it would run a fake bridge or a fake
  * Zalo client. In every environment the real browser bridge needs its own token (Story 5.3),
  * different from the internal and the assistant tokens.
@@ -56,6 +57,8 @@ export interface IsolationSubject {
   /** The off-site backup folder (Story 8.2); dev never writes into production's. */
   readonly backupOffsite?: { readonly rcloneRemote: string } | null;
   readonly publicBaseUrl: string | null;
+  /** The external heartbeat URL (Story 8.4); dev never pings production's check. */
+  readonly heartbeatUrl?: string | null;
   readonly fingerprintKey: string | null;
   readonly accesstradeApiKey: string | null;
   /** ALLOW_PROD_ACCESSTRADE_KEY=1: dev may read the networks' report API with the production key. */
@@ -138,6 +141,19 @@ const onHost = (host: string, ids: ProductionIdentifiers): boolean => {
   return ids.hostnames.includes(h) || hostOnDomain(h, ids.zones);
 };
 
+/** Two URLs naming the same check: host without case, path without a trailing slash. */
+function sameUrl(one: string, other: string): boolean {
+  const norm = (text: string): string => {
+    try {
+      const url = new URL(text);
+      return `${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${url.search}`;
+    } catch {
+      return text.trim().replace(/\/+$/, "");
+    }
+  };
+  return norm(one) === norm(other);
+}
+
 /** Secrets compared with the production env file's values; equal means a copied secret. */
 type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY";
 
@@ -198,6 +214,9 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
   if (context.prodEnv !== null) {
     const prod = context.prodEnv;
     for (const [key, value] of Object.entries(secretsOf(config))) if (value !== null && blank(prod[key]) === value) out.push({ key, reason: "same_as_production" });
+    const heartbeat = config.heartbeatUrl ?? null;
+    const prodHeartbeat = blank(prod["HEARTBEAT_URL"]);
+    if (heartbeat !== null && prodHeartbeat !== null && sameUrl(heartbeat, prodHeartbeat)) out.push({ key: "HEARTBEAT_URL", reason: "same_as_production" });
     const remote = config.backupOffsite?.rcloneRemote ?? null;
     if (remote !== null && blank(prod["BACKUP_RCLONE_REMOTE"])?.replace(/\/+$/, "") === remote.replace(/\/+$/, "")) out.push({ key: "BACKUP_RCLONE_REMOTE", reason: "same_as_production" });
   }

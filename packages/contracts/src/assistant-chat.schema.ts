@@ -91,3 +91,15 @@ export const assistantLinkReplySchema = z.object({
   estimate: z.object({ cashback: z.number().int().min(0), shareBps: z.number().int().min(0).max(10_000), withheld: z.boolean() }).nullable(),
 });
 export type AssistantLinkReply = z.infer<typeof assistantLinkReplySchema>;
+
+/**
+ * Friend check: someone sent the assistant's account a friend request, and the assistant asks
+ * before accepting it. `accept` is false for the guest account (HOUSE, D5) and a disabled
+ * customer; true for anyone else, a person the server does not know included (nobody is
+ * registered by the check, D10).
+ */
+export const ASSISTANT_FRIEND_CHECK_PATH = "/internal/assistant/friend-checks";
+export const assistantFriendCheckSchema = z.strictObject({ zaloUserId });
+export type AssistantFriendCheck = z.infer<typeof assistantFriendCheckSchema>;
+export const assistantFriendCheckedSchema = z.object({ accept: z.boolean() });
+export type AssistantFriendChecked = z.infer<typeof assistantFriendCheckedSchema>;

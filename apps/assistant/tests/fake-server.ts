@@ -4,6 +4,7 @@
  */
 import {
   ASSISTANT_COMMAND_PATH,
+  ASSISTANT_FRIEND_CHECK_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
   ASSISTANT_LINK_CONFIRM_PATH,
@@ -76,6 +77,7 @@ export function fakeServer(): FakeServer {
       const { code, created } = body["chat"] === "private" ? register(body) : { code: "DP00009", created: false };
       return ok({ registered: created, customerCode: body["chat"] === "private" ? code : null, reply: { kind: "help" } });
     },
+    [ASSISTANT_FRIEND_CHECK_PATH]: () => ok({ accept: true }),
     [NOTIFICATION_NEXT_PATH]: () => ok({ notification: null }),
     [NOTIFICATION_ACK_ROUTE]: (body) => ok({ id: body["id"], outcome: "sent" }),
   };

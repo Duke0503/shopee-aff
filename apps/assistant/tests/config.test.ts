@@ -96,3 +96,11 @@ describe("Story 6.1: dev configuration", () => {
     expect(seen).toEqual(["dev"]);
   });
 });
+
+describe("cutover: which groups welcome new members", () => {
+  it("production welcomes in its configured groups except the Dev group; dev welcomes only in the Dev group", () => {
+    const prod = parseAssistantConfig("prod", { ASSISTANT_TOKEN: TOKEN, ZALO_CREDENTIALS_PATH: PROD_CREDENTIALS, ZALO_GROUP_IDS: `${LIVE_GROUP},${DEV_GROUP}` }, ISOLATION);
+    expect([prod.zaloGroupIds, prod.welcomeGroupIds]).toEqual([[LIVE_GROUP, DEV_GROUP], [LIVE_GROUP]]);
+    expect(dev({ ZALO_MODE: "account", ZALO_CREDENTIALS_PATH: DEV_CREDENTIALS, ZALO_GROUP_IDS: DEV_GROUP }).welcomeGroupIds).toEqual([DEV_GROUP]);
+  });
+});

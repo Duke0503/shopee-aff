@@ -6,15 +6,14 @@
  * orders a ratio is marked "not enough data" (it is still the real value, never a placeholder).
  */
 import type { Overview, OverviewHealth, OverviewNetworkOrders, Ratio } from "@cashback/contracts";
-import type { Clock, Instant, InstantRange } from "@cashback/core";
+import type { Clock, InstantRange } from "@cashback/core";
 import { averageDong, ratioBps, sumDong } from "@cashback/money";
 
 import { customerCodeOf, deskCustomers, newCustomerCount } from "../modules/identity/index";
 import { deliveredLinkCounts } from "../modules/linking/index";
-import { healthModel, withoutAlerts } from "../modules/operations/index";
+import { healthModel, withoutAlerts, type HealthSources } from "../modules/operations/index";
 import { customersWithOrderBefore, recordedOrderFacts, type ApprovedOrderFact, type RecordedOrderFact } from "../modules/orders/index";
 import { survivorResolver } from "../modules/payouts/index";
-import type { BackupHealth } from "../platform/backup/backup-status";
 import type { LedgerDb } from "../platform/db/ledger";
 import { figureOf, ratioOf } from "./overview-business.query";
 
@@ -124,16 +123,11 @@ export function customersOf(db: LedgerDb, range: InstantRange, previous: Instant
   };
 }
 
-/** Up, down or not known yet, from the one heartbeat store (Stories 6.1, 6.11). */
-export type LastHeartbeat = (now: Instant) => { readonly state: "up" | "down" | "unknown"; readonly at: string | null };
-
-/** The last backup's health at `now` (Story 8.2). */
-export type LastBackup = (now: Instant) => BackupHealth;
 
 /**
  * Block 8: the one health model (AD-27, Story 8.3), the same entries the health check alerts on,
  * without their alerts. A part with no source is "not known yet", never "up".
  */
-export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat?: LastHeartbeat, lastBackup?: LastBackup): OverviewHealth[] {
-  return withoutAlerts(healthModel(db, clock, { ...(lastHeartbeat ? { assistant: lastHeartbeat } : {}), ...(lastBackup ? { backup: lastBackup } : {}) }));
+export function healthOf(db: LedgerDb, clock: Clock, sources: HealthSources = {}): OverviewHealth[] {
+  return withoutAlerts(healthModel(db, clock, sources));
 }

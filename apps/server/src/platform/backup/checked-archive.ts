@@ -5,6 +5,10 @@
  * must come back with the same size and SHA-256, the restored ledger must pass `integrity_check`,
  * and its row counts must equal the live ledger's when the copy was taken.
  *
+ * When the composition root gives the balance totals (the server always does), the archive also
+ * holds `manifest.json` (backup-manifest.ts): the copy's SHA-256, its row counts and those totals,
+ * read the moment the copy finished, for the restore command of Story 8.6.
+ *
  * The secrets file and the cloudflared credentials are never in the archive: only the ledger and
  * the files folder go in, and inside that folder any env file, certificate or credentials file is
  * left out. A file whose name the archive cannot hold safely (the server names every proof image
@@ -17,13 +21,14 @@
  * An archive that fails its check is kept aside as `.corrupt`, so the folder only holds good
  * archives under the plain name.
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { toMs, type Clock, type Instant } from "@cashback/core";
 
 import { checkIntegrity, rowCountMismatches, snapshotLedger } from "../db/backup";
 import type { Ledger } from "../db/ledger";
 import { extractArchive, isSafeEntryName, writeArchive, type ArchiveEntry, type ArchiveSource } from "./backup-archive";
+import { MANIFEST_ENTRY, MANIFEST_FORMAT, manifestText, sha256OfFile } from "./backup-manifest";
 import { archiveName } from "./backup-retention";
 
 export const LEDGER_ENTRY = "ledger.sqlite";
@@ -75,6 +80,8 @@ export interface CheckedArchiveOptions {
   readonly clock: Clock;
   /** Writes the ledger copy; tests replace it to produce a copy whose restore check fails. */
   readonly writeCopy?: (ledger: Ledger, target: string) => Promise<void>;
+  /** The balance totals, read right after the copy (no await between); with them the archive holds its manifest. */
+  readonly totals?: (ledger: Ledger) => Readonly<Record<string, number>>;
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -100,8 +107,10 @@ async function build(options: CheckedArchiveOptions, work: string, target: strin
   const at = options.clock.now();
   const copy = join(work, LEDGER_ENTRY);
   let counts: Readonly<Record<string, number>>;
+  let totals: Readonly<Record<string, number>> | null;
   try {
     counts = await snapshotLedger(options.ledger, copy, options.writeCopy);
+    totals = options.totals ? options.totals(options.ledger) : null;
   } catch (error) {
     return { ok: false, step: "snapshot", problems: [messageOf(error)] };
   }
@@ -110,7 +119,13 @@ async function build(options: CheckedArchiveOptions, work: string, target: strin
   let entries: ArchiveEntry[];
   const files = fileSources(options.filesDir);
   try {
-    entries = await writeArchive(building, [{ name: LEDGER_ENTRY, path: copy }, ...files.sources], Math.floor(toMs(at) / 1000));
+    const manifest: ArchiveSource[] = [];
+    if (totals !== null) {
+      const path = join(work, MANIFEST_ENTRY);
+      writeFileSync(path, manifestText({ format: MANIFEST_FORMAT, createdAt: at, ledgerSha256: await sha256OfFile(copy), rowCounts: { ...counts }, totals: { ...totals } }));
+      manifest.push({ name: MANIFEST_ENTRY, path });
+    }
+    entries = await writeArchive(building, [{ name: LEDGER_ENTRY, path: copy }, ...manifest, ...files.sources], Math.floor(toMs(at) / 1000));
   } catch (error) {
     return { ok: false, step: "archive", problems: [messageOf(error)] };
   }

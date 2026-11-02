@@ -148,9 +148,13 @@ const customersSchema = z.object({
   concentration: z.object({ customerCode: z.string().nullable(), shareBps: count }).nullable(),
 });
 
-/** The one health model (AD-27, Story 8.3): the same entries feed this line and the owner alerts. */
-export const HEALTH_COMPONENTS = ["bridge", "assistant", "reconciliation", "backup", "queue"] as const;
-export const HEALTH_STATES = ["up", "down", "unknown"] as const;
+/**
+ * The one health model (AD-27, Story 8.3): the same entries feed this line and the owner alerts.
+ * `drill`: the quarterly restore drill (Story 8.6), `due` while it is.
+ */
+export const HEALTH_COMPONENTS = ["bridge", "assistant", "reconciliation", "backup", "queue", "drill"] as const;
+/** `due`: a reminder (the quarterly restore drill), not an outage: shown with warning colours, never stops the external heartbeat. */
+export const HEALTH_STATES = ["up", "down", "unknown", "due"] as const;
 /** `count`: the queue depth (link requests waiting for the bridge), on the queue entry only. */
 const healthSchema = z.object({ component: z.enum(HEALTH_COMPONENTS), state: z.enum(HEALTH_STATES), at: instant.nullable(), count: count.optional() });
 

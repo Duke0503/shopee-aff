@@ -19,8 +19,13 @@
  * the customer is checked, the new password is drawn and hashed outside any transaction (argon2id
  * runs on the thread pool), and the hash is stored with every open session ended in one
  * transaction. The password is in the answer only; the log line names the reply kind.
+ *
+ *   POST /internal/assistant/friend-checks   may the assistant accept this person's friend request
+ *
+ * Read only, nobody is registered (D10): the guest account (HOUSE, D5) and a disabled customer are
+ * refused, anyone else (a person the server does not know included) is accepted, as live.
  */
-import { ASSISTANT_COMMAND_PATH, assistantCommandAnswerSchema, assistantCommandSchema, CHAT_ORDERS_MAX, PRIVATE_ONLY_COMMANDS, type AssistantCommand, type AssistantCommandReply } from "@cashback/contracts";
+import { ASSISTANT_COMMAND_PATH, ASSISTANT_FRIEND_CHECK_PATH, assistantCommandAnswerSchema, assistantFriendCheckedSchema, assistantFriendCheckSchema, assistantCommandSchema, CHAT_ORDERS_MAX, PRIVATE_ONLY_COMMANDS, type AssistantCommand, type AssistantCommandReply } from "@cashback/contracts";
 import type { FastifyInstance } from "fastify";
 
 import { bankAccountsOf, bankDisplayName, customerCodeOf, customerKeys, hashPassword, newCustomerPassword, resolveCustomer, setCustomerPassword } from "../modules/identity/index";
@@ -123,6 +128,14 @@ export function assistantCommandRoutes(deps: AssistantCommandRouteDeps): (app: F
       const reply = await replyOf(deps, command, sender?.customerId ?? zaloUserId);
       request.log.info({ command, chat, reply: reply.kind }, "messaging.chat_command.answered");
       return answer(reply, sender);
+    });
+    app.post(ASSISTANT_FRIEND_CHECK_PATH, { config: ASSISTANT_ROUTE }, async (request) => {
+      const body = assistantFriendCheckSchema.safeParse(request.body);
+      if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
+      const customer = deps.ledger.tx((db) => resolveCustomer(db, body.data.zaloUserId));
+      const accept = customer === null || (customer.role !== "HOUSE" && customer.status === "ACTIVE");
+      request.log.info({ accept }, "messaging.friend_check.answered");
+      return assistantFriendCheckedSchema.parse({ accept });
     });
   };
 }

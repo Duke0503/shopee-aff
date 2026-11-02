@@ -44,6 +44,8 @@ export interface DailyBackupDeps {
   /** Production: a missing off-site configuration is a failure, not a skip. */
   readonly offsiteRequired: boolean;
   readonly writeCopy?: CheckedArchiveOptions["writeCopy"];
+  /** The balance totals for the archive's manifest (Story 8.6); the composition root always gives them. */
+  readonly totals?: CheckedArchiveOptions["totals"];
 }
 
 export interface DailyBackupRun {
@@ -155,7 +157,7 @@ export async function runDailyBackup(deps: DailyBackupDeps, signal?: AbortSignal
 async function runSteps(deps: DailyBackupDeps, signal?: AbortSignal): Promise<DailyBackupRun> {
   const dir = dailyBackupDir(deps.dataDir);
   cleanUp(deps, dir);
-  const local = await writeCheckedArchive({ ledger: deps.ledger, filesDir: filesDirOf(deps.dataDir), dir, clock: deps.clock, ...(deps.writeCopy ? { writeCopy: deps.writeCopy } : {}) });
+  const local = await writeCheckedArchive({ ledger: deps.ledger, filesDir: filesDirOf(deps.dataDir), dir, clock: deps.clock, ...(deps.writeCopy ? { writeCopy: deps.writeCopy } : {}), ...(deps.totals ? { totals: deps.totals } : {}) });
   if (!local.ok) {
     deps.logger.error({ step: local.step, problems: local.problems }, "platform.backup.failed");
     record(deps, { lastOutcome: "local_failed", failedStep: local.step });

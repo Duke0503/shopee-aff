@@ -15,6 +15,7 @@
     "@cashback/core": "workspace:*",
     "@cashback/labels": "workspace:*",
     "pino": "10.4.0",
+    "zca-js": "2.2.0",
     "zod": "4.6.7"
   }
 }

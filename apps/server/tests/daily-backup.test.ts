@@ -102,7 +102,7 @@ async function restoreFromDrive(s: Setup): Promise<{ dir: string; names: string[
   return { dir, names: (await extractArchive(tar, dir)).map((e) => e.name) };
 }
 
-const backupHealthOf = (s: Setup) => overviewOf(s.ledger.db, { period: "today" }, s.clock, undefined, lastBackupOf(s.dataDir)).health.find((h) => h.component === "backup");
+const backupHealthOf = (s: Setup) => overviewOf(s.ledger.db, { period: "today" }, s.clock, { backup: lastBackupOf(s.dataDir) }).health.find((h) => h.component === "backup");
 
 describe("Story 8.2: daily and off-site encrypted backups that check their own restore", () => {
   it("AC1: given the daily run, when it finishes, then a local copy exists that passed integrity_check, its restored row counts equal the live counts, and the encrypted file is on Google Drive", async () => {

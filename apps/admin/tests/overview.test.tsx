@@ -88,6 +88,20 @@ describe("Story 4.17 acceptance criteria on the desk", () => {
     expect(document.getElementById("runbook-reconciliation")).toHaveTextContent(adminText("ov_runbook_reconciliation"));
     expect(document.querySelector('[data-component="bridge"]')).toHaveTextContent(adminText("ov_state_unknown"));
   });
+
+  it("Story 8.6 AC4: a restore drill a quarter old is in the state 'due', with warning colours and its runbook step", async () => {
+    const due: Overview = { ...GOLDEN, health: [...GOLDEN.health, { component: "drill", state: "due", at: "2026-07-01T02:00:00.000Z" }] };
+    await overview("/admin/", overviewServer(() => due));
+    const item = document.querySelector('[data-component="drill"]') as HTMLElement;
+    expect(item).toHaveAttribute("data-state", "due");
+    expect(item.querySelector("span[aria-hidden]")?.className).toContain("bg-status-attention");
+    expect(within(item).getByText(adminText("ov_state_due")).className).toContain("text-status-attention");
+    expect(item).toHaveTextContent(adminText("ov_health_drill"));
+    expect(item).toHaveTextContent(adminText("ov_state_due"));
+    expect(item).not.toHaveTextContent(adminText("ov_state_down"));
+    expect(within(item).getByRole("link", { name: adminText("ov_runbook") }).getAttribute("href")).toBe("#runbook-drill");
+    expect(document.getElementById("runbook-drill")).toHaveTextContent(adminText("ov_runbook_drill"));
+  });
 });
 
 describe("the Overview blocks (dashboard-spec)", () => {

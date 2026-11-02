@@ -34,7 +34,7 @@ export function overviewRoutes({ ledger, clock, health = {} }: OverviewRouteDeps
           throw new HttpError("invalid_request", "error.overview.bad_period");
         }
         // One read transaction: every block of the answer sees the same snapshot of the ledger.
-        const overview = ledger.sqlite.transaction(() => overviewOf(ledger.db, query.data, clock, health.assistant, health.backup)).deferred();
+        const overview = ledger.sqlite.transaction(() => overviewOf(ledger.db, query.data, clock, health)).deferred();
         return overviewSchema.parse(overview);
       },
     });

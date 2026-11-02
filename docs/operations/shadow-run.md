@@ -130,6 +130,77 @@ The daily cap on proactive sends is `NOTIFICATION_DAILY_CAP` (150 by default); t
 Vietnam day reaches it the owner gets one `notification_daily_cap` alert and the rest wait for the
 next day.
 
+## Zalo account at cutover
+
+The new assistant (`apps/assistant`, `ZALO_MODE=account`) takes over the live bot's Zalo account
+with the live bot's own login session, so nobody scans a QR code and every customer keeps the
+Zalo id their customer id is (no `merge-customers`). It runs zca-js 2.2.0, the exact version of
+the live `zalo_assistant/package-lock.json`, the way `assistant_worker.js` uses it
+(`apps/assistant/src/zca-zalo.adapter.ts`).
+
+**One account, one session.** Two processes logged in to the same account kick each other off
+(websocket close 3000, "duplicate connection"). Never run the new assistant while the live one
+runs, and never copy the session file while the live one runs. If it happens anyway, the new
+assistant stops reconnecting at the first such close, so it does not keep kicking the other
+session, and the owner gets the critical
+`assistant_session_conflict` alert within a minute. Stop the other session, then restart the new
+assistant.
+
+Like the live bot, the new assistant accepts friend requests (after 10 to 40 s, within the same 30
+a day, never the guest account or a disabled customer) and welcomes people who join the main
+group, tagged, once each, remembered in `group-welcomes.json` in its data folder. It never
+welcomes in the Dev group in production.
+
+1. On the VPS, stop the live assistant: close window `[2] ZALO ASSISTANT BOT (Port 8891)` that
+   `scripts/start-all.ps1` opened. In Task Manager, no `node.exe` may still run
+   `assistant_worker.js`, and nothing may listen on port 8891.
+2. Only then copy the session file out of the live folder into the new configuration folder,
+   outside the repository (in Git Bash use `/usr/bin/cp`):
+
+   ```bash
+   mkdir -p ~/.config/cashback/zalo
+   /usr/bin/cp /c/Project/mmo/zalo_assistant/credentials.json ~/.config/cashback/zalo/credentials.json
+   ```
+
+   It holds the account's cookies, imei and user agent: never commit it, paste it or open it in a
+   log. The assistant reads it and hands it to zca-js only; a broken file is reported by key
+   name, never by content.
+3. In `~/.config/cashback/prod.env` set:
+
+   ```
+   ZALO_MODE=account
+   ZALO_CREDENTIALS_PATH=C:/Users/<the server's Windows user>/.config/cashback/zalo/credentials.json
+   ZALO_GROUP_IDS=2813090100064697955
+   ```
+
+   `2813090100064697955` is the main customer group. Add the Dev group "Dev Internal DP",
+   `8786316503449470342`, after a comma only while checking the cutover there. The assistant
+   writes to private chats and to these groups only; a message from any other group is ignored
+   and a send to one is refused before it reaches Zalo. (A dev environment may list only the Dev
+   group and may not use this credentials path.)
+4. Start the new assistant (`CASHBACK_ENV=prod pnpm --filter @cashback/assistant start`). It logs
+   `assistant.process.started` with `zalo: "account"`. Within a minute its heartbeat shows the
+   session `connected` and the account id; that id must be the one the live bot printed as
+   `[Bot Online] ... UID`. If it is not connected after 5 minutes the server raises
+   `assistant_down`.
+5. Check from a personal account: a private `/id` is answered, and a Shopee link posted in the
+   Dev group (when listed) or the main group gets its reply with the sender tagged.
+
+If the login is refused (`zalo login failed: the session was refused`), the session has expired:
+run `node login.js` in `C:\Project\mmo\zalo_assistant` with the live assistant stopped, scan the
+QR code with the bot account's phone, and copy the new `credentials.json` again (step 2).
+
+### Rollback
+
+1. Stop the new assistant (Ctrl+C in its window, or end its `node.exe`); wait until it logs
+   `assistant.process.stopped`.
+2. Start the live assistant again: `scripts/start-all.ps1 -CodeOnly` in `C:\Project\mmo`
+   (it restarts the backend and the assistant), or `node assistant_worker.js` in
+   `C:\Project\mmo\zalo_assistant`. It still has its own `credentials.json`, which the copy did not
+   move; if Zalo refuses it, run `node login.js` there as above.
+3. Set `ZALO_MODE` in `prod.env` back only when the new platform is retried; the live bot does
+   not read it.
+
 ## Import rehearsals on production copies
 
 ### 2026-10-30, backup `cashback-20261030-122003.db` (production `main` a8a2439)

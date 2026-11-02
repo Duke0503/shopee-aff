@@ -22,6 +22,8 @@ export const JOB_SCHEDULES = {
   notificationExpiry: { context: "messaging", schedule: every(10 * 60_000) },
   /** The one health model checked, and the alert of each part that just went down raised (Story 8.3). */
   health: { context: "operations", schedule: every(60_000) },
+  /** The external heartbeat pinged while the health model is green (Story 8.4, AD-29). */
+  heartbeat: { context: "operations", schedule: every(5 * 60_000) },
   /** Pending owner alerts sent to Telegram; a failed send is retried on the next run (Story 8.3). */
   alertDelivery: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */

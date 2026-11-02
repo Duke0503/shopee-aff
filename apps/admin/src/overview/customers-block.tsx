@@ -51,16 +51,21 @@ export function CustomersBlock({ customers }: { readonly customers: Overview["cu
   );
 }
 
-const COMPONENT: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_health_bridge", assistant: "ov_health_assistant", reconciliation: "ov_health_reconciliation", backup: "ov_health_backup", queue: "ov_health_queue" };
-const RUNBOOK: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_runbook_bridge", assistant: "ov_runbook_assistant", reconciliation: "ov_runbook_reconciliation", backup: "ov_runbook_backup", queue: "ov_runbook_queue" };
+const COMPONENT: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_health_bridge", assistant: "ov_health_assistant", reconciliation: "ov_health_reconciliation", backup: "ov_health_backup", queue: "ov_health_queue", drill: "ov_health_drill" };
+const RUNBOOK: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_runbook_bridge", assistant: "ov_runbook_assistant", reconciliation: "ov_runbook_reconciliation", backup: "ov_runbook_backup", queue: "ov_runbook_queue", drill: "ov_runbook_drill" };
 const STATE: Record<OverviewHealth["state"], { readonly word: AdminKey; readonly dot: string }> = {
   up: { word: "ov_state_up", dot: "bg-primary" },
   down: { word: "ov_state_down", dot: "bg-status-rejected" },
   unknown: { word: "ov_state_unknown", dot: "bg-status-neutral" },
+  due: { word: "ov_state_due", dot: "bg-status-attention" },
 };
 
+/** Down and due need the owner: both show their runbook step. */
+const needsOwner = (h: OverviewHealth): boolean => h.state === "down" || h.state === "due";
+const WORD_COLOUR: Record<OverviewHealth["state"], string> = { up: "text-muted-foreground", unknown: "text-muted-foreground", down: "text-status-rejected", due: "text-status-attention" };
+
 export function HealthLine({ health }: { readonly health: readonly OverviewHealth[] }) {
-  const down = health.filter((h) => h.state === "down");
+  const down = health.filter(needsOwner);
   return (
     <Block title={adminText("ov_health_title")}>
       <ul data-health className="flex min-w-0 flex-wrap gap-x-5 gap-y-2 text-sm">
@@ -68,10 +73,10 @@ export function HealthLine({ health }: { readonly health: readonly OverviewHealt
           <li key={h.component} data-component={h.component} data-state={h.state} className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span aria-hidden className={cn("size-2 shrink-0 rounded-full", STATE[h.state].dot)} />
             <span>{adminText(COMPONENT[h.component])}</span>
-            <span className={cn("font-medium", h.state === "down" ? "text-status-rejected" : "text-muted-foreground")}>{adminText(STATE[h.state].word)}</span>
+            <span className={cn("font-medium", WORD_COLOUR[h.state])}>{adminText(STATE[h.state].word)}</span>
             {h.count !== undefined && <span className="text-meta text-muted-foreground">{adminText("ov_health_waiting", { count: formatCount(h.count) })}</span>}
             {h.at !== null && <span className="text-meta text-muted-foreground">{adminText("ov_health_at", { time: formatVnDateTime(parseInstant(h.at), systemClock) })}</span>}
-            {h.state === "down" && (
+            {needsOwner(h) && (
               <a href={`#runbook-${h.component}`} className="font-medium text-primary underline-offset-2 hover:underline">
                 {adminText("ov_runbook")}
               </a>

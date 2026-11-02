@@ -7,6 +7,7 @@
 import {
   ASSISTANT_BANK_PATH,
   ASSISTANT_COMMAND_PATH,
+  ASSISTANT_FRIEND_CHECK_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
   ASSISTANT_LINK_CONFIRM_PATH,
@@ -19,6 +20,8 @@ import {
   assistantBankSaveSchema,
   assistantCommandAnswerSchema,
   assistantCommandSchema,
+  assistantFriendCheckedSchema,
+  assistantFriendCheckSchema,
   assistantHeartbeatReceivedSchema,
   assistantHeartbeatSchema,
   assistantLinkAnswerSchema,
@@ -40,6 +43,7 @@ import {
   type AssistantBankAnswer,
   type AssistantBankSave,
   type AssistantCommand,
+  type AssistantFriendChecked,
   type AssistantCommandAnswer,
   type AssistantHeartbeat,
   type AssistantHeartbeatReceived,
@@ -91,6 +95,8 @@ export interface InternalApi {
   command(command: AssistantCommand): Promise<AssistantCommandAnswer>;
   /** Bank details written after `/stk` in the private chat, read and saved by the server (Story 6.9). */
   saveBank(save: AssistantBankSave): Promise<AssistantBankAnswer>;
+  /** Whether a friend request from this person may be accepted (never HOUSE or a disabled customer). */
+  friendCheck(zaloUserId: string): Promise<AssistantFriendChecked>;
   /** The next due notification, leased to this assistant, or null (Story 6.4). */
   nextNotification(signal?: AbortSignal): Promise<AssistantNotification | null>;
   acknowledgeNotification(id: number, ack: NotificationAck, signal?: AbortSignal): Promise<NotificationAcked>;
@@ -141,6 +147,7 @@ export function internalApi(options: InternalApiOptions): InternalApi {
     confirmLink: async (claim) => assistantLinkConfirmedSchema.parse(await post(ASSISTANT_LINK_CONFIRM_PATH, assistantLinkClaimSchema.parse(claim))).confirmed,
     command: async (command) => assistantCommandAnswerSchema.parse(await post(ASSISTANT_COMMAND_PATH, assistantCommandSchema.parse(command))),
     saveBank: async (save) => assistantBankAnswerSchema.parse(await post(ASSISTANT_BANK_PATH, assistantBankSaveSchema.parse(save))),
+    friendCheck: async (zaloUserId) => assistantFriendCheckedSchema.parse(await post(ASSISTANT_FRIEND_CHECK_PATH, assistantFriendCheckSchema.parse({ zaloUserId }))),
     nextNotification: async (signal) => notificationNextSchema.parse(await call("GET", NOTIFICATION_NEXT_PATH, undefined, signal)).notification,
     acknowledgeNotification: async (id, ack, signal) => notificationAckedSchema.parse(await post(notificationAckPath(id), notificationAckSchema.parse(ack), signal)),
   };

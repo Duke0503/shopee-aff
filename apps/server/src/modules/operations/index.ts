@@ -15,5 +15,6 @@ export { ASSISTANT_DOWN_AFTER_MS, assistantHeartbeats, type AssistantHeartbeats,
 export { ASSISTANT_DOWN_ALERT, runAssistantHealthCheck, type AssistantHealthDeps, type AssistantHealthStep } from "./assistant-health.job";
 export { healthModel, QUEUE_STUCK_AFTER_MS, QUEUE_STUCK_ALERT, readHealthModel, RECONCILIATION_DOWN_AFTER_MS, RECONCILIATION_DOWN_ALERT, withoutAlerts, type HealthAlert, type HealthEntry, type HealthSources } from "./health-model.query";
 export { healthCheck, type HealthCheck, type HealthCheckDeps } from "./health.job";
+export { heartbeatPinger, isGreen, type HeartbeatDeps, type PingFetch, type PingOutcome } from "./heartbeat.job";
 export { assistantHeartbeatRoutes, type AssistantHeartbeatRouteDeps } from "./http/assistant-heartbeat.routes";
 export { siteStatusRoutes, type SiteStatusRouteDeps } from "./http/site-status.routes";

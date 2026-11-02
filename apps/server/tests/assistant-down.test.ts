@@ -46,7 +46,7 @@ function watcher() {
   const clock = movingClock(START);
   const heartbeats = assistantHeartbeats(clock.now());
   const check = () => runAssistantHealthCheck({ heartbeats, clock, alerts: ledgerAlerts(ledger, clock, SILENT) });
-  const assistantState = () => healthOf(ledger.db, clock, (now) => heartbeats.liveness(now)).find((h) => h.component === "assistant");
+  const assistantState = () => healthOf(ledger.db, clock, { assistant: (now) => heartbeats.liveness(now) }).find((h) => h.component === "assistant");
   return { ledger, clock, heartbeats, check, assistantState };
 }
 

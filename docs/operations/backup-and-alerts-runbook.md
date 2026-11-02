@@ -2,7 +2,8 @@
 
 How the new platform keeps the ledger safe and tells the owner when something needs a person
 (Stories 8.2 and 8.3; AD-26, AD-27; decisions D36, D52, D61). Production runs on the Windows
-Server 2022 VPS (D61). The restore drill itself is Story 8.6; this page holds the pointer.
+Server 2022 VPS (D61). The restore and its quarterly drill are in `restore-runbook.md` (Story 8.6);
+the external heartbeat and the host itself are in `production-host-runbook.md` (Stories 8.4, 8.5).
 
 ## 1. One-time owner setup (before go-live)
 
@@ -117,19 +118,12 @@ Drive copy leaves the machine, and only age-encrypted.
 The Overview health line shows **Sao lưu: có lỗi** with the time of the last good local copy
 until a run succeeds.
 
-## 3. Restore (pointer for Story 8.6)
+## 3. Restore (Story 8.6)
 
-The tested drill, with its log, is Story 8.6. The outline, from AD-26:
-
-1. Download the newest `.tar.age` from the Drive folder (`rclone copy` or the Drive web page).
-2. On a trusted computer with the private key: `age --decrypt -i cashback-backup-key.txt -o backup.tar <file>.tar.age`.
-3. `tar -xf backup.tar -C <empty folder>` (the `tar` built into Windows).
-4. Stop the server. Check for `ledger.sqlite-wal` and `ledger.sqlite-shm` beside the ledger and
-   delete them together with the old ledger, then put the restored `ledger.sqlite` and `files\`
-   in `data\<env>\`.
-5. `PRAGMA integrity_check` on the restored ledger, then start.
-6. Rebuild the env file, `rclone.conf` and the cloudflared credentials by hand from the
-   password manager: they are never in a backup.
+The restore procedure, the `pnpm restore:ledger` command that checks the restored ledger against
+the archive's manifest (row counts and balance totals at backup time), and the quarterly drill log
+are in [`restore-runbook.md`](restore-runbook.md). Secrets, `rclone.conf` and the cloudflared
+credentials are never in a backup; that runbook rebuilds them from the password manager.
 
 ## 4. Alerts (Story 8.3, AD-27)
 
@@ -170,6 +164,12 @@ stays down for the same reason nothing more is raised.
 | Reconciliation | a network's hourly run has not succeeded for 3 hours | `reconciliation_failed` |
 | Backup | the last run failed, or no good copy for 26 hours | `backup_failed` or `backup_offsite_failed` |
 | Queue | a link request that is due (not in a retry wait) on a network whose queue is open has waited more than 10 minutes; a paused or held Shopee queue is the bridge part's. The line shows how many requests wait | `link_queue_stuck` |
+| Drill (state `due`, not down) | no restore drill recorded, the last one failed, or it is more than a quarter (92 days) old; the line reads "đến hạn" (due) | `restore_drill_due` |
+
+The drill is never "down": it has its own state `due` (a reminder, shown in warning colours). While
+no part is down the server also pings the external heartbeat every 5 minutes (Story 8.4,
+`production-host-runbook.md`); any part down stops the pings, so the checker outside the VPS
+alerts too. A `due` drill never stops them.
 
 The bridge does not report its own liveness, so while the queue is open it shows "chưa rõ" (not
 known yet), never "ổn".
@@ -181,6 +181,7 @@ Every kind the server raises; a test checks this table against the code.
 | Kind | Severity | What happened | What the owner does |
 | --- | --- | --- | --- |
 | `assistant_down` | critical | the Zalo assistant has had no connected session for 5 minutes | open the assistant window on the VPS; scan the QR code with the bot account's phone if Zalo asks |
+| `assistant_session_conflict` | critical | another login took the assistant's Zalo account (the old bot left running, Zalo Web); the assistant stopped reconnecting | stop the other session, then restart the assistant (`shadow-run.md#zalo-account-at-cutover`) |
 | `bridge_login_lost` | critical | the affiliate browser was signed out of Shopee; the link queue is paused | sign in again, then resume the queue (`bridge-runbook.md#sign-in-again`) |
 | `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
 | `backup_failed` | high | the daily backup failed a step or was missed for 26 hours | section 2.3 |
@@ -201,6 +202,7 @@ Every kind the server raises; a test checks this table against the code.
 | `shopee_payout_record_failed` | warning | the Shopee payout page could not be read this time | nothing; the job tries again next hour |
 | `shopee_payout_record_unavailable` | warning | the Shopee payout page has no data yet | nothing |
 | `shopee_payout_status_refused` | warning | the payout page showed a status the server does not know | report it; nothing was recorded |
+| `restore_drill_due` | warning | the quarterly restore drill is due (none recorded, the last failed, or older than 92 days) | run the drill of `restore-runbook.md` and record it |
 
 A new kind needs a line in `packages/labels/vi/alerts.json` and a row here; the tests fail until
 both exist.

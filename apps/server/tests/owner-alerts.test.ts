@@ -261,7 +261,7 @@ describe("Story 8.3: one health model", () => {
     writeBackupStatus(backupStatusPath(dataDir), { ...NO_BACKUP_YET, lastGoodAt: "2026-11-01T20:00:00.000Z" as Instant, lastRunAt: "2026-11-01T20:00:00.000Z" as Instant, lastOutcome: "offsite_failed", failedStep: "upload" });
     const sources = healthSourcesFor({ env: "prod", dataDir, telegram: null, backupOffsite: null, assistantToken: "a".repeat(40) }, heartbeats);
     const check = healthCheck({ model: () => readHealthModel(ledger, clock, sources), alerts: ledgerAlerts(ledger, clock), clock, heartbeats });
-    const overview = () => overviewOf(ledger.db, { period: "today" }, clock, sources.assistant, sources.backup).health;
+    const overview = () => overviewOf(ledger.db, { period: "today" }, clock, sources).health;
     return { ledger, clock, dataDir, heartbeats, check, overview };
   }
 
@@ -271,8 +271,10 @@ describe("Story 8.3: one health model", () => {
     expect(h.overview()).toEqual(withoutAlerts(model));
     const down = h.overview().filter((e) => e.state === "down");
     expect(down.map((e) => e.component)).toEqual(["bridge", "assistant", "backup", "queue"]);
-    expect(raised.map((a) => a?.kind)).toEqual(["bridge_login_lost", "assistant_down", "backup_offsite_failed", "link_queue_stuck"]);
-    expect(alertRows(h.ledger).map((a) => a.kind)).toEqual(["bridge_login_lost", "assistant_down", "backup_offsite_failed", "link_queue_stuck"]);
+    // No restore drill recorded in the data folder: the drill is due, a reminder with its own alert (Story 8.6).
+    expect(h.overview().find((e) => e.component === "drill")).toEqual({ component: "drill", state: "due", at: null });
+    expect(raised.map((a) => a?.kind)).toEqual(["bridge_login_lost", "assistant_down", "backup_offsite_failed", "link_queue_stuck", "restore_drill_due"]);
+    expect(alertRows(h.ledger).map((a) => a.kind)).toEqual(["bridge_login_lost", "assistant_down", "backup_offsite_failed", "link_queue_stuck", "restore_drill_due"]);
     expect(h.overview().find((e) => e.component === "backup")).toEqual({ component: "backup", state: "down", at: "2026-11-01T20:00:00.000Z" });
     expect(h.overview().find((e) => e.component === "queue")).toEqual({ component: "queue", state: "down", at: "2026-11-02T00:45:00.000Z", count: 1 });
     // The assistant's down mark (the website banner) is kept by the same run.
@@ -334,6 +336,7 @@ describe("Story 8.3: one health model", () => {
       { component: "reconciliation", state: "unknown", at: null },
       { component: "backup", state: "unknown", at: null },
       { component: "queue", state: "up", at: null, count: 0 },
+      { component: "drill", state: "unknown", at: null },
     ]);
     expect(raised).toEqual([]);
     expect(overviewOf(ledger.db, { period: "today" }, clock).health).toEqual(withoutAlerts(model));

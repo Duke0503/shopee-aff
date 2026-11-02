@@ -23,11 +23,21 @@ export type FriendAdmission =
   | { readonly kind: "refused"; readonly reason: "never_wrote_first" | "already_requested" }
   | { readonly kind: "wait"; readonly until: Instant };
 
+export type FriendAcceptAdmission = Exclude<FriendAdmission, { kind: "refused" }> | { readonly kind: "refused"; readonly reason: "already_accepted" };
+
 export interface FriendRequestLimiter {
   /** A private message from this person arrived. */
   noteWroteFirst(userId: string): void;
   /** Decides and, when admitted, takes today's slot and marks the person as asked. */
   admit(userId: string): FriendAdmission;
+  /**
+   * The same for accepting a request the person sent (friend-accept.ts): they need not have written
+   * first and the acceptance takes a slot of the same day, but the person is remembered only by
+   * `noteAccepted` once the acceptance went through, so a failed one can be tried again.
+   */
+  admitAccept(userId: string): FriendAcceptAdmission;
+  noteAccepted(userId: string): void;
+  isAccepted(userId: string): boolean;
 }
 
 /** What survives a restart (AD-15 allows the assistant small local files): the day's count and everyone asked. */
@@ -35,6 +45,8 @@ export interface FriendRequestState {
   readonly day: VnDate;
   readonly count: number;
   readonly requested: readonly string[];
+  /** Everyone whose own friend request was accepted; absent in files written before it existed. */
+  readonly accepted?: readonly string[];
 }
 
 /** Synchronous so a slot is saved before it is used; a failing `save` refuses the request. */
@@ -62,22 +74,37 @@ export function friendRequestLimiter(clock: Clock, perDay: number = FRIEND_REQUE
   const asked = new Set<string>(saved?.requested ?? []);
   let day: VnDate | null = saved?.day ?? null;
   let count = saved?.count ?? 0;
+  const accepted = new Set<string>(saved?.accepted ?? []);
+  const write = (today: VnDate, used: number) => store.save({ day: today, count: used, requested: [...asked], ...(accepted.size > 0 ? { accepted: [...accepted] } : {}) });
+  const takeSlot = (userId: string, mark: boolean): { readonly kind: "admitted" } | { readonly kind: "wait"; readonly until: Instant } => {
+    const today = vnDateOf(clock.now());
+    const used = day === today ? count : 0;
+    if (used >= perDay) return { kind: "wait", until: vnDayStart(addVnDays(today, 1)) };
+    if (mark) asked.add(userId);
+    try {
+      write(today, used + 1);
+    } catch (error) {
+      if (mark) asked.delete(userId);
+      throw error;
+    }
+    day = today;
+    count = used + 1;
+    return { kind: "admitted" };
+  };
   return {
     noteWroteFirst: (userId) => {
       wroteFirst.add(userId);
     },
     admit: (userId) => {
       if (!wroteFirst.has(userId)) return { kind: "refused", reason: "never_wrote_first" };
-      if (asked.has(userId)) return { kind: "refused", reason: "already_requested" };
-      const today = vnDateOf(clock.now());
-      const used = day === today ? count : 0;
-      if (used >= perDay) return { kind: "wait", until: vnDayStart(addVnDays(today, 1)) };
-      store.save({ day: today, count: used + 1, requested: [...asked, userId] });
-      day = today;
-      count = used + 1;
-      asked.add(userId);
-      return { kind: "admitted" };
+      return asked.has(userId) ? { kind: "refused", reason: "already_requested" } : takeSlot(userId, true);
     },
+    admitAccept: (userId) => (accepted.has(userId) ? { kind: "refused", reason: "already_accepted" } : takeSlot(userId, false)),
+    noteAccepted: (userId) => {
+      accepted.add(userId);
+      write(day ?? vnDateOf(clock.now()), count);
+    },
+    isAccepted: (userId) => accepted.has(userId),
   };
 }
 

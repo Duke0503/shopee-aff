@@ -34,6 +34,8 @@ export interface AssistantConfig {
   readonly zaloMode: ZaloMode;
   /** The only groups the session may write to or listen to. */
   readonly zaloGroupIds: readonly string[];
+  /** The groups whose new members are welcomed: never the Dev group in production, only it in dev. */
+  readonly welcomeGroupIds: readonly string[];
   /** The Zalo session file; set exactly when `zaloMode` is `account`. */
   readonly zaloCredentialsPath: string | null;
   /** The live bot's broadcast token; set exactly when `zaloMode` is `relay`. */
@@ -131,6 +133,7 @@ export function parseAssistantConfig(env: Environment, values: Readonly<Record<s
     assistantToken: file.ASSISTANT_TOKEN,
     zaloMode: file.ZALO_MODE,
     zaloGroupIds: idList(file.ZALO_GROUP_IDS),
+    welcomeGroupIds: idList(file.ZALO_GROUP_IDS).filter((id) => (env === "dev") === isolation.devGroupIds.includes(id)),
     zaloCredentialsPath: file.ZALO_MODE === "account" ? (file.ZALO_CREDENTIALS_PATH ?? null) : null,
     liveBotToken: file.ZALO_MODE === "relay" ? (file.LIVE_BOT_TOKEN ?? null) : null,
     sendDelay: { minMs: file.ASSISTANT_SEND_DELAY_MIN_MS, maxMs: file.ASSISTANT_SEND_DELAY_MAX_MS },

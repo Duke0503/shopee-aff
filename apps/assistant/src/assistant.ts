@@ -8,18 +8,24 @@
  * does not run on the send-only relay, which writes to the Dev group only and has no private chat.
  * A lost Zalo session (Story 6.11) is seen through the session itself: the beat reports it, the
  * loss is logged once, and the notification loop pulls nothing until the session is back, so
- * waiting notifications stay on the server.
+ * waiting notifications stay on the server. A friend request someone sent is accepted, people who
+ * join a welcome group are welcomed, and a session another login took is reported at once
+ * (session-events.ts).
  */
+import type { AssistantHeartbeat } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
 
 import { chatReplier, type ChatSend, type ChatSendWhenDue, type Tag } from "./chat-reply";
 import { runHeartbeat, sessionBeat } from "./heartbeat.job";
-import { friendRequestLimiter, requestFriend, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
+import { friendAccepter } from "./friend-accept";
+import { friendRequestLimiter, requestFriend, type FriendRequestLimiter, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
+import { groupWelcomer, memoryWelcomeStore, type WelcomeStore } from "./group-welcome";
 import type { InternalApi } from "./internal-api.adapter";
 import { messageText } from "./messages";
 import { runNotifications } from "./notification.job";
 import { createPacer, type HumanDelay, type Pacer, type Sleep } from "./pacer";
 import { memorySentNotifications, type SentNotifications } from "./sent-notifications-file.adapter";
+import { rescanFriendRequests, sessionEventHandler } from "./session-events";
 import { guardTargets } from "./zalo-target.guard";
 import type { ChatTarget, ZaloSession } from "./zalo.port";
 
@@ -42,6 +48,10 @@ export interface AssistantDeps {
   readonly sentNotifications?: SentNotifications;
   /** The wait before asking again when no notification is due. */
   readonly notificationIdleMs?: number;
+  /** The groups whose new members are welcomed (assistant.config.ts); none when left out. */
+  readonly welcomeGroupIds?: readonly string[];
+  /** Who was welcomed, surviving a restart; in memory when left out. */
+  readonly welcomeState?: WelcomeStore;
 }
 
 export interface RunningAssistant {
@@ -52,13 +62,21 @@ export interface RunningAssistant {
   stop(): Promise<void>;
 }
 
+/** Friend requests, group joins and a session conflict (session-events.ts). */
+function listenToSessionEvents(deps: AssistantDeps, run: { zalo: ZaloSession; pacer: Pacer; limiter: FriendRequestLimiter; beat: () => AssistantHeartbeat; signal: AbortSignal }): void {
+  const { zalo, pacer } = run;
+  const friends = friendAccepter({ limiter: run.limiter, pacer, zalo, api: deps.api, clock: deps.clock, sleep: deps.sleep, random: deps.random ?? Math.random, signal: run.signal });
+  const welcome = groupWelcomer({ welcomeGroupIds: deps.welcomeGroupIds ?? [], store: deps.welcomeState ?? memoryWelcomeStore(), send: (target, text, mentions) => pacer.send(() => zalo.sendText(target, text, mentions)) });
+  zalo.onEvent(sessionEventHandler({ friends, welcome, api: deps.api, beat: run.beat, onError: deps.onError }));
+  rescanFriendRequests(friends, deps.onError);
+}
+
 export function startAssistant(deps: AssistantDeps): RunningAssistant {
   const zalo = guardTargets(deps.zalo, deps.zaloGroupIds);
   const pacer = createPacer({ clock: deps.clock, sleep: deps.sleep, delay: deps.sendDelay, ...(deps.random ? { random: deps.random } : {}) });
   const limiter = friendRequestLimiter(deps.clock, deps.friendRequestsPerDay, deps.friendState);
   const stopping = new AbortController();
   const startedAt = deps.clock.now();
-
   const write = (target: ChatTarget, text: string, tag?: Tag | null): Promise<void> => {
     if (target.kind !== "group" || !tag) return zalo.sendText(target, text);
     // A group reply opens with "@Name" on its own line, tagged as a mention of the sender (as live).
@@ -81,6 +99,7 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
   });
 
   const beat = sessionBeat(zalo, startedAt, () => pacer.queued(), () => deps.onError("assistant.zalo.session_lost", new Error("zalo session closed")));
+  listenToSessionEvents(deps, { zalo, pacer, limiter, beat, signal: stopping.signal });
   const heartbeat = runHeartbeat({
     api: deps.api,
     sleep: deps.sleep,
@@ -102,12 +121,11 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
           signal: stopping.signal,
           ...(deps.notificationIdleMs === undefined ? {} : { idleMs: deps.notificationIdleMs }),
         }).catch((error: unknown) => deps.onError("assistant.notifications.stopped", error));
-  const friends = { limiter, pacer, zalo, clock: deps.clock, sleep: deps.sleep, greeting: messageText("friend_request_greeting"), signal: stopping.signal };
 
   return {
     pacer,
     send,
-    requestFriend: (userId) => requestFriend(friends, userId),
+    requestFriend: (userId) => requestFriend({ limiter, pacer, zalo, clock: deps.clock, sleep: deps.sleep, greeting: messageText("friend_request_greeting"), signal: stopping.signal }, userId),
     stop: async () => {
       stopping.abort();
       await heartbeat;

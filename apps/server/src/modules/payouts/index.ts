@@ -12,7 +12,7 @@ export {
   type PayoutsImportResult,
 } from "./payout-import.command";
 export { CLAWBACK_MESSAGE_KEYS, clawedBackOn, openClawback, orderPayoutReadsFor, orderPayoutsFor, type ClawbackWriters } from "./order-clawback.command";
-export { allBalances, getBalances, NO_BALANCE, nextPayoutNetting, payableBalances, survivorResolver, type Balance } from "./balance.query";
+export { allBalances, balanceTotals, getBalances, NO_BALANCE, nextPayoutNetting, payableBalances, survivorResolver, type Balance, type BalanceTotals } from "./balance.query";
 export { clawbackOpen } from "./clawback.query";
 export { findReceipt, isReceiptToken, type Receipt } from "./receipt.query";
 export { CLAWBACK_KINDS, CREDIT_KINDS, LEDGER_ENTRY_KINDS, PAYOUT_CLAIM_STATUSES, PAYOUT_STATUSES, PROOF_CONTENT_TYPES } from "./schema";

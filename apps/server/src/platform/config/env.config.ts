@@ -94,6 +94,11 @@ export interface ServerConfig {
    * dev keeps local backups only and production reports every daily off-site copy as failed.
    */
   backupOffsite: OffsiteConfig | null;
+  /**
+   * The external heartbeat checker's ping URL (AD-29, Story 8.4): https only, a secret (it holds
+   * the check's id), never logged. Without it no heartbeat is sent; production logs that as an error.
+   */
+  heartbeatUrl: string | null;
   /** The public origin links and pages are built on; empty in dev, which has no tunnel (AD-25). */
   publicBaseUrl: string | null;
   /**
@@ -219,6 +224,7 @@ function fileSchema(env: Environment) {
     BACKUP_RCLONE_REMOTE: z.string().regex(RCLONE_REMOTE).optional(),
     BACKUP_RCLONE_CONFIG: z.string().refine(isAbsolute).optional(),
     PUBLIC_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
+    HEARTBEAT_URL: z.url({ protocol: /^https$/ }).optional(),
     FALLBACK_CONTACT_URL: z.string().regex(FALLBACK_CONTACT_URL).optional(),
     ZALO_ASSISTANT_URL: z.string().regex(ZALO_CHAT_URL).optional(),
     ALLOW_PROD_ACCESSTRADE_KEY: z.enum(["0", "1"]).optional(),
@@ -265,6 +271,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     telegram: telegramOf(file),
     backupOffsite: backupOffsiteOf(file),
     publicBaseUrl: file.PUBLIC_BASE_URL ?? null,
+    heartbeatUrl: file.HEARTBEAT_URL ?? null,
     fallbackContactUrl: file.FALLBACK_CONTACT_URL ?? null,
     zaloAssistantUrl: file.ZALO_ASSISTANT_URL ?? null,
     allowProdAccesstradeKey: file.ALLOW_PROD_ACCESSTRADE_KEY === "1",

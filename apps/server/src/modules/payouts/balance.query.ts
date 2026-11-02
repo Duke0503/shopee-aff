@@ -173,3 +173,29 @@ export function payableBalances(db: LedgerDb, all: ReadonlyMap<string, Balance> 
     .filter((b) => b.gross > 0)
     .sort((a, b) => (a.customerId < b.customerId ? -1 : a.customerId > b.customerId ? 1 : 0));
 }
+
+/** What every customer is owed and was paid, summed: the figures a restored ledger must give back (Story 8.6). */
+// A type, not an interface: it is passed where named integers (Record<string, number>) are expected.
+export type BalanceTotals = {
+  /** Survivors with any figure at all. */
+  readonly customers: number;
+  readonly gross: number;
+  readonly payable: number;
+  readonly waiting: number;
+  readonly paid: number;
+  readonly deductedNext: number;
+};
+
+/** The sums of `allBalances`, read in one pass. */
+export function balanceTotals(db: LedgerDb): BalanceTotals {
+  const all = [...allBalances(db).values()];
+  const sum = (pick: (b: Balance) => number, what: string): number => sumDong(all.map(pick), what);
+  return {
+    customers: all.length,
+    gross: sum((b) => b.gross, "gross"),
+    payable: sum((b) => b.payable, "payable"),
+    waiting: sum((b) => b.waiting, "waiting"),
+    paid: sum((b) => b.paid, "paid"),
+    deductedNext: sum((b) => b.deductedNext, "deductedNext"),
+  };
+}

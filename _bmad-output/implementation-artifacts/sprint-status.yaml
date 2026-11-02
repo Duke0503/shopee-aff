@@ -140,9 +140,9 @@ development_status:
   8-1-dev-environment-separated-from-production-in-every-resource: review
   8-2-daily-and-off-site-encrypted-backups-that-check-their-own-re: review
   8-3-telegram-owner-alerts-and-one-health-model: review
-  8-4-external-heartbeat-alerts-when-the-mac-goes-silent: backlog
-  8-5-production-host-services-on-the-mac-behind-the-tunnel: backlog
-  8-6-restore-drill-procedure: backlog
+  8-4-external-heartbeat-alerts-when-the-production-host-goes-silent: review
+  8-5-production-host-services-on-the-windows-vps-behind-the-tunnel: review
+  8-6-restore-drill-procedure: review
   8-7-cutover-rehearsal-on-a-copy-of-the-live-database: backlog
   8-8-go-live-runbook-with-the-72-hour-no-payout-window: backlog
   epic-8-retrospective: optional
@@ -377,8 +377,8 @@ sprint_plan:
     goal: "Heartbeat, production host services, restore drill"
     points: 4
     stories:
-      - 8-4-external-heartbeat-alerts-when-the-mac-goes-silent
-      - 8-5-production-host-services-on-the-mac-behind-the-tunnel
+      - 8-4-external-heartbeat-alerts-when-the-production-host-goes-silent
+      - 8-5-production-host-services-on-the-windows-vps-behind-the-tunnel
       - 8-6-restore-drill-procedure
   - sprint: 34
     goal: "Cutover rehearsal and go-live with the 72-hour window"

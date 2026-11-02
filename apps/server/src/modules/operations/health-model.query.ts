@@ -14,6 +14,8 @@
  * - queue: up with its depth (every waiting link request); down once a request that is due (not
  *   in a retry wait) on a network whose queue is open has waited over 10 minutes. A paused or held
  *   Shopee queue is the bridge part's to report, not the queue's again.
+ * - drill: the quarterly restore drill (Story 8.6), in the state `due` while it is: a reminder
+ *   with its own alert, never `down`, so the external heartbeat (heartbeat.job.ts) keeps pinging.
  */
 import type { OverviewHealth } from "@cashback/contracts";
 import { parseInstant, toMs, type Clock, type Instant } from "@cashback/core";
@@ -21,6 +23,7 @@ import { parseInstant, toMs, type Clock, type Instant } from "@cashback/core";
 import { LINK_QUEUE_ALERTS, oldestDueLinkRequest, shopeeQueueGate, shopeeQueueState, waitingLinkRequests } from "../linking/index";
 import { hasRun, lastSucceededRun } from "../orders/index";
 import type { BackupHealth } from "../../platform/backup/backup-status";
+import type { DrillHealth } from "../../platform/backup/restore-drill";
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { AlertSeverity } from "../../platform/ports/alert.port";
 import { ASSISTANT_DOWN_ALERT } from "./assistant-health.job";
@@ -48,6 +51,8 @@ export interface HealthSources {
   readonly assistant?: (now: Instant) => Liveness;
   /** The last backup's health at `now`, from its status file. */
   readonly backup?: (now: Instant) => BackupHealth;
+  /** The restore drill's health at `now`, from its record file (Story 8.6). */
+  readonly drill?: (now: Instant) => DrillHealth;
 }
 
 const stale = (at: string | null, now: Instant, afterMs: number): boolean => at === null || toMs(now) - toMs(parseInstant(at)) > afterMs;
@@ -87,12 +92,14 @@ export function healthModel(db: LedgerDb, clock: Clock, sources: HealthSources =
   const now = clock.now();
   const assistant = sources.assistant?.(now) ?? { state: "unknown", at: null };
   const backup = sources.backup?.(now) ?? { state: "unknown", at: null, alert: null };
+  const drill = sources.drill?.(now) ?? { state: "unknown", at: null, alert: null };
   return [
     bridgeHealth(db, now),
     { component: "assistant", state: assistant.state, at: assistant.at, alert: assistant.state === "down" ? ASSISTANT_DOWN_ALERT : null },
     reconciliationHealth(db, now),
     { component: "backup", state: backup.state, at: backup.at, alert: backup.state === "down" ? backup.alert : null },
     queueHealth(db, now),
+    { component: "drill", state: drill.state, at: drill.at, alert: drill.state === "due" ? drill.alert : null },
   ];
 }
 

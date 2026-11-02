@@ -36,6 +36,24 @@ export interface Mention {
 
 export type MessageHandler = (message: IncomingMessage) => Promise<void>;
 
+/** A person who joined a group, with the name Zalo shows for them. */
+export interface GroupMember {
+  readonly userId: string;
+  readonly name: string | null;
+}
+
+/**
+ * What the session reports besides messages: a friend request someone sent this account, members
+ * who joined a group (never this account itself), and the session taken by another login of the
+ * same account, after which the session stays closed (`conflicted()`).
+ */
+export type SessionEvent =
+  | { readonly kind: "friend_request"; readonly userId: string }
+  | { readonly kind: "group_join"; readonly groupId: string; readonly members: readonly GroupMember[] }
+  | { readonly kind: "session_conflict" };
+
+export type SessionEventHandler = (event: SessionEvent) => void;
+
 export interface ZaloSession {
   readonly mode: ZaloMode;
   /**
@@ -44,13 +62,21 @@ export interface ZaloSession {
    * notification is pulled meanwhile, so none is lost.
    */
   connected(): boolean;
+  /** True once another login took the account; the session no longer reconnects. */
+  conflicted(): boolean;
   /** The Zalo account the session runs on (its own id), or null when it has none (the relay). */
   accountId(): string | null;
   /** One handler; a second call replaces the first. */
   onMessage(handler: MessageHandler): void;
   /** Called only by the pacer; `mentions` tag people in a group message. */
   sendText(target: ChatTarget, text: string, mentions?: readonly Mention[]): Promise<void>;
+  /** One handler for session events; a second call replaces the first. */
+  onEvent(handler: SessionEventHandler): void;
   /** Called only by the friend-request queue, through the pacer. */
   addFriend(userId: string, greeting: string): Promise<void>;
+  /** Accepts a friend request this account received; only friend-accept.ts calls it, through the pacer. */
+  acceptFriend(userId: string): Promise<void>;
+  /** The people whose friend requests to this account are still waiting, read from Zalo. */
+  pendingFriendRequests(): Promise<readonly string[]>;
   stop(): Promise<void>;
 }

@@ -36,6 +36,7 @@ import { buildServers, close, listen, type Servers } from "./platform/http/serve
 import { JOB_SCHEDULES } from "./platform/jobs/job-schedules";
 import { createScheduler, systemTimer, type Job, type Scheduler } from "./platform/jobs/scheduler";
 import { stopServer, type RunningParts } from "./platform/lifecycle/shutdown";
+import { phaseFilePath, writeServerPhase } from "./platform/lifecycle/server-phase";
 import { shutdownRoutes } from "./platform/lifecycle/shutdown.routes";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
 import { createLogger, type Logger } from "./platform/log/logger";
@@ -96,8 +97,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, health }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
     const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
-    // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
-    if (config.env === "dev") internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
+    // dev:stop and `pnpm host stop` ask for an ordered stop here (Stories 8.1, 8.5): on Windows a signal ends the process at once.
+    internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     if (config.assistantToken !== null) {
       internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats, ledger }));
       // The assistant pulls the outbox one row at a time and acknowledges each send (Story 6.4).
@@ -155,8 +156,12 @@ async function main(): Promise<number> {
         .then((code) => process.exit(code));
     },
   };
+  // `pnpm host start` waits, and never kills, while this PID reports `starting` (backup and migrations; Story 8.5).
+  const phaseFile = phaseFilePath(config.runDir);
+  writeServerPhase(phaseFile, { pid: process.pid, phase: "starting", at: systemClock.now() });
   parts = await start(config, logger, lock, stopper);
   if (!parts) return 1;
+  writeServerPhase(phaseFile, { pid: process.pid, phase: "ready", at: systemClock.now() });
   for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => stopper.stop(signal));
   return 0;
 }

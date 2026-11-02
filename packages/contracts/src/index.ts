@@ -255,6 +255,11 @@ export {
 } from "./bridge.schema";
 export {
   ASSISTANT_CHATS,
+  ASSISTANT_FRIEND_CHECK_PATH,
+  assistantFriendCheckedSchema,
+  assistantFriendCheckSchema,
+  type AssistantFriendCheck,
+  type AssistantFriendChecked,
   ASSISTANT_LINK_REPLY_PATH,
   ASSISTANT_LINK_REQUEST_PATH,
   ASSISTANT_REGISTRATION_PATH,
