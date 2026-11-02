@@ -17,14 +17,17 @@ import {
   payoutConfirmResponseSchema,
   payoutListResponseSchema,
   payoutReleaseResponseSchema,
+  PAYOUT_WINDOW_STATE_PATH,
+  payoutWindowStateSchema,
   type ListSearchState,
   type PayoutClaimResponse,
   type PayoutConfirmResponse,
   type PayoutListResponse,
   type PayoutQueue,
+  type PayoutWindowState,
 } from "@cashback/contracts";
 import { useListQuery } from "@cashback/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest } from "../api/api.queries";
 import { CUSTOMERS_KEY } from "../customers/customers.queries";
@@ -37,6 +40,14 @@ export const PAYOUTS_SEARCH = listSearch({
   filters: [{ field: "queue", values: PAYOUT_QUEUES }],
   defaultSort: { field: "payable", direction: "desc" },
 });
+
+/** The cutover's no-payout window (Story 8.8): while open, Payouts says until when. */
+export function usePayoutWindow() {
+  return useQuery({
+    queryKey: [...PAYOUTS_KEY, "window"],
+    queryFn: async ({ signal }): Promise<PayoutWindowState> => payoutWindowStateSchema.parse(await apiRequest(PAYOUT_WINDOW_STATE_PATH, { signal })),
+  });
+}
 
 /** The tab a URL state shows: "payable now" unless it names the other one. */
 export const queueOfState = (state: ListSearchState): PayoutQueue => (state.filters["queue"]?.[0] === "ACTION" ? "ACTION" : "PAYABLE");

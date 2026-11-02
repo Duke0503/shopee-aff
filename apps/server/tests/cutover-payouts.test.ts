@@ -298,6 +298,8 @@ describe("Story 2.4: the import as one command", () => {
       { actor_kind: "system", actor_id: "cutover", event: "messaging.outbox.seeded", payload: '{"seeded":16}' },
       // Story 6.10: the import leaves the new ledger quiet for its first run (D46).
       { actor_kind: "system", actor_id: "cutover", event: "messaging.settings.silent_changed", payload: '{"silent":true}' },
+      // Story 8.8: and opens the 72-hour no-payout window, ending 72 hours after the import.
+      { actor_kind: "system", actor_id: "cutover", event: "payouts.window.opened", payload: '{"endsAt":"2026-11-02T07:00:00.000Z"}' },
     ]);
   });
 

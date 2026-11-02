@@ -58,6 +58,7 @@
   "col_recorded_at": "Ngày ghi nhận",
   "col_recorded_short": "Ghi nhận",
   "payouts_lead": "Đơn đã duyệt, chưa chuyển. Chuyển từng khách một.",
+  "payouts_window_banner": "Đang chốt chuyển hệ thống: tạm dừng chuyển tiền đến {end}. Chưa mở được lần chuyển nào trước giờ này.",
   "payouts_tabs": "Các mục chuyển tiền",
   "payouts_tab_payable": "Chuyển được",
   "payouts_tab_action": "Cần xử lý",

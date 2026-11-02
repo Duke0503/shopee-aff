@@ -26,6 +26,8 @@ import {
   payoutCustomerParamsSchema,
   payoutListResponseSchema,
   payoutReleaseResponseSchema,
+  PAYOUT_WINDOW_STATE_PATH,
+  payoutWindowStateSchema,
   type ErrorCode,
   type PayoutClaimResponse,
   type PayoutConfirmResponse,
@@ -45,6 +47,7 @@ import { WriteOffError, writeOffClawback, type WriteOffErrorCode } from "../claw
 import { confirmPayout, type ConfirmOutcome } from "../payout-confirm.command";
 import { openPayoutClaim, PayoutClaimError, releasePayoutClaim, revealClaimAccount, type ClaimOutcome, type PayoutClaimErrorCode } from "../payout-claim.command";
 import { answerPayoutQueue } from "../payout-queue.list";
+import { windowState } from "../payout-window.command";
 import { nettingOf, PayoutSnapshotError } from "../payout-snapshot.query";
 
 export interface PayoutRouteDeps {
@@ -148,6 +151,22 @@ function confirmedOf(outcome: ConfirmOutcome): PayoutConfirmResponse {
   return { outcome: "recorded", ...outcome.payout, replay: outcome.replay };
 }
 
+/**
+ * The cutover window (Story 8.8) pauses every step toward a transfer: opening a claim, showing the
+ * account and confirming. Confirm checks it itself, after answering a replay.
+ */
+function whileNotPaused<T>(deps: PayoutRouteDeps, fn: (db: LedgerDb, by: CommandAudit) => T): (db: LedgerDb, by: CommandAudit) => T {
+  return (db, by) => {
+    if (deps.confirmPaused?.() === true) throw new PayoutClaimError("confirm_paused");
+    return fn(db, by);
+  };
+}
+
+/** The window's state for the banner on Payouts. */
+export function payoutWindowStateRoutes(deps: Pick<PayoutRouteDeps, "ledger">): StaffRoutes {
+  return (add) => add({ method: "GET", url: PAYOUT_WINDOW_STATE_PATH, handler: async () => payoutWindowStateSchema.parse(windowState(deps.ledger.db)) });
+}
+
 export function payoutRoutes(deps: PayoutRouteDeps): StaffRoutes {
   const { clock } = deps;
   return (add) => {
@@ -158,7 +177,7 @@ export function payoutRoutes(deps: PayoutRouteDeps): StaffRoutes {
       handler: async (request, _reply, { staff }) => {
         parsed(payoutClaimRequestSchema, request.body ?? {});
         const { customerId } = parsed(payoutCustomerParamsSchema, request.params);
-        const outcome = inTx(deps, staff, (db, by) => openPayoutClaim(db, customerId, { clock, by }));
+        const outcome = inTx(deps, staff, whileNotPaused(deps, (db, by) => openPayoutClaim(db, customerId, { clock, by })));
         return payoutClaimResponseSchema.parse(previewOf(outcome));
       },
     });
@@ -178,7 +197,7 @@ export function payoutRoutes(deps: PayoutRouteDeps): StaffRoutes {
       handler: async (request, _reply, { staff }) => {
         parsed(payoutClaimRequestSchema, request.body ?? {});
         const { claimId } = parsed(payoutClaimParamsSchema, request.params);
-        return payoutAccountResponseSchema.parse({ accountNumber: inTx(deps, staff, (db, by) => revealClaimAccount(db, claimId, { clock, by })) });
+        return payoutAccountResponseSchema.parse({ accountNumber: inTx(deps, staff, whileNotPaused(deps, (db, by) => revealClaimAccount(db, claimId, { clock, by }))) });
       },
     });
     add({

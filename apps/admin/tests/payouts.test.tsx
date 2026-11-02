@@ -259,3 +259,20 @@ describe("review 6: the copy button writes to the clipboard inside the click (iO
     expect(onError).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("Story 8.8: the cutover window on Payouts", () => {
+  it("AC1: while payouts are paused the screen says until when; otherwise no banner", async () => {
+    const paused = payoutServer(() => payoutsAnswer(ROWS, SUM), undefined, undefined, undefined, { open: true, endsAt: "2026-11-05T13:00:00.000Z" });
+    fakeServer({ session: EMPLOYEE, routes: [paused.route] });
+    const view = renderDesk("/admin/payouts");
+    await settle(view.queryClient, PAYOUTS_KEY);
+    // 13:00 UTC is 20:00 in Vietnam; the date carries the year only outside the current one.
+    await waitFor(() => expect(document.querySelector("[data-payout-window]")).not.toBeNull());
+    const banner = document.querySelector("[data-payout-window]") as HTMLElement;
+    expect(banner.textContent).toMatch(/05\/11(\/2026)? 20:00/);
+    expect(banner).toHaveAttribute("role", "status");
+    view.unmount();
+    await desk();
+    expect(document.querySelector("[data-payout-window]")).toBeNull();
+  });
+});

@@ -9,6 +9,7 @@
  * its tab totals stop refreshing while it is open (LC-11).
  */
 import type { ListSearchState, PayoutQueue, PayoutQueueRow } from "@cashback/contracts";
+import { formatVnDateTime, parseInstant, systemClock } from "@cashback/core";
 import { DataList, formatCount } from "@cashback/ui";
 import { useMemo, useState } from "react";
 
@@ -18,7 +19,18 @@ import { PageHeader } from "../shell/page-header";
 import { PayoutCard, payoutColumns, type RowActions } from "./payout-columns";
 import { PayoutPanel } from "./payout-panel";
 import { PayoutTabs } from "./payout-tabs";
-import { PAYOUTS_SEARCH, queueOfState, usePayoutsList } from "./payouts.queries";
+import { PAYOUTS_SEARCH, queueOfState, usePayoutsList, usePayoutWindow } from "./payouts.queries";
+
+/** Story 8.8: while the cutover window is open no payout can be made; the banner says until when. */
+function PayoutWindowBanner() {
+  const pause = usePayoutWindow();
+  if (!pause.data?.open || pause.data.endsAt === null) return null;
+  return (
+    <p data-payout-window role="status" className="rounded-md bg-status-attention-soft p-3 text-sm break-words text-status-attention">
+      {adminText("payouts_window_banner", { end: formatVnDateTime(parseInstant(pause.data.endsAt), systemClock) })}
+    </p>
+  );
+}
 
 export interface PayoutsPageProps {
   readonly state: ListSearchState;
@@ -53,6 +65,7 @@ export function PayoutsPage({ state, onStateChange }: PayoutsPageProps) {
     <>
       <PageHeader title={adminText("nav_payouts")} lead={adminText("payouts_lead")} />
       <div className="flex min-w-0 flex-col gap-3">
+        <PayoutWindowBanner />
         <PayoutTabs current={queue} queue={{ counts: query.data?.queues, onSelect: selectQueue }} />
         <DataList
           search={PAYOUTS_SEARCH}

@@ -5,7 +5,8 @@
  * Every module import is a command by the system actor `cutover` and writes its audit entry in
  * the same transaction (AD-17). The import also turns `messaging.silent` on (D46, Story 6.10): the
  * first reconciliation after it records would-be sends and sends nothing until the owner turns
- * the flag off.
+ * the flag off. It opens the 72-hour no-payout window too (Story 8.8): payout confirm is refused
+ * until the owner closes it after the window, so a rollback can never meet a double payment.
  */
 import type { Clock } from "@cashback/core";
 import type BetterSqlite3 from "better-sqlite3";
@@ -16,7 +17,7 @@ import { importLinks, type LinksImportResult } from "../modules/linking/index";
 import { seedSentNotifications, setSilent } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { importOrders, type ImportedOrder, type OrdersImportResult } from "../modules/orders/index";
-import { importNetworkSettlements, importPayouts, type ImportedNetworkSettlement, type NetworkSettlementsImportResult, type PayoutsImportResult } from "../modules/payouts/index";
+import { importNetworkSettlements, importPayouts, openPayoutWindow, type ImportedNetworkSettlement, type NetworkSettlementsImportResult, type PayoutsImportResult } from "../modules/payouts/index";
 import type { Ledger } from "../platform/db/ledger";
 import { CUTOVER_SYSTEM_ACTOR } from "../platform/ports/audit.port";
 import { readLiveCampaigns, type LiveCampaigns } from "./campaign-source";
@@ -56,6 +57,8 @@ export interface Written {
   seeded: number;
   /** True: the new ledger starts with `messaging.silent` on. */
   silent: boolean;
+  /** When the no-payout window ends (Story 8.8). */
+  payoutWindowEndsAt: string | null;
 }
 
 /** Reads the live copy; stops with duplicate_identity before anything is written. */
@@ -97,6 +100,7 @@ export function writeLive(ledger: Ledger, live: LiveData, fingerprintKey: string
       networkPayouts: importNetworkSettlements(db, live.networkPayouts, importedAt, by),
       seeded: seedSentNotifications(db, live.notifications.seeds, importedAt, by),
       silent: setSilent(db, true, importedAt, by).silent,
+      payoutWindowEndsAt: openPayoutWindow(db, importedAt, by).endsAt,
     };
   });
 }
@@ -168,6 +172,7 @@ export function finishedLine(report: ImportReport, written: Written): Record<str
     campaignAwards: written.campaigns.awards,
     seededNotifications: written.seeded,
     messagingSilent: written.silent,
+    payoutWindowEndsAt: written.payoutWindowEndsAt,
     paidParity: report.paidParity?.result ?? null,
     timeProblems: report.timeProblems.length,
     notes: report.notes.length,

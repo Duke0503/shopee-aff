@@ -57,7 +57,7 @@ export const SHARE_CSP = `default-src 'none'; style-src ${hashOf(STYLE)}; script
 export const HANDOFF_PARAM = "via";
 const HANDOFF_VALUE = "app";
 /** The hosts a start without PUBLIC_BASE_URL (dev only: production requires it) may build share addresses on. */
-const LOCAL_HOSTS = ["127.0.0.1", "localhost"] as const;
+const LOCAL_HOSTS = ["127.0.0.1", "localhost", "[::1]"] as const;
 /** How long a real browser shows the page before it moves on to the shop. */
 export const SHARE_REDIRECT_SECONDS = 1;
 
@@ -223,7 +223,7 @@ export interface SharePageDeps {
 function originOf(deps: SharePageDeps, request: FastifyRequest): string | null {
   if (deps.baseUrl !== null) return deps.baseUrl.replace(/\/+$/, "");
   const host = request.headers.host ?? "";
-  const name = /^([^:]+)(?::\d{1,5})?$/.exec(host)?.[1]?.toLowerCase() ?? "";
+  const name = /^(\[[0-9a-f:]+\]|[^:[\]]+)(?::\d{1,5})?$/i.exec(host)?.[1]?.toLowerCase() ?? "";
   return (LOCAL_HOSTS as readonly string[]).includes(name) ? `http://${host}` : null;
 }
 

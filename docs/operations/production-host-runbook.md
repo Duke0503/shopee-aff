@@ -19,7 +19,7 @@ dashboard, in the order given.
 | Data | `C:\Project\mmo\cashback.db` | `<folder>\data\prod\` (ledger, lock, backups, proof files, logs) |
 | PID records | none | `<folder>\run\prod\server.pid`, `assistant.pid`, `browser.pid` |
 | Secrets | `C:\Project\mmo\.env` | `%USERPROFILE%\.config\cashback\prod.env` (outside the repository) |
-| Tunnel | cloudflared Windows service, public hostnames to the live ports | the same service; at cutover (Story 8.8) the public hostnames switch to `127.0.0.1:8080` |
+| Tunnel | cloudflared Windows service, public hostnames to the live ports | the same service and the same routing: at cutover (Story 8.8) the new public listener takes over port 80 (`PUBLIC_PORT=80`) once the live backend has released it, so no hostname changes; see `go-live-runbook.md` |
 
 The scripts in `ops\windows\` know only the three `CashbackV2*` tasks and refuse the live ones.
 Every start and stop goes through `pnpm --filter @cashback/server host ...`, which acts only on the
@@ -208,6 +208,9 @@ If a task is not running, start it with `.\ops\windows\start.ps1` and read
 ## 5. Cloudflare dashboard (owner steps)
 
 ### 5.1 Tunnel public hostnames (at cutover, Story 8.8)
+
+> Cutover of 2026-11-02: the public listener runs on port 80 (`go-live-runbook.md`), so read
+> `8080` below as the value of `PUBLIC_PORT`; `hoantiendp.com` keeps its existing route to port 80.
 
 The tunnel is remotely managed (the cloudflared service runs with a token). In Zero Trust,
 **Networks**, **Tunnels**, the production tunnel, **Public Hostname**, the list must be exactly:

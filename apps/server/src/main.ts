@@ -16,6 +16,7 @@ import { systemClock } from "@cashback/core";
 import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { linkQueueRoutes } from "./admin/link-queue.routes";
 import { messagingSilentRoutes } from "./admin/messaging-silent.routes";
+import { payoutWindowRoutes } from "./admin/payout-window.routes";
 import { adminBuildRoutes } from "./admin/admin-build";
 import { adminDesk } from "./admin/admin-desk";
 import { assistantBankRoutes } from "./links/assistant-bank.routes";
@@ -96,7 +97,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const health = healthSourcesFor(config, heartbeats);
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, health }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
-    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
+    const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), payoutWindowRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop and `pnpm host stop` ask for an ordered stop here (Stories 8.1, 8.5): on Windows a signal ends the process at once.
     internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     if (config.assistantToken !== null) {

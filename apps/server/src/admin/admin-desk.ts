@@ -11,7 +11,7 @@ import { outboxFor, wasTold } from "../modules/messaging/index";
 import { auditFor, commandAudit, type HealthSources } from "../modules/operations/index";
 import { linkRequestDeskRoutes } from "../modules/linking/index";
 import { orderDeskRoutes, reviewCaseRoutes } from "../modules/orders/index";
-import { networkSettlementRoutes, payoutRecordRoutes, payoutRoutes, type ProofStore } from "../modules/payouts/index";
+import { isConfirmPaused, networkSettlementRoutes, payoutRecordRoutes, payoutRoutes, payoutWindowStateRoutes, type ProofStore } from "../modules/payouts/index";
 import type { StaffAccessConfig } from "../platform/config/env.config";
 import type { Ledger } from "../platform/db/ledger";
 import type { Logger } from "../platform/log/logger";
@@ -58,7 +58,8 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
       applyDeps: (db, actor) => applyDepsFor(db, clock, { production: deps.production, actor }),
       readDeps: (actor) => reviewReadDepsFor(ledger.db, clock, actor, deps.production),
     }),
-    payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), ...(deps.logger ? { logger: deps.logger } : {}) }),
+    payoutRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), confirmPaused: () => isConfirmPaused(ledger.db), ...(deps.logger ? { logger: deps.logger } : {}) }),
+    payoutWindowStateRoutes({ ledger }),
     payoutRecordRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor), outbox: (db, by) => outboxFor(db, clock, by), lookup: (db) => ({ told: (key) => wasTold(db, key) }), proofs: deps.proofs }),
     orderDeskRoutes({ ledger, clock, audit: (db, actor) => commandAudit(db, clock, actor) }),
     networkSettlementRoutes({ ledger, clock }),

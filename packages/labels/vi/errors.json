@@ -23,6 +23,8 @@
   "error.payout.amount_changed": "Số tiền đã thay đổi, xem lại",
   "error.payout.other_claim_open": "Khách này đang có một lần chuyển khác mở. Đóng lần đó trước khi xác nhận lần này.",
   "error.payout.confirm_paused": "Đang trong thời gian chốt chuyển hệ thống nên tạm chưa ghi nhận chuyển tiền.",
+  "error.payout.window_not_over": "Chưa hết 72 giờ chốt chuyển hệ thống nên chưa mở lại việc chuyển tiền.",
+  "error.payout.window_already_closed": "Thời gian chốt chuyển hệ thống đã kết thúc trước đó.",
   "error.clawback.admin_only": "Chỉ quản trị viên được xoá nợ.",
   "error.clawback.clawback_not_found": "Không tìm thấy khoản trừ nợ này.",
   "error.clawback.clawback_closed": "Khoản trừ nợ này đã đóng.",

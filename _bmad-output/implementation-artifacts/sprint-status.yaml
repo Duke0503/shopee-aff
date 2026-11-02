@@ -143,8 +143,8 @@ development_status:
   8-4-external-heartbeat-alerts-when-the-production-host-goes-silent: review
   8-5-production-host-services-on-the-windows-vps-behind-the-tunnel: review
   8-6-restore-drill-procedure: review
-  8-7-cutover-rehearsal-on-a-copy-of-the-live-database: backlog
-  8-8-go-live-runbook-with-the-72-hour-no-payout-window: backlog
+  8-7-cutover-rehearsal-on-a-copy-of-the-live-database: review
+  8-8-go-live-runbook-with-the-72-hour-no-payout-window: review
   epic-8-retrospective: optional
 
   epic-9: backlog

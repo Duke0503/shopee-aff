@@ -112,6 +112,7 @@ export {
   type PayoutQueueCounts,
   type PayoutQueueRow,
 } from "./payout.schema";
+export { PAYOUT_WINDOW_PATH, PAYOUT_WINDOW_STATE_PATH, payoutWindowCloseSchema, payoutWindowStateSchema, type PayoutWindowState } from "./payout-window.schema";
 export {
   payoutIdParamsSchema,
   payoutProofResponseSchema,

@@ -75,3 +75,16 @@ export function rows(path: string, query: string): unknown[] {
     db.close();
   }
 }
+
+/**
+ * The fixture's rows without its deliberately unimportable ones (a gone customer, rows owned
+ * through an alias, a guest award, a malformed share code, an unknown click kind), which the real live copy does
+ * not have: the shape a passing cutover sees.
+ */
+export const CLEAN_LIVE_SQL = `
+DELETE FROM customer_aliases WHERE customer_id = 'ghost';
+DELETE FROM link_clicks WHERE request_id IN ('26091800008', '26091900009') OR agent = 'bot';
+DELETE FROM link_requests WHERE customer_id IN ('ghost', '9000000000000000002');
+DELETE FROM campaign_awards WHERE customer_id IN ('ghost', '9000000000000000002', 'HOUSE');
+DELETE FROM payment_transfers WHERE customer_id = '9000000000000000002';
+DELETE FROM orders WHERE customer_id IN ('ghost', '9000000000000000002');`;

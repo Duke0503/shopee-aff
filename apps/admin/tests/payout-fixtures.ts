@@ -105,6 +105,7 @@ export function payoutServer(
   claim: (customerId: string) => Answer | Promise<Answer> = () => json(200, preview()),
   account: () => Answer = () => json(200, { accountNumber: "0071000123456" }),
   confirm: (claimId: string, body: unknown) => Answer | Promise<Answer> = () => json(200, recorded()),
+  payoutWindow: { open: boolean; endsAt: string | null } = { open: false, endsAt: null },
 ): PayoutServer {
   const calls: PayoutServer["calls"] = [];
   const route: Route = (url, init) => {
@@ -113,6 +114,7 @@ export function payoutServer(
     if (!path.startsWith("/api/admin/payout")) return undefined;
     calls.push({ method, path, body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body });
     if (path === "/api/admin/payouts") return list(url);
+    if (path === "/api/admin/payouts/window") return json(200, payoutWindow);
     const claimed = /^\/api\/admin\/payouts\/([^/]+)\/claim$/.exec(path);
     if (claimed !== null) return claim(claimed[1] ?? "");
     if (path.endsWith("/account")) return account();

@@ -1,7 +1,7 @@
 /**
  * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql,
  * 0013_payout_claims.sql, 0014_payout_confirm.sql, 0015_payout_proofs_and_void.sql and
- * 0017_network_settlements.sql (whose generated payouts.paid_amount is read by the history list only,
+ * 0017_network_settlements.sql and 0032_payout_cutover_window.sql (whose generated payouts.paid_amount is read by the history list only,
  * so it is not declared here). Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
@@ -152,6 +152,14 @@ export const networkSettlementOrders = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.settlementId, t.orderId] })],
 );
+
+/** The one row of payout flags: the cutover's no-payout window end (Story 8.8), null when closed. */
+export const payoutSettings = sqliteTable("payout_settings", {
+  id: integer("id").primaryKey().notNull(),
+  windowEndsAt: text("window_ends_at"),
+  changedAt: text("changed_at"),
+  changedBy: text("changed_by"),
+});
 
 export type PayoutRow = typeof payouts.$inferInsert;
 export type PayoutClaimRow = typeof payoutClaims.$inferSelect;

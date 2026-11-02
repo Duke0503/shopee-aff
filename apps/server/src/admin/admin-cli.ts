@@ -10,6 +10,7 @@
  *   merge-proposals latest|<since> --as <admin>          pairs to merge after a new Zalo account (Story 6.11): since the latest account switch, or <since>; merges nothing
  *   link-queue resume --as <admin>                       resume the Shopee link queue after the affiliate browser signed in again
  *   messaging-silent on|off --as <admin>                 turn the quiet mode of notifications on or off (Story 6.10)
+ *   payout-window off --as <admin>                       close the 72-hour no-payout window after the cutover (Story 8.8)
  *
  * `--as` signs in as that admin (the password is asked, never an argument) and signs out at the
  * end. The first seed of an empty staff table needs no `--as`. Every new password is asked twice
@@ -30,6 +31,8 @@ import {
   linkQueueResumedSchema,
   MESSAGING_SILENT_PATH,
   messagingSilentSetSchema,
+  PAYOUT_WINDOW_PATH,
+  payoutWindowStateSchema,
   STAFF_TOKEN_HEADER,
   staffAccessResponseSchema,
   staffPasswordResponseSchema,
@@ -90,8 +93,8 @@ interface Args {
   readonly flags: ReadonlyMap<string, string | true>;
 }
 
-const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "merge-proposals", "link-queue", "messaging-silent"];
-export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | merge-proposals latest|<since> --as <admin> | link-queue resume --as <admin> | messaging-silent on|off --as <admin>";
+const COMMANDS = ["staff-seed", "staff-password", "staff-access", "campaign-create", "customer-merge", "merge-proposals", "link-queue", "messaging-silent", "payout-window"];
+export const CLI_USAGE = "usage: staff-seed <seed.json> [--as <admin>] | staff-password <staffId> --as <admin> | staff-access <staffId> --as <admin> [--role ADMIN|EMPLOYEE] [--status ACTIVE|DISABLED] | campaign-create <campaign.json> --as <admin> [--apply] | customer-merge <merged> --into <survivor> --as <admin> [--apply] | merge-proposals latest|<since> --as <admin> | link-queue resume --as <admin> | messaging-silent on|off --as <admin> | payout-window off --as <admin>";
 
 function parseArgs(argv: readonly string[]): Args | null {
   const [command, target, ...rest] = argv;
@@ -208,6 +211,11 @@ async function messagingSilent(io: CliIo, args: Args, token: string | null): Pro
   return messagingSilentSetSchema.parse(await ok(io, "POST", MESSAGING_SILENT_PATH, { silent: args.target === "on" }, token));
 }
 
+async function payoutWindowOff(io: CliIo, args: Args, token: string | null): Promise<Record<string, unknown>> {
+  if (args.target !== "off") throw new CliRefusal("usage", { error: CLI_USAGE });
+  return payoutWindowStateSchema.parse(await ok(io, "POST", PAYOUT_WINDOW_PATH, { open: false }, token));
+}
+
 const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promise<Record<string, unknown>>> = {
   "staff-seed": staffSeed,
   "staff-password": staffPassword,
@@ -217,6 +225,7 @@ const RUN: Record<string, (io: CliIo, args: Args, token: string | null) => Promi
   "merge-proposals": mergeProposalsOf,
   "link-queue": linkQueue,
   "messaging-silent": messagingSilent,
+  "payout-window": payoutWindowOff,
 };
 
 /** Runs one command; returns the exit code after printing its one JSON line. */

@@ -201,13 +201,14 @@ function record(db: LedgerDb, claim: PayoutClaimRow, snapshot: PayoutSnapshot, d
 
 /** Confirms the calling staff member's claim; run inside `tx`. */
 export function confirmPayout(db: LedgerDb, input: ConfirmInput, deps: ConfirmDeps): ConfirmOutcome {
-  if (deps.confirmPaused?.() === true) throw new PayoutClaimError("confirm_paused");
   const claim = ownClaim(db, input.claimId, deps);
   if (claim.status === "CONFIRMED") {
     const done = payoutOfClaim(db, claim.claimId);
     if (done === undefined) throw inconsistent(`claim ${claim.claimId} is CONFIRMED without a payout`);
     return { kind: "recorded", payout: recordedOf(db, done), replay: true };
   }
+  // After the replay: a payout already recorded is answered again; nothing new is paid while paused.
+  if (deps.confirmPaused?.() === true) throw new PayoutClaimError("confirm_paused");
   if (claim.status === "ABANDONED" && openClaimOf(db, claim.customerId) !== undefined) throw new PayoutClaimError("other_claim_open");
   const snapshot = payoutSnapshot(db, claim.customerId);
   if (snapshot === null || snapshot.hash !== claim.snapshotHash || input.snapshotHash !== claim.snapshotHash) return { kind: "changed", previousAmount: claim.amount };

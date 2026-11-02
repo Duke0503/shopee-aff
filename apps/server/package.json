@@ -21,6 +21,8 @@
     "link-queue:resume": "tsx src/admin/run-admin-command.ts link-queue resume",
     "messaging:silent": "tsx src/admin/run-admin-command.ts messaging-silent",
     "cutover:first-run": "tsx src/cutover/run-first-run.ts",
+    "cutover:step": "tsx src/cutover/run-cutover-step.ts",
+    "payout:window": "tsx src/admin/run-admin-command.ts payout-window",
     "restore:ledger": "tsx src/restore/run-restore.ts ledger",
     "restore:drill-record": "tsx src/restore/run-restore.ts drill-record",
     "host": "tsx src/host/run-host.ts",
