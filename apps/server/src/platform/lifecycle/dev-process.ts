@@ -6,6 +6,11 @@
  * The stop is ordered first (the server stops itself through its internal shutdown route, so jobs,
  * listeners, ledger and lock close in turn); only a server that has not stopped when the wait ends
  * is killed, reported as `forced`.
+ *
+ * A live PID whose start time the OS will not tell (on Windows, a process of another logon session
+ * or elevation) is `unverified`: never stopped, never treated as free, and its record is kept, so
+ * no second process is started beside it (production 2026-11-02: a second Zalo assistant started
+ * beside the first one when its start time could not be read).
  * The OS probe is injected, so the rule is tested without touching real processes.
  */
 import { execFileSync } from "node:child_process";
@@ -46,16 +51,25 @@ export function readPidRecord(path: string): PidRecord | null {
   }
 }
 
-/** True when `record.pid` is alive and started when the record says. */
-export function isRecordedProcess(record: PidRecord, probe: ProcessProbe, clock: Clock): boolean {
-  if (!probe.isAlive(record.pid)) return false;
+/**
+ * Whether the recorded PID is the process started then: `ours` (alive, started when recorded),
+ * `not_ours` (alive, started at another time: the OS reused the PID), `dead`, or `unknown` (alive,
+ * but the OS does not say when it started).
+ */
+export function recordIdentity(record: PidRecord, probe: ProcessProbe, clock: Clock): "ours" | "not_ours" | "dead" | "unknown" {
+  if (!probe.isAlive(record.pid)) return "dead";
   const elapsed = probe.elapsedSeconds(record.pid);
-  if (elapsed === null) return false;
+  if (elapsed === null) return "unknown";
   const started = toMs(clock.now()) - elapsed * 1000;
-  return Math.abs(started - toMs(parseInstant(record.startedAt))) <= START_TOLERANCE_MS;
+  return Math.abs(started - toMs(parseInstant(record.startedAt))) <= START_TOLERANCE_MS ? "ours" : "not_ours";
 }
 
-export type StopOutcome = "stopped" | "forced" | "nothing_recorded" | "not_running" | "not_ours";
+/** True when `record.pid` is alive and started when the record says. */
+export function isRecordedProcess(record: PidRecord, probe: ProcessProbe, clock: Clock): boolean {
+  return recordIdentity(record, probe, clock) === "ours";
+}
+
+export type StopOutcome = "stopped" | "forced" | "nothing_recorded" | "not_running" | "not_ours" | "unverified";
 
 /** The ordered stop the server offers (its internal shutdown route), and how long to wait for it. */
 export interface GracefulStop {
@@ -90,7 +104,9 @@ export async function stopRecorded(path: string, probe: ProcessProbe, clock: Clo
     rmSync(path, { force: true });
     return { outcome: "not_running", pid: record.pid };
   }
-  if (!isRecordedProcess(record, probe, clock)) {
+  const identity = recordIdentity(record, probe, clock);
+  if (identity === "unknown") return { outcome: "unverified", pid: record.pid };
+  if (identity !== "ours") {
     rmSync(path, { force: true });
     return { outcome: "not_ours", pid: record.pid };
   }
@@ -111,13 +127,24 @@ export function parseEtime(text: string): number | null {
   return Number(d ?? 0) * 86_400 + Number(h ?? 0) * 3_600 + Number(m) * 60 + Number(s);
 }
 
+/**
+ * The process's age on Windows: Get-Process's StartTime needs a handle to the process, which
+ * Windows refuses across logon sessions and elevation (a task's S4U process asking about one started
+ * from an elevated console); WMI's CreationDate needs none, so it is the fallback.
+ */
+export const WINDOWS_ELAPSED_SCRIPT = (pid: number): string =>
+  `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; $t = if ($p) { $p.StartTime }; ` +
+  `if ($null -eq $t) { $t = (Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue).CreationDate }; ` +
+  `if ($null -ne $t) { [int]((Get-Date) - $t).TotalSeconds }`;
+
 function elapsedOnThisOs(pid: number): number | null {
   try {
     if (process.platform === "win32") {
-      const script = `[int]((Get-Date) - (Get-Process -Id ${pid}).StartTime).TotalSeconds`;
+      const script = WINDOWS_ELAPSED_SCRIPT(pid);
       const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-      const seconds = Number(out.trim());
-      return Number.isInteger(seconds) ? seconds : null;
+      const text = out.trim();
+      const seconds = Number(text);
+      return text !== "" && Number.isInteger(seconds) ? seconds : null;
     }
     return parseEtime(execFileSync("ps", ["-o", "etime=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
   } catch {

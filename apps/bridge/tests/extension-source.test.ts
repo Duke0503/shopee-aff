@@ -18,16 +18,26 @@ const SOURCES = readdirSync(join(ROOT, "src")).filter((f) => f.endsWith(".ts")).
 const code = (text: string) => text.replace(/\/\*\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 describe("Story 5.3 AC4: no Shopee signature and no direct Shopee API call", () => {
-  it("the source builds no signature header, names no Shopee API path and adds no request header but the bridge token", () => {
+  it("the source builds no signature header, names no Shopee API path but the report list the page itself asks for, and adds no request header but the bridge token", () => {
     const forbidden = /af-ac-enc|x-sap-|x-csrftoken|x-api-source|x-shopee|signature|hmac|crypto\.subtle|\/api\/v\d|\/gql|graphql|open-api/i;
-    for (const { file, text } of SOURCES) expect(`${file}: ${code(text).match(forbidden)?.[0] ?? ""}`).toBe(`${file}: `);
+    const REPORT_LIST = '"/api/v3/report/list"';
+    for (const { file, text } of SOURCES) {
+      const allowed = file === "shopee-page.ts" ? code(text).replace(`REPORT_API_PATH = ${REPORT_LIST}`, "") : code(text);
+      expect(`${file}: ${allowed.match(forbidden)?.[0] ?? ""}`).toBe(`${file}: `);
+    }
+    expect(SOURCES.filter(({ text }) => code(text).includes(REPORT_LIST)).map((s) => s.file)).toEqual(["shopee-page.ts"]);
   });
 
-  it("only the server client and the worker's wiring touch fetch, and no page script calls the network", () => {
+  it("only the server client, the worker's wiring and the report list page script touch fetch; that script makes one plain GET with the page's cookies", () => {
     const users = SOURCES.filter(({ text }) => /\bfetch(Fn)?\b|XMLHttpRequest|WebSocket|sendBeacon/.test(code(text))).map((s) => s.file).sort();
-    expect(users).toEqual(["background.ts", "bridge-service.ts", "server-client.ts"]);
+    expect(users).toEqual(["background.ts", "bridge-service.ts", "report-api-script.ts", "server-client.ts"]);
     const page = SOURCES.find((s) => s.file === "page-scripts.ts")?.text ?? "";
     expect(code(page)).not.toMatch(/fetch|XMLHttpRequest|chrome\./);
+    // The live extension's request (report_reader.py on main): same origin, GET, no header, no body.
+    const report = code(SOURCES.find((s) => s.file === "report-api-script.ts")?.text ?? "");
+    expect(report.match(/\bfetch\(/g)).toHaveLength(1);
+    expect(report).toContain('fetch(`${input.path}?${query}`, { credentials: "include" })');
+    expect(report).not.toMatch(/headers|method|body:|XMLHttpRequest|chrome\.|setTimeout|setInterval|https?:\/\//);
   });
 
   it("the manifest reaches only the affiliate dashboard, 127.0.0.1 and the Shopee and ShopeeFood hosts a short link resolves through (Stories 5.4, 5.11), with no debugger permission", () => {

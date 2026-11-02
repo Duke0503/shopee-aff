@@ -196,6 +196,19 @@ describe("Story 5.9: the browser session and the report page are trusted only as
     expect(all(paused, "SELECT kind FROM alerts")).toContainEqual({ kind: "bridge_login_lost" });
   });
 
+  it("production 2026-11-02: a failed read logs its precise reason code from the extension (never data), not only report_fetch_failed", async () => {
+    for (const reason of ["report_http_error", "report_api_error", "report_not_json", "report_network_error", "report_bad_answer", "page_not_ready"]) {
+      const ledger = freshLedger();
+      const lines: Record<string, unknown>[] = [];
+      const logger = createLogger({ level: "info", destination: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } });
+      const bridge = reportBridge([], null, () => ({ outcome: "failed", reason }));
+      expect((await runHourlyReconcile({ ...context(ledger, bridge), logger }))[0]).toMatchObject({ outcome: "FAILED", errorCode: "report_fetch_failed" });
+      expect(lines.find((l) => l["msg"] === "orders.reconciliation.read_failed")).toMatchObject({ errorCode: "report_fetch_failed", reason });
+      expect(lines.find((l) => l["msg"] === "orders.reconciliation.failed")).toMatchObject({ outcome: "FAILED", errorCode: "report_fetch_failed", reason });
+      expect(all(ledger, "SELECT held_reason, paused_reason FROM link_queue_state")).toEqual([]);
+    }
+  });
+
   it("no page is asked for while the Shopee queue is held or paused", async () => {
     const ledger = freshLedger();
     ledger.sqlite.exec("INSERT INTO link_queue_state (queue, paused_reason, paused_at) VALUES ('shopee', 'login_redirect', '2026-10-30T06:00:00.000Z')");
@@ -207,11 +220,11 @@ describe("Story 5.9: the browser session and the report page are trusted only as
   it("a page that shows another page number, a row that is no conversion, or rows outside the window fail the read", async () => {
     const clock = fixedClock(NOW);
     const read = (bridge: BridgePort) => shopeeBridgeSource(sourceDeps(freshLedger(), bridge, clock)).read(hourlyWindow(clock), NEVER);
-    await expect(read(reportBridge([], null, () => ({ outcome: "value", value: { page: 2, total: null, list: [] } })))).rejects.toMatchObject({ code: "report_fetch_failed" });
-    await expect(read(reportBridge([[{ checkout_id: "1", payout: 3 }]]))).rejects.toMatchObject({ code: "report_fetch_failed" });
-    await expect(read(reportBridge([[conversion("261001OLD00001", { purchaseTime: PURCHASED - 30 * 86_400 })]]))).rejects.toMatchObject({ code: "report_fetch_failed" });
-    await expect(read(reportBridge([], null, () => ({ outcome: "unavailable", reason: "no_bridge" })))).rejects.toMatchObject({ code: "report_source_unavailable" });
-    await expect(read(fakeBridge())).rejects.toMatchObject({ code: "report_source_unavailable" });
+    await expect(read(reportBridge([], null, () => ({ outcome: "value", value: { page: 2, total: null, list: [] } })))).rejects.toMatchObject({ code: "report_fetch_failed", reason: "page_mismatch" });
+    await expect(read(reportBridge([[{ checkout_id: "1", payout: 3 }]]))).rejects.toMatchObject({ code: "report_fetch_failed", reason: "not_a_conversion" });
+    await expect(read(reportBridge([[conversion("261001OLD00001", { purchaseTime: PURCHASED - 30 * 86_400 })]]))).rejects.toMatchObject({ code: "report_fetch_failed", reason: "outside_window" });
+    await expect(read(reportBridge([], null, () => ({ outcome: "unavailable", reason: "no_bridge" })))).rejects.toMatchObject({ code: "report_source_unavailable", reason: "no_bridge" });
+    await expect(read(fakeBridge())).rejects.toMatchObject({ code: "report_source_unavailable", reason: "no_report_bridge" });
   });
 
   it("production reads Shopee through the bridge and ignores a saved file; dev reads a saved file when one is set", () => {

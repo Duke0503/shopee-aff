@@ -6,19 +6,20 @@
  * touches Task Scheduler, the VPS, Cloudflare or a live process.
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Clock } from "@cashback/core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AFFILIATE_START_URL, edgeArgs, findEdge, HostLaunchError, launchSpec, pidFileOf, READY_WAIT_MS, recordedState, runRecorded, STARTING_WAIT_MS, startRecorded, waitForServer, type Launched, type LaunchSpec, type StartDeps } from "../src/host/host-process";
+import { AFFILIATE_START_URL, edgeArgs, findEdge, HostLaunchError, hostLockFileOf, launchSpec, pidFileOf, READY_WAIT_MS, recordedState, runRecorded, STARTING_WAIT_MS, startRecorded, waitForServer, type Launched, type LaunchSpec, type StartDeps } from "../src/host/host-process";
 import { productionGaps } from "../src/host/production-readiness";
 import { blobsOf, existingRef, gitIn, keysFoundIn, keysSharedWith, searchedSecrets, splitBatch } from "../src/host/secrets-check";
 import { checkTunnelConfig } from "../src/host/tunnel-config";
 import { configFilePath, parseConfig, REPOSITORY_ROOT } from "../src/platform/config/env.config";
 import { ACCESS_JWT_HEADER } from "../src/platform/http/access-jwt.guard";
 import { buildServers, close, listen, LOOPBACK, type Servers } from "../src/platform/http/servers";
-import { readPidRecord, writePidRecord, type ProcessProbe } from "../src/platform/lifecycle/dev-process";
+import { osProcessProbe, readPidRecord, WINDOWS_ELAPSED_SCRIPT, writePidRecord, type ProcessProbe } from "../src/platform/lifecycle/dev-process";
+import { acquireServerLock } from "../src/platform/lock/server-lock";
 import { phaseFilePath, readServerPhase, writeServerPhase } from "../src/platform/lifecycle/server-phase";
 import { memoryLogger } from "./helpers/link-ledger";
 import { tempDir } from "./helpers/live-fixture";
@@ -61,6 +62,8 @@ function fakeOs(clock: Clock, processes: Record<number, number> = {}) {
 const PATHS = { repositoryRoot: "C:\\cashback", node: "C:\\node\\node.exe", edge: "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" };
 const CONFIG = { dataDir: "C:\\cashback\\data\\prod", browserProfileDir: "C:\\cashback\\.browser-profile\\prod" };
 const BUILT = (path: string): boolean => path.replaceAll("\\", "/").endsWith("apps/bridge/dist/manifest.json");
+/** A host lock nobody else holds. */
+const FREE = () => ({ release: () => undefined });
 
 describe("Story 8.5: production host services on the Windows VPS", () => {
   it("AC1: the server and assistant tasks start at boot and the affiliate Edge at the operator's log-on, each running `pnpm host run <role> --env prod`", () => {
@@ -100,11 +103,11 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
     const clock = movingClock(NOW);
     const os = fakeOs(clock);
     const pidFile = pidFileOf(tempDir("cashback-run-"), "assistant");
-    const deps: StartDeps = { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null };
+    const deps: StartDeps = { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null, lock: FREE };
     const spec = launchSpec("assistant", CONFIG, PATHS, BUILT);
     expect(await startRecorded(spec, deps)).toEqual({ outcome: "started", pid: 4100 });
     expect(readPidRecord(pidFile)).toEqual({ pid: 4100, startedAt: NOW });
-    expect(await startRecorded(spec, deps)).toEqual({ outcome: "already_running", pid: 4100 });
+    expect(await startRecorded(spec, deps)).toEqual({ outcome: "already_running", pid: 4100, verified: true });
     expect(os.launches).toHaveLength(1);
     // A process that dies before it is ready is reported and leaves no record.
     const other = pidFileOf(tempDir("cashback-run-"), "browser");
@@ -118,7 +121,7 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
     const pidFile = pidFileOf(tempDir("cashback-run-"), "server");
     let child: Launched | null = null;
     const launch = (spec: LaunchSpec): Launched => (child = os.launch("stays")(spec));
-    const running = runRecorded(launchSpec("server", CONFIG, PATHS, BUILT), { pidFile, probe: os.probe, clock, launch, ready: async () => null });
+    const running = runRecorded(launchSpec("server", CONFIG, PATHS, BUILT), { pidFile, probe: os.probe, clock, launch, ready: async () => null, lock: FREE });
     await new Promise((resolve) => setImmediate(resolve));
     expect(readPidRecord(pidFile)?.pid).toBe(4100);
     (child as Launched | null)?.kill();
@@ -156,11 +159,11 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
     const os = fakeOs(clock);
     const pidFile = pidFileOf(tempDir("cashback-run-"), "server");
     const spec = launchSpec("server", CONFIG, PATHS, BUILT);
-    expect(await startRecorded(spec, { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => ({ reason: "still_starting", kill: false }) })).toEqual({ outcome: "started", pid: 4100, pending: "still_starting" });
+    expect(await startRecorded(spec, { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => ({ reason: "still_starting", kill: false }), lock: FREE })).toEqual({ outcome: "started", pid: 4100, pending: "still_starting" });
     expect(readPidRecord(pidFile)?.pid).toBe(4100);
     expect(os.alive.has(4100)).toBe(true);
     const other = pidFileOf(tempDir("cashback-run-"), "server");
-    expect(await startRecorded(spec, { pidFile: other, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => ({ reason: "not_healthy", kill: true }) })).toEqual({ outcome: "failed", reason: "not_healthy" });
+    expect(await startRecorded(spec, { pidFile: other, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => ({ reason: "not_healthy", kill: true }), lock: FREE })).toEqual({ outcome: "failed", reason: "not_healthy" });
     expect(os.alive.has(4101)).toBe(false);
     expect(readPidRecord(other)).toBeNull();
   });
@@ -177,6 +180,81 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
     expect(main.indexOf('phase: "ready"')).toBeGreaterThan(main.indexOf("parts = await start("));
   });
 
+  it("production 2026-11-02: a recorded process that is alive but whose start time the OS will not tell is never started beside (one assistant per environment)", async () => {
+    const clock = movingClock(NOW);
+    // PID 8808 is alive; the OS does not say when it started (another logon session or elevation on Windows).
+    const os = fakeOs(clock, { 8808: 60 });
+    const probe: ProcessProbe = { ...os.probe, elapsedSeconds: () => null };
+    const pidFile = pidFileOf(tempDir("cashback-run-"), "assistant");
+    writePidRecord(pidFile, { pid: 8808, startedAt: "2026-11-02T02:59:00.000Z" });
+    expect(recordedState(pidFile, probe, clock)).toMatchObject({ state: "unverified", pid: 8808 });
+    const spec = launchSpec("assistant", CONFIG, PATHS, BUILT);
+    const deps: StartDeps = { pidFile, probe, clock, launch: os.launch("stays"), ready: async () => null, lock: FREE };
+    expect(await startRecorded(spec, deps)).toEqual({ outcome: "already_running", pid: 8808, verified: false });
+    expect(await runRecorded(spec, deps)).toEqual({ outcome: "already_running", pid: 8808, verified: false });
+    expect(os.launches).toEqual([]);
+    expect(readPidRecord(pidFile)?.pid).toBe(8808);
+    // Every role gets the same decision.
+    for (const role of ["server", "browser"] as const) {
+      const file = pidFileOf(tempDir("cashback-run-"), role);
+      writePidRecord(file, { pid: 8808, startedAt: "2026-11-02T02:59:00.000Z" });
+      expect(await startRecorded(launchSpec(role, CONFIG, PATHS, BUILT), { ...deps, pidFile: file })).toMatchObject({ outcome: "already_running", pid: 8808 });
+    }
+    expect(os.launches).toEqual([]);
+  });
+
+  it("production 2026-11-02: while another host command holds the role's host lock, start and run start nothing", async () => {
+    const clock = movingClock(NOW);
+    const os = fakeOs(clock);
+    const pidFile = pidFileOf(tempDir("cashback-run-"), "assistant");
+    const deps: StartDeps = { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null, lock: () => null };
+    const spec = launchSpec("assistant", CONFIG, PATHS, BUILT);
+    expect(await startRecorded(spec, deps)).toEqual({ outcome: "busy" });
+    expect(await runRecorded(spec, deps)).toEqual({ outcome: "busy" });
+    expect(os.launches).toEqual([]);
+  });
+
+  it("production 2026-11-02: `host run` holds the role's real OS host lock until its child exits, so a second command cannot start a second child", async () => {
+    const clock = movingClock(NOW);
+    const os = fakeOs(clock);
+    const runDir = tempDir("cashback-run-");
+    const pidFile = pidFileOf(runDir, "assistant");
+    const lock = () => acquireServerLock(hostLockFileOf(runDir, "assistant"));
+    let child: Launched | null = null;
+    const spec = launchSpec("assistant", CONFIG, PATHS, BUILT);
+    const running = runRecorded(spec, { pidFile, probe: os.probe, clock, launch: (s) => (child = os.launch("stays")(s)), ready: async () => null, lock });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(readPidRecord(pidFile)?.pid).toBe(4100);
+    // Even with the record gone (or unreadable), the held lock refuses a second start.
+    rmSync(pidFile);
+    expect(await startRecorded(spec, { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null, lock })).toEqual({ outcome: "busy" });
+    expect(os.launches).toHaveLength(1);
+    (child as Launched | null)?.kill();
+    expect(await running).toEqual({ outcome: "exited", pid: 4100, code: 1 });
+    // Released once the child exited.
+    const again = lock();
+    expect(again).not.toBeNull();
+    again?.release();
+  });
+
+  it("production 2026-11-02: the tasks ignore a new instance while one runs; the Windows probe reads a start time without a process handle", () => {
+    const install = script("install-tasks.ps1");
+    expect(install).toContain("-MultipleInstances IgnoreNew");
+    expect(install.match(/-Settings \(New-OwnSettings\)/g)).toHaveLength(1);
+    expect(install.match(/Register-OwnTask \$OwnTasks\.\w+/g)).toHaveLength(3);
+    const probe = WINDOWS_ELAPSED_SCRIPT(8808);
+    expect(probe).toContain("Get-Process -Id 8808");
+    expect(probe).toContain('Get-CimInstance Win32_Process -Filter "ProcessId = 8808"');
+    expect(probe).toContain(".CreationDate");
+  });
+
+  it.runIf(process.platform === "win32")("production 2026-11-02: on Windows the probe tells this process's start time", () => {
+    const seconds = osProcessProbe.elapsedSeconds(process.pid);
+    expect(seconds).not.toBeNull();
+    expect(seconds as number).toBeGreaterThanOrEqual(0);
+    expect(seconds as number).toBeLessThan(3_600);
+  });
+
   it("start and stop act only on recorded PIDs: a PID the OS gave to another process is 'not ours' and is started over, never stopped", async () => {
     const clock = movingClock(NOW);
     // PID 7000 is alive but started an hour after the record says: another process.
@@ -184,7 +262,7 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
     const pidFile = pidFileOf(tempDir("cashback-run-"), "server");
     writePidRecord(pidFile, { pid: 7000, startedAt: "2026-11-02T02:00:00.000Z" });
     expect(recordedState(pidFile, os.probe, clock)).toMatchObject({ state: "not_ours", pid: 7000 });
-    expect(await startRecorded(launchSpec("server", CONFIG, PATHS, BUILT), { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null })).toEqual({ outcome: "started", pid: 4100 });
+    expect(await startRecorded(launchSpec("server", CONFIG, PATHS, BUILT), { pidFile, probe: os.probe, clock, launch: os.launch("stays"), ready: async () => null, lock: FREE })).toEqual({ outcome: "started", pid: 4100 });
     expect(os.killed).toEqual([]);
     expect(os.alive.has(7000)).toBe(true);
   });

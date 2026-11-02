@@ -30,8 +30,11 @@ export interface PageDriver {
   href(): Promise<string>;
   /** Loads `url` in the tab and waits for the load to finish, at most `LOAD_WAIT_MS`. */
   open(url: string): Promise<void>;
-  /** Runs one page script in the tab and returns its answer. */
-  run<A, R>(func: (arg: A) => R, arg: A): Promise<R>;
+  /**
+   * Runs one page script in the tab and returns its answer; one not answered within `answerMs`
+   * (default `SCRIPT_ANSWER_MS`) means a frozen page.
+   */
+  run<A, R>(func: (arg: A) => R, arg: A, answerMs?: number): Promise<R>;
 }
 
 export const LOAD_WAIT_MS = 30_000;
@@ -133,10 +136,10 @@ export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = s
       await wait(LOAD_POLL_MS);
       await settle(id);
     },
-    async run(func, arg) {
+    async run(func, arg, answerMs = SCRIPT_ANSWER_MS) {
       const id = current();
       const answer = chrome.scripting.executeScript({ target: { tabId: id }, world: "MAIN", func, args: [arg] });
-      const looked = await Promise.race([answer, wait(SCRIPT_ANSWER_MS).then((): typeof FROZEN => FROZEN)]);
+      const looked = await Promise.race([answer, wait(answerMs).then((): typeof FROZEN => FROZEN)]);
       if (looked === FROZEN) throw new Blocked(await frozenAnswer(id));
       const [first] = looked as Awaited<typeof answer>;
       if (first === undefined || !("result" in first)) throw new BridgeTabError("the page script returned nothing");

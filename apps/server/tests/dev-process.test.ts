@@ -73,15 +73,16 @@ describe("Story 8.1 AC2: the stop script stops only the PIDs it recorded", () =>
     expect([os.killed, asked]).toEqual([[], false]);
   });
 
-  it("AC2: with no record, a dead PID, an unreadable record or an unknown start time nothing is stopped", async () => {
+  it("AC2: with no record, a dead PID, an unreadable record or an unknown start time nothing is stopped; an unknown start time keeps the record", async () => {
     const dir = tempDir("cashback-run-");
     const os = fakeOs({ 4242: 60 });
     expect(await stopRecorded(pidFilePath(dir), os, NOW)).toEqual({ outcome: "nothing_recorded", pid: null });
     writePidRecord(pidFilePath(dir), { pid: 5151, startedAt: "2026-11-01T02:59:00.000Z" });
     expect(await stopRecorded(pidFilePath(dir), os, NOW)).toEqual({ outcome: "not_running", pid: 5151 });
     writePidRecord(pidFilePath(dir), { pid: 4242, startedAt: "2026-11-01T02:59:00.000Z" });
-    expect(await stopRecorded(pidFilePath(dir), { ...os, elapsedSeconds: () => null }, NOW)).toEqual({ outcome: "not_ours", pid: 4242 });
+    expect(await stopRecorded(pidFilePath(dir), { ...os, elapsedSeconds: () => null }, NOW)).toEqual({ outcome: "unverified", pid: 4242 });
     expect(os.killed).toEqual([]);
+    expect(readPidRecord(pidFilePath(dir))?.pid).toBe(4242);
     expect(readPidRecord(join(dir, "missing.pid"))).toBeNull();
   });
 

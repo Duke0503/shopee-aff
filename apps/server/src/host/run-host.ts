@@ -30,7 +30,8 @@ import { JOB_STOP_TIMEOUT_MS } from "../platform/jobs/job-schedules";
 import { osProcessProbe, stopRecorded, type GracefulStop } from "../platform/lifecycle/dev-process";
 import { SHUTDOWN_PATH } from "../platform/lifecycle/shutdown.routes";
 import { phaseFilePath, readServerPhase } from "../platform/lifecycle/server-phase";
-import { EDGE_CANDIDATES, findEdge, HOST_ROLES, HostLaunchError, launchSpec, pidFileOf, recordedState, runRecorded, START_ORDER, startRecorded, type HostRole, type Launched, type LaunchSpec, type NotReady, waitForServer } from "./host-process";
+import { acquireServerLock } from "../platform/lock/server-lock";
+import { EDGE_CANDIDATES, findEdge, HOST_ROLES, HostLaunchError, hostLockFileOf, launchSpec, pidFileOf, recordedState, runRecorded, START_ORDER, startRecorded, type HostRole, type Launched, type LaunchSpec, type NotReady, waitForServer } from "./host-process";
 import { productionGaps } from "./production-readiness";
 import { blobsOf, existingRef, gitIn, keysFoundIn, keysSharedWith, searchedSecrets } from "./secrets-check";
 import { checkTunnelConfig } from "./tunnel-config";
@@ -77,6 +78,9 @@ function readiness(config: ServerConfig) {
   };
 }
 
+/** The role's host lock, an OS lock dropped when this command exits (platform/lock/server-lock.ts). */
+const hostLock = (config: ServerConfig, role: HostRole) => () => acquireServerLock(hostLockFileOf(config.runDir, role));
+
 function rolesOf(name: string | undefined): HostRole[] | null {
   if (name === "all") return [...START_ORDER];
   return (HOST_ROLES as readonly (string | undefined)[]).includes(name) ? [name as HostRole] : null;
@@ -99,7 +103,7 @@ async function start(env: Environment, config: ServerConfig, roles: readonly Hos
       lines.push(spec);
       continue;
     }
-    const result = await startRecorded(spec, { pidFile: pidFileOf(config.runDir, role), probe: osProcessProbe, clock: systemClock, launch: (s) => launch(env, s, true), ready: readiness(config) });
+    const result = await startRecorded(spec, { pidFile: pidFileOf(config.runDir, role), probe: osProcessProbe, clock: systemClock, launch: (s) => launch(env, s, true), ready: readiness(config), lock: hostLock(config, role) });
     lines.push({ event: `platform.host.${result.outcome}`, env, role, ...result });
   }
   return lines;
@@ -109,7 +113,7 @@ async function start(env: Environment, config: ServerConfig, roles: readonly Hos
 async function runRole(env: Environment, config: ServerConfig, role: HostRole, edge: string | undefined): Promise<{ lines: Line[]; code: number }> {
   const spec = specOf(env, config, role, edge);
   if ("event" in spec) return { lines: [spec], code: 1 };
-  const result = await runRecorded(spec, { pidFile: pidFileOf(config.runDir, role), probe: osProcessProbe, clock: systemClock, launch: (s) => launch(env, s, false), ready: readiness(config) });
+  const result = await runRecorded(spec, { pidFile: pidFileOf(config.runDir, role), probe: osProcessProbe, clock: systemClock, launch: (s) => launch(env, s, false), ready: readiness(config), lock: hostLock(config, role) });
   const code = result.outcome === "exited" ? (result.code ?? 1) : result.outcome === "failed" ? 1 : 0;
   return { lines: [{ event: `platform.host.${result.outcome}`, env, role, ...result }], code };
 }
@@ -162,7 +166,7 @@ function check(env: Environment, config: ServerConfig, options: { tunnel?: strin
   return lines;
 }
 
-const FAILED = /\.(failed|refused|settings_missing|secrets_committed|secrets_shared|secrets_unchecked|tunnel_refused|usage)$/;
+const FAILED = /\.(failed|refused|unverified|settings_missing|secrets_committed|secrets_shared|secrets_unchecked|tunnel_refused|usage)$/;
 
 async function run(argv: readonly string[]): Promise<Line[] | { lines: Line[]; code: number }> {
   const { values, positionals } = parseArgs({

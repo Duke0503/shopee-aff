@@ -11,6 +11,7 @@ import { browserBridge, readShopeePayoutRecords, type BridgeTimer } from "../src
 import { PAYOUT_RECORD_ALERTS, payoutRecordJobs, runShopeePayoutRecords } from "../src/reconcile/payout-record.job";
 import type { Ledger } from "../src/platform/db/ledger";
 import { createLogger } from "../src/platform/log/logger";
+import { memoryLogger } from "./helpers/link-ledger";
 import type { BridgePayoutRecordResult, BridgePort } from "../src/platform/ports/bridge.port";
 import { closeLedgers } from "./helpers/order-ledger";
 import { CLOCK, payoutLedger } from "./helpers/payout-ledger";
@@ -62,7 +63,7 @@ describe("Story 4.22 acceptance criteria", () => {
   it("AC1: three batches (paid, processing, failed) are each recorded once in whole dong with their times; a second run records nothing new", async () => {
     const ledger = payoutLedger();
     const bridge = payoutBridge(page(FAILED, PROCESSING, PAID));
-    expect(await run(ledger, bridge)).toEqual({ batches: 3, recorded: 3, replays: 0, refused: 0 });
+    expect(await run(ledger, bridge)).toEqual({ batches: 3, recorded: 3, replays: 0, refused: 0, skipped: 0 });
     const stored = settlements(ledger);
     expect(stored).toEqual([
       { network: "shopee", network_payout_id: "900002", status: "PAID", amount: withheldNet(100_000), eligible_amount: 100_000, withheld: 1, created_at: "2026-09-28T03:00:00.000Z", paid_at: "2026-10-01T03:00:00.000Z", match: expect.any(String) },
@@ -70,7 +71,7 @@ describe("Story 4.22 acceptance criteria", () => {
       { network: "shopee", network_payout_id: "900004", status: "FAILED", amount: withheldNet(20_000), eligible_amount: 20_000, withheld: 1, created_at: "2026-10-05T03:00:00.000Z", paid_at: null, match: "PENDING" },
     ]);
     const audits = count(ledger, "audit_entries");
-    expect(await run(ledger, bridge)).toEqual({ batches: 3, recorded: 0, replays: 3, refused: 0 });
+    expect(await run(ledger, bridge)).toEqual({ batches: 3, recorded: 0, replays: 3, refused: 0, skipped: 0 });
     expect(settlements(ledger)).toEqual(stored);
     expect(count(ledger, "audit_entries")).toBe(audits);
   });
@@ -95,7 +96,6 @@ describe("Story 4.22 acceptance criteria", () => {
   it("AC3: rows without the known record shape, or with an unreadable amount, write nothing, fail the run loudly and raise an owner alert", async () => {
     const pages: BridgePayoutRecordResult[] = [
       page({ ...PAID, totalPaymentAmount: "12,5 trieu" }, PROCESSING),
-      page(PAID, { ...PROCESSING, payoutPaymentStatus: 7 }),
       page({ ...PAID, payoutId: null }),
       page({ ...PAID, payoutCreatedTime: 0 }),
       { outcome: "value", value: { list: [{ ...PAID, bankAccount: "0123" }] } },
@@ -109,6 +109,32 @@ describe("Story 4.22 acceptance criteria", () => {
       expect(alertKinds(ledger)).toEqual([PAYOUT_RECORD_ALERTS.unreadable.kind]);
     }
     expect(readShopeePayoutRecords([PAID, { ...PAID, totalPaymentAmount: "1" }])).toMatchObject({ ok: false });
+  });
+
+  it("production 2026-11-02: an unknown status skips only that batch with a warning; the batches around it are recorded", async () => {
+    const ledger = payoutLedger();
+    const { logger, lines } = memoryLogger();
+    const unknown = { ...PROCESSING, payoutId: "900005", payoutPaymentStatus: 7 };
+    const odd = { ...PROCESSING, payoutId: "900006", payoutPaymentStatus: "on hold" };
+    expect(await runShopeePayoutRecords({ ledger, clock: CLOCK, bridge: payoutBridge(page(unknown, odd, PROCESSING, PAID)), logger }, NEVER)).toEqual({ batches: 2, recorded: 2, replays: 0, refused: 0, skipped: 2 });
+    expect(settlements(ledger).map((s) => (s as { network_payout_id: string }).network_payout_id)).toEqual(["900002", "900003"]);
+    expect(alertKinds(ledger)).toEqual([PAYOUT_RECORD_ALERTS.refused.kind]);
+    const warnings = lines.map((l) => JSON.parse(l) as Record<string, unknown>).filter((l) => l["msg"] === "payouts.payout_record.unknown_status");
+    expect(warnings.map((l) => [l["level"], l["networkPayoutId"], l["status"]])).toEqual([[40, "900005", "7"], [40, "900006", "unreadable"]]);
+  });
+
+  it("production 2026-11-02: every payoutPaymentStatus the live payout_batches hold maps as the live system stored it (10 paid, 1 processing, 2 and 9 failed)", () => {
+    // The live batch of 2026-10-29 (status 2, stored `failed`, no arrival time), with its amounts.
+    const live = { accountType: 3, eligibleTotalAmount: "6074300000", invoiceStatus: 1, payArrivalTime: 0, payoutCreatedTime: 1793214007, payoutId: "17384440701261029", payoutPaymentStatus: 2, totalPaymentAmount: "5407300000" };
+    const read = readShopeePayoutRecords([live, { ...live, payoutId: "1", payoutPaymentStatus: 1 }, { ...live, payoutId: "2", payoutPaymentStatus: 10, payArrivalTime: 1793270584 }, { ...live, payoutId: "3", payoutPaymentStatus: 9 }]);
+    expect(read).toMatchObject({ ok: true, skipped: [] });
+    expect(read.ok && read.batches.map((b) => [b.networkPayoutId, b.status, b.amount, b.eligibleAmount])).toEqual([
+      ["17384440701261029", "PROCESSING", 54_073, 60_743],
+      ["1", "PROCESSING", 54_073, 60_743],
+      ["2", "PAID", 54_073, 60_743],
+      ["3", "FAILED", 54_073, 60_743],
+    ]);
+    expect(readShopeePayoutRecords([{ ...live, payoutPaymentStatus: "__proto__" }])).toEqual({ ok: true, batches: [], skipped: [{ networkPayoutId: "17384440701261029", status: "unreadable" }] });
   });
 
   it("AC4: a captcha holds and the login page pauses the Shopee queue exactly as for a link job, and nothing is written; a held queue is not read", async () => {

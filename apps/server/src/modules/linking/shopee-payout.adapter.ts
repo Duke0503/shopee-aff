@@ -7,7 +7,8 @@
  *
  * While the Shopee queue is held or paused no page is asked for; a page answered with a captcha
  * or the login page holds or pauses the queue as a link submission does. Anything but a readable
- * page fails the read, so nothing is recorded from it.
+ * page fails the read, so nothing is recorded from it; a batch with a status Shopee added since is
+ * only left out and named in `skipped`.
  */
 import { bridgePayoutRecordValueSchema, type NetworkPayoutRecord } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
@@ -15,7 +16,7 @@ import type { Clock } from "@cashback/core";
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import type { BridgePort } from "../../platform/ports/bridge.port";
-import { readShopeePayoutRecords } from "./domain/shopee-payout-record";
+import { readShopeePayoutRecords, type SkippedPayoutBatch } from "./domain/shopee-payout-record";
 import { shopeeQueueGate } from "./link-queue.command";
 import { blockOnSessionPage } from "./shopee-bridge.adapter";
 
@@ -38,12 +39,18 @@ export interface ShopeePayoutSourceDeps {
   readonly alerts: (db: LedgerDb) => AlertPort;
 }
 
+export interface ShopeePayoutRead {
+  readonly records: NetworkPayoutRecord[];
+  /** Batches left out for a status the server does not know. */
+  readonly skipped: SkippedPayoutBatch[];
+}
+
 /**
  * The batches page 1 of the payout record page shows, as network-payout records in whole dong,
  * oldest first: a batch's matching window starts at the batch before it, so that one is recorded
  * first (the page lists the newest first).
  */
-export async function readShopeePayouts(deps: ShopeePayoutSourceDeps, signal: AbortSignal): Promise<NetworkPayoutRecord[]> {
+export async function readShopeePayouts(deps: ShopeePayoutSourceDeps, signal: AbortSignal): Promise<ShopeePayoutRead> {
   const read = deps.bridge.readPayoutRecords;
   if (read === undefined) throw new PayoutRecordError("payout_record_unavailable", "this bridge reads no payout record page");
   const gate = shopeeQueueGate(deps.ledger.db, deps.clock.now());
@@ -59,5 +66,6 @@ export async function readShopeePayouts(deps: ShopeePayoutSourceDeps, signal: Ab
   const page = readShopeePayoutRecords(value.data.list);
   if (!page.ok) throw new PayoutRecordError("payout_record_unreadable", `the payout record page: ${page.problem}`);
   const oldestFirst = [...page.batches].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.networkPayoutId.localeCompare(b.networkPayoutId));
-  return oldestFirst.map((b) => ({ network: "shopee", networkPayoutId: b.networkPayoutId, status: b.status, amount: b.amount, eligibleAmount: b.eligibleAmount, createdAt: b.createdAt, paidAt: b.paidAt }));
+  const records = oldestFirst.map((b): NetworkPayoutRecord => ({ network: "shopee", networkPayoutId: b.networkPayoutId, status: b.status, amount: b.amount, eligibleAmount: b.eligibleAmount, createdAt: b.createdAt, paidAt: b.paidAt }));
+  return { records, skipped: page.skipped };
 }

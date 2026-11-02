@@ -112,8 +112,8 @@ export { LINK_CLICK_AGENTS, type LinkClickAgent } from "./schema";
 export { answerDeskLinkRequests, DESK_LINK_REQUESTS_LIST } from "./link-requests-desk.list";
 export { linkRequestDeskRoutes, type LinkRequestDeskRouteDeps } from "./http/link-request-desk.routes";
 export { linkReplyFactsOf, type LinkReplyFacts } from "./link-reply.query";
-export { readShopeePayoutRecords, SHOPEE_PAYOUT_STATUS_MAP, type PayoutRecordRead, type ShopeePayoutBatch } from "./domain/shopee-payout-record";
-export { PayoutRecordError, readShopeePayouts, type PayoutRecordErrorCode, type ShopeePayoutSourceDeps } from "./shopee-payout.adapter";
+export { readShopeePayoutRecords, SHOPEE_PAYOUT_STATUS_MAP, type PayoutRecordRead, type ShopeePayoutBatch, type SkippedPayoutBatch } from "./domain/shopee-payout-record";
+export { PayoutRecordError, readShopeePayouts, type PayoutRecordErrorCode, type ShopeePayoutRead, type ShopeePayoutSourceDeps } from "./shopee-payout.adapter";
 export {
   checkLinkDeliveries,
   claimLinkDelivery,

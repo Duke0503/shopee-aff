@@ -79,8 +79,29 @@ export type BridgePayoutRecordJob = z.infer<typeof bridgePayoutRecordJobSchema>;
  * (Story 5.5 pauses or retries on them); the others are about this one submission or page.
  * `source_unresolved`: a ShopeeFood short link or invite the browser could not resolve to a shop
  * (Story 5.11); it counts like any failed submission.
+ *
+ * The `report_*` reasons say why a report page's list could not be read (Story 5.9, production
+ * 2026-11-02): the dashboard answered an HTTP error, its own error, no JSON, no list, or the request
+ * never got an answer. They are codes the server logs, never a body.
  */
-export const BRIDGE_FAILURES = ["captcha", "login_redirect", "page_not_ready", "form_missing", "submit_failed", "shopee_refused", "no_link", "script_error", "bad_job", "unsupported", "source_unresolved"] as const;
+export const BRIDGE_FAILURES = [
+  "captcha",
+  "login_redirect",
+  "page_not_ready",
+  "form_missing",
+  "submit_failed",
+  "shopee_refused",
+  "no_link",
+  "script_error",
+  "bad_job",
+  "unsupported",
+  "source_unresolved",
+  "report_http_error",
+  "report_api_error",
+  "report_not_json",
+  "report_network_error",
+  "report_bad_answer",
+] as const;
 export type BridgeFailure = (typeof BRIDGE_FAILURES)[number];
 
 export const bridgeResultSchema = z.discriminatedUnion("outcome", [

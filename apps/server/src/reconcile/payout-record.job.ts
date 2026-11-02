@@ -10,8 +10,10 @@
  * succeeds, then rests until the next day. A read the bridge could not serve (no browser, the queue
  * held or paused) raises a warning alert and is tried again the next hour.
  *
- * A page that cannot be read whole (no known record shape, an unreadable amount, an unknown status)
- * writes nothing: the run fails loudly and raises an owner alert. A captcha or the login page holds
+ * A page that cannot be read whole (no known record shape, an unreadable amount) writes nothing: the
+ * run fails loudly and raises an owner alert. A batch with a status the server does not know is
+ * skipped with a warning (its id and raw status code) and the `refused` warning alert; the other
+ * batches are still recorded. A captcha or the login page holds
  * or pauses the Shopee queue (and alerts) in the adapter. A batch whose status the recording refuses
  * to move back is skipped and named in a warning alert; the others are still recorded.
  */
@@ -46,6 +48,8 @@ export interface PayoutRecordRun {
   readonly recorded: number;
   readonly replays: number;
   readonly refused: number;
+  /** Batches left out for an unknown status. */
+  readonly skipped: number;
 }
 
 const alert = (deps: PayoutRecordDeps, which: keyof typeof PAYOUT_RECORD_ALERTS): void => {
@@ -54,9 +58,9 @@ const alert = (deps: PayoutRecordDeps, which: keyof typeof PAYOUT_RECORD_ALERTS)
 };
 
 export async function runShopeePayoutRecords(deps: PayoutRecordDeps, signal: AbortSignal): Promise<PayoutRecordRun> {
-  let records;
+  let read;
   try {
-    records = await readShopeePayouts({ bridge: deps.bridge, ledger: deps.ledger, clock: deps.clock, alerts: (db) => alertsFor(db, deps.clock, deps.logger) }, signal);
+    read = await readShopeePayouts({ bridge: deps.bridge, ledger: deps.ledger, clock: deps.clock, alerts: (db) => alertsFor(db, deps.clock, deps.logger) }, signal);
   } catch (error) {
     if (error instanceof PayoutRecordError) {
       deps.logger.error({ code: error.code, reason: error.message }, "payouts.payout_record.read_failed");
@@ -66,6 +70,8 @@ export async function runShopeePayoutRecords(deps: PayoutRecordDeps, signal: Abo
     }
     throw error;
   }
+  const { records, skipped } = read;
+  for (const batch of skipped) deps.logger.warn({ networkPayoutId: batch.networkPayoutId, status: batch.status }, "payouts.payout_record.unknown_status");
   let recorded = 0;
   let replays = 0;
   let refused = 0;
@@ -80,8 +86,8 @@ export async function runShopeePayoutRecords(deps: PayoutRecordDeps, signal: Abo
       deps.logger.warn({ networkPayoutId: record.networkPayoutId, code: error.code }, "payouts.payout_record.refused");
     }
   }
-  if (refused > 0) alert(deps, "refused");
-  const run = { batches: records.length, recorded, replays, refused };
+  if (refused > 0 || skipped.length > 0) alert(deps, "refused");
+  const run = { batches: records.length, recorded, replays, refused, skipped: skipped.length };
   deps.logger.info(run, "payouts.payout_record.read");
   return run;
 }

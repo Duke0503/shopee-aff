@@ -70,23 +70,18 @@ export const COMMISSION_LABEL = "hoa h\u1ed3ng|commission";
 export const XTRA_LABEL = "xtra";
 
 /**
- * The conversion report page (Story 5.9; the live `report_reader.py` and `payout_sync.py` read as
- * reference, without their API call): opened at one page of one purchase-time window, like a
- * person paging through it, and read from the table the page itself rendered. Each row of the
- * table carries the conversion the page shows in its React props (`record`), as the live payout
- * reader reads the payout table; the pager carries the total. The address takes the page and the
- * window as query parameters; whether the page honours them is checked on the server (the page
- * number shown, every purchase time inside the window).
+ * The conversion report page (Story 5.9; the live `report_reader.py` on main read as reference and
+ * mirrored): the bridge opens the report page as it is, then the page asks for one page of its
+ * own list (`/api/v3/report/list`) with the operator's session, as the live extension did in
+ * production (report-api-script.ts). The live page did not take the page or the window from its
+ * address, so they go only into the list request: `page_size`, `page_num`, `purchase_time_s` and
+ * `purchase_time_e` (Unix seconds, both ends included).
  */
 export const REPORT_PAGE_URL = "https://affiliate.shopee.vn/report/conversion_report";
+export const REPORT_API_PATH = "/api/v3/report/list";
 export const REPORT_PAGE_SIZE = 50;
-export const reportPageUrl = (job: { page: number; purchaseTimeStart: number; purchaseTimeEnd: number }): string =>
-  `${REPORT_PAGE_URL}?page_num=${job.page}&page_size=${REPORT_PAGE_SIZE}&purchase_time_s=${job.purchaseTimeStart}&purchase_time_e=${job.purchaseTimeEnd}`;
-export const REPORT_ROW = "tr[data-row-key]";
-export const REPORT_EMPTY = ".ant-empty";
-export const REPORT_PAGER = ".ant-pagination";
-export const REPORT_ACTIVE_PAGE = ".ant-pagination-item-active";
-export const REPORT_LOADING = ".ant-spin-spinning";
+/** The report list's origin: the list request is made only from a page on it. */
+export const AFFILIATE_ORIGIN = "https://affiliate.shopee.vn";
 
 /**
  * The payout record page (Story 4.22; the live `payout_sync.py` read as reference): the operator's

@@ -55,8 +55,9 @@ export interface ShopeeBridgeSourceDeps {
   readonly yieldMaxMs?: number;
 }
 
-const fail = (code: "report_fetch_failed" | "report_source_unavailable" | "report_page_cap", message: string): never => {
-  throw new ReportSourceError(code, message);
+/** Every failure names its reason code, which the reconciliation run logs (production 2026-11-02). */
+const fail = (code: "report_fetch_failed" | "report_source_unavailable" | "report_page_cap", message: string, reason: string): never => {
+  throw new ReportSourceError(code, message, { reason });
 };
 
 /** The window as the report page takes it: whole seconds, both ends included. */
@@ -68,10 +69,10 @@ export function reportSeconds(window: ReportWindow): { purchaseTimeStart: number
 async function yieldToLinks(deps: ShopeeBridgeSourceDeps, signal: AbortSignal | undefined): Promise<void> {
   const step = deps.yieldPollMs ?? REPORT_YIELD_POLL_MS;
   for (let waited = 0; ; waited += step) {
-    if (signal?.aborted === true) fail("report_source_unavailable", "the read was stopped");
+    if (signal?.aborted === true) fail("report_source_unavailable", "the read was stopped", "stopped");
     const now = deps.clock.now();
     const gate = shopeeQueueGate(deps.ledger.db, now);
-    if (gate !== "open") fail("report_source_unavailable", `the Shopee queue is ${gate}; no report page is read`);
+    if (gate !== "open") fail("report_source_unavailable", `the Shopee queue is ${gate}; no report page is read`, `queue_${gate}`);
     if (!linkWorkDue(deps.ledger.db, now) || waited >= (deps.yieldMaxMs ?? REPORT_YIELD_MAX_MS)) return;
     await deps.wait(step, signal);
   }
@@ -98,27 +99,27 @@ export function blockOnSessionPage(deps: Pick<ShopeeBridgeSourceDeps, "ledger" |
 /** A failed page: a captcha holds the queue, the login page pauses it (Story 5.5); the read fails either way. */
 function pageFailed(deps: ShopeeBridgeSourceDeps, page: number, reason: string): never {
   blockOnSessionPage(deps, reason);
-  return fail("report_fetch_failed", `report page ${page}: the browser answered ${reason}`);
+  return fail("report_fetch_failed", `report page ${page}: the browser answered ${reason}`, reason);
 }
 
 /** The page's rows as the contract allows them, the page it says it shows, and rows that look like conversions. */
 function pageValue(deps: ShopeeBridgeSourceDeps, page: number, answer: BridgeReportResult): BridgeReportValue {
-  if (answer.outcome === "unavailable") return fail("report_source_unavailable", `report page ${page}: ${answer.reason}`);
+  if (answer.outcome === "unavailable") return fail("report_source_unavailable", `report page ${page}: ${answer.reason}`, answer.reason);
   if (answer.outcome === "failed") return pageFailed(deps, page, answer.reason);
   const value = bridgeReportValueSchema.safeParse(answer.value);
-  if (!value.success) return fail("report_fetch_failed", `report page ${page}: the answer is not a report page`);
-  if (value.data.page !== page) return fail("report_fetch_failed", `report page ${page}: the page shows page ${value.data.page}`);
-  if (value.data.list.some((row) => !Array.isArray(row["orders"]))) return fail("report_fetch_failed", `report page ${page}: a row is not a conversion`);
+  if (!value.success) return fail("report_fetch_failed", `report page ${page}: the answer is not a report page`, "not_a_report_page");
+  if (value.data.page !== page) return fail("report_fetch_failed", `report page ${page}: the page shows page ${value.data.page}`, "page_mismatch");
+  if (value.data.list.some((row) => !Array.isArray(row["orders"]))) return fail("report_fetch_failed", `report page ${page}: a row is not a conversion`, "not_a_conversion");
   return value.data;
 }
 
 async function ask(deps: ShopeeBridgeSourceDeps, job: ReportBridgeJob, signal: AbortSignal): Promise<BridgeReportResult> {
   const read = deps.bridge.readReportPage;
-  if (read === undefined) return fail("report_source_unavailable", "this bridge reads no report pages");
+  if (read === undefined) return fail("report_source_unavailable", "this bridge reads no report pages", "no_report_bridge");
   try {
     return await read.call(deps.bridge, job, signal);
   } catch (error) {
-    return fail(signal.aborted ? "report_source_unavailable" : "report_fetch_failed", `report page ${job.page}: ${error instanceof Error ? error.message : String(error)}`);
+    return fail(signal.aborted ? "report_source_unavailable" : "report_fetch_failed", `report page ${job.page}: ${error instanceof Error ? error.message : String(error)}`, signal.aborted ? "stopped" : "bridge_error");
   }
 }
 
@@ -156,7 +157,7 @@ async function readPass(deps: ShopeeBridgeSourceDeps, window: ReportWindow, sign
       const content = JSON.stringify(raw);
       const before = id === "" ? undefined : seen.get(id);
       if (before === content) continue;
-      if (before !== undefined) fail("report_fetch_failed", `conversion ${id} shows different content on two pages of one read`);
+      if (before !== undefined) fail("report_fetch_failed", `conversion ${id} shows different content on two pages of one read`, "conversion_changed");
       if (id !== "") seen.set(id, content);
       list.push(raw);
     }
@@ -166,7 +167,7 @@ async function readPass(deps: ShopeeBridgeSourceDeps, window: ReportWindow, sign
       if (total !== null && list.length < total) return { kind: "moved" };
       return { kind: "read", list };
     }
-    if (page >= maxPages) fail("report_page_cap", `${maxPages} full pages of the report and more to come; the window holds too many conversions`);
+    if (page >= maxPages) fail("report_page_cap", `${maxPages} full pages of the report and more to come; the window holds too many conversions`, "page_cap");
   }
 }
 
@@ -176,7 +177,7 @@ async function readConversions(deps: ShopeeBridgeSourceDeps, window: ReportWindo
     const read = await readPass(deps, window, signal);
     if (read.kind === "read") return read.list;
   }
-  return fail("report_fetch_failed", `the report kept changing during ${REPORT_READ_PASSES} reads; the next run reads it again`);
+  return fail("report_fetch_failed", `the report kept changing during ${REPORT_READ_PASSES} reads; the next run reads it again`, "report_moved");
 }
 
 export function shopeeBridgeSource(deps: ShopeeBridgeSourceDeps): WindowedReportSource {
@@ -189,7 +190,7 @@ export function shopeeBridgeSource(deps: ShopeeBridgeSourceDeps): WindowedReport
       const until = Math.ceil(toMs(window.until) / 1000) * 1000;
       // A row without a readable purchase time cannot be shown to be inside the window: the page may have ignored it.
       const outside = rows.filter((r) => r.purchasedAt === null || toMs(r.purchasedAt) < since || toMs(r.purchasedAt) >= until);
-      if (outside.length > 0) fail("report_fetch_failed", `${outside.length} rows were purchased outside the window or at no readable time; the report page did not apply it`);
+      if (outside.length > 0) fail("report_fetch_failed", `${outside.length} rows were purchased outside the window or at no readable time; the report page did not apply it`, "outside_window");
       return { network: "shopee", source: SHOPEE_BRIDGE_REPORT, rows, skippedLines: 0, sha256: null } satisfies SourcedReport;
     },
   };

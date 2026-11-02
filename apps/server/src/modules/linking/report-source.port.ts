@@ -99,14 +99,24 @@ export type ReportSourceErrorCode =
   | "report_window_too_long"
   | "report_source_unavailable";
 
+/** A reason code: lower-case letters, digits and underscores, safe to log (never a body or a value). */
+const REASON = /^[a-z0-9_]{1,48}$/;
+
+/**
+ * A failed read. `reason` says precisely why, as a code for the logs (the bridge's failure reason,
+ * such as `report_http_error`, or the check that refused the answer); `message` may name more.
+ */
 export class ReportSourceError extends Error {
+  readonly reason: string | null;
   constructor(
     readonly code: ReportSourceErrorCode,
     message: string,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown; reason?: string },
   ) {
-    super(message, options);
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = "ReportSourceError";
+    const reason = options?.reason;
+    this.reason = reason === undefined ? null : REASON.test(reason) ? reason : "unreadable_reason";
   }
 }
 

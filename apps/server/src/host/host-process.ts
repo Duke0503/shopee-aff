@@ -7,8 +7,17 @@
  * the live system's `CashbackBackend` and `CashbackAssistant` tasks and the live browser beside
  * them are never touched.
  *
+ * One process per role and environment (production 2026-11-02: a second Zalo assistant was started
+ * beside the first, and the two sessions kicked each other off). Three guards, each enough alone:
+ * the task's `MultipleInstances IgnoreNew`; this start, which starts nothing while the recorded
+ * process is alive unless its start time proves the OS gave the PID to another process (alive with
+ * an unknown start time is `unverified` and counts as running), and which holds the role's host
+ * lock `run/<env>/<role>.host.lock` from its decision until its child exits, so two `pnpm host`
+ * commands never decide at once; and the processes themselves (the server's lock, the assistant's
+ * own instance lock, Edge's one instance per profile).
+ *
  * A start is idempotent: a role whose recorded process is still running reports
- * `already_running` and starts nothing. The tasks run `pnpm host run <role>` (`runRecorded`), which
+ * `already_running` and starts nothing; one whose host lock another command holds reports `busy`. The tasks run `pnpm host run <role>` (`runRecorded`), which
  * stays running as long as the process it started, so a task's repeating trigger, ignored while it
  * runs, restarts only a role that died. The server counts as started once its health route
  * answers: it gets 60 seconds after it last reported the phase `starting`
@@ -27,7 +36,7 @@ import { join } from "node:path";
 import type { Clock } from "@cashback/core";
 
 import type { ServerConfig } from "../platform/config/env.config";
-import { isRecordedProcess, readPidRecord, writePidRecord, type ProcessProbe } from "../platform/lifecycle/dev-process";
+import { readPidRecord, recordIdentity, writePidRecord, type ProcessProbe } from "../platform/lifecycle/dev-process";
 
 export const HOST_ROLES = ["server", "assistant", "browser"] as const;
 export type HostRole = (typeof HOST_ROLES)[number];
@@ -36,6 +45,8 @@ export type HostRole = (typeof HOST_ROLES)[number];
 export const START_ORDER: readonly HostRole[] = HOST_ROLES;
 
 export const pidFileOf = (runDir: string, role: HostRole): string => join(runDir, `${role}.pid`);
+/** The lock a `pnpm host` command holds for one role while it decides and while its child runs. */
+export const hostLockFileOf = (runDir: string, role: HostRole): string => join(runDir, `${role}.host.lock`);
 
 /** The custom link page the bridge works on (apps/bridge/src/shopee-page.ts). */
 export const AFFILIATE_START_URL = "https://affiliate.shopee.vn/offer/custom_link";
@@ -106,14 +117,23 @@ export function launchSpec(role: HostRole, config: Pick<ServerConfig, "dataDir" 
   return { role, command: paths.edge, args: edgeArgs(config.browserProfileDir, extension), cwd: config.browserProfileDir, log: null, ready: "alive" };
 }
 
-export type HostState = "running" | "not_running" | "nothing_recorded" | "not_ours";
+export type HostState = "running" | "unverified" | "not_running" | "nothing_recorded" | "not_ours";
 
-/** What the recorded PID of a role is now; `not_ours` when the OS gave the PID to another process. */
+/**
+ * What the recorded PID of a role is now: `not_ours` only when its start time proves the OS gave
+ * the PID to another process; `unverified` when it is alive and the OS does not say when it started.
+ */
 export function recordedState(pidFile: string, probe: ProcessProbe, clock: Clock): { state: HostState; pid: number | null; startedAt: string | null } {
   const record = readPidRecord(pidFile);
   if (record === null) return { state: "nothing_recorded", pid: null, startedAt: null };
-  if (!probe.isAlive(record.pid)) return { state: "not_running", pid: record.pid, startedAt: record.startedAt };
-  return { state: isRecordedProcess(record, probe, clock) ? "running" : "not_ours", pid: record.pid, startedAt: record.startedAt };
+  const identity = recordIdentity(record, probe, clock);
+  const state: HostState = identity === "ours" ? "running" : identity === "unknown" ? "unverified" : identity === "dead" ? "not_running" : "not_ours";
+  return { state, pid: record.pid, startedAt: record.startedAt };
+}
+
+/** A held host lock. */
+export interface HeldLock {
+  release(): void;
 }
 
 /** A started child as the start needs it. */
@@ -133,6 +153,8 @@ export interface StartDeps {
   readonly launch: (spec: LaunchSpec) => Launched;
   /** Resolves with null when the child is ready, or why it is not and whether it may be killed. */
   readonly ready: (spec: LaunchSpec, child: Launched) => Promise<NotReady | null>;
+  /** Takes the role's host lock, or null when another command holds it. */
+  readonly lock: () => HeldLock | null;
 }
 
 export interface NotReady {
@@ -172,16 +194,32 @@ export async function waitForServer(wait: ServerWait): Promise<NotReady | null> 
   }
 }
 
-export type StartOutcome = { readonly outcome: "started"; readonly pid: number; readonly pending?: string } | { readonly outcome: "already_running"; readonly pid: number } | { readonly outcome: "failed"; readonly reason: string };
+export type StartOutcome =
+  | { readonly outcome: "started"; readonly pid: number; readonly pending?: string }
+  | { readonly outcome: "already_running"; readonly pid: number; readonly verified: boolean }
+  | { readonly outcome: "busy" }
+  | { readonly outcome: "failed"; readonly reason: string };
 
 /**
- * Starts `spec` unless its recorded process still runs. The PID is recorded only once the child is
- * ready; a child that is not is killed (it is the PID this call just started) and nothing is recorded,
+ * Starts `spec` unless its recorded process is alive and not proven to be another process, or
+ * another command holds the role's host lock. The PID is recorded only once the child is ready; a
+ * child that is not is killed (it is the PID this call just started) and nothing is recorded,
  * unless it may not be killed (a server still starting): then it is recorded and `pending` says why.
+ * The host lock is released before this returns; `runRecorded` keeps it until its child exits.
  */
 export async function startRecorded(spec: LaunchSpec, deps: StartDeps): Promise<StartOutcome> {
+  const lock = deps.lock();
+  if (lock === null) return { outcome: "busy" };
+  try {
+    return await startLocked(spec, deps);
+  } finally {
+    lock.release();
+  }
+}
+
+async function startLocked(spec: LaunchSpec, deps: StartDeps): Promise<StartOutcome> {
   const now = recordedState(deps.pidFile, deps.probe, deps.clock);
-  if (now.state === "running" && now.pid !== null) return { outcome: "already_running", pid: now.pid };
+  if ((now.state === "running" || now.state === "unverified") && now.pid !== null) return { outcome: "already_running", pid: now.pid, verified: now.state === "running" };
   const startedAt = deps.clock.now();
   const child = deps.launch(spec);
   const notReady = await deps.ready(spec, child);
@@ -200,13 +238,20 @@ export type RunOutcome = Exclude<StartOutcome, { outcome: "started" }> | { reado
  * What a Task Scheduler task runs (`pnpm host run <role>`): the start above, then a wait for the
  * started process to exit, so the task stays running exactly as long as its process. Its record is
  * removed when it exits (unless a later start recorded another PID), and the exit code is passed on,
- * so a crash fails the task and its restart settings apply. A role already running ends at once.
+ * so a crash fails the task and its restart settings apply. A role already running, or whose host
+ * lock another command holds, ends at once. The host lock is held until the child exits.
  */
 export async function runRecorded(spec: LaunchSpec, deps: StartDeps): Promise<RunOutcome> {
-  const holder: { child: Launched | null } = { child: null };
-  const result = await startRecorded(spec, { ...deps, launch: (s) => (holder.child = deps.launch(s)) });
-  if (result.outcome !== "started" || holder.child === null) return result as RunOutcome;
-  const code = await holder.child.exitCode();
-  if (readPidRecord(deps.pidFile)?.pid === result.pid) rmSync(deps.pidFile, { force: true });
-  return { outcome: "exited", pid: result.pid, code };
+  const lock = deps.lock();
+  if (lock === null) return { outcome: "busy" };
+  try {
+    const holder: { child: Launched | null } = { child: null };
+    const result = await startLocked(spec, { ...deps, launch: (s) => (holder.child = deps.launch(s)) });
+    if (result.outcome !== "started" || holder.child === null) return result as RunOutcome;
+    const code = await holder.child.exitCode();
+    if (readPidRecord(deps.pidFile)?.pid === result.pid) rmSync(deps.pidFile, { force: true });
+    return { outcome: "exited", pid: result.pid, code };
+  } finally {
+    lock.release();
+  }
 }

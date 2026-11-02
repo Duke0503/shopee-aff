@@ -119,6 +119,8 @@ interface Ended extends Started {
   readonly counts: RunCounts;
   readonly outcome: RunOutcome;
   readonly errorCode: string | null;
+  /** Why the read failed, as a code (ReportSourceError.reason); logged, not stored. */
+  readonly reason?: string | null;
 }
 
 function previousFailed(db: LedgerDb, kind: RunKind, network: Ended["network"]): boolean {
@@ -182,7 +184,7 @@ function record(deps: RunDeps, e: Ended): RunRecord {
     const row = db.insert(reconciliationRuns).values(values).returning({ runId: reconciliationRuns.runId }).get();
     return { runId: row.runId, failedBefore };
   });
-  const line = { runId, kind: e.kind, network: e.network, windowFrom: e.window.since, windowTo: e.window.until, outcome: e.outcome, errorCode: e.errorCode, durationMs, ...e.counts };
+  const line = { runId, kind: e.kind, network: e.network, windowFrom: e.window.since, windowTo: e.window.until, outcome: e.outcome, errorCode: e.errorCode, ...(e.reason ? { reason: e.reason } : {}), durationMs, ...e.counts };
   if (clockStepped) deps.logger.warn({ runId, startedAt: e.startedAt, wallClock: wall }, "orders.reconciliation.clock_stepped");
   if (e.outcome === "SUCCEEDED") deps.logger.info(line, "orders.reconciliation.finished");
   else deps.logger.error(line, "orders.reconciliation.failed");
@@ -216,8 +218,9 @@ export async function runReconciliation(kind: RunKind, source: WindowedReportSou
     if (error instanceof ReconciliationRunError) throw error;
     if (aborted(deps)) return null;
     const errorCode = error instanceof ReportSourceError ? error.code : "report_fetch_failed";
-    deps.logger.error({ network: source.network, err: error }, "orders.reconciliation.read_failed");
-    return record(deps, { ...s, report: null, counts: emptyCounts(), outcome: "FAILED", errorCode });
+    const reason = error instanceof ReportSourceError ? error.reason : null;
+    deps.logger.error({ network: source.network, errorCode, reason, err: error }, "orders.reconciliation.read_failed");
+    return record(deps, { ...s, report: null, counts: emptyCounts(), outcome: "FAILED", errorCode, reason });
   }
   if (aborted(deps)) return null;
   if (isStale(deps, s, report)) return record(deps, { ...s, report, counts: { ...emptyCounts(), rowsRead: report.rows.length }, outcome: "SOURCE_STALE", errorCode: "source_stale" });

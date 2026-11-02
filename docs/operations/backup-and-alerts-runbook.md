@@ -201,7 +201,7 @@ Every kind the server raises; a test checks this table against the code.
 | `notification_undeliverable` | warning | a Zalo message could not be delivered | nothing unless it repeats |
 | `shopee_payout_record_failed` | warning | the Shopee payout page could not be read this time | nothing; the job tries again next hour |
 | `shopee_payout_record_unavailable` | warning | the Shopee payout page has no data yet | nothing |
-| `shopee_payout_status_refused` | warning | the payout page showed a status the server does not know | report it; nothing was recorded |
+| `shopee_payout_status_refused` | warning | the payout page showed a batch with a status the server does not know (logged as `payouts.payout_record.unknown_status` with its id and code), or a status the recording refused to move back | report it; that batch was skipped, the other batches were recorded |
 | `restore_drill_due` | warning | the quarterly restore drill is due (none recorded, the last failed, or older than 92 days) | run the drill of `restore-runbook.md` and record it |
 
 A new kind needs a line in `packages/labels/vi/alerts.json` and a row here; the tests fail until
