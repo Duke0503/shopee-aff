@@ -14,13 +14,13 @@ import { shopeeEstimate } from "@cashback/money";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { openSession } from "../src/modules/identity/index";
-import { fakeBridge, WEB_LINKS_PER_CLIENT_HOUR, WEB_LINKS_PER_CUSTOMER_DAY, WEB_LINKS_SAFETY_CAP_HOUR } from "../src/modules/linking/index";
+import { fakeBridge, fakeLinkUrl, WEB_LINKS_PER_CLIENT_HOUR, WEB_LINKS_PER_CUSTOMER_DAY, WEB_LINKS_SAFETY_CAP_HOUR } from "../src/modules/linking/index";
 import type { Ledger } from "../src/platform/db/ledger";
 import { clientKeyer } from "../src/platform/http/client-key";
 import { buildServers, close, type Servers } from "../src/platform/http/servers";
 import { CUSTOMER_SESSION_COOKIE } from "../src/platform/http/session-cookie";
 import { requestOfTicket, ticketOf, webLinkRoutes } from "../src/web/web-link.routes";
-import { alertRows, C1, C2, LINK_START, linkLedger, runLinks, SHOPEE_PRODUCT } from "./helpers/link-ledger";
+import { alertRows, answeringBridge, C1, C2, LINK_START, linkLedger, runLinks, SHOPEE_PRODUCT } from "./helpers/link-ledger";
 
 const ORIGIN = "https://hoantiendp.com";
 const SECRET = "t".repeat(40);
@@ -153,6 +153,18 @@ describe("Story 7.6: Home link converter with a customer code or as a guest", ()
     const queued = await s.post({ url: SHOPEE_PRODUCT, customerCode: "DP00001" }, { cookie: s.cookieOf(C2) });
     expect(webLinkQueuedSchema.parse(queued.body).customerCode).toBe("DP00002");
     expect(s.owners()).toEqual([`${C2}/web/SESSION`]);
+  });
+
+  it("test(web): a signed-in customer's web link is filed under their own id (sub_id1), even with another customer's code typed", async () => {
+    const s = site();
+    const own = await s.post({ url: SHOPEE_PRODUCT }, { cookie: s.cookieOf(C1) });
+    const typedOther = await s.post({ url: product(2), customerCode: "DP00002" }, { cookie: s.cookieOf(C1) });
+    expect([own.body.customerCode, typedOther.body.customerCode]).toEqual(["DP00001", "DP00001"]);
+    const bridge = answeringBridge((job) => ({ outcome: "link", url: fakeLinkUrl(job) }), "fake");
+    await runLinks(s.ledger, bridge);
+    // sub_id1 is what Shopee's report carries back and what reconciliation credits the order to.
+    expect(bridge.jobs.map((j) => j.subId1)).toEqual([C1, C1]);
+    expect(s.owners()).toEqual([`${C1}/web/SESSION`, `${C1}/web/SESSION`]);
   });
 
   it("AC5: a Lazada link gets the server's polite refusal and nothing is queued", async () => {

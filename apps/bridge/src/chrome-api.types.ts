@@ -26,6 +26,7 @@ export interface ChromeApi {
     create(properties: { url: string; pinned: boolean; active: boolean }): Promise<ChromeTab>;
     update(tabId: number, properties: { url?: string; pinned?: boolean; autoDiscardable?: boolean }): Promise<ChromeTab | undefined>;
     reload(tabId: number): Promise<void>;
+    remove(tabId: number): Promise<void>;
   };
   readonly scripting: {
     executeScript<A extends unknown[], R>(injection: { target: { tabId: number }; world: "MAIN"; func: (...args: A) => R; args: A }): Promise<InjectionResult<Awaited<R>>[]>;
@@ -45,6 +46,7 @@ export interface ChromeApi {
     readonly onStartup: ChromeEvent<[]>;
     readonly onInstalled: ChromeEvent<[unknown]>;
     openOptionsPage(): Promise<void>;
+    getURL(path: string): string;
   };
   readonly action: {
     readonly onClicked: ChromeEvent<[unknown]>;

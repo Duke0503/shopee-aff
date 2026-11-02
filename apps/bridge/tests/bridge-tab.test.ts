@@ -4,10 +4,14 @@
  * wake-up event with at most one loop running. A fake Chrome API, no browser.
  */
 import { BRIDGE_INSTANCE_HEADER } from "@cashback/contracts";
+import { instantFromMs } from "@cashback/core";
 import { describe, expect, it } from "vitest";
 
 import { bridgeService, KEEPALIVE_ALARM, KEEPALIVE_MINUTES } from "../src/bridge-service";
-import { chromePageDriver } from "../src/bridge-tab";
+import { Blocked, chromePageDriver, REPLACE_TAB_EVERY_MS, SCRIPT_ANSWER_MS } from "../src/bridge-tab";
+import { runLinkJob } from "../src/link-job";
+import { readPage } from "../src/page-scripts";
+import { runReportJob } from "../src/report-job";
 import type { Fetch } from "../src/server-client";
 import type { FollowLink } from "../src/short-link";
 import { CUSTOM_LINK_URL } from "../src/shopee-page";
@@ -98,5 +102,74 @@ describe("Story 5.3 review 5: one stable instance id per profile", () => {
     // A restart makes a new worker with other random bytes; the stored id is kept.
     await bridgeService({ ...deps, randomBytes: (n: number) => new Uint8Array(n).fill(255) }, stop).start();
     expect(sent).toEqual([id, id]);
+  });
+});
+
+describe("fix(shopee): replace a frozen tab and report what the fresh one shows", () => {
+  const JOB = { ticket: "0".repeat(32), kind: "link", sourceUrl: "https://shopee.vn/Ao-i.11001.22001", subId1: "DEV1000000000000000001", subId2: "DEV26110100001", timeoutMs: 90_000 } as const;
+  const CAPTCHA = "https://affiliate.shopee.vn/verify/traffic?x=1";
+  const LOOK = { textarea: "t", subIdFields: [], result: "r", buttonLabel: "b" };
+
+  /** A tab whose page answers no script, as on 19 Oct 2026 behind a captcha; tab-level calls still answer. */
+  function frozenChrome(landsAt?: string) {
+    const chrome = fakeChrome([{ id: 7, url: "https://shopee.vn/" }, { id: 9, url: CUSTOM_LINK_URL }]);
+    chrome.landsAt = landsAt;
+    Object.assign(chrome, { scripting: { executeScript: () => new Promise(() => undefined) } });
+    return chrome;
+  }
+  function movingClock(at = "2026-11-02T03:00:00.000Z") {
+    let ms = Date.parse(at);
+    return { now: () => instantFromMs(ms), advance: (by: number) => void (ms += by) };
+  }
+
+  it("a page script that never answers opens a fresh custom link tab, closes only the frozen one, and the next job works in the fresh tab", async () => {
+    const chrome = frozenChrome();
+    const wait = recordingWait();
+    const page = chromePageDriver(chrome, wait, movingClock());
+    await page.prepare();
+    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("page_not_ready"));
+    expect(wait.calls).toContain(SCRIPT_ANSWER_MS);
+    expect(chrome.removed).toEqual([9]);
+    expect(chrome.created).toEqual([{ url: CUSTOM_LINK_URL, pinned: true, active: false }]);
+    expect(page.tabId()).toBe(101);
+    expect(chrome.openTabs.map((t) => t.id)).toEqual([7, 101]);
+  });
+
+  it("a captcha or the login page behind a frozen tab is answered as such, read from the fresh tab's address without a script", async () => {
+    const captcha = chromePageDriver(frozenChrome(CAPTCHA), recordingWait(), movingClock());
+    await captcha.prepare();
+    expect(await runLinkJob(JOB, captcha, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    const login = chromePageDriver(frozenChrome("https://shopee.vn/buyer/login?next=x"), recordingWait(), movingClock());
+    await login.prepare();
+    await expect(login.run(readPage, LOOK)).rejects.toEqual(new Blocked("login_redirect"));
+  });
+
+  it("a report job on a frozen page answers what the fresh tab shows too (the other jobs share the same driver)", async () => {
+    const page = chromePageDriver(frozenChrome(CAPTCHA), recordingWait(), movingClock());
+    expect(await runReportJob({ ticket: "a".repeat(32), kind: "report", page: 1, purchaseTimeStart: 1, purchaseTimeEnd: 2, timeoutMs: 90_000 }, page, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+  });
+
+  it("is done at most once every 5 minutes, so a page that keeps freezing cannot loop", async () => {
+    const chrome = frozenChrome(CAPTCHA);
+    const clock = movingClock();
+    const page = chromePageDriver(chrome, recordingWait(), clock);
+    await page.prepare();
+    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("captcha"));
+    clock.advance(REPLACE_TAB_EVERY_MS - 1);
+    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("page_not_ready"));
+    expect(chrome.created).toHaveLength(1);
+    clock.advance(1);
+    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("captcha"));
+    expect(chrome.created).toHaveLength(2);
+    expect(chrome.removed).toEqual([9, 101]);
+  });
+
+  it("a page that answers is never replaced", async () => {
+    const chrome = fakeChrome([{ id: 9, url: CUSTOM_LINK_URL }]);
+    Object.assign(chrome, { scripting: { executeScript: async () => [{ result: { href: CUSTOM_LINK_URL, ready: true, passwordBox: false } }] } });
+    const page = chromePageDriver(chrome, recordingWait(), movingClock());
+    await page.prepare();
+    expect(await page.run(readPage, LOOK)).toEqual({ href: CUSTOM_LINK_URL, ready: true, passwordBox: false });
+    expect([chrome.created, chrome.removed]).toEqual([[], []]);
   });
 });

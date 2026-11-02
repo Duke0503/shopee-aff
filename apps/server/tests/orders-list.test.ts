@@ -9,13 +9,14 @@ import { adminOrdersResponseSchema, type AdminOrderRow } from "@cashback/contrac
 import { searchText, statusesOf } from "@cashback/core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ORDERS_LIST } from "../src/modules/orders/index";
+import { answerOrdersList, ORDERS_LIST } from "../src/modules/orders/index";
+import { openLedger } from "../src/platform/db/ledger";
 import type { Ledger } from "../src/platform/db/ledger";
 import { close, type Servers } from "../src/platform/http/servers";
 import { deskGet, deskPost, errorOf, staffCookie } from "./helpers/desk-http";
 import { closeLedgers } from "./helpers/order-ledger";
 import { CLOCK, codeOf, nameOf, payoutLedger } from "./helpers/payout-ledger";
-import { buildLiveCopy, importOnce, rows } from "./helpers/live-fixture";
+import { buildLiveCopy, CLEAN_LIVE_SQL, importOnce, rows, TEST_CLOCK } from "./helpers/live-fixture";
 import { deskServers } from "./helpers/staff-desk";
 
 /** Product names with diacritics live in a JSON fixture (no Vietnamese in .ts files). */
@@ -190,5 +191,33 @@ describe("list-defects Orders regressions (server)", () => {
       ["Noi com", "https://cf.example.test/a.jpg"],
       ["Tai nghe", null],
     ]);
+  });
+});
+
+describe("fix(admin): the order date filter kept dropping the last day", () => {
+  // Live stored "2026-09-24T23:30:00+07:00" and compared it with "2026-09-24 23:59:59": 'T' sorts
+  // after ' ', so every order on the "to" day was dropped. Here the live text goes through the
+  // cutover import and the filter is a Vietnam-day range that includes its whole end day.
+  const ORDER = "INSERT INTO orders (order_id, customer_id, request_id, order_value, estimated_commission, approved_commission, cashback_amount, status, rejection_reason, recorded_at, approved_at, paid_at, updated_at, platform, notified_status, settlement_status, payout_batch_id, settled_at) VALUES";
+  const LIVE_TIMES = `${ORDER}
+    ('260924LATE0001', '1000000000000000001', NULL, 100000, 5000, NULL, NULL, 'awaiting_approval', NULL, '2026-09-24T23:30:00+07:00', NULL, NULL, '2026-09-24T23:30:00+07:00', 'shopee', NULL, 'unsettled', NULL, NULL),
+    ('260925EARL0002', '1000000000000000001', NULL, 100000, 5000, NULL, NULL, 'awaiting_approval', NULL, '2026-09-25T06:30:00+07:00', NULL, NULL, '2026-09-25T06:30:00+07:00', 'shopee', NULL, 'unsettled', NULL, NULL);`;
+
+  it.each([
+    ["2026-09-24", ["260924LATE0001"]],
+    ["2026-09-20..2026-09-24", ["260924LATE0001"]],
+    ["2026-09-25", ["260925EARL0002"]],
+    ["2026-09-24..2026-09-25", ["260924LATE0001", "260925EARL0002"]],
+    ["2026-09-23", []],
+  ])("an order recorded in live's +07:00 text on the last day of %s is kept", (range, expected) => {
+    const run = importOnce(buildLiveCopy({ extraSql: `${CLEAN_LIVE_SQL}
+${LIVE_TIMES}` }));
+    const ledger = openLedger(run.targetPath);
+    try {
+      const page = answerOrdersList(ledger.db, { "filter[recordedAt]": range, pageSize: "100" }, TEST_CLOCK);
+      expect(ids(page.rows).filter((id) => /LATE|EARL/.test(id)).sort()).toEqual(expected);
+    } finally {
+      ledger.close();
+    }
   });
 });

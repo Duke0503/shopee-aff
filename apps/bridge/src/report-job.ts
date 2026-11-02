@@ -12,8 +12,8 @@
  */
 import type { BridgeFailure, BridgeReportJob, BridgeReportValue } from "@cashback/contracts";
 
-import type { PageDriver, Wait } from "./bridge-tab";
-import { Blocked, lookUntil } from "./lookup-job";
+import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { lookUntil } from "./lookup-job";
 import { readReportTable, type ReportLook, type ReportTableInput } from "./page-scripts";
 import { REPORT_ACTIVE_PAGE, REPORT_EMPTY, REPORT_LOADING, REPORT_PAGE_SIZE, REPORT_PAGER, REPORT_ROW, reportPageUrl } from "./shopee-page";
 

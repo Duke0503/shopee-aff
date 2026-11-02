@@ -10,8 +10,8 @@
  */
 import type { BridgeFailure, BridgePayoutRecordJob, BridgePayoutRecordValue } from "@cashback/contracts";
 
-import type { PageDriver, Wait } from "./bridge-tab";
-import { Blocked, lookUntil } from "./lookup-job";
+import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { lookUntil } from "./lookup-job";
 import { readPayoutTable, type PayoutTableInput } from "./page-scripts";
 import { PAYOUT_EMPTY, PAYOUT_FIELDS, PAYOUT_FIXED_COPIES, PAYOUT_LOADING, PAYOUT_PAGE_SIZE, PAYOUT_RECORD_URL, PAYOUT_ROW } from "./shopee-page";
 

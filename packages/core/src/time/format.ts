@@ -1,6 +1,7 @@
 /**
  * Display formats (EXPERIENCE.md date rules): `30/10` in the current Vietnam
- * year, `30/10/2025` otherwise; with time `30/10 19:42`.
+ * year, `30/10/2025` otherwise; with time `30/10 19:42`. A table whose rows span months and is
+ * filtered by date (the desk's Orders, owner 2026-10-18) shows the year always: `30/10/2026 19:42`.
  */
 import { INSTANT_PATTERN, toMs, vnDateOf, VN_OFFSET_MINUTES, type Clock, type Instant } from "./instant";
 
@@ -24,6 +25,12 @@ export function formatVnDateTime(instant: Instant, clock: Clock): string {
   return `${formatVnDate(instant, clock)} ${vnParts(instant).time}`;
 }
 
+/** `30/10/2026 19:42` in Vietnam time, the year always shown. */
+export function formatVnDateTimeWithYear(instant: Instant): string {
+  const p = vnParts(instant);
+  return `${p.dayMonth}/${p.year} ${p.time}`;
+}
+
 /** `19:42` in Vietnam time, for "updated at" and stale lines beside a list. */
 export function formatVnTime(instant: Instant): string {
   return vnParts(instant).time;
@@ -42,4 +49,9 @@ export function formatVnTimeOf(value: unknown): string | null {
 /** The same for the display date (`30/10`, or `30/10/2025` in another year). */
 export function formatVnDateOf(value: unknown, clock: Clock): string | null {
   return isInstant(value) ? formatVnDate(value, clock) : null;
+}
+
+/** The same with the year always (`30/10/2026 19:42`), or null when the value is not a stored instant. */
+export function formatVnDateTimeWithYearOf(value: unknown): string | null {
+  return isInstant(value) ? formatVnDateTimeWithYear(value) : null;
 }

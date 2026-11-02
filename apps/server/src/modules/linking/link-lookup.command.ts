@@ -97,10 +97,16 @@ function saveOffer(db: LedgerDb, facts: ProductFacts, at: Instant, canonicalUrl:
     .run();
 }
 
-/** The item's shared facts when they are fresh and complete (price and rates: an estimate can be made), else null. */
+/**
+ * The item's shared facts when they are fresh and complete (price and rates: an estimate can be
+ * made), else null. A price with both rates at 0 is not taken either: the live system cached a
+ * product its offer search never listed as "0%", which is "not found" (live fix 2326e07, item
+ * 43733512926 was 4% + 10%); the cutover imported such rows, so the item is looked up again.
+ */
 function freshOffer(db: LedgerDb, itemId: string, now: Instant): ProductFacts | null {
   const row = db.select().from(productOffers).where(and(eq(productOffers.productOfferId, itemId), gte(productOffers.updatedAt, minus(now, PRODUCT_FACTS_FRESH_MS)))).get();
   if (row === undefined || row.price === null || row.shopId === null || row.shopeeRateBps === null || row.sellerRateBps === null) return null;
+  if (row.shopeeRateBps === 0 && row.sellerRateBps === 0) return null;
   return { productOfferId: row.productOfferId, shopId: row.shopId, name: row.name, imageUrl: row.imageUrl, price: row.price, shopeeRateBps: row.shopeeRateBps, sellerRateBps: row.sellerRateBps };
 }
 

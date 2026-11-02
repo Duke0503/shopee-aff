@@ -84,16 +84,20 @@ export interface FakeChrome extends ChromeApi {
   readonly updates: { tabId: number; properties: Record<string, unknown> }[];
   readonly created: Record<string, unknown>[];
   readonly reloads: number[];
+  readonly removed: number[];
   readonly store: Record<string, unknown>;
   readonly listeners: Record<string, ((...args: never[]) => void)[]>;
   readonly alarmsCreated: { name: string; periodInMinutes: number }[];
   openTabs: ChromeTab[];
+  /** Where a newly opened tab lands (a verification or login page); its own address when unset. */
+  landsAt?: string;
 }
 
 export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unknown> = {}): FakeChrome {
   const updates: FakeChrome["updates"] = [];
   const created: Record<string, unknown>[] = [];
   const reloads: number[] = [];
+  const removed: number[] = [];
   const listeners: FakeChrome["listeners"] = {};
   const alarmsCreated: FakeChrome["alarmsCreated"] = [];
   const event = (name: string) => ({ addListener: (fn: (...args: never[]) => void) => void (listeners[name] ??= []).push(fn) });
@@ -102,6 +106,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
     updates,
     created,
     reloads,
+    removed,
     store,
     listeners,
     alarmsCreated,
@@ -114,7 +119,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
       },
       create: async (properties) => {
         created.push(properties);
-        const tab = { id: 100 + created.length, url: properties.url, status: "complete" };
+        const tab = { id: 100 + created.length, url: self.landsAt ?? properties.url, status: "complete" };
         self.openTabs.push(tab);
         return tab;
       },
@@ -123,6 +128,10 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
         return self.openTabs.find((t) => t.id === tabId);
       },
       reload: async (tabId) => void reloads.push(tabId),
+      remove: async (tabId) => {
+        removed.push(tabId);
+        self.openTabs = self.openTabs.filter((t) => t.id !== tabId);
+      },
     },
     scripting: { executeScript: async () => [] },
     storage: {
@@ -130,7 +139,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
       onChanged: event("storage.onChanged"),
     },
     alarms: { create: (name, info) => void alarmsCreated.push({ name, ...info }), onAlarm: event("alarms.onAlarm") },
-    runtime: { onStartup: event("runtime.onStartup"), onInstalled: event("runtime.onInstalled"), openOptionsPage: async () => undefined },
+    runtime: { onStartup: event("runtime.onStartup"), onInstalled: event("runtime.onInstalled"), openOptionsPage: async () => undefined, getURL: (path: string) => `chrome-extension://test/${path}` },
     action: { onClicked: event("action.onClicked") },
   };
   return self;

@@ -19,7 +19,7 @@
 import type { BridgeFailure, BridgeLinkJob } from "@cashback/contracts";
 import { readShopeeFoodLink } from "@cashback/core";
 
-import type { PageDriver, Wait } from "./bridge-tab";
+import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FormSelectors } from "./page-scripts";
 import { NO_RESOLUTION, RESOLVE_TIMEOUT_MS, type ResolveLink } from "./short-link";
 import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, pageBlock, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
@@ -136,7 +136,7 @@ export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wai
     if (!pressed.ok) return { outcome: "failed", reason: "submit_failed" };
     return withSource(await withTarget(await awaitResult(page, wait, previous, resultWaitMs(job.timeoutMs, source.target !== undefined)), resolve));
   } catch (error) {
-    if (error instanceof StepFailure) return { outcome: "failed", reason: error.reason };
+    if (error instanceof StepFailure || error instanceof Blocked) return { outcome: "failed", reason: error.reason };
     return { outcome: "failed", reason: "script_error" };
   }
 }

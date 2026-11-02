@@ -26,4 +26,8 @@ bridgeService({
   wait,
   randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
   log: (event, detail) => console.info(`[cashback-bridge] ${event}`, detail ?? {}),
+  deployedSettings: async () => {
+    const answer = await fetch(chrome.runtime.getURL("bridge-config.json"), { cache: "no-store" });
+    return answer.ok ? ((await answer.json()) as Record<string, unknown>) : null;
+  },
 }).install();

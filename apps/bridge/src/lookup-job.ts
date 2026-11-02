@@ -16,7 +16,7 @@
 import type { BridgeFailure, BridgeLookupJob, BridgeLookupValue } from "@cashback/contracts";
 import { readShopeeProduct } from "@cashback/core";
 
-import type { PageDriver, Wait } from "./bridge-tab";
+import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
 import { readOfferResults, readStorefront, type OfferLook, type StorefrontLook } from "./page-scripts";
 import { type ResolveLink } from "./short-link";
 import { COMMISSION_LABEL, isShopeeLink, KEYWORD_WORDS, OFFER_CARD, OFFER_EMPTY, offerSearchUrl, pageBlock, productPageUrl, STOREFRONT_IMAGE, STOREFRONT_NAME, STOREFRONT_PRICE, XTRA_LABEL } from "./shopee-page";
@@ -28,12 +28,6 @@ export const PAGE_POLL_MS = 500;
 
 const STOREFRONT = { name: STOREFRONT_NAME, image: STOREFRONT_IMAGE, price: STOREFRONT_PRICE };
 const NOT_FOUND: LookupAnswer = { outcome: "value", value: { found: false } };
-
-export class Blocked extends Error {
-  constructor(readonly reason: BridgeFailure) {
-    super(reason);
-  }
-}
 
 const check = (look: { href: string; passwordBox: boolean }): void => {
   const block = pageBlock(look.href, look.passwordBox);

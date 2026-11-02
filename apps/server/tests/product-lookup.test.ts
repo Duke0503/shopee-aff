@@ -197,6 +197,21 @@ describe("Story 5.6 review items 1-4: an unreadable page gives no estimate, neve
     expect(offerRow(ledger)).toMatchObject({ price: 450_000, shopee_rate_bps: null, updated_at: null });
   });
 
+  it("feat(links): re-check products cached at 0%: shared facts with a price and both rates at 0 (a live cache row imported at cutover) are not quoted, the item is looked up again", async () => {
+    const ledger = linkLedger(ledgers);
+    // As the cutover writes a live products_cache row for a product Shopee's search never listed.
+    ledger.sqlite.prepare("INSERT INTO product_offers (product_offer_id, shop_id, name, price, shopee_rate_bps, seller_rate_bps, first_seen_at, updated_at, origin) VALUES ('22001', '11001', 'x', 242250, 0, 0, ?, ?, 'CUTOVER')").run(LINK_START, LINK_START);
+    const bridge = lookupBridge(() => ({ outcome: "value", value: RICE_COOKER }));
+    const id = await issuedAndLookedUp(ledger, bridge);
+    expect(bridge.lookups).toHaveLength(1);
+    expect(snapshotOf(ledger, id)).toMatchObject({ product_price: 450_000, shopee_rate_bps: 260, seller_rate_bps: 0 });
+    // A real rate cached by a lookup is still taken as it is.
+    queueLink(ledger, "1000000000000000002", PRODUCT);
+    await runLinks(ledger, bridge);
+    await lookups(ledger, bridge);
+    expect(bridge.lookups).toHaveLength(1);
+  });
+
   it("item 2: a price range or a from-price as the page shows it gives no price, so no estimate", async () => {
     for (const priceText of ["\u20ab100.000 - \u20ab200.000", "T\u1eeb \u20ab450.000", "\u20ab450.000 \u20ab399.000"]) {
       expect(readPriceText(priceText)).toBeNull();

@@ -81,11 +81,10 @@ describe("Story 4.13 acceptance criteria on the desk", () => {
     expect(screen.getAllByRole("option", { name: adminText("orders_network_all") })).toHaveLength(1);
   });
 
-  it("AC5: a date in another year shows the year, one in this year does not; status sorts on the server's lifecycle order", async () => {
+  it("AC5: a date in another year shows the year (on Orders every date does, see below); status sorts on the server's lifecycle order", async () => {
     const user = userEvent.setup();
     const { server } = await orders();
-    expect(screen.getByText("31/12/2025")).toBeInTheDocument();
-    expect(screen.getByText("30/10")).toBeInTheDocument();
+    expect(screen.getByText("31/12/2025 10:00")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: new RegExp(`^${adminText("col_status")}`) }));
     await waitFor(() => expect(server.queries.at(-1)?.["sort"]).toBe("status:asc"));
   });
@@ -104,5 +103,22 @@ describe("Story 4.13 acceptance criteria on the desk", () => {
     // The card's meta line names the network in words, not its stored key.
     expect(list).toHaveTextContent(adminText("network_shopee"));
     expect(list.textContent).not.toContain(" shopee ");
+  });
+});
+
+describe("feat(admin): purchase date next to the order id, with the year", () => {
+  it("the date column follows the order id and reads dd/MM/yyyy HH:mm in Vietnam time, this year's dates included", async () => {
+    await orders();
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent ?? "");
+    const at = headers.findIndex((h) => h.startsWith(adminText("col_order_id")));
+    expect(headers[at + 1]).toMatch(new RegExp(`^${adminText("col_recorded_at")}`));
+    const row = screen.getAllByRole("row")[1] as HTMLElement;
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[at + 1]).toHaveTextContent(/^30\/10\/2026 12:00$/);
+  });
+
+  it("follows the date kind the filter is on", async () => {
+    await orders("/admin/orders?filter[approvedAt]=2026-10-30");
+    expect(await screen.findAllByText("30/10/2026 13:00")).toHaveLength(2);
   });
 });

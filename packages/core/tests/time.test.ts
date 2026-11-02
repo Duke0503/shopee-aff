@@ -6,6 +6,8 @@ import {
   fixedClock,
   formatVnDate,
   formatVnDateTime,
+  formatVnDateTimeWithYear,
+  formatVnDateTimeWithYearOf,
   formatVnDateOf,
   formatVnTime,
   formatVnTimeOf,
@@ -119,5 +121,14 @@ describe("list date presets in Vietnam days (Stories 4.12 AC4 and 4.13 AC1)", ()
   it("'last 7 days' ends today and 'last month' is the whole previous month, across a year", () => {
     expect(vnDatePreset("last7", fixedClock("2026-10-30T12:00:00.000Z"))).toEqual({ from: "2026-10-24", to: "2026-10-30" });
     expect(vnDatePreset("lastMonth", fixedClock("2027-01-05T12:00:00.000Z"))).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+});
+
+describe("feat(admin): purchase date next to the order id, with the year", () => {
+  it("reads dd/MM/yyyy HH:mm in Vietnam time, this year included, and a non-instant is null", () => {
+    expect(formatVnDateTimeWithYear(parseInstant("2026-09-25T07:23:00.000Z"))).toBe("25/09/2026 14:23");
+    expect(formatVnDateTimeWithYear(parseInstant("2025-12-31T17:05:00.000Z"))).toBe("01/01/2026 00:05");
+    expect(formatVnDateTimeWithYearOf("2026-09-25 14:23:00")).toBeNull();
+    expect(formatVnDateTimeWithYearOf(null)).toBeNull();
   });
 });

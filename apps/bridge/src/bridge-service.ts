@@ -26,12 +26,28 @@ export interface ServiceDeps {
   /** `crypto.getRandomValues` in the worker. */
   readonly randomBytes: (length: number) => Uint8Array;
   log(event: string, detail?: Record<string, unknown>): void;
+  /**
+   * The settings the deployment wrote next to the build (`bridge-config.json`, never in the
+   * repository), used when the profile has none, so no one has to type the token by hand.
+   */
+  readonly deployedSettings?: () => Promise<Record<string, unknown> | null>;
+}
+
+/** The stored settings, or the deployment's file stored once when the profile has none yet. */
+async function settingsOf(deps: ServiceDeps, stored: Record<string, unknown>): Promise<ReturnType<typeof parseSettings>> {
+  const settings = parseSettings(stored);
+  if (settings !== null || deps.deployedSettings === undefined) return settings;
+  const deployed = parseSettings((await deps.deployedSettings().catch(() => null)) ?? {});
+  if (deployed === null) return null;
+  await deps.chrome.storage.local.set({ serverUrl: deployed.serverOrigin, token: deployed.token });
+  deps.log("bridge.settings.from_deployment");
+  return deployed;
 }
 
 /** The settings with this profile's instance id, made and stored the first time. */
 async function loadConnected(deps: ServiceDeps): Promise<ConnectedSettings | null> {
   const stored = await deps.chrome.storage.local.get([...SETTINGS_KEYS, INSTANCE_KEY]);
-  const settings = parseSettings(stored);
+  const settings = await settingsOf(deps, stored);
   if (settings === null) return null;
   let instance = instanceIdOf(stored);
   if (instance === null) {

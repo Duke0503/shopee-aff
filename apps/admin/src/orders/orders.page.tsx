@@ -3,13 +3,16 @@
  * its state in the URL. One value per column: the customer code and the customer name apart;
  * codes are code chips; the product shows its snapshot thumbnail; the approved commission and the
  * cashback are the stored figures, a dash until approved. One date kind per column: the column
- * shows the kind the date filter (or the sort) is on, recorded by default, and says which. There
+ * shows the kind the date filter (or the sort) is on, recorded by default, and says which. It sits
+ * right after the order id and reads `25/09/2026 14:23`, the year always: orders span months and
+ * the filter is by date (the owner's change on the live desk, 18 Oct 2026). There
  * is one network filter beside the status chips, whose "all" chip carries the overall total named
  * as such. There is no action on a row: an order becomes paid only through a payout confirm.
  * Tablet drops the order id, customer code, network and commission; phone shows compact cards.
  */
 import type { ListSearchState, OrderDateField } from "@cashback/contracts";
-import { DataList, DateFilter, formatCount, OptionFilter, type ListColumn } from "@cashback/ui";
+import { formatVnDateTimeWithYearOf } from "@cashback/core";
+import { DataList, DateFilter, formatCount, MissingValue, OptionFilter, type ListColumn } from "@cashback/ui";
 import { useMemo } from "react";
 
 import { adminText, type AdminKey } from "../labels";
@@ -25,10 +28,16 @@ const DATE_HEADER: Record<OrderDateField, { readonly header: AdminKey; readonly 
 const NETWORK_LABEL: Record<string, AdminKey> = { shopee: "network_shopee", accesstrade: "network_accesstrade" };
 const networkName = (network: string | null): string | null => (network === null ? null : adminText(NETWORK_LABEL[network] ?? "network_unknown"));
 
+function DateWithYear({ value }: { readonly value: unknown }) {
+  const text = formatVnDateTimeWithYearOf(value);
+  return text === null ? <MissingValue /> : <span className="whitespace-nowrap tabular-nums">{text}</span>;
+}
+
 export function orderColumns(dateField: OrderDateField = "recordedAt"): readonly ListColumn<OrderRow>[] {
   const date = DATE_HEADER[dateField];
   return [
     { key: "orderId", header: adminText("col_order_id"), kind: "code", sortable: true, card: "meta", width: 156, desktopOnly: true },
+    { key: dateField, header: adminText(date.header), kind: "instant", sortable: true, card: "meta", cardLabel: adminText(date.short), width: 136, render: (row) => <DateWithYear value={row[dateField]} /> },
     { key: "customerCode", header: adminText("col_customer_code"), kind: "code", sortable: true, card: "who", desktopOnly: true },
     { key: "customerName", header: adminText("col_customer_name"), kind: "name", sortable: true, card: "who" },
     { key: "productName", header: adminText("col_product"), kind: "product", imageKey: "productImageUrl", card: "title" },
@@ -36,7 +45,6 @@ export function orderColumns(dateField: OrderDateField = "recordedAt"): readonly
     { key: "status", header: adminText("col_status"), kind: "status", entity: "order", sortable: true, card: "status" },
     { key: "approvedCommission", header: adminText("col_approved_commission"), kind: "money", sortable: true, card: "none", desktopOnly: true, width: 112 },
     { key: "cashback", header: adminText("col_cashback"), kind: "money", sortable: true, card: "amount" },
-    { key: dateField, header: adminText(date.header), kind: "instant", sortable: true, card: "meta", cardLabel: adminText(date.short), width: 116 },
   ];
 }
 

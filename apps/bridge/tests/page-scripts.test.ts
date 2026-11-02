@@ -73,3 +73,15 @@ describe("Story 5.3: page scripts look once and return", () => {
     expect(look()).toEqual({ state: "error", message: "Product not supported" });
   });
 });
+
+describe("fix(shopee): find the submit button in English as well as Vietnamese", () => {
+  // Since 16 Oct 2026 the bot's profile can carry the language=en cookie: the button reads "Get Link".
+  it.each(["Lấy link", "Get Link", "GET LINK"])("sees the form ready and presses the button labelled %s", (label) => {
+    customLinkForm(label);
+    expect(readPage(SELECTORS).ready).toBe(true);
+    let clicks = 0;
+    document.querySelector("button")?.addEventListener("click", () => clicks++);
+    expect(pressSubmit(SUBMIT_BUTTON_TEXT)).toEqual({ ok: true });
+    expect(clicks).toBe(1);
+  });
+});
