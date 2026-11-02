@@ -1,0 +1,425 @@
+{
+ "$comment": "Fake figures for the My money screen tests and screenshots (Stories 7.3, 7.4); no real customer or order.",
+ "money": {
+  "customerCode": "DP00012",
+  "balance": {
+   "payable": 75737,
+   "approved": 80000,
+   "refunded": 5000,
+   "waiting": 9263,
+   "paid": 152000,
+   "deducted": 9263,
+   "owedAfter": 0
+  },
+  "bank": {
+   "bankName": "Vietcombank",
+   "holderName": "NGUYEN THI LAN",
+   "lastFour": "6789",
+   "held": false
+  },
+  "deductions": [
+   {
+    "deductionId": "260901C0001-1",
+    "orderId": "260901C0001",
+    "productName": "Bình giữ nhiệt Lock&Lock 500ml",
+    "productImageUrl": "https://img.example.test/deal_home_3.jpg",
+    "amount": 9263
+   }
+  ],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "moneyNoDeduction": {
+  "customerCode": "DP00012",
+  "balance": {
+   "payable": 79216,
+   "approved": 79216,
+   "refunded": 0,
+   "waiting": 9263,
+   "paid": 152000,
+   "deducted": 0,
+   "owedAfter": 0
+  },
+  "bank": {
+   "bankName": "Vietcombank",
+   "holderName": "NGUYEN THI LAN",
+   "lastFour": "6789",
+   "held": false
+  },
+  "deductions": [],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "moneyOwed": {
+  "customerCode": "DP00031",
+  "balance": {
+   "payable": 0,
+   "approved": 10000,
+   "refunded": 0,
+   "waiting": 0,
+   "paid": 44000,
+   "deducted": 10000,
+   "owedAfter": 20000
+  },
+  "bank": null,
+  "deductions": [
+   {
+    "deductionId": "260902C0009-1",
+    "orderId": "260902C0009",
+    "productName": "Máy sấy tóc Panasonic",
+    "productImageUrl": "https://img.example.test/deal_beauty_1.jpg",
+    "amount": 25000
+   },
+   {
+    "deductionId": "imported-7",
+    "orderId": null,
+    "productName": null,
+    "productImageUrl": null,
+    "amount": 5000
+   }
+  ],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "moneyNoBank": {
+  "customerCode": "DP00012",
+  "balance": {
+   "payable": 79216,
+   "approved": 79216,
+   "refunded": 0,
+   "waiting": 0,
+   "paid": 0,
+   "deducted": 0,
+   "owedAfter": 0
+  },
+  "bank": null,
+  "deductions": [],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "moneyHeld": {
+  "customerCode": "DP00012",
+  "balance": {
+   "payable": 79216,
+   "approved": 79216,
+   "refunded": 0,
+   "waiting": 0,
+   "paid": 0,
+   "deducted": 0,
+   "owedAfter": 0
+  },
+  "bank": {
+   "bankName": "MB Bank",
+   "holderName": "NGUYEN THI LAN",
+   "lastFour": "4321",
+   "held": true
+  },
+  "deductions": [],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "moneyEmpty": {
+  "customerCode": "DP00077",
+  "balance": {
+   "payable": 0,
+   "approved": 0,
+   "refunded": 0,
+   "waiting": 0,
+   "paid": 0,
+   "deducted": 0,
+   "owedAfter": 0
+  },
+  "bank": null,
+  "deductions": [],
+  "asOf": "2026-11-02T12:42:00.000Z"
+ },
+ "orders": {
+  "rows": [
+   {
+    "lineId": "261026W0001",
+    "kind": "order",
+    "orderId": "261026W0001",
+    "platform": "tiktok",
+    "status": "AWAITING_APPROVAL",
+    "amount": 9263,
+    "estimate": true,
+    "rejectionReason": null,
+    "campaignName": null,
+    "productName": "Tai nghe Bluetooth Soundcore P20i",
+    "productImageUrl": "https://img.example.test/deal_tech_1.jpg",
+    "recordedAt": "2026-10-26T08:12:00.000Z",
+    "approvedAt": null,
+    "paidAt": null,
+    "deducted": null
+   },
+   {
+    "lineId": "261012A0001",
+    "kind": "order",
+    "orderId": "261012A0001",
+    "platform": "shopee",
+    "status": "APPROVED",
+    "amount": 60000,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": null,
+    "productName": "Nồi cơm điện tử Sunhouse 1.8L SHD8955",
+    "productImageUrl": "https://img.example.test/deal_home_1.jpg",
+    "recordedAt": "2026-10-12T03:00:00.000Z",
+    "approvedAt": "2026-10-20T03:00:00.000Z",
+    "paidAt": null,
+    "deducted": null
+   },
+   {
+    "lineId": "bonus-7",
+    "kind": "bonus",
+    "orderId": "261012A0001",
+    "platform": "shopee",
+    "status": "APPROVED",
+    "amount": 20000,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": "20 đơn đầu tháng 10",
+    "productName": "Nồi cơm điện tử Sunhouse 1.8L SHD8955",
+    "productImageUrl": "https://img.example.test/deal_home_1.jpg",
+    "recordedAt": "2026-10-12T03:00:00.000Z",
+    "approvedAt": "2026-10-20T03:00:00.000Z",
+    "paidAt": null,
+    "deducted": null
+   },
+   {
+    "lineId": "261002R0001",
+    "kind": "order",
+    "orderId": "261002R0001",
+    "platform": "shopee",
+    "status": "REJECTED",
+    "amount": null,
+    "estimate": false,
+    "rejectionReason": "order_cancelled",
+    "campaignName": null,
+    "productName": "Áo khoác gió nam chống nước",
+    "productImageUrl": "https://img.example.test/deal_beauty_2.jpg",
+    "recordedAt": "2026-10-02T03:00:00.000Z",
+    "approvedAt": null,
+    "paidAt": null,
+    "deducted": null
+   },
+   {
+    "lineId": "260915P0001",
+    "kind": "order",
+    "orderId": "260915P0001",
+    "platform": "shopee",
+    "status": "PAID",
+    "amount": 147000,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": null,
+    "productName": "Bộ nồi inox 3 đáy Elmich",
+    "productImageUrl": "https://img.example.test/deal_home_2.jpg",
+    "recordedAt": "2025-12-18T03:00:00.000Z",
+    "approvedAt": "2026-09-20T03:00:00.000Z",
+    "paidAt": "2026-10-01T03:00:00.000Z",
+    "deducted": null
+   },
+   {
+    "lineId": "260901C0001",
+    "kind": "order",
+    "orderId": "260901C0001",
+    "platform": "shopeefood",
+    "status": "REVERSED",
+    "amount": null,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": null,
+    "productName": "Bình giữ nhiệt Lock&Lock 500ml",
+    "productImageUrl": "https://img.example.test/deal_home_3.jpg",
+    "recordedAt": "2026-09-01T03:00:00.000Z",
+    "approvedAt": "2026-09-10T03:00:00.000Z",
+    "paidAt": "2026-09-15T03:00:00.000Z",
+    "deducted": 9263
+   }
+  ],
+  "total": 6,
+  "page": 1,
+  "pageSize": 20,
+  "facets": {
+   "status": [
+    {
+     "value": "AWAITING_APPROVAL",
+     "count": 1
+    },
+    {
+     "value": "FROZEN",
+     "count": 0
+    },
+    {
+     "value": "APPROVED",
+     "count": 2
+    },
+    {
+     "value": "REVERSED",
+     "count": 1
+    },
+    {
+     "value": "PAID",
+     "count": 1
+    },
+    {
+     "value": "REJECTED",
+     "count": 1
+    }
+   ]
+  },
+  "summary": {},
+  "asOf": "2026-11-02T12:42:00.000Z",
+  "overall": 6
+ },
+ "ordersApproved": {
+  "rows": [
+   {
+    "lineId": "261012A0001",
+    "kind": "order",
+    "orderId": "261012A0001",
+    "platform": "shopee",
+    "status": "APPROVED",
+    "amount": 60000,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": null,
+    "productName": "Nồi cơm điện tử Sunhouse 1.8L SHD8955",
+    "productImageUrl": "https://img.example.test/deal_home_1.jpg",
+    "recordedAt": "2026-10-12T03:00:00.000Z",
+    "approvedAt": "2026-10-20T03:00:00.000Z",
+    "paidAt": null,
+    "deducted": null
+   },
+   {
+    "lineId": "bonus-7",
+    "kind": "bonus",
+    "orderId": "261012A0001",
+    "platform": "shopee",
+    "status": "APPROVED",
+    "amount": 20000,
+    "estimate": false,
+    "rejectionReason": null,
+    "campaignName": "20 đơn đầu tháng 10",
+    "productName": "Nồi cơm điện tử Sunhouse 1.8L SHD8955",
+    "productImageUrl": "https://img.example.test/deal_home_1.jpg",
+    "recordedAt": "2026-10-12T03:00:00.000Z",
+    "approvedAt": "2026-10-20T03:00:00.000Z",
+    "paidAt": null,
+    "deducted": null
+   }
+  ],
+  "total": 2,
+  "page": 1,
+  "pageSize": 20,
+  "facets": {
+   "status": [
+    {
+     "value": "AWAITING_APPROVAL",
+     "count": 0
+    },
+    {
+     "value": "FROZEN",
+     "count": 0
+    },
+    {
+     "value": "APPROVED",
+     "count": 2
+    },
+    {
+     "value": "REVERSED",
+     "count": 0
+    },
+    {
+     "value": "PAID",
+     "count": 0
+    },
+    {
+     "value": "REJECTED",
+     "count": 0
+    }
+   ]
+  },
+  "summary": {},
+  "asOf": "2026-11-02T12:42:00.000Z",
+  "overall": 6
+ },
+ "ordersEmpty": {
+  "rows": [],
+  "total": 0,
+  "page": 1,
+  "pageSize": 20,
+  "facets": {
+   "status": [
+    {
+     "value": "AWAITING_APPROVAL",
+     "count": 0
+    },
+    {
+     "value": "FROZEN",
+     "count": 0
+    },
+    {
+     "value": "APPROVED",
+     "count": 0
+    },
+    {
+     "value": "REVERSED",
+     "count": 0
+    },
+    {
+     "value": "PAID",
+     "count": 0
+    },
+    {
+     "value": "REJECTED",
+     "count": 0
+    }
+   ]
+  },
+  "summary": {},
+  "asOf": "2026-11-02T12:42:00.000Z",
+  "overall": 0
+ },
+ "payouts": {
+  "rows": [
+   {
+    "payoutId": 2,
+    "amount": 30000,
+    "paidAmount": 0,
+    "status": "VOIDED",
+    "recordedAt": "2026-10-08T12:10:00.000Z",
+    "voidedAt": "2026-10-09T03:00:00.000Z",
+    "receiptToken": "rcpt_demo_token_0002",
+    "hasProof": false
+   },
+   {
+    "payoutId": 1,
+    "amount": 152000,
+    "paidAmount": 152000,
+    "status": "RECORDED",
+    "recordedAt": "2026-10-01T12:30:00.000Z",
+    "voidedAt": null,
+    "receiptToken": "rcpt_demo_token_0001",
+    "hasProof": true
+   }
+  ],
+  "total": 2,
+  "page": 1,
+  "pageSize": 20,
+  "facets": {},
+  "summary": {
+   "paidAmount": 152000
+  },
+  "asOf": "2026-11-02T12:42:00.000Z",
+  "overall": 2
+ },
+ "payoutsEmpty": {
+  "rows": [],
+  "total": 0,
+  "page": 1,
+  "pageSize": 20,
+  "facets": {},
+  "summary": {
+   "paidAmount": 0
+  },
+  "asOf": "2026-11-02T12:42:00.000Z",
+  "overall": 0
+ }
+}

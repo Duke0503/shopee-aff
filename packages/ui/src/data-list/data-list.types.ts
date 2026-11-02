@@ -85,6 +85,8 @@ export interface DataListProps<R> {
   /** The noun of this list with its count, for the summary and the live region. */
   readonly countLabel: (count: number) => string;
   readonly emptyText: string;
+  /** The one action of the empty state (EXPERIENCE.md: at most one), such as the link to Home. */
+  readonly emptyAction?: ReactNode;
   readonly statusFilter?: StatusFilter;
   readonly summary?: readonly SummaryField[];
   /**
@@ -97,6 +99,16 @@ export interface DataListProps<R> {
    * same URL state; on phone they sit in the filter sheet with the chips.
    */
   readonly filters?: (api: FilterApi) => ReactNode;
+  /**
+   * `cards` is the customer website's one column (Story 7.4): the `card` of every row at every
+   * width, the sort choice and the status chips in line above the rows (no filter sheet), and the
+   * short pager. `adaptive` (the default) is the desk's table on tablet and desktop.
+   */
+  readonly form?: "adaptive" | "cards";
+  /** False for a list whose server spec searches nothing: no search box that could not find anything. */
+  readonly searchable?: boolean;
+  /** The words of one sort choice when "<column>: ascending" is not plain enough (the customer website). */
+  readonly sortLabel?: (column: string, direction: "asc" | "desc") => string;
 }
 
 /** A list fetch that failed with an HTTP status, or null status for no answer at all. */

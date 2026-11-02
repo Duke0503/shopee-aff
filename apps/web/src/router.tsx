@@ -5,17 +5,20 @@
  * site) or to My money.
  */
 import { CUSTOMER_PATHS } from "@cashback/contracts";
-import { createRootRoute, createRoute, createRouter, type RouterHistory } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, useNavigate, type RouterHistory } from "@tanstack/react-router";
 import { lazy } from "react";
+
 
 import { HomePage } from "./pages/home.page";
 import { NotFoundPage } from "./pages/not-found.page";
 import { safeRedirect } from "./pages/safe-redirect";
+import { parseSearch, stringifySearch } from "./search-params";
 import { SiteShell } from "./shell/site-shell";
 
 // Home comes in the first script; every other page loads when it is opened (Story 7.1 AC3).
 const SignInRoute = lazy(() => import("./pages/sign-in-route").then((m) => ({ default: m.SignInRoute })));
 const MyMoneyPage = lazy(() => import("./pages/my-money.page").then((m) => ({ default: m.MyMoneyPage })));
+const AccountPage = lazy(() => import("./pages/account.page").then((m) => ({ default: m.AccountPage })));
 const GuidePage = lazy(() => import("./pages/guide.page").then((m) => ({ default: m.GuidePage })));
 
 const rootRoute = createRootRoute({ component: SiteShell, notFoundComponent: NotFoundPage });
@@ -30,13 +33,27 @@ export const signInRoute = createRoute({
 });
 
 const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.home, component: HomePage });
-const myMoneyRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.myMoney, component: MyMoneyPage });
+/** Flat text parameters only; a page that keeps list state checks them itself, in its own chunk. */
+const textParams = (raw: Record<string, unknown>): Record<string, string> => Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+
+/** My money: the view and that view's list state in the URL (LC-4), readable as the API query; the page normalises it. */
+const myMoneyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: CUSTOMER_PATHS.myMoney,
+  validateSearch: textParams,
+  component: function MyMoneyScreen() {
+    const search = myMoneyRoute.useSearch();
+    const navigate = useNavigate({ from: myMoneyRoute.fullPath });
+    return <MyMoneyPage search={search} onSearch={(next, options) => void navigate({ search: next, replace: options?.replace === true })} />;
+  },
+});
+const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.account, component: AccountPage });
 const guideRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.guide, component: GuidePage });
 
-const routeTree = rootRoute.addChildren([homeRoute, signInRoute, myMoneyRoute, guideRoute]);
+const routeTree = rootRoute.addChildren([homeRoute, signInRoute, myMoneyRoute, accountRoute, guideRoute]);
 
 export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, defaultPreload: false, scrollRestoration: true, ...(history === undefined ? {} : { history }) });
+  return createRouter({ routeTree, parseSearch, stringifySearch, defaultPreload: false, scrollRestoration: true, ...(history === undefined ? {} : { history }) });
 }
 
 export type AppRouter = ReturnType<typeof createAppRouter>;

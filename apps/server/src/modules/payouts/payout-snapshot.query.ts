@@ -80,7 +80,7 @@ function entrySums(db: LedgerDb, keys: readonly string[], kinds: readonly (typeo
 }
 
 /** The void credits still owed, one per clawback whose netting a void gave back. */
-function openRefunds(db: LedgerDb, keys: readonly string[]): RefundLine[] {
+export function openRefunds(db: LedgerDb, keys: readonly string[]): RefundLine[] {
   return entrySums(db, keys, CREDIT_KINDS, "NETTING_REFUND")
     .map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, amount: creditOpenAmount([r.total]) }))
     .filter((r) => r.amount > 0);
@@ -90,6 +90,17 @@ function openRefunds(db: LedgerDb, keys: readonly string[]): RefundLine[] {
 export function openClawbacks(db: LedgerDb, keys: readonly string[]): ClawbackLine[] {
   const rows = entrySums(db, keys, CLAWBACK_KINDS, "CLAWBACK");
   return rows.map((r) => ({ clawbackId: r.clawbackId, customerId: r.customerId, orderId: r.orderId, open: openClawbackTotal([clawbackOpenAmount([r.total])]) })).filter((c) => c.open > 0);
+}
+
+/**
+ * The parts of a gross under the stored ids (AD-6): what the approved orders and confirmed
+ * bonuses add (the payable lines, the payout preview's own) and what void credits add back. They
+ * sum to `getBalances`' gross, so a screen can show the payable as these parts minus the netting.
+ */
+export function grossParts(db: LedgerDb, keys: readonly string[]): { readonly approved: number; readonly refunded: number } {
+  const frozen = orderBalanceRows(db, keys).frozenOrderIds;
+  const approved = sumDong([...payableOrderLines(db, keys).map((o) => o.cashback), ...confirmedBonusLines(db, keys, frozen).map((b) => b.amount)], "approved");
+  return { approved, refunded: sumDong(openRefunds(db, keys).map((r) => r.amount), "refunded") };
 }
 
 export function snapshotHash(s: Omit<PayoutSnapshot, "hash" | "customerCode" | "customerName">): string {

@@ -57,7 +57,7 @@ export function SearchBox({ committed, placeholder, onCommit }: SearchBoxProps) 
 export function RefreshButton({ asOf, onRefresh }: { readonly asOf: string | undefined; readonly onRefresh: () => void }) {
   const time = formatVnTimeOf(asOf);
   return (
-    <Button type="button" variant="ghost" className="h-9 text-muted-foreground coarse:h-11" onClick={onRefresh} aria-label={time === null ? uiText("list_refresh") : undefined}>
+    <Button type="button" variant="ghost" className="h-9 text-muted-foreground coarse:h-11 coarse:min-w-11" onClick={onRefresh} aria-label={time === null ? uiText("list_refresh") : undefined}>
       <RefreshCwIcon aria-hidden />
       {time !== null && <span className="text-meta">{uiText("list_updated_at", { time })}</span>}
     </Button>
@@ -68,16 +68,19 @@ export interface SortSelectProps<R> {
   readonly columns: readonly ListColumn<R>[];
   readonly sort: ListSort;
   readonly onChange: (sort: ListSort) => void;
+  readonly label?: ((column: string, direction: "asc" | "desc") => string) | undefined;
+  readonly className?: string;
 }
 
 /** A native select on phone: the platform picker is the easiest control on a touch screen. */
-export function SortSelect<R>({ columns, sort, onChange }: SortSelectProps<R>) {
+export function SortSelect<R>({ columns, sort, onChange, label, className }: SortSelectProps<R>) {
+  const words = label ?? ((column: string, direction: "asc" | "desc") => uiText(direction === "asc" ? "list_sort_asc" : "list_sort_desc", { column }));
   const options = columns.filter((c) => c.sortable === true).flatMap((c) => [
-    { value: `${c.key}:asc`, label: uiText("list_sort_asc", { column: c.header }) },
-    { value: `${c.key}:desc`, label: uiText("list_sort_desc", { column: c.header }) },
+    { value: `${c.key}:asc`, label: words(c.header, "asc") },
+    { value: `${c.key}:desc`, label: words(c.header, "desc") },
   ]);
   return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1">
+    <label className={className ?? "flex min-w-0 flex-1 flex-col gap-1"}>
       <span className="text-caption text-muted-foreground">{uiText("list_sort_label")}</span>
       <select
         value={`${sort.field}:${sort.direction}`}

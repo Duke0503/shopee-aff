@@ -16,7 +16,7 @@ import {
   parseSortParam,
   splitFilterValues,
   type SortDirection,
-} from "./list.schema";
+} from "./list-params";
 
 /** One filterable field; `values` lists what it may hold (a status field's stored values). */
 export interface ListFilterSpec {

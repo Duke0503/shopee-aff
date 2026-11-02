@@ -8,11 +8,14 @@
  */
 import { CUSTOMER_SESSION_PATH, customerSessionResponseSchema, type CustomerSessionResponse, type CustomerSignInRequest } from "@cashback/contracts";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { ApiError, apiRequest, isUnauthorized } from "../api/api.queries";
 
 export const SESSION_KEY = ["customer", "session"] as const;
 export const SESSION_ENDED_KEY = ["customer", "session-ended"] as const;
+/** Every read of the signed-in customer's own money and orders; dropped whenever the session changes hands. */
+export const MONEY_KEY = ["customer", "money"] as const;
 const ENDED_STORAGE = "cashback.session-ended";
 
 /** True when the session answer says a new password ended it (AC5). */
@@ -36,21 +39,33 @@ function setEnded(client: QueryClient, ended: boolean): void {
   client.setQueryData(SESSION_ENDED_KEY, ended);
 }
 
+/**
+ * Who is signed in. A session already known stays while a later check fails for another reason
+ * (no network); once the server answers 401 (the session ended while a page was open) the cached
+ * answer is cleared and asked again, so no page keeps showing a customer who is no longer signed in.
+ */
 export function useCustomerSession() {
   const client = useQueryClient();
-  return useQuery({
+  const query = useQuery({
     queryKey: SESSION_KEY,
     queryFn: async ({ signal }): Promise<CustomerSessionResponse> => {
       try {
         return customerSessionResponseSchema.parse(await apiRequest(CUSTOMER_SESSION_PATH, { signal }));
       } catch (error) {
         if (endedByNewPassword(error)) setEnded(client, true);
+        if (isUnauthorized(error)) client.removeQueries({ queryKey: MONEY_KEY });
         throw error;
       }
     },
     retry: (failures, error) => !isUnauthorized(error) && failures < 1,
     staleTime: 60_000,
   });
+  const stale = query.data !== undefined && isUnauthorized(query.error);
+  useEffect(() => {
+    // A 401 after a known session: the cached customer is dropped, so the gate shows sign-in.
+    if (stale) void client.resetQueries({ queryKey: SESSION_KEY, exact: true });
+  }, [stale, client]);
+  return query;
 }
 
 /** Whether to show "the session ended because of a new password", and the way to dismiss it. */
@@ -66,6 +81,7 @@ export function useSignIn() {
     mutationFn: async (body: CustomerSignInRequest): Promise<CustomerSessionResponse> => customerSessionResponseSchema.parse(await apiRequest(CUSTOMER_SESSION_PATH, { method: "POST", body })),
     onSuccess: (session) => {
       setEnded(client, false);
+      client.removeQueries({ queryKey: MONEY_KEY });
       client.setQueryData(SESSION_KEY, session);
     },
   });
@@ -78,6 +94,10 @@ export function useSignOut() {
       await apiRequest(CUSTOMER_SESSION_PATH, { method: "DELETE" });
     },
     // Back to no session: the cached one is dropped and the open pages ask the server again.
-    onSuccess: () => void client.resetQueries({ queryKey: SESSION_KEY }),
+    // The last customer's figures never stay in the cache for whoever signs in next (INV-5).
+    onSuccess: () => {
+      client.removeQueries({ queryKey: MONEY_KEY });
+      void client.resetQueries({ queryKey: SESSION_KEY });
+    },
   });
 }

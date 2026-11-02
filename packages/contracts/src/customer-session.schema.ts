@@ -46,5 +46,6 @@ export const CUSTOMER_PATHS = {
   home: "/",
   signIn: "/dang-nhap",
   myMoney: "/tien-cua-toi",
+  account: "/tai-khoan",
   guide: "/huong-dan",
 } as const;

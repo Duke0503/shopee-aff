@@ -1,13 +1,15 @@
-// Screenshots of the customer website for the design review (Stories 7.1 and 7.2): the shell
+// Screenshots of the customer website for the design review (Stories 7.1 to 7.4): the shell
 // (Home, Guide, My money) with and without the Zalo-down banner, the not-found page, sign-in
-// empty, refused and waiting, the session-ended notice and the session check error, at phone 390, tablet 768 and desktop 1440. Starts the Vite dev
+// empty, refused and waiting, the session-ended notice and the session check error, My money
+// (normal, with a deduction, empty) and its order list (list, filtered, empty) from
+// tests/fixtures/my-money.json, at phone 390, tablet 768 and desktop 1440. Starts the Vite dev
 // server and answers /api from fixtures in the browser. Every page is also opened at 360 px with
 // the Zalo in-app browser's user agent and checked (Story 7.1 AC4): nothing scrolls sideways or
 // pokes past the viewport, no text is under 12 px, on touch screens every link, button and field
 // is at least 44 px tall and wide (a code chip counts its invisible 44 px tap area), and the bottom bar hides while
 // a field has focus.
 // Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,15 +33,27 @@ const LAN = { status: 200, json: { customerCode: "DP00012" } };
 const REFUSED = { status: 401, json: { error: { code: "unauthorized", messageKey: "error.customer_sign_in_refused" } } };
 const WAITING = { status: 429, json: { error: { code: "rate_limited", messageKey: "error.customer_sign_in_waiting", fields: { retryAt: "2026-11-02T12:57:00.000Z" } } } };
 
+const MONEY = JSON.parse(readFileSync(join(root, "tests", "fixtures", "my-money.json"), "utf8"));
+const IMAGES = join(root, "..", "..", "docs", "design", "wireframe", "images");
+const MY = { money: "moneyNoDeduction", orders: "orders", payouts: "payouts" };
+
 const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 5175, strictPort: true }, logLevel: "error" });
 await server.listen();
 const browser = await chromium.launch();
 const problems = [];
 
-async function open(width, height, path, { status = UP, session = SIGNED_OUT, signIn = REFUSED, zalo = false } = {}) {
+async function open(width, height, path, { status = UP, session = SIGNED_OUT, signIn = REFUSED, zalo = false, my = MY } = {}) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: width < 768 ? 2 : 1, hasTouch: width < 1280, isMobile: width < 768, ...(zalo ? { userAgent: ZALO_UA } : {}) });
   await page.route("**/api/site-status", (route) => route.fulfill({ json: status }));
   await page.route("**/api/session", (route) => route.fulfill(route.request().method() === "POST" ? signIn : session));
+  await page.route("**/api/me/money", (route) => route.fulfill({ json: MONEY[my.money] }));
+  await page.route("**/api/me/orders?**", (route) => {
+    const filtered = new URL(route.request().url()).searchParams.get("filter[status]");
+    const answer = MONEY[filtered === "APPROVED" && my.orders === "orders" ? "ordersApproved" : my.orders];
+    route.fulfill(answer === undefined ? { status: 503, json: { error: { code: "busy", messageKey: "error.busy" } } } : { json: answer });
+  });
+  await page.route("**/api/me/payouts?**", (route) => route.fulfill({ json: MONEY[my.payouts] }));
+  await page.route("https://img.example.test/**", (route) => route.fulfill({ body: readFileSync(join(IMAGES, new URL(route.request().url()).pathname.slice(1))), contentType: "image/jpeg" }));
   await page.goto(`http://localhost:5175${path}`);
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
@@ -78,6 +92,9 @@ async function shoot(name, width, height, path, options = {}, after) {
   if (only !== undefined && !name.startsWith(only)) return;
   const page = await open(width, height, path, options);
   if (after) await after(page);
+  // A full-page shot shows rows below the fold, so lazy product images load now.
+  await page.evaluate(() => document.querySelectorAll("img[loading=lazy]").forEach((img) => (img.loading = "eager")));
+  await page.waitForFunction(() => [...document.images].every((img) => img.complete && img.naturalWidth > 0), null, { timeout: 10_000 });
   await page.waitForTimeout(250);
   record(name, await page.evaluate(layoutProblems));
   const file = join(out, `${name}.png`);
@@ -107,6 +124,27 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`sign-in-error-${label}`, width, height, "/dang-nhap", {}, submit("dp00012", "sai-mat-khau"));
   await shoot(`sign-in-throttled-${label}`, width, height, "/dang-nhap", { signIn: WAITING }, submit("DP00012", "sai-mat-khau"));
 }
+// Stories 7.3 and 7.4: My money and its order list.
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`my-money-normal-${label}`, width, height, "/tien-cua-toi", { session: LAN }, (page) => page.locator("[data-order-line]").first().waitFor());
+  await shoot(`my-money-deduction-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "money" } }, (page) => page.locator("[data-deduction]").waitFor());
+  await shoot(`my-money-empty-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { money: "moneyEmpty", orders: "ordersEmpty", payouts: "payoutsEmpty" } }, (page) => page.locator("[data-list-empty]").waitFor());
+  await shoot(`my-orders-list-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "money" } }, async (page) => {
+    await page.locator("[data-order-line]").first().waitFor();
+    await page.locator("[data-order-line]").nth(1).getByRole("button").last().click();
+    await page.locator("[data-order-line]").nth(1).locator("dl").scrollIntoViewIfNeeded();
+  });
+  await shoot(`my-orders-filtered-${label}`, width, height, "/tien-cua-toi?filter[status]=APPROVED", { session: LAN, my: { ...MY, money: "money" } }, (page) => page.locator("[data-order-line]").first().waitFor());
+  await shoot(`my-orders-empty-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, orders: "ordersEmpty" } }, (page) => page.locator("[data-list-empty]").waitFor());
+}
+await shoot("my-money-payable-view-phone-390", 390, 844, "/tien-cua-toi?filter[status]=APPROVED", { session: LAN, my: { ...MY, money: "money" } }, (page) => page.locator("[data-payable-breakdown]").waitFor());
+await shoot("my-money-owed-phone-390", 390, 844, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "moneyOwed" } }, (page) => page.locator("[data-deduction]").waitFor());
+await shoot("my-money-deducted-view-phone-390", 390, 844, "/tien-cua-toi?view=deducted", { session: LAN, my: { ...MY, money: "moneyOwed" } }, (page) => page.locator("[data-deductions] li").first().waitFor());
+await shoot("my-money-no-bank-phone-390", 390, 844, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "moneyNoBank" } }, (page) => page.locator("[data-bank=missing]").waitFor());
+await shoot("my-money-bank-held-phone-390", 390, 844, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "moneyHeld" } }, (page) => page.locator("[data-bank=held]").waitFor());
+await shoot("my-money-payouts-phone-390", 390, 844, "/tien-cua-toi?view=payouts", { session: LAN }, (page) => page.locator("[data-payout]").first().waitFor());
+await shoot("my-money-orders-error-phone-390", 390, 844, "/tien-cua-toi", { session: LAN, my: { ...MY, orders: "missing" } }, (page) => page.getByRole("alert").first().waitFor());
+await shoot("account-placeholder-phone-390", 390, 844, "/tai-khoan", { session: LAN });
 await shoot("shell-guide-phone-390", 390, 844, "/huong-dan", { session: LAN });
 await shoot("not-found-phone-390", 390, 844, "/khong-co");
 await shoot("sign-in-session-ended-phone-390", 390, 844, "/tien-cua-toi", { session: { status: 401, json: { error: { code: "unauthorized", messageKey: "error.session_ended_new_password" } } } });
@@ -124,7 +162,8 @@ await shoot("account-menu-phone-390", 390, 844, "/tien-cua-toi", { session: LAN 
 // Story 7.1 AC4: 360 px in the Zalo in-app browser, each tab and the sign-in form.
 if (only === undefined || "zalo-360".startsWith(only) || only.startsWith("zalo-360")) {
   for (const [path, status, session] of [["/", DOWN, SIGNED_OUT], ["/tien-cua-toi", UP, LAN], ["/huong-dan", UP, SIGNED_OUT], ["/dang-nhap", DOWN, SIGNED_OUT]]) {
-    const page = await open(360, 740, path, { status, session, zalo: true });
+    const page = await open(360, 740, path, { status, session, zalo: true, my: { ...MY, money: "money" } });
+    if (path === "/tien-cua-toi") await page.locator("[data-order-line]").first().waitFor();
     record(`zalo-360${path}`, await page.evaluate(layoutProblems));
     if (path === "/dang-nhap") {
       await page.locator("#customer-code").focus();

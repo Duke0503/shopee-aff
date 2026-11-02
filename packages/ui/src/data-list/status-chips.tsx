@@ -21,9 +21,14 @@ export interface StatusChipsProps {
   readonly onChange: (next: readonly string[]) => void;
   /** Every record with no filter and no search, when the list sends it. */
   readonly overall?: number | undefined;
+  /**
+   * The customer website's fewer choices (Story 7.4): a status with no record in the set and not
+   * selected has no chip. The desk keeps every chip, 0 included.
+   */
+  readonly hideEmpty?: boolean;
 }
 
-export function StatusChips({ entity, facets, total, selected, onChange, overall }: StatusChipsProps) {
+export function StatusChips({ entity, facets, total, selected, onChange, overall, hideEmpty = false }: StatusChipsProps) {
   const counts = new Map((facets ?? []).map((f) => [f.value, f.count]));
   const toggle = (value: string): void => onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   return (
@@ -35,6 +40,7 @@ export function StatusChips({ entity, facets, total, selected, onChange, overall
       )}
       {statusesOf(entity)
         .filter((s) => s.derivedFrom === null)
+        .filter((s) => !hideEmpty || facets === undefined || (counts.get(s.value) ?? 0) > 0 || selected.includes(s.value))
         .map((s) => (
           <FilterChip key={s.value} label={statusLabel(s.labelKey)} count={facets === undefined ? undefined : (counts.get(s.value) ?? 0)} pressed={selected.includes(s.value)} onToggle={() => toggle(s.value)} />
         ))}

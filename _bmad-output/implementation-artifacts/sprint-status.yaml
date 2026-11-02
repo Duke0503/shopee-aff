@@ -129,8 +129,8 @@ development_status:
   epic-7: in-progress
   7-1-customer-website-shell-with-the-zalo-down-banner: review
   7-2-customer-sign-in-with-code-and-password: review
-  7-3-my-money-shows-payable-waiting-and-paid-amounts: backlog
-  7-4-my-orders-list-with-states-in-words: backlog
+  7-3-my-money-shows-payable-waiting-and-paid-amounts: review
+  7-4-my-orders-list-with-states-in-words: review
   7-5-account-page-manages-the-bank-account-and-password: backlog
   7-6-home-link-converter-with-a-customer-code-or-as-a-guest: backlog
   7-7-basic-guide-page-with-the-money-rules-stated-correctly: backlog

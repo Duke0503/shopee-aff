@@ -15,7 +15,7 @@
  * account (HOUSE) has no balance and is in no payable list (D5). SQL only SUMs stored integers;
  * every other step is `packages/money`.
  */
-import { clawbackOpenAmount, creditOpenAmount, estimatedCashback, openClawbackTotal, payableBalance, sumDong } from "@cashback/money";
+import { clawbackOpenAmount, creditOpenAmount, estimatedCashback, nettingPlan, openClawbackTotal, payableBalance, sumDong } from "@cashback/money";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -141,6 +141,16 @@ export function getBalances(db: LedgerDb, customerIds: readonly string[]): Balan
   if (asked.length === 0) return [];
   const parts = collect(db, [...keys], asked);
   return asked.map((id) => balanceOf(id, parts.get(id) as Parts));
+}
+
+/**
+ * What the next payout does with the open clawbacks (D42), by the confirm's own rule
+ * (`nettingPlan`): `deducted` is what it nets from the gross, `owedAfter` what stays owed for later
+ * payouts. `/sodu` and the website's balance card both say exactly this.
+ */
+export function nextPayoutNetting(balance: Pick<Balance, "gross" | "deductedNext">): { readonly deducted: number; readonly owedAfter: number } {
+  const plan = nettingPlan(balance.gross, [{ clawbackId: "open", open: balance.deductedNext }]);
+  return { deducted: plan.netted, owedAfter: plan.carriedForward };
 }
 
 /**

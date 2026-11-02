@@ -11,7 +11,7 @@
  * `/help` needs no customer. The guest account (HOUSE) gets no reply at all (D5); a known record
  * without a customer code (a staff record) is asked to write to an admin, never told to register
  * again. The balance is `getBalances` itself (D27), with the next payout's netting of the open
- * clawbacks from packages/money (`nettingPlan`, the confirm's own rule); the orders are the latest
+ * clawbacks (`nextPayoutNetting`: packages/money's `nettingPlan`, the confirm's own rule); the orders are the latest
  * under the customer's ids, aliases included; the bank account is its bank name and last four
  * digits only (SECURITY_MODEL.md). The registration commits in its own transaction first.
  *
@@ -21,13 +21,12 @@
  * transaction. The password is in the answer only; the log line names the reply kind.
  */
 import { ASSISTANT_COMMAND_PATH, assistantCommandAnswerSchema, assistantCommandSchema, CHAT_ORDERS_MAX, PRIVATE_ONLY_COMMANDS, type AssistantCommand, type AssistantCommandReply } from "@cashback/contracts";
-import { nettingPlan } from "@cashback/money";
 import type { FastifyInstance } from "fastify";
 
 import { bankAccountsOf, bankDisplayName, customerCodeOf, customerKeys, hashPassword, newCustomerPassword, resolveCustomer, setCustomerPassword } from "../modules/identity/index";
 import { commandAudit } from "../modules/operations/index";
 import { chatOrdersOf } from "../modules/orders/index";
-import { getBalances } from "../modules/payouts/index";
+import { getBalances, nextPayoutNetting } from "../modules/payouts/index";
 import type { LedgerDb } from "../platform/db/ledger";
 import { HttpError } from "../platform/http/error-envelope";
 import { ASSISTANT_ROUTE } from "../platform/http/internal-token.guard";
@@ -55,9 +54,8 @@ const isReply = (found: ReturnType<typeof commandCustomer>): found is AssistantC
 
 function balanceReply(db: LedgerDb, customerId: string): AssistantCommandReply {
   const [balance] = getBalances(db, [customerId]);
-  const gross = balance?.gross ?? 0;
-  const netting = nettingPlan(gross, [{ clawbackId: "open", open: balance?.deductedNext ?? 0 }]);
-  return { kind: "balance", payable: balance?.payable ?? 0, waiting: balance?.waiting ?? 0, paid: balance?.paid ?? 0, deducted: netting.netted, owedAfter: netting.carriedForward };
+  const netting = nextPayoutNetting({ gross: balance?.gross ?? 0, deductedNext: balance?.deductedNext ?? 0 });
+  return { kind: "balance", payable: balance?.payable ?? 0, waiting: balance?.waiting ?? 0, paid: balance?.paid ?? 0, deducted: netting.deducted, owedAfter: netting.owedAfter };
 }
 
 /** What one command about a customer says for the record `key` resolves to. */

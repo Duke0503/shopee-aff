@@ -2,7 +2,7 @@
  * The composition of the customer website's server side (AD-18, AD-21; Stories 7.1 and 7.2): the
  * site status every page reads (assistant down, the fallback contact path, the assistant's chat),
  * the customer sign-in routes with their Origin check, client keys, burst watch and the hourly
- * housekeeping job, and the built website itself when apps/web/dist exists (a dev start without a
+ * housekeeping job, the signed-in customer's money, orders and payouts (Stories 7.3 and 7.4), and the built website itself when apps/web/dist exists (a dev start without a
  * build serves the API only; the Vite dev server serves the pages then). The receipt, share and
  * proof routes stay as they are and win over the website's catch-all. Later customer stories add
  * their routes here.
@@ -25,6 +25,7 @@ import { staticBuildRoutes } from "../platform/http/static-site";
 import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
 import type { Job } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
+import { myMoneyRoutes } from "./my-money.routes";
 
 export const WEB_DIST = join(REPOSITORY_ROOT, "apps", "web", "dist");
 /** The website's Vite dev server (apps/web/vite.config.ts), allowed as an origin in dev only. */
@@ -66,6 +67,7 @@ export function customerSite(deps: CustomerSiteDeps): CustomerSite {
   const routes: PublicRoutes[] = [
     siteStatusRoutes({ heartbeats: deps.heartbeats, fallbackContactUrl: config.fallbackContactUrl, assistantUrl: config.zaloAssistantUrl }),
     customerSessionRoutes({ ledger, clock, auditFor: (db) => auditFor(db, clock), alertsFor: (db) => alertsFor(db, clock, deps.logger), burst: signInBurstWatch(), unknown, clientKey, origins: customerOrigins(config) }),
+    myMoneyRoutes({ ledger, clock }),
   ];
   const dist = deps.dist ?? WEB_DIST;
   if (existsSync(join(dist, "index.html"))) routes.push(staticBuildRoutes({ kind: "site", root: dist, pagePaths: Object.values(CUSTOMER_PATHS), otherHosts: config.staffAccess ? [config.staffAccess.adminHost] : [] }));

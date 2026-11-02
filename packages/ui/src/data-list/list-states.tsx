@@ -5,6 +5,7 @@
  * reload keeps the rows and draws the 2 px progress line instead (LC-8).
  */
 import { formatVnTimeOf } from "@cashback/core";
+import type { ReactNode } from "react";
 
 import { Button } from "../components/button";
 import { Skeleton } from "../components/skeleton";
@@ -60,10 +61,11 @@ export function ListNoMatches({ onClear }: { readonly onClear: () => void }) {
   );
 }
 
-export function ListEmpty({ text }: { readonly text: string }) {
+export function ListEmpty({ text, action }: { readonly text: string; readonly action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-8">
+    <div data-list-empty className="flex flex-col items-start gap-3 rounded-xl border border-border bg-card px-4 py-8">
       <p className="text-base font-semibold text-muted-foreground">{text}</p>
+      {action}
     </div>
   );
 }
