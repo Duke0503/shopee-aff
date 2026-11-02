@@ -363,7 +363,7 @@ describe("Story 8.5: production host services on the Windows VPS", () => {
 
 describe("Story 8.5: the PowerShell scripts never touch the live system", () => {
   it("the scripts know only their own three tasks, refuse the live ones, and never find or stop a process by name", () => {
-    expect(scripts().sort()).toEqual(["common.ps1", "install-tasks.ps1", "start.ps1", "status.ps1", "stop.ps1", "uninstall-tasks.ps1"]);
+    expect(scripts().sort()).toEqual(["common.ps1", "deploy.ps1", "install-tasks.ps1", "start.ps1", "status.ps1", "stop.ps1", "uninstall-tasks.ps1"]);
     for (const name of scripts()) {
       const text = script(name);
       expect(text, name).not.toMatch(/Stop-Process|taskkill|Get-Process|kill\s/i);

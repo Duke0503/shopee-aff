@@ -172,7 +172,7 @@ describe("Story 3.7: window, networks and row failures", () => {
     });
     expect(JOB_SCHEDULES.reconcile).toEqual({
       context: "orders",
-      schedule: { kind: "every", delayMs: 60 * 60_000 },
+      schedule: { kind: "every", delayMs: 60 * 60_000, firstDelayMs: 3 * 60_000 },
     });
   });
 

@@ -14,13 +14,18 @@
  * A read is all or nothing (D43). Pages are read from 1 until one holds fewer than 50 rows or the
  * stated total is reached; a read that would need more than `maxPages` pages (20, as live) fails
  * with `report_page_cap`. A live report moves while it is read (a new purchase between two pages):
- * a conversion seen twice with the same content is kept once, and a total that changes, or is not
+ * an entry seen twice with the same content is kept once, and a total that changes, or is not
  * reached, reads again from page 1 once (`REPORT_READ_PASSES`); applying is idempotent, so a
- * second read costs nothing. The same conversion with different content on two pages fails the
- * read. The page must say it shows the page asked for, every row must look like a conversion, and
- * every purchase time must be readable and inside the window, or the read fails: a report page that
- * ignored the window is never applied. Rows go through the same
- * normaliser as the saved pages (status map, `fromNetworkUnits`), so a ShopeeFood order in the
+ * second read costs nothing. The list holds one checkout id in several entries with different
+ * content (several orders, an order's items over several entries), so rows are keyed by order
+ * number as the live reader keyed them, and an order's entries are put together
+ * (domain/shopee-report-merge.ts). Only an order whose entries disagree (its status or sub_ids,
+ * or one item shown with other content) reads again from page 1, and fails the read with
+ * `conversion_changed` when the second read disagrees too. The run logs the read's counts
+ * (`orders.reconciliation.read`), never an id or an amount. The page must say it shows the page
+ * asked for, every row must look like a conversion, and every purchase time must be readable and
+ * inside the window, or the read fails: a report page that ignored the window is never applied.
+ * Rows go through the same normaliser as the saved pages (status map, `fromNetworkUnits`), so a ShopeeFood order in the
  * report is read like any Shopee order (D60).
  */
 import { bridgeReportValueSchema, SHOPEE_REPORT_PAGE_SIZE, type BridgeReportValue } from "@cashback/contracts";
@@ -30,6 +35,7 @@ import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import type { BridgePort, BridgeReportResult, ReportBridgeJob } from "../../platform/ports/bridge.port";
 import { CAPTCHA_HOLD_MS, LINK_QUEUE_ALERTS } from "./domain/link-failure";
+import { mergeShopeeOrders, type ShopeeReadCounts } from "./domain/shopee-report-merge";
 import { linkWorkDue } from "./link-lookup.command";
 import { holdShopeeQueue, pauseShopeeQueue, shopeeQueueGate } from "./link-queue.command";
 import { ReportSourceError, type ReportWindow, type SourcedReport, type WindowedReportSource } from "./report-source.port";
@@ -123,28 +129,28 @@ async function ask(deps: ShopeeBridgeSourceDeps, job: ReportBridgeJob, signal: A
   }
 }
 
-/** A conversion's identity across pages: its checkout id, else its orders' ids. */
-function conversionId(raw: Record<string, unknown>): string {
-  const checkout = raw["checkout_id"];
-  if ((typeof checkout === "string" && checkout !== "") || typeof checkout === "number") return String(checkout);
-  const orders = Array.isArray(raw["orders"]) ? raw["orders"] : [];
-  return orders.map((o) => (o !== null && typeof o === "object" ? String((o as Record<string, unknown>)["order_sn"] ?? "") : "")).join(",");
-}
-
-type Pass = { readonly kind: "read"; readonly list: Conversion[] } | { readonly kind: "moved" };
 type Conversion = BridgeReportValue["list"][number];
+type Pass = { readonly kind: "read"; readonly list: Conversion[]; readonly repeatedEntries: number } | { readonly kind: "moved" };
+
+/** What one read held, counts only, for the run's log line. */
+export interface ShopeeReportReadCounts extends ShopeeReadCounts {
+  /** Entries shown again on a later page with the same content, kept once. */
+  readonly repeatedEntries: number;
+  readonly passes: number;
+}
 
 /**
  * One pass over the pages from page 1. A live report moves while it is read: a purchase that lands
- * between two pages pushes a row of the last page onto the next one. A conversion seen again with
- * the same content is kept once; seen again with other content, the read fails. A total that
- * changes between pages ends the pass as `moved`, so the caller reads again from page 1.
+ * between two pages pushes an entry of the last page onto the next one, so an entry seen again
+ * with the same content is kept once. A total that changes between pages ends the pass as
+ * `moved`, so the caller reads again from page 1.
  */
 async function readPass(deps: ShopeeBridgeSourceDeps, window: ReportWindow, signal: AbortSignal): Promise<Pass> {
   const seconds = reportSeconds(window);
   const maxPages = deps.maxPages ?? SHOPEE_MAX_PAGES;
-  const seen = new Map<string, string>();
+  const seen = new Set<string>();
   const list: Conversion[] = [];
+  let repeatedEntries = 0;
   let firstTotal: number | null | undefined;
   for (let page = 1; ; page++) {
     await yieldToLinks(deps, signal);
@@ -153,30 +159,35 @@ async function readPass(deps: ShopeeBridgeSourceDeps, window: ReportWindow, sign
     if (firstTotal === undefined || firstTotal === null) firstTotal = value.total;
     else if (value.total !== null && value.total !== firstTotal) return { kind: "moved" };
     for (const raw of value.list) {
-      const id = conversionId(raw);
       const content = JSON.stringify(raw);
-      const before = id === "" ? undefined : seen.get(id);
-      if (before === content) continue;
-      if (before !== undefined) fail("report_fetch_failed", `conversion ${id} shows different content on two pages of one read`, "conversion_changed");
-      if (id !== "") seen.set(id, content);
-      list.push(raw);
+      if (seen.has(content)) repeatedEntries++;
+      else list.push(raw);
+      seen.add(content);
     }
     const total = firstTotal ?? null;
     const more = value.list.length >= SHOPEE_REPORT_PAGE_SIZE && (total === null || list.length < total);
     if (!more) {
       if (total !== null && list.length < total) return { kind: "moved" };
-      return { kind: "read", list };
+      return { kind: "read", list, repeatedEntries };
     }
     if (page >= maxPages) fail("report_page_cap", `${maxPages} full pages of the report and more to come; the window holds too many conversions`, "page_cap");
   }
 }
 
-/** Every conversion of the window: one pass, or a second from page 1 when the report moved during the first. */
-async function readConversions(deps: ShopeeBridgeSourceDeps, window: ReportWindow, signal: AbortSignal): Promise<Conversion[]> {
+/**
+ * Every order of the window, its entries put together: one pass, or a second from page 1 when the
+ * report moved during the first or one order's entries disagreed (a change caught mid-read).
+ */
+async function readConversions(deps: ShopeeBridgeSourceDeps, window: ReportWindow, signal: AbortSignal): Promise<{ conversions: Record<string, unknown>[]; counts: ShopeeReportReadCounts }> {
+  let conflict: string | null = null;
   for (let pass = 1; pass <= REPORT_READ_PASSES; pass++) {
     const read = await readPass(deps, window, signal);
-    if (read.kind === "read") return read.list;
+    if (read.kind === "moved") continue;
+    const merged = mergeShopeeOrders(read.list);
+    conflict = merged.conflict;
+    if (conflict === null) return { conversions: merged.conversions, counts: { ...merged.counts, repeatedEntries: read.repeatedEntries, passes: pass } };
   }
+  if (conflict !== null) fail("report_fetch_failed", `order ${conflict} shows different content in two entries of one read, ${REPORT_READ_PASSES} reads in a row`, "conversion_changed");
   return fail("report_fetch_failed", `the report kept changing during ${REPORT_READ_PASSES} reads; the next run reads it again`, "report_moved");
 }
 
@@ -185,13 +196,14 @@ export function shopeeBridgeSource(deps: ShopeeBridgeSourceDeps): WindowedReport
     network: "shopee",
     async read(window, signal) {
       const stop = signal ?? new AbortController().signal;
-      const rows = readShopeePages(await readConversions(deps, window, stop), SHOPEE_BRIDGE_REPORT);
+      const { conversions, counts } = await readConversions(deps, window, stop);
+      const rows = readShopeePages(conversions, SHOPEE_BRIDGE_REPORT);
       const since = toMs(window.since);
       const until = Math.ceil(toMs(window.until) / 1000) * 1000;
       // A row without a readable purchase time cannot be shown to be inside the window: the page may have ignored it.
       const outside = rows.filter((r) => r.purchasedAt === null || toMs(r.purchasedAt) < since || toMs(r.purchasedAt) >= until);
       if (outside.length > 0) fail("report_fetch_failed", `${outside.length} rows were purchased outside the window or at no readable time; the report page did not apply it`, "outside_window");
-      return { network: "shopee", source: SHOPEE_BRIDGE_REPORT, rows, skippedLines: 0, sha256: null } satisfies SourcedReport;
+      return { network: "shopee", source: SHOPEE_BRIDGE_REPORT, rows, skippedLines: 0, sha256: null, readCounts: { ...counts, rows: rows.length } } satisfies SourcedReport;
     },
   };
 }

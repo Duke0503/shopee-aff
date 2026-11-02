@@ -10,15 +10,18 @@
  *
  * Saved pages that hold fewer conversions than their `total`, or that stop at the live reader's
  * page cap (20 full pages of 50), fail with `report_page_cap` and yield nothing. A page saved
- * twice (the same page number, or a conversion already read) fails with `report_duplicate_page`,
- * and numbered pages that do not run from 1 without a gap with `report_page_missing`. The file is
- * read once; its checksum is of the bytes parsed.
+ * twice (the same page number, or an entry already read with the same content) fails with
+ * `report_duplicate_page`, and numbered pages that do not run from 1 without a gap with
+ * `report_page_missing`. Entries sharing a checkout id are not duplicates: they are put together
+ * per order number (domain/shopee-report-merge.ts), and an order whose entries disagree fails
+ * with `report_duplicate_page`. The file is read once; its checksum is of the bytes parsed.
  */
 import { basename, extname } from "node:path";
 
 import { asArray, asId, asObject, readPurchaseTime } from "./domain/report-row";
 import { readShopeeExport, shopeeExportMapping, ShopeeExportMappingError, type ShopeeExportMapping } from "./domain/shopee-export";
 import { readShopeeConversion } from "./domain/shopee-report";
+import { mergeShopeeOrders } from "./domain/shopee-report-merge";
 import { assertComplete, cachedFileReport, readReportFile, ReportSourceError, sourced, withinWindow, type ReportSource, type SourcedReport, type SourcedRow, type WindowedReportSource } from "./report-source.port";
 
 /** report_reader.py PAGE_SIZE and MAX_PAGES. */
@@ -71,11 +74,9 @@ function assertPagesOnce(pages: readonly Page[], what: string): void {
   }
   const seen = new Set<string>();
   for (const raw of pages.flatMap((p) => p.list)) {
-    const c = asObject(raw);
-    const id = asId(c["checkout_id"]) || asArray(c["orders"]).map((o) => asId(asObject(o)["order_sn"])).join(",");
-    if (id === "") continue;
-    if (seen.has(id)) throw new ReportSourceError("report_duplicate_page", `${what}: conversion ${id} is saved twice; a page was saved twice`);
-    seen.add(id);
+    const content = JSON.stringify(raw);
+    if (seen.has(content)) throw new ReportSourceError("report_duplicate_page", `${what}: checkout ${asId(asObject(raw)["checkout_id"]) || "without id"} is saved twice with the same content; a page was saved twice`);
+    seen.add(content);
   }
 }
 
@@ -96,7 +97,9 @@ export function readShopeePages(json: unknown, what: string): SourcedRow[] {
   if (totals.length === 0 && pages.length >= SHOPEE_MAX_PAGES && (last?.list.length ?? 0) >= SHOPEE_PAGE_SIZE) {
     throw new ReportSourceError("report_page_cap", `${what}: ${SHOPEE_MAX_PAGES} full pages, the live reader's cap; narrow the date range`);
   }
-  return conversions.flatMap((raw) => {
+  const merged = mergeShopeeOrders(conversions);
+  if (merged.conflict !== null) throw new ReportSourceError("report_duplicate_page", `${what}: order ${merged.conflict} shows different content in two entries`, { reason: "conversion_changed" });
+  return merged.conversions.flatMap((raw) => {
     const purchasedAt = readPurchaseTime(asObject(raw)["purchase_time"]);
     return readShopeeConversion(raw).map((row) => sourced(row, purchasedAt));
   });

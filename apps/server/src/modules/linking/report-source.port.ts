@@ -36,6 +36,8 @@ export interface SourcedReport {
   readonly sha256: string | null;
   /** A file source's modification time; absent or null for a live API read. */
   readonly modifiedAt?: Instant | null;
+  /** What a paged read held, counts only (entries, orders, repeats), logged by the run; absent for a file. */
+  readonly readCounts?: Readonly<Record<string, number>>;
 }
 
 export interface ReportSource {

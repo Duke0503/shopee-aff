@@ -179,10 +179,10 @@ describe("the scheduler's own rules", () => {
       heartbeat: { context: "operations", schedule: { kind: "every", delayMs: 300_000 } },
       alertDelivery: { context: "operations", schedule: { kind: "every", delayMs: 30_000 } },
       signInHousekeeping: { context: "identity", schedule: { kind: "every", delayMs: 3_600_000 } },
-      reconcile: { context: "orders", schedule: { kind: "every", delayMs: 3_600_000 } },
+      reconcile: { context: "orders", schedule: { kind: "every", delayMs: 3_600_000, firstDelayMs: 180_000 } },
       nightlySweep: { context: "orders", schedule: { kind: "daily_vn", at: { hour: 2, minute: 0 } } },
       backup: { context: "platform", schedule: { kind: "daily_vn", at: { hour: 3, minute: 0 } } },
-      payoutRecords: { context: "payouts", schedule: { kind: "every", delayMs: 3_600_000 } },
+      payoutRecords: { context: "payouts", schedule: { kind: "every", delayMs: 3_600_000, firstDelayMs: 300_000 } },
     });
   });
 
@@ -192,6 +192,33 @@ describe("the scheduler's own rules", () => {
     expect(() => createScheduler([job("a", 1), job("a", 1)], options)).toThrow("two jobs named a");
     expect(() => createScheduler([job("a", 0)], options)).toThrow(RangeError);
     expect(() => createScheduler([job("a", 1.5)], options)).toThrow(RangeError);
+    expect(() => createScheduler([{ ...job("a", 1), schedule: { kind: "every", delayMs: 1, firstDelayMs: 0 } }], options)).toThrow(RangeError);
+  });
+
+  it("production 2026-11-03: reconcile and payoutRecords first run a few minutes after start, then hourly, so a restart never postpones them by an hour", async () => {
+    const time = fakeTime(START);
+    const starts: string[] = [];
+    const jobs: Job[] = (["reconcile", "payoutRecords"] as const).map((name) => ({ name, ...JOB_SCHEDULES[name], run: () => void starts.push(`${name} ${time.clock.now()}`) }));
+    const scheduler = createScheduler(jobs, { ...time, logger: capture().logger });
+    scheduler.start();
+    await time.advance(2 * 60_000);
+    expect(starts).toEqual([]);
+    await time.advance(3 * 60_000);
+    expect(starts).toEqual(["reconcile 2026-10-30T07:03:00.000Z", "payoutRecords 2026-10-30T07:05:00.000Z"]);
+    await time.advance(60 * 60_000);
+    expect(starts.slice(2)).toEqual(["reconcile 2026-10-30T08:03:00.000Z", "payoutRecords 2026-10-30T08:05:00.000Z"]);
+    expect(time.pending()).toBe(2);
+  });
+
+  it("a job triggered before its first delay has run: the next run is a full delay after it", async () => {
+    const time = fakeTime(START);
+    const starts: string[] = [];
+    const scheduler = createScheduler([{ name: "reconcile", ...JOB_SCHEDULES.reconcile, run: () => void starts.push(time.clock.now()) }], { ...time, logger: capture().logger });
+    scheduler.start();
+    await time.advance(60_000);
+    scheduler.trigger("reconcile");
+    await time.advance(60 * 60_000);
+    expect(starts).toEqual(["2026-10-30T07:01:00.000Z", "2026-10-30T08:01:00.000Z"]);
   });
 
   it("a manual trigger runs now and moves the next run to a delay after it", async () => {

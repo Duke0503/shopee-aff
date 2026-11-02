@@ -8,6 +8,9 @@
  * Outcomes are log lines (AD-27): `<context>.job.finished` or `<context>.job.failed`, and
  * `<context>.job.skipped` when a run is asked for while one is going. A failed run is
  * rescheduled like a finished one. The clock and the timer are injected so tests drive time.
+ * An hourly job may name a shorter first delay (`firstDelayMs`), used only for the first run after
+ * start: a deploy restarts the server, and a full delay counted from every start would keep
+ * postponing it while deploys come more often than its delay.
  * On shutdown no new run starts, each current run's `AbortSignal` is aborted so a long job (the
  * nightly sweep) stops at its next step, and `stop` waits for the current runs or gives up at its
  * timeout.
@@ -16,7 +19,7 @@ import { nextVnTimeOfDay, toMs, type Clock, type VnTimeOfDay } from "@cashback/c
 
 import type { Logger } from "../log/logger";
 
-export type JobSchedule = { readonly kind: "every"; readonly delayMs: number } | { readonly kind: "daily_vn"; readonly at: VnTimeOfDay };
+export type JobSchedule = { readonly kind: "every"; readonly delayMs: number; readonly firstDelayMs?: number } | { readonly kind: "daily_vn"; readonly at: VnTimeOfDay };
 
 export interface Job {
   /** Unique per scheduler, e.g. `reconcile`. */
@@ -71,10 +74,12 @@ interface JobState {
   pending: unknown;
   /** Bumped whenever the pending timer is replaced or cancelled; a callback from an older timer does nothing. */
   generation: number;
+  /** True once a run of this job has started; until then an `every` job waits its `firstDelayMs`. */
+  hasRun: boolean;
 }
 
-export function delayUntilNextRun(schedule: JobSchedule, clock: Clock): number {
-  if (schedule.kind === "every") return schedule.delayMs;
+export function delayUntilNextRun(schedule: JobSchedule, clock: Clock, first = false): number {
+  if (schedule.kind === "every") return first ? (schedule.firstDelayMs ?? schedule.delayMs) : schedule.delayMs;
   const now = clock.now();
   return toMs(nextVnTimeOfDay(now, schedule.at)) - toMs(now);
 }
@@ -84,7 +89,9 @@ function assertJobs(jobs: readonly Job[]): void {
   for (const job of jobs) {
     if (names.has(job.name)) throw new Error(`two jobs named ${job.name}`);
     names.add(job.name);
-    if (job.schedule.kind === "every" && !(Number.isInteger(job.schedule.delayMs) && job.schedule.delayMs > 0)) {
+    if (job.schedule.kind !== "every") continue;
+    const { delayMs, firstDelayMs = delayMs } = job.schedule;
+    if (![delayMs, firstDelayMs].every((ms) => Number.isInteger(ms) && ms > 0)) {
       throw new RangeError(`job ${job.name}: the delay must be a positive whole number of milliseconds`);
     }
   }
@@ -111,7 +118,7 @@ function scheduleNext(ctx: Context, state: JobState): void {
     if (state.generation !== generation) return;
     state.pending = null;
     runOnce(ctx, state);
-  }, delayUntilNextRun(state.job.schedule, ctx.clock));
+  }, delayUntilNextRun(state.job.schedule, ctx.clock, !state.hasRun));
 }
 
 function runOnce(ctx: Context, state: JobState): TriggerResult {
@@ -122,6 +129,7 @@ function runOnce(ctx: Context, state: JobState): TriggerResult {
     return "already_running";
   }
   cancelPending(ctx, state);
+  state.hasRun = true;
   const startedAt = toMs(ctx.clock.now());
   const elapsed = () => toMs(ctx.clock.now()) - startedAt;
   const abort = new AbortController();
@@ -160,7 +168,7 @@ async function stopAll(ctx: Context, timeoutMs: number): Promise<StopResult> {
 
 export function createScheduler(jobs: readonly Job[], options: SchedulerOptions): Scheduler {
   assertJobs(jobs);
-  const ctx: Context = { ...options, states: new Map(jobs.map((job) => [job.name, { job, running: null, abort: null, pending: null, generation: 0 }])), started: false, stopping: false };
+  const ctx: Context = { ...options, states: new Map(jobs.map((job) => [job.name, { job, running: null, abort: null, pending: null, generation: 0, hasRun: false }])), started: false, stopping: false };
   return {
     start() {
       if (ctx.started || ctx.stopping) return;

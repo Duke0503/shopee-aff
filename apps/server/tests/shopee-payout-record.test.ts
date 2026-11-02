@@ -197,7 +197,7 @@ describe("Story 4.22 acceptance criteria", () => {
 
   it("the job exists only when the bridge reads the payout record page (the real browser), every hour", () => {
     const ledger = payoutLedger();
-    expect(payoutRecordJobs({ ledger, clock: CLOCK, bridge: payoutBridge(page()), logger: SILENT }).map((j) => [j.name, j.schedule])).toEqual([["payoutRecords", { kind: "every", delayMs: 3_600_000 }]]);
+    expect(payoutRecordJobs({ ledger, clock: CLOCK, bridge: payoutBridge(page()), logger: SILENT }).map((j) => [j.name, j.schedule])).toEqual([["payoutRecords", { kind: "every", delayMs: 3_600_000, firstDelayMs: 300_000 }]]);
     const fake: BridgePort = { mode: "fake", createLink: async () => ({ outcome: "unavailable", reason: "no_bridge" }) };
     expect(payoutRecordJobs({ ledger, clock: CLOCK, bridge: fake, logger: SILENT })).toEqual([]);
   });

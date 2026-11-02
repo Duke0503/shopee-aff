@@ -223,6 +223,7 @@ export async function runReconciliation(kind: RunKind, source: WindowedReportSou
     return record(deps, { ...s, report: null, counts: emptyCounts(), outcome: "FAILED", errorCode, reason });
   }
   if (aborted(deps)) return null;
+  if (report.readCounts !== undefined) deps.logger.info({ network: source.network, source: report.source, ...report.readCounts }, "orders.reconciliation.read");
   if (isStale(deps, s, report)) return record(deps, { ...s, report, counts: { ...emptyCounts(), rowsRead: report.rows.length }, outcome: "SOURCE_STALE", errorCode: "source_stale" });
   const counts = applyRows(report.rows, deps, source.network);
   if (counts === null) return null;

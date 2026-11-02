@@ -5,7 +5,7 @@
  */
 import type { JobSchedule } from "./scheduler";
 
-const every = (delayMs: number): JobSchedule => ({ kind: "every", delayMs });
+const every = (delayMs: number, firstDelayMs?: number): JobSchedule => (firstDelayMs === undefined ? { kind: "every", delayMs } : { kind: "every", delayMs, firstDelayMs });
 const dailyVn = (hour: number, minute = 0): JobSchedule => ({ kind: "daily_vn", at: { hour, minute } });
 
 export interface JobTiming {
@@ -28,12 +28,14 @@ export const JOB_SCHEDULES = {
   alertDelivery: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */
   signInHousekeeping: { context: "identity", schedule: every(60 * 60_000) },
-  reconcile: { context: "orders", schedule: every(60 * 60_000) },
+  /** Hourly; the first run 3 minutes after start, so frequent deploys never postpone it (production 2026-11-03). */
+  reconcile: { context: "orders", schedule: every(60 * 60_000, 3 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },
   /** The checked local archive, then the encrypted copy on Google Drive (Story 8.2). */
   backup: { context: "platform", schedule: dailyVn(3) },
   /** The Shopee payout record page: hourly, read once a day from 09:30 Vietnam time until it succeeds (Story 4.22). */
-  payoutRecords: { context: "payouts", schedule: every(60 * 60_000) },
+  /** The first run 5 minutes after start, after the first reconcile has asked the bridge for its pages. */
+  payoutRecords: { context: "payouts", schedule: every(60 * 60_000, 5 * 60_000) },
 } as const satisfies Record<string, JobTiming>;
 
 export type JobName = keyof typeof JOB_SCHEDULES;

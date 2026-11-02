@@ -1,0 +1,103 @@
+{
+  "about": "Entries of /api/v3/report/list shaped like the live answer (production 2026-11-03), all ids and amounts fake. One checkout id comes back in several entries with different content: checkout 247229500000001 holds two orders in one entry; checkout 247229500000002 holds one order per entry; checkout 247229500000003 holds one order whose items come in two entries, the second of which is on page 2. Amounts are x100,000.",
+  "multiOrder": {
+    "conversion_id": 247229500000001,
+    "checkout_id": 247229500000001,
+    "purchase_time": 1793156400,
+    "utm_content": "C1-REQ1---",
+    "conversion_status": 1,
+    "estimated_total_commission": 1500000000,
+    "orders": [
+      {
+        "order_sn": "261028FIXA0001",
+        "shop_id": 7001,
+        "order_status": "PAID",
+        "items": [
+          { "item_id": 9001, "model_id": 1, "item_name": "Item A", "display_item_status": "Pending", "actual_amount": 10000000000, "item_commission": 500000000, "capped_brand_commission": 0 },
+          { "item_id": 9002, "model_id": 1, "item_name": "Item B", "display_item_status": "Pending", "actual_amount": 5000000000, "item_commission": 250000000, "capped_brand_commission": 0 }
+        ]
+      },
+      {
+        "order_sn": "261028FIXA0002",
+        "shop_id": 7002,
+        "order_status": "PAID",
+        "items": [
+          { "item_id": 9003, "model_id": 4, "item_name": "Item C", "display_item_status": "Pending", "actual_amount": 15000000000, "item_commission": 750000000, "capped_brand_commission": 0 }
+        ]
+      }
+    ]
+  },
+  "shopOrderOne": {
+    "conversion_id": 247229500000002,
+    "checkout_id": 247229500000002,
+    "purchase_time": 1793156400,
+    "utm_content": "C1-REQ1---",
+    "conversion_status": 1,
+    "estimated_total_commission": 300000000,
+    "orders": [
+      {
+        "order_sn": "261028FIXB0001",
+        "shop_id": 7003,
+        "order_status": "PAID",
+        "items": [
+          { "item_id": 9004, "model_id": 2, "item_name": "Item D", "display_item_status": "Pending", "actual_amount": 6000000000, "item_commission": 300000000, "capped_brand_commission": 0 }
+        ]
+      }
+    ]
+  },
+  "shopOrderTwo": {
+    "conversion_id": 247229500000002,
+    "checkout_id": 247229500000002,
+    "purchase_time": 1793156400,
+    "utm_content": "C1-REQ1---",
+    "conversion_status": 1,
+    "estimated_total_commission": 200000000,
+    "orders": [
+      {
+        "order_sn": "261028FIXB0002",
+        "shop_id": 7004,
+        "order_status": "UNPAID",
+        "items": [
+          { "item_id": 9005, "model_id": 3, "item_name": "Item E", "display_item_status": "", "actual_amount": 4000000000, "item_commission": 200000000, "capped_brand_commission": 0 }
+        ]
+      }
+    ]
+  },
+  "splitFirst": {
+    "conversion_id": 247229500000003,
+    "checkout_id": 247229500000003,
+    "purchase_time": 1793156400,
+    "utm_content": "C1-REQ1---",
+    "conversion_status": 1,
+    "estimated_total_commission": 400000000,
+    "orders": [
+      {
+        "order_sn": "261028FIXC0001",
+        "shop_id": 7005,
+        "order_status": "PAID",
+        "items": [
+          { "item_id": 9006, "model_id": 1, "item_name": "Item F", "display_item_status": "Pending", "actual_amount": 8000000000, "item_commission": 400000000, "capped_brand_commission": 0 }
+        ]
+      }
+    ]
+  },
+  "splitSecond": {
+    "conversion_id": 247229500000003,
+    "checkout_id": 247229500000003,
+    "purchase_time": 1793156400,
+    "utm_content": "C1-REQ1---",
+    "conversion_status": 1,
+    "estimated_total_commission": 700000000,
+    "orders": [
+      {
+        "order_sn": "261028FIXC0001",
+        "shop_id": 7005,
+        "order_status": "PAID",
+        "items": [
+          { "item_id": 9006, "model_id": 1, "item_name": "Item F", "display_item_status": "Pending", "actual_amount": 8000000000, "item_commission": 400000000, "capped_brand_commission": 0 },
+          { "item_id": 9007, "model_id": 1, "item_name": "Item G", "display_item_status": "Pending", "actual_amount": 6000000000, "item_commission": 300000000, "capped_brand_commission": 0 }
+        ]
+      }
+    ]
+  }
+}
