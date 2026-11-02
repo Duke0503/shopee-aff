@@ -3,7 +3,29 @@
  * alert, never inside a transaction. The bot token is a secret from platform/config and appears
  * in no log line or error message. `fetch` is injected so tests use a fake and never reach the
  * network.
+ *
+ * The message is the owner's Vietnamese text for the alert kind from packages/labels/vi/alerts.json
+ * (Story 8.3): the severity word, the label and the repeat count, nothing else, so no personal
+ * data, bank number or token can reach the chat.
  */
+import ALERT_LABELS from "@cashback/labels/vi/alerts.json" with { type: "json" };
+
+import type { AlertSeverity } from "./domain/alert-cooldown";
+
+const LABELS: Readonly<Record<string, string>> = ALERT_LABELS;
+
+const fill = (text: string, values: Record<string, string>): string => text.replace(/\{(\w+)\}/g, (all, key: string) => values[key] ?? all);
+
+/** True when the alert kind has its own owner text. */
+export const hasAlertLabel = (kind: string): boolean => /^[a-z][a-z0-9_]*$/.test(kind) && !kind.startsWith("severity_") && kind !== "repeated" && kind !== "unknown_kind" && typeof LABELS[kind] === "string";
+
+/** The Telegram text of one stored alert. */
+export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number }): string {
+  const severity = LABELS[`severity_${alert.severity}`] ?? alert.severity;
+  const body = hasAlertLabel(alert.kind) ? (LABELS[alert.kind] as string) : fill(LABELS["unknown_kind"] ?? "{kind}", { kind: alert.kind });
+  const repeats = alert.suppressed > 0 ? ` ${fill(LABELS["repeated"] ?? "", { count: String(alert.suppressed) })}` : "";
+  return `[${severity}] ${body}${repeats}`;
+}
 
 export interface AlertSender {
   send(text: string): Promise<void>;

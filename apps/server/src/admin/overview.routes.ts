@@ -9,17 +9,17 @@ import type { Clock } from "@cashback/core";
 import type { Ledger } from "../platform/db/ledger";
 import { HttpError } from "../platform/http/error-envelope";
 import type { StaffRoutes } from "../platform/http/staff-routes";
-import type { LastHeartbeat } from "./overview-activity.query";
+import type { HealthSources } from "../modules/operations/index";
 import { overviewOf, periodOf } from "./overview.query";
 
 export interface OverviewRouteDeps {
   readonly ledger: Ledger;
   readonly clock: Clock;
-  /** The assistant's last heartbeat, from the store its heartbeat route writes (Story 6.1). */
-  readonly lastHeartbeat?: LastHeartbeat;
+  /** The one health model's sources, the same object the health check reads (Stories 6.1, 8.2, 8.3). */
+  readonly health?: HealthSources;
 }
 
-export function overviewRoutes({ ledger, clock, lastHeartbeat }: OverviewRouteDeps): StaffRoutes {
+export function overviewRoutes({ ledger, clock, health = {} }: OverviewRouteDeps): StaffRoutes {
   return (add) => {
     add({
       method: "GET",
@@ -34,7 +34,7 @@ export function overviewRoutes({ ledger, clock, lastHeartbeat }: OverviewRouteDe
           throw new HttpError("invalid_request", "error.overview.bad_period");
         }
         // One read transaction: every block of the answer sees the same snapshot of the ledger.
-        const overview = ledger.sqlite.transaction(() => overviewOf(ledger.db, query.data, clock, lastHeartbeat)).deferred();
+        const overview = ledger.sqlite.transaction(() => overviewOf(ledger.db, query.data, clock, health.assistant, health.backup)).deferred();
         return overviewSchema.parse(overview);
       },
     });

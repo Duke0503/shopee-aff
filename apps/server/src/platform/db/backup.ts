@@ -1,10 +1,10 @@
 /**
- * Local ledger backups (AD-26, FR-32), in the form the migration gate needs: a copy taken
- * with SQLite's online backup API, so it is consistent while the ledger is open, then
- * checked with `PRAGMA integrity_check` before anything trusts it. The copy is switched to
- * a rollback journal so it is one self-contained file, with no -wal or -shm beside it.
- * The daily job, the encrypted off-site copy and the row-count restore check come with
- * Story 8.2.
+ * Local ledger backups (AD-26, FR-32), in the form the migration gate and the daily backup
+ * (platform/backup) need: a copy taken with SQLite's online backup API, so it is consistent
+ * while the ledger is open, then checked with `PRAGMA integrity_check` before anything trusts
+ * it, then its row counts must equal the live ledger's at the moment the copy finished (Story
+ * 8.2; the daily backup also restores its whole archive into a temporary folder). The copy is switched to a rollback journal so it is one
+ * self-contained file, with no -wal or -shm beside it.
  */
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -40,6 +40,36 @@ export async function backupLedger(ledger: Ledger, target: string): Promise<void
     copy.pragma("journal_mode = DELETE");
   } finally {
     copy.close();
+  }
+}
+
+/** Rows per table (SQLite's own tables left out), the measure the restore check compares. */
+export type RowCounts = Readonly<Record<string, number>>;
+
+export function tableRowCounts(sqlite: Database.Database): RowCounts {
+  const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name").all() as { name: string }[];
+  return Object.fromEntries(tables.map(({ name }) => [name, (sqlite.prepare(`SELECT count(*) AS n FROM "${name.replaceAll('"', '""')}"`).get() as { n: number }).n]));
+}
+
+/**
+ * Writes the copy like `backupLedger` and returns the live row counts read the moment the copy
+ * finished. The online backup API carries every write made through this connection into the copy,
+ * and the counts are read synchronously right after it resolves, so no write falls in between.
+ */
+export async function snapshotLedger(ledger: Ledger, target: string, write: (ledger: Ledger, target: string) => Promise<void> = backupLedger): Promise<RowCounts> {
+  await write(ledger, target);
+  return tableRowCounts(ledger.sqlite);
+}
+
+/** Each table whose row count differs between `expected` and the database at `path`; empty when they agree. */
+export function rowCountMismatches(path: string, expected: RowCounts): string[] {
+  const db = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    const actual = tableRowCounts(db);
+    const names = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort();
+    return names.filter((name) => expected[name] !== actual[name]).map((name) => `${name}: ${actual[name] ?? "missing"} restored, ${expected[name] ?? "missing"} live`);
+  } finally {
+    db.close();
   }
 }
 

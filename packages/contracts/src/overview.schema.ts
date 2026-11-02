@@ -148,9 +148,11 @@ const customersSchema = z.object({
   concentration: z.object({ customerCode: z.string().nullable(), shareBps: count }).nullable(),
 });
 
-export const HEALTH_COMPONENTS = ["bridge", "assistant", "reconciliation", "backup"] as const;
+/** The one health model (AD-27, Story 8.3): the same entries feed this line and the owner alerts. */
+export const HEALTH_COMPONENTS = ["bridge", "assistant", "reconciliation", "backup", "queue"] as const;
 export const HEALTH_STATES = ["up", "down", "unknown"] as const;
-const healthSchema = z.object({ component: z.enum(HEALTH_COMPONENTS), state: z.enum(HEALTH_STATES), at: instant.nullable() });
+/** `count`: the queue depth (link requests waiting for the bridge), on the queue entry only. */
+const healthSchema = z.object({ component: z.enum(HEALTH_COMPONENTS), state: z.enum(HEALTH_STATES), at: instant.nullable(), count: count.optional() });
 
 export const overviewSchema = z.object({
   asOf: instant,

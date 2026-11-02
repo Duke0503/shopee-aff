@@ -176,6 +176,7 @@ describe("the scheduler's own rules", () => {
       claimExpiry: { context: "payouts", schedule: { kind: "every", delayMs: 60_000 } },
       notificationExpiry: { context: "messaging", schedule: { kind: "every", delayMs: 600_000 } },
       health: { context: "operations", schedule: { kind: "every", delayMs: 60_000 } },
+      alertDelivery: { context: "operations", schedule: { kind: "every", delayMs: 30_000 } },
       signInHousekeeping: { context: "identity", schedule: { kind: "every", delayMs: 3_600_000 } },
       reconcile: { context: "orders", schedule: { kind: "every", delayMs: 3_600_000 } },
       nightlySweep: { context: "orders", schedule: { kind: "daily_vn", at: { hour: 2, minute: 0 } } },

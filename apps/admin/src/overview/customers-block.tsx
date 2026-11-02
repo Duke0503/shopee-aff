@@ -1,6 +1,6 @@
 /**
  * Block 7, customers and risk (dashboard-spec Block 7), and Block 8, the quiet health line from the
- * one health model (AD-27, Story 4.17 AC6): each component is a dot plus a word, never colour
+ * one health model (AD-27, Story 4.17 AC6, Story 8.3; the queue shows its depth): each component is a dot plus a word, never colour
  * alone; a component that is down links to its runbook step, which opens right below the line. A
  * component that does not report yet reads "not known yet", never "up".
  */
@@ -51,8 +51,8 @@ export function CustomersBlock({ customers }: { readonly customers: Overview["cu
   );
 }
 
-const COMPONENT: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_health_bridge", assistant: "ov_health_assistant", reconciliation: "ov_health_reconciliation", backup: "ov_health_backup" };
-const RUNBOOK: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_runbook_bridge", assistant: "ov_runbook_assistant", reconciliation: "ov_runbook_reconciliation", backup: "ov_runbook_backup" };
+const COMPONENT: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_health_bridge", assistant: "ov_health_assistant", reconciliation: "ov_health_reconciliation", backup: "ov_health_backup", queue: "ov_health_queue" };
+const RUNBOOK: Record<OverviewHealth["component"], AdminKey> = { bridge: "ov_runbook_bridge", assistant: "ov_runbook_assistant", reconciliation: "ov_runbook_reconciliation", backup: "ov_runbook_backup", queue: "ov_runbook_queue" };
 const STATE: Record<OverviewHealth["state"], { readonly word: AdminKey; readonly dot: string }> = {
   up: { word: "ov_state_up", dot: "bg-primary" },
   down: { word: "ov_state_down", dot: "bg-status-rejected" },
@@ -69,6 +69,7 @@ export function HealthLine({ health }: { readonly health: readonly OverviewHealt
             <span aria-hidden className={cn("size-2 shrink-0 rounded-full", STATE[h.state].dot)} />
             <span>{adminText(COMPONENT[h.component])}</span>
             <span className={cn("font-medium", h.state === "down" ? "text-status-rejected" : "text-muted-foreground")}>{adminText(STATE[h.state].word)}</span>
+            {h.count !== undefined && <span className="text-meta text-muted-foreground">{adminText("ov_health_waiting", { count: formatCount(h.count) })}</span>}
             {h.at !== null && <span className="text-meta text-muted-foreground">{adminText("ov_health_at", { time: formatVnDateTime(parseInstant(h.at), systemClock) })}</span>}
             {h.state === "down" && (
               <a href={`#runbook-${h.component}`} className="font-medium text-primary underline-offset-2 hover:underline">

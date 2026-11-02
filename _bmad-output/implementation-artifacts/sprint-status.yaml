@@ -138,8 +138,8 @@ development_status:
 
   epic-8: in-progress
   8-1-dev-environment-separated-from-production-in-every-resource: review
-  8-2-daily-and-off-site-encrypted-backups-that-check-their-own-re: backlog
-  8-3-telegram-owner-alerts-and-one-health-model: backlog
+  8-2-daily-and-off-site-encrypted-backups-that-check-their-own-re: review
+  8-3-telegram-owner-alerts-and-one-health-model: review
   8-4-external-heartbeat-alerts-when-the-mac-goes-silent: backlog
   8-5-production-host-services-on-the-mac-behind-the-tunnel: backlog
   8-6-restore-drill-procedure: backlog

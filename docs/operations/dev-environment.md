@@ -16,6 +16,7 @@ after cutover it is the new server with the resources in the right-hand column o
 | Browser bridge | the in-process fake bridge (`BRIDGE_MODE=fake`), or the `apps/bridge` extension in an Edge or Chrome profile of its own (`BROWSER_PROFILE_DIR`) never signed in to the production Shopee account, with its own `BRIDGE_TOKEN` | `.browser-profile/` (live), `.browser-profile/prod/`, the live extension in `extension/`, port 8787 |
 | Zalo | the fake client (`ZALO_MODE=fake`), or the dev account posting only to the Dev group "Dev Internal DP" | the live main group, the production Zalo account |
 | Telegram | off, unless a separate dev chat is configured | -1004416753701 (production alerts; the live config also calls it the "dev" chat) and -5232520551 (business) |
+| Off-site backup (Story 8.2) | none (local archives only), or a Drive folder of its own (`BACKUP_RCLONE_REMOTE`); see `backup-and-alerts-runbook.md` | the production `BACKUP_RCLONE_REMOTE` (refused at start) |
 | Tunnel and host names | none; `PUBLIC_BASE_URL` empty | https://hoantiendp.com and every host under `hoantiendp.com` |
 | sub_id1 | `DEV` + customer id | plain customer id |
 | Request id (sub_id2) | `DEV` + `YYMMDD` + five digits | `YYMMDD` + five digits |

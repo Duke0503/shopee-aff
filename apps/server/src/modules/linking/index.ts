@@ -82,7 +82,7 @@ export {
   LINK_REQUESTS_LIST,
   linkRequestCountOf,
 } from "./link-requests.list";
-export { deliveredLinkCounts, failedLinkCount, type NetworkCount } from "./link-overview.query";
+export { deliveredLinkCounts, failedLinkCount, oldestDueLinkRequest, waitingLinkRequests, type NetworkCount, type WaitingLinks } from "./link-overview.query";
 export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type LinkRequestNote, type QueuedLinkRequest } from "./link-request.command";
 export { claimLinkJob, claimLinkWork, type ApiLinkRequest, type ClaimOptions, type LinkWork } from "./link-issue.command";
 export { LINK_FAILED_MESSAGE, randomShareCode, recordApiLinkResult, recordLinkResult, recordSilentBridge, SHARE_CODE_LENGTH, SILENT_ANSWERS_BEFORE_FAILURE, type ApiLinkAnswer, type LinkEffects, type LinkResultRecorded, type RecordedBridgeAnswer, type RecordOptions } from "./link-result.command";

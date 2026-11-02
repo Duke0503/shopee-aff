@@ -138,7 +138,7 @@ describe("Story 4.17 acceptance criteria (server)", () => {
     run("accesstrade", "2026-10-30T07:50:00.000Z");
     const later = overviewOf(ledger.db, { period: "today" }, fixedClock("2026-10-30T08:00:00.000Z")).health.find((h) => h.component === "reconciliation");
     expect(later).toEqual({ component: "reconciliation", state: "down", at: "2026-10-30T04:30:00.000Z" });
-    expect(overviewOf(ledger.db, { period: "today" }, fixedClock(golden.clock)).health.filter((h) => h.component !== "reconciliation").every((h) => h.state === "unknown")).toBe(true);
+    expect(overviewOf(ledger.db, { period: "today" }, fixedClock(golden.clock)).health.filter((h) => h.component !== "reconciliation" && h.component !== "queue").every((h) => h.state === "unknown")).toBe(true);
   });
 
   it("an erased customer's awaiting order is estimated at 0 cashback (FR-35)", () => {

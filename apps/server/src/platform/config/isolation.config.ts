@@ -3,7 +3,8 @@
  * configuration is refused when it points at any production resource: a production port, the
  * live or the new production data, PID or browser-profile folders, a Zalo group other than the
  * Dev group, a production Telegram chat or host name, a public base URL (dev has no tunnel), or a
- * secret shared with the production env file on the same machine, or when the dev env file is the
+ * secret or the off-site backup folder (Story 8.2) shared with the production env file on the
+ * same machine, or when the dev env file is the
  * production env file itself. Production is refused when it would run a fake bridge or a fake
  * Zalo client. In every environment the real browser bridge needs its own token (Story 5.3),
  * different from the internal and the assistant tokens.
@@ -52,6 +53,8 @@ export interface IsolationSubject {
   readonly zaloGroupIds: readonly string[];
   readonly browserProfileDir: string | null;
   readonly telegram: { readonly botToken: string; readonly chatId: string } | null;
+  /** The off-site backup folder (Story 8.2); dev never writes into production's. */
+  readonly backupOffsite?: { readonly rcloneRemote: string } | null;
   readonly publicBaseUrl: string | null;
   readonly fingerprintKey: string | null;
   readonly accesstradeApiKey: string | null;
@@ -195,6 +198,8 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
   if (context.prodEnv !== null) {
     const prod = context.prodEnv;
     for (const [key, value] of Object.entries(secretsOf(config))) if (value !== null && blank(prod[key]) === value) out.push({ key, reason: "same_as_production" });
+    const remote = config.backupOffsite?.rcloneRemote ?? null;
+    if (remote !== null && blank(prod["BACKUP_RCLONE_REMOTE"])?.replace(/\/+$/, "") === remote.replace(/\/+$/, "")) out.push({ key: "BACKUP_RCLONE_REMOTE", reason: "same_as_production" });
   }
   return out;
 }

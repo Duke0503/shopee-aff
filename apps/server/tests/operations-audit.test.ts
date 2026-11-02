@@ -21,6 +21,7 @@ import {
   ledgerAlerts,
   TelegramSendError,
   telegramSender,
+  telegramText,
   type AlertSender,
   type FetchLike,
 } from "../src/modules/operations/index";
@@ -137,7 +138,7 @@ describe("Story 3.2 acceptance criteria", () => {
 });
 
 describe("Story 3.2: alerts", () => {
-  it("a repeat after the last alert was SENT or FAILED is a new alert, even inside the cooldown", () => {
+  it("a repeat after the last alert was FAILED is a new alert at once; after one SENT inside the cooldown it is a new alert held until the cooldown ends (Story 8.3)", () => {
     const ledger = freshLedger();
     const clock = movingClock("2026-10-30T07:00:00.000Z");
     const alerts = ledgerAlerts(ledger, clock);
@@ -149,10 +150,10 @@ describe("Story 3.2: alerts", () => {
     clock.advance(60_000);
     alerts.alert("assistant_down", "critical");
     alerts.alert("assistant_down", "critical");
-    expect(ledger.sqlite.prepare("SELECT id, delivery, suppressed FROM alerts ORDER BY id").all()).toEqual([
-      { id: 1, delivery: "FAILED", suppressed: 0 },
-      { id: 2, delivery: "SENT", suppressed: 0 },
-      { id: 3, delivery: "PENDING", suppressed: 1 },
+    expect(ledger.sqlite.prepare("SELECT id, delivery, suppressed, not_before FROM alerts ORDER BY id").all()).toEqual([
+      { id: 1, delivery: "FAILED", suppressed: 0, not_before: null },
+      { id: 2, delivery: "SENT", suppressed: 0, not_before: null },
+      { id: 3, delivery: "PENDING", suppressed: 1, not_before: "2026-10-30T07:06:00.000Z" },
     ]);
   });
 
@@ -166,8 +167,8 @@ describe("Story 3.2: alerts", () => {
     const flaky = {
       tx: <T>(fn: Parameters<Ledger["tx"]>[0]): T => {
         calls++;
-        // The third transaction is the first SENT bookkeeping: claim was the second.
-        if (calls >= 3 && failMarks > 0) {
+        // The fourth transaction is the first SENT bookkeeping: expiry, pending read and claim came first (Story 8.3).
+        if (calls >= 4 && failMarks > 0) {
           failMarks--;
           throw new Error("disk full");
         }
@@ -183,11 +184,11 @@ describe("Story 3.2: alerts", () => {
 
     // When every bookkeeping try fails, the alert stays SENDING and is never sent again.
     ledgerAlerts(ledger, movingClock("2026-10-30T08:00:00.000Z")).alert("backup_failed", "high");
-    // Pending read and claim go through; every SENT bookkeeping after them fails.
+    // Expiry, pending read and claim go through; every SENT bookkeeping after them fails.
     let txs = 0;
     const broken = {
       tx: <T>(fn: Parameters<Ledger["tx"]>[0]): T => {
-        if (++txs > 2) throw new Error("disk full");
+        if (++txs > 3) throw new Error("disk full");
         return ledger.tx(fn) as T;
       },
     };
@@ -231,7 +232,7 @@ describe("Story 3.2: alerts", () => {
       },
     };
     expect(await deliverPendingAlerts(ledger, sender, clock, silent)).toEqual({ sent: 1, failed: 0 });
-    expect(sent).toEqual(["[HIGH] backup_failed (repeated 1 more times inside the cooldown)"]);
+    expect(sent).toEqual([telegramText({ kind: "backup_failed", severity: "high", suppressed: 1 })]);
     expect(ledger.sqlite.prepare("SELECT delivery, attempts, delivered_at FROM alerts").all()).toEqual([{ delivery: "SENT", attempts: 1, delivered_at: "2026-10-30T07:00:00.000Z" }]);
     expect(await deliverPendingAlerts(ledger, sender, clock, silent)).toEqual({ sent: 0, failed: 0 });
 

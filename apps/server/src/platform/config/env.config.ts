@@ -20,6 +20,7 @@ import { parseEnv } from "node:util";
 import { FALLBACK_CONTACT_URL, ZALO_CHAT_URL } from "@cashback/contracts";
 import { z } from "zod";
 
+import type { OffsiteConfig } from "../backup/offsite.adapter";
 import { BRIDGE_MODES, type BridgeMode } from "../ports/bridge.port";
 import { describeProblems, isolationContext, isolationProblems, isolationWarnings, parseIdList } from "./isolation.config";
 
@@ -87,6 +88,12 @@ export interface ServerConfig {
   browserProfileDir: string | null;
   /** The owner's Telegram alert chat (AD-27); both or none. */
   telegram: { botToken: string; chatId: string } | null;
+  /**
+   * The off-site backup (AD-26, D36, Story 8.2): age and rclone executables, the owner's age public
+   * key and the rclone remote folder; all four or none (BACKUP_RCLONE_CONFIG optional). Without it
+   * dev keeps local backups only and production reports every daily off-site copy as failed.
+   */
+  backupOffsite: OffsiteConfig | null;
   /** The public origin links and pages are built on; empty in dev, which has no tunnel (AD-25). */
   publicBaseUrl: string | null;
   /**
@@ -158,6 +165,28 @@ function telegramOf(file: { TELEGRAM_BOT_TOKEN?: string | undefined; TELEGRAM_CH
   return { botToken: file.TELEGRAM_BOT_TOKEN, chatId: file.TELEGRAM_CHAT_ID };
 }
 
+const BACKUP_OFFSITE_KEYS = ["BACKUP_AGE_PATH", "BACKUP_AGE_RECIPIENT", "BACKUP_RCLONE_PATH", "BACKUP_RCLONE_REMOTE"] as const;
+
+type BackupOffsiteFile = Partial<Record<(typeof BACKUP_OFFSITE_KEYS)[number] | "BACKUP_RCLONE_CONFIG", string | undefined>>;
+
+function backupOffsiteOf(file: BackupOffsiteFile): OffsiteConfig | null {
+  const missing = BACKUP_OFFSITE_KEYS.filter((key) => file[key] === undefined);
+  if (missing.length === BACKUP_OFFSITE_KEYS.length && file.BACKUP_RCLONE_CONFIG === undefined) return null;
+  if (missing.length > 0) throw new ConfigError(`config: missing or invalid ${missing.join(", ")}`);
+  return {
+    agePath: file.BACKUP_AGE_PATH ?? "",
+    ageRecipient: file.BACKUP_AGE_RECIPIENT ?? "",
+    rclonePath: file.BACKUP_RCLONE_PATH ?? "",
+    rcloneRemote: file.BACKUP_RCLONE_REMOTE ?? "",
+    rcloneConfig: file.BACKUP_RCLONE_CONFIG ?? null,
+  };
+}
+
+/** An age X25519 public key (bech32): never a private key, which starts AGE-SECRET-KEY-. */
+const AGE_RECIPIENT = /^age1[02-9ac-hj-np-z]{58}$/;
+/** An rclone remote name and an optional folder, `gdrive:cashback-backups/prod`. */
+const RCLONE_REMOTE = /^[A-Za-z0-9_][A-Za-z0-9_. -]*:[A-Za-z0-9_./ -]*$/;
+
 function fileSchema(env: Environment) {
   return z.object({
     INTERNAL_TOKEN: z.string().min(32),
@@ -184,6 +213,11 @@ function fileSchema(env: Environment) {
     BROWSER_PROFILE_DIR: z.string().refine(isAbsolute).optional(),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().regex(/^-?\d+$/).optional(),
+    BACKUP_AGE_PATH: z.string().refine(isAbsolute).optional(),
+    BACKUP_AGE_RECIPIENT: z.string().regex(AGE_RECIPIENT).optional(),
+    BACKUP_RCLONE_PATH: z.string().refine(isAbsolute).optional(),
+    BACKUP_RCLONE_REMOTE: z.string().regex(RCLONE_REMOTE).optional(),
+    BACKUP_RCLONE_CONFIG: z.string().refine(isAbsolute).optional(),
     PUBLIC_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
     FALLBACK_CONTACT_URL: z.string().regex(FALLBACK_CONTACT_URL).optional(),
     ZALO_ASSISTANT_URL: z.string().regex(ZALO_CHAT_URL).optional(),
@@ -229,6 +263,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     zaloGroupIds: parseIdList(file.ZALO_GROUP_IDS),
     browserProfileDir: file.BROWSER_PROFILE_DIR ?? null,
     telegram: telegramOf(file),
+    backupOffsite: backupOffsiteOf(file),
     publicBaseUrl: file.PUBLIC_BASE_URL ?? null,
     fallbackContactUrl: file.FALLBACK_CONTACT_URL ?? null,
     zaloAssistantUrl: file.ZALO_ASSISTANT_URL ?? null,

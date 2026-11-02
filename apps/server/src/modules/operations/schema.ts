@@ -1,5 +1,5 @@
 /**
- * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012). Only this
+ * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012, 0031). Only this
  * module writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -22,7 +22,7 @@ export const auditEntries = sqliteTable("audit_entries", {
   actorRole: text("actor_role", { enum: STAFF_ROLES }),
 });
 
-export const ALERT_DELIVERIES = ["PENDING", "SENDING", "SENT", "FAILED"] as const;
+export const ALERT_DELIVERIES = ["PENDING", "SENDING", "SENT", "FAILED", "EXPIRED"] as const;
 
 export const alerts = sqliteTable("alerts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -34,6 +34,8 @@ export const alerts = sqliteTable("alerts", {
   attempts: integer("attempts").notNull().default(0),
   sendAttempt: text("send_attempt"),
   deliveredAt: text("delivered_at"),
+  /** A repeat queued behind a sent alert goes out only from this instant (migration 0031). */
+  notBefore: text("not_before"),
 });
 
 export type AlertRow = typeof alerts.$inferSelect;

@@ -20,11 +20,15 @@ export const JOB_SCHEDULES = {
   claimExpiry: { context: "payouts", schedule: every(60_000) },
   /** Unsent notifications older than 7 days are dropped and counted (Story 6.4). */
   notificationExpiry: { context: "messaging", schedule: every(10 * 60_000) },
+  /** The one health model checked, and the alert of each part that just went down raised (Story 8.3). */
   health: { context: "operations", schedule: every(60_000) },
+  /** Pending owner alerts sent to Telegram; a failed send is retried on the next run (Story 8.3). */
+  alertDelivery: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */
   signInHousekeeping: { context: "identity", schedule: every(60 * 60_000) },
   reconcile: { context: "orders", schedule: every(60 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },
+  /** The checked local archive, then the encrypted copy on Google Drive (Story 8.2). */
   backup: { context: "platform", schedule: dailyVn(3) },
   /** The Shopee payout record page: hourly, read once a day from 09:30 Vietnam time until it succeeds (Story 4.22). */
   payoutRecords: { context: "payouts", schedule: every(60 * 60_000) },

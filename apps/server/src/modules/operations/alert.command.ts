@@ -1,22 +1,26 @@
 /**
  * `alert(kind, severity)` (AD-27, FR-30): stores an owner alert for the sender to deliver, with
  * the per-severity cooldown. Raised again inside the cooldown of the last alert of the same kind
- * and severity while that alert is still PENDING, it is counted on it as suppressed; once the last
- * one is being sent, sent or given up, a repeat is a new alert, so a FAILED critical alert never
- * silences the next. Inside a command it goes through that command's transaction handle
+ * and severity:
+ * - while that alert still waits or is being sent, the repeat is counted on it as suppressed;
+ * - once it was sent, the repeat is a new alert held until the cooldown ends (`not_before`), and
+ *   later repeats count on that one, so a second outage inside the cooldown is still told, once,
+ *   with its repeat count (Story 8.3: 3 critical alerts in 4 minutes are one Telegram message
+ *   inside the cooldown);
+ * - a last alert given up as FAILED or skipped as EXPIRED lets the repeat through at once. Inside a command it goes through that command's transaction handle
  * (`alertsFor`); a job outside any transaction uses `ledgerAlerts`, which opens its own. Every
  * raise is also a log line.
  *
  * Delivery bookkeeping: `claimForSending` marks a PENDING alert SENDING under a fresh attempt id
  * before the send; `markAlertDelivery` then records the outcome of that attempt only.
  */
-import { toMs, type Clock, type Instant } from "@cashback/core";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { instantFromMs, toMs, type Clock, type Instant } from "@cashback/core";
+import { and, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { Logger } from "../../platform/log/logger";
 import { ALERT_SEVERITIES, type AlertPort, type AlertSeverity } from "../../platform/ports/alert.port";
-import { ALERT_KIND, insideCooldown } from "./domain/alert-cooldown";
+import { ALERT_COOLDOWN_MS, ALERT_KIND, insideCooldown } from "./domain/alert-cooldown";
 import { alerts, type AlertRow } from "./schema";
 
 export type AlertOutcome = { readonly result: "pending" | "suppressed"; readonly id: number };
@@ -32,14 +36,16 @@ export function raiseAlert(db: LedgerDb, clock: Clock, kind: string, severity: A
     .orderBy(desc(alerts.raisedAt), desc(alerts.id))
     .limit(1)
     .get();
-  if (last && last.delivery === "PENDING" && insideCooldown(severity, toMs(now) - toMs(last.raisedAt as Instant))) {
+  const inside = last !== undefined && insideCooldown(severity, toMs(now) - toMs(last.raisedAt as Instant));
+  if (inside && (last.delivery === "PENDING" || last.delivery === "SENDING")) {
     db.update(alerts)
       .set({ suppressed: sql`${alerts.suppressed} + 1` })
       .where(eq(alerts.id, last.id))
       .run();
     return { result: "suppressed", id: last.id };
   }
-  const row = db.insert(alerts).values({ kind, severity, raisedAt: now, delivery: "PENDING" }).returning({ id: alerts.id }).get();
+  const notBefore = inside && last.delivery === "SENT" ? instantFromMs(toMs(last.raisedAt as Instant) + ALERT_COOLDOWN_MS[severity]) : null;
+  const row = db.insert(alerts).values({ kind, severity, raisedAt: now, delivery: "PENDING", notBefore }).returning({ id: alerts.id }).get();
   return { result: "pending", id: row.id };
 }
 
@@ -61,8 +67,19 @@ export function ledgerAlerts(ledger: Ledger, clock: Clock, logger?: AlertLogger)
   return { alert: (kind, severity) => void ledger.tx((db) => alertsFor(db, clock, logger).alert(kind, severity)) };
 }
 
-export function pendingAlerts(db: LedgerDb): AlertRow[] {
-  return db.select().from(alerts).where(eq(alerts.delivery, "PENDING")).orderBy(alerts.id).all();
+/** Pending alerts due at `now` (all pending ones without `now`), oldest first. */
+export function pendingAlerts(db: LedgerDb, now?: Instant): AlertRow[] {
+  const due = now === undefined ? undefined : or(isNull(alerts.notBefore), lte(alerts.notBefore, now));
+  return db.select().from(alerts).where(and(eq(alerts.delivery, "PENDING"), due)).orderBy(alerts.id).all();
+}
+
+/** Marks pending alerts raised before `before` EXPIRED, never to be sent; returns how many. */
+export function expireAlerts(db: LedgerDb, before: Instant): number {
+  return db
+    .update(alerts)
+    .set({ delivery: "EXPIRED" })
+    .where(and(eq(alerts.delivery, "PENDING"), sql`${alerts.raisedAt} < ${before}`))
+    .run().changes;
 }
 
 /** Attempts before a pending alert is given up as FAILED. */

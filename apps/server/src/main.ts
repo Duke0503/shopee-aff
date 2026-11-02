@@ -4,7 +4,8 @@
  * the customer's proof image, Story 4.9, and the customer website, Stories 7.1 and 7.2) (the internal one with the admin commands
  * of the internal CLI, Story 4.20; the public one with the admin desk's staff routes when
  * the config names the admin host and its Cloudflare Access settings), then the job scheduler (AD-13; each
- * module adds its job with its story, timed by platform/jobs/job-schedules.ts). A config error names the keys and exits before anything else runs; a held
+ * module adds its job with its story, timed by platform/jobs/job-schedules.ts; the daily backup,
+ * the health check and the Telegram delivery come from health/owner-jobs.ts, Stories 8.2 and 8.3). A config error names the keys and exits before anything else runs; a held
  * lock exits before the ledger is opened, so a second instance never touches the data.
  * Any failure after the lock is taken is logged, and whatever was started is closed and
  * the lock released before the process exits.
@@ -20,7 +21,8 @@ import { adminDesk } from "./admin/admin-desk";
 import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
 import { accessTradeLinksFor, environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, subIdPrefixFor, type LinkBridge } from "./links/link-jobs";
-import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit, ledgerAlerts, runAssistantHealthCheck, type AssistantHeartbeats } from "./modules/operations/index";
+import { healthSourcesFor, ownerJobs, startupAlerts } from "./health/owner-jobs";
+import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { notificationJobs } from "./notifications/notification-expiry.job";
 import { notificationRoutes } from "./notifications/notification.routes";
@@ -51,17 +53,11 @@ function readConfig(): ServerConfig | null {
   }
 }
 
-/** The module jobs; Stories 8.2 and 8.3 add theirs here. */
+/** The module jobs; the owner's backup, health and alert jobs come from health/owner-jobs.ts (Stories 8.2, 8.3). */
 function jobsFor(config: ServerConfig, ledger: Ledger, logger: Logger, bridge: LinkBridge): Job[] {
   const claimExpiry: Job = { name: "claimExpiry", ...JOB_SCHEDULES.claimExpiry, run: () => void runClaimExpiry({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }) };
   const payoutRecords = payoutRecordJobs({ ledger, clock: systemClock, bridge: bridge.port, logger });
   return [...reconcileJobs({ config, ledger, clock: systemClock, timer: systemTimer, logger, bridge: bridge.port }), claimExpiry, ...linkJobs({ config, ledger, clock: systemClock, logger }, bridge), ...payoutRecords, ...notificationJobs(ledger, systemClock, logger)];
-}
-
-/** The assistant health check (Story 6.11): the owner alert once no connected heartbeat came for 5 minutes. */
-function assistantHealthJob(ledger: Ledger, logger: Logger, heartbeats: AssistantHeartbeats): Job {
-  const alerts = ledgerAlerts(ledger, systemClock, logger);
-  return { name: "assistantHealth", ...JOB_SCHEDULES.health, run: () => void runAssistantHealthCheck({ heartbeats, clock: systemClock, alerts, logger }) };
 }
 
 /** The one stop of this process, whichever asks first: a signal, or the dev shutdown route. */
@@ -74,6 +70,9 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
   let servers: Servers | null = null;
   let jobs: Scheduler | null = null;
   const parts = (): RunningParts => ({ jobs, closeServers: async () => (servers ? close(servers) : undefined), ledger, lock, logger });
+  // A refused start runs no delivery job: a failed pre-migration backup is sent to Telegram at once (Story 8.2).
+  const gateAlerts = startupAlerts(config, logger);
+  let migrated = false;
   try {
     ledger = await openMigratedLedger({
       ledgerPath: join(config.dataDir, LEDGER_FILE),
@@ -81,6 +80,10 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
       backupsDir: join(config.dataDir, "backups"),
       clock: systemClock,
       logger,
+      alerts: gateAlerts,
+      onMigrated: () => {
+        migrated = true;
+      },
     });
     const proofs = fileProofStore(proofFilesDir(config.dataDir));
     // One bridge for the link job and, for the real one, its long-poll routes (Story 5.3).
@@ -88,7 +91,9 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     // One heartbeat store: the assistant's route writes it, the Overview's health reads it (Story 6.1).
     // Watched from now: with no connected beat 5 minutes after this start, the assistant counts as down (Story 6.11).
     const heartbeats = assistantHeartbeats(systemClock.now());
-    const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, heartbeats }) : undefined;
+    // One set of health sources for the Overview and the health check (Story 8.3).
+    const health = healthSourcesFor(config, heartbeats);
+    const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, health }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
     const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
     // dev:stop asks for an ordered stop here; production stops by its service manager (Story 8.1).
@@ -109,13 +114,16 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs }), ...site.routes, ...adminBuildRoutes(config, { logger })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
-    const health = config.assistantToken === null ? [] : [assistantHealthJob(ledger, logger, heartbeats)];
-    jobs = createScheduler([...jobsFor(config, ledger, logger, bridge), ...health, ...site.jobs], { clock: systemClock, timer: systemTimer, logger });
+    const owner = ownerJobs({ config, ledger, clock: systemClock, logger, heartbeats, health });
+    jobs = createScheduler([...jobsFor(config, ledger, logger, bridge), ...owner, ...site.jobs], { clock: systemClock, timer: systemTimer, logger });
     jobs.start();
+    // After migrations the daily backup runs now, off-site copy included; that step never blocks the start (AD-26).
+    if (migrated) jobs.trigger("backup");
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort, bridge: config.bridgeMode, zalo: config.zaloMode }, "platform.server.started");
     return parts();
   } catch (error) {
     logger.error({ err: error }, "platform.server.start_failed");
+    await gateAlerts.settled();
     await stopServer(parts(), "start_failed");
     return null;
   }

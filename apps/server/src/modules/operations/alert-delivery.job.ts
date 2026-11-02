@@ -7,20 +7,32 @@
  * SENT fails, only that bookkeeping is retried, each failure logged; an alert left SENDING is
  * never picked up again. A failed send goes back to PENDING for the next run, up to
  * ALERT_MAX_ATTEMPTS. The log names the alert id and kind only.
+ *
+ * Story 8.3: a pending alert raised more than 24 hours ago (a first deploy over an old ledger, a
+ * long Telegram outage) is marked EXPIRED and never sent, counted in one log line per run; an
+ * alert held until its cooldown ends waits; and one run sends at most ALERTS_PER_RUN, the rest
+ * going out on the next runs, so the owner's chat is never flooded.
  */
 import { randomUUID } from "node:crypto";
-import type { Clock } from "@cashback/core";
+import { instantFromMs, toMs, type Clock } from "@cashback/core";
 
 import type { Ledger } from "../../platform/db/ledger";
 import type { Logger } from "../../platform/log/logger";
-import { claimForSending, markAlertDelivery, pendingAlerts } from "./alert.command";
-import { alertText } from "./domain/alert-cooldown";
-import type { AlertSender } from "./telegram.adapter";
+import type { AlertPort } from "../../platform/ports/alert.port";
+import { claimForSending, expireAlerts, markAlertDelivery, pendingAlerts } from "./alert.command";
+import { telegramText, type AlertSender } from "./telegram.adapter";
 
 export interface DeliveryResult {
   sent: number;
   failed: number;
+  /** Alerts older than ALERT_EXPIRY_MS skipped in this run, never sent. */
+  expired?: number;
 }
+
+/** A pending alert older than this is skipped, never sent. */
+export const ALERT_EXPIRY_MS = 24 * 3_600_000;
+/** The most alerts one delivery run sends. */
+export const ALERTS_PER_RUN = 10;
 
 /** Tries of the SENT bookkeeping after a successful send. */
 export const BOOKKEEPING_ATTEMPTS = 3;
@@ -48,13 +60,16 @@ function recordFailed(ledger: Pick<Ledger, "tx">, alert: { id: number; kind: str
 }
 
 export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: AlertSender, clock: Clock, logger: DeliveryLogger): Promise<DeliveryResult> {
-  const pending = ledger.tx((db) => pendingAlerts(db));
-  const result: DeliveryResult = { sent: 0, failed: 0 };
+  const now = clock.now();
+  const expired = ledger.tx((db) => expireAlerts(db, instantFromMs(toMs(now) - ALERT_EXPIRY_MS)));
+  if (expired > 0) logger.warn({ expired }, "operations.alert.older_alerts_skipped");
+  const pending = ledger.tx((db) => pendingAlerts(db, now)).slice(0, ALERTS_PER_RUN);
+  const result: DeliveryResult = expired > 0 ? { sent: 0, failed: 0, expired } : { sent: 0, failed: 0 };
   for (const alert of pending) {
     const attemptId = randomUUID();
     if (!ledger.tx((db) => claimForSending(db, alert.id, attemptId))) continue;
     try {
-      await sender.send(alertText(alert));
+      await sender.send(telegramText(alert));
     } catch (error) {
       recordFailed(ledger, alert, attemptId, clock, logger, error);
       result.failed++;
@@ -65,4 +80,20 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
   }
   if (pending.length > 0) logger.info({ ...result }, "operations.alert.delivered");
   return result;
+}
+
+/**
+ * The alert port of a start that is failing (a pre-migration backup that failed its check, Story
+ * 8.2): no scheduler will deliver a stored alert, so each alert is sent at once, and `settled`
+ * waits for the sends before the process exits. A failed send is logged, never thrown.
+ */
+export function immediateAlerts(sender: AlertSender, logger: DeliveryLogger): AlertPort & { settled(): Promise<void> } {
+  const sends: Promise<void>[] = [];
+  return {
+    alert(kind, severity) {
+      logger.warn({ kind, severity, result: "immediate" }, "operations.alert.raised");
+      sends.push(sender.send(telegramText({ kind, severity, suppressed: 0 })).catch((error: unknown) => logger.warn({ kind, error: error instanceof Error ? error.name : "unknown" }, "operations.alert.delivery_failed")));
+    },
+    settled: async () => void (await Promise.all(sends)),
+  };
 }

@@ -430,6 +430,12 @@
     "component": "backup",
     "state": "unknown",
     "at": null
+   },
+   {
+    "component": "queue",
+    "state": "up",
+    "at": null,
+    "count": 0
    }
   ]
  }

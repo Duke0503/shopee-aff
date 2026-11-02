@@ -1,17 +1,20 @@
 /**
  * The Overview's activity blocks (Story 4.17, docs/operations/dashboard-spec.md Blocks 5, 7 and
- * 8): orders per network by recorded day, customers and concentration, and the health line. Counts
+ * 8): orders per network by recorded day, customers and concentration, and the health line from
+ * the operations module's one health model (Story 8.3). Counts
  * come from the module queries; every ratio is `packages/money` (FR-27). Below 100 approved
  * orders a ratio is marked "not enough data" (it is still the real value, never a placeholder).
  */
 import type { Overview, OverviewHealth, OverviewNetworkOrders, Ratio } from "@cashback/contracts";
-import { parseInstant, toMs, type Clock, type Instant, type InstantRange } from "@cashback/core";
+import type { Clock, Instant, InstantRange } from "@cashback/core";
 import { averageDong, ratioBps, sumDong } from "@cashback/money";
 
 import { customerCodeOf, deskCustomers, newCustomerCount } from "../modules/identity/index";
 import { deliveredLinkCounts } from "../modules/linking/index";
-import { customersWithOrderBefore, hasRun, lastSucceededRun, recordedOrderFacts, type ApprovedOrderFact, type RecordedOrderFact } from "../modules/orders/index";
+import { healthModel, withoutAlerts } from "../modules/operations/index";
+import { customersWithOrderBefore, recordedOrderFacts, type ApprovedOrderFact, type RecordedOrderFact } from "../modules/orders/index";
 import { survivorResolver } from "../modules/payouts/index";
+import type { BackupHealth } from "../platform/backup/backup-status";
 import type { LedgerDb } from "../platform/db/ledger";
 import { figureOf, ratioOf } from "./overview-business.query";
 
@@ -19,8 +22,6 @@ import { figureOf, ratioOf } from "./overview-business.query";
 export const ENOUGH_APPROVED_ORDERS = 100;
 /** One customer above this share of the period's commission is a concentration risk. */
 export const CONCENTRATION_BPS = 3000;
-/** The hourly reconciliation counts as down when its last success is older than this. */
-export const RECONCILIATION_DOWN_AFTER_MS = 3 * 3_600_000;
 
 const APPROVED = new Set(["APPROVED", "PAID"]);
 const CANCELLED = new Set(["REJECTED", "REVERSED"]);
@@ -126,30 +127,13 @@ export function customersOf(db: LedgerDb, range: InstantRange, previous: Instant
 /** Up, down or not known yet, from the one heartbeat store (Stories 6.1, 6.11). */
 export type LastHeartbeat = (now: Instant) => { readonly state: "up" | "down" | "unknown"; readonly at: string | null };
 
-/**
- * Block 8 from the one health model (AD-27): the hourly reconciliation from its runs, the Zalo
- * assistant from its heartbeats (Stories 6.1, 6.11: up while a beat with the Zalo session connected
- * came within 5 minutes, down after, the health check's own rule); the browser bridge and the backup do not report to
- * the server yet, so they are "not known yet", never "up".
- */
-export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat: LastHeartbeat = () => ({ state: "unknown", at: null })): OverviewHealth[] {
-  return [{ component: "bridge", state: "unknown", at: null }, { component: "assistant", ...lastHeartbeat(clock.now()) }, reconciliationHealth(db, clock), { component: "backup", state: "unknown", at: null }];
-}
+/** The last backup's health at `now` (Story 8.2). */
+export type LastBackup = (now: Instant) => BackupHealth;
 
 /**
- * Each network's hourly reconciliation on its own, the worst one wins: a network whose last success
- * is over 3 hours old, or that never succeeded while it or another network recorded a run, is
- * down, so a source that fails every run (a production Shopee with no bridge) is never silent.
- * Before any hourly run was recorded nothing reports yet ("not known yet"). `at` is the oldest of
- * the last successes.
+ * Block 8: the one health model (AD-27, Story 8.3), the same entries the health check alerts on,
+ * without their alerts. A part with no source is "not known yet", never "up".
  */
-function reconciliationHealth(db: LedgerDb, clock: Clock): OverviewHealth {
-  const networks = ["shopee", "accesstrade"] as const;
-  const last = networks.map((n) => lastSucceededRun(db, n, "HOURLY"));
-  const seen = last.filter((at) => at !== null).sort();
-  const ran = networks.filter((n) => hasRun(db, n, "HOURLY"));
-  if (seen.length === 0 && ran.length === 0) return { component: "reconciliation", state: "unknown", at: null };
-  const stale = (at: string | null): boolean => at === null || toMs(clock.now()) - toMs(parseInstant(at)) > RECONCILIATION_DOWN_AFTER_MS;
-  const watched = networks.map((n, i) => ({ ran: ran.includes(n) || last[i] !== null, at: last[i] ?? null })).filter((w) => w.ran || seen.length > 0);
-  return { component: "reconciliation", state: watched.some((w) => stale(w.at)) ? "down" : "up", at: seen[0] ?? null };
+export function healthOf(db: LedgerDb, clock: Clock, lastHeartbeat?: LastHeartbeat, lastBackup?: LastBackup): OverviewHealth[] {
+  return withoutAlerts(healthModel(db, clock, { ...(lastHeartbeat ? { assistant: lastHeartbeat } : {}), ...(lastBackup ? { backup: lastBackup } : {}) }));
 }

@@ -10,6 +10,7 @@
     "./vi/admin.json": "./vi/admin.json",
     "./vi/errors.json": "./vi/errors.json",
     "./vi/pages.json": "./vi/pages.json",
-    "./vi/web.json": "./vi/web.json"
+    "./vi/web.json": "./vi/web.json",
+    "./vi/alerts.json": "./vi/alerts.json"
   }
 }
