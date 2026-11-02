@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Every request and response shape as a Zod schema, and the one error envelope (AD-20).",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

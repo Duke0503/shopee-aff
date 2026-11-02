@@ -1,7 +1,7 @@
 /**
  * Composition root: config, logger, the single-instance lock, the ledger (migrated behind a
  * checked local backup, AD-26), then the two listeners (the public one with the receipt page, the share page (Story 5.8) and
- * the customer's proof image, Story 4.9) (the internal one with the admin commands
+ * the customer's proof image, Story 4.9, and the customer website, Stories 7.1 and 7.2) (the internal one with the admin commands
  * of the internal CLI, Story 4.20; the public one with the admin desk's staff routes when
  * the config names the admin host and its Cloudflare Access settings), then the job scheduler (AD-13; each
  * module adds its job with its story, timed by platform/jobs/job-schedules.ts). A config error names the keys and exits before anything else runs; a held
@@ -15,6 +15,7 @@ import { systemClock } from "@cashback/core";
 import { adminCommandRoutes } from "./admin/admin-command.routes";
 import { linkQueueRoutes } from "./admin/link-queue.routes";
 import { messagingSilentRoutes } from "./admin/messaging-silent.routes";
+import { adminBuildRoutes } from "./admin/admin-build";
 import { adminDesk } from "./admin/admin-desk";
 import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
@@ -38,6 +39,7 @@ import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/loc
 import { createLogger, type Logger } from "./platform/log/logger";
 import { payoutRecordJobs } from "./reconcile/payout-record.job";
 import { reconcileJobs } from "./reconcile/reconcile-jobs";
+import { customerSite } from "./web/customer-site";
 
 function readConfig(): ServerConfig | null {
   try {
@@ -101,11 +103,14 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
       internal.push(notificationRoutes({ ledger, clock: systemClock, dailyCap: config.notificationDailyCap, shareBaseUrl: shareBaseUrlFor(config), production: config.env === "prod" }));
     }
     const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });
-    const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs })];
+    // The customer website (Stories 7.1, 7.2): site status, sign-in, and the built pages behind the server pages;
+    // the admin desk's built pages on the admin host only.
+    const site = customerSite({ config, ledger, clock: systemClock, heartbeats, logger });
+    const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs }), ...site.routes, ...adminBuildRoutes(config, { logger })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });
     const health = config.assistantToken === null ? [] : [assistantHealthJob(ledger, logger, heartbeats)];
-    jobs = createScheduler([...jobsFor(config, ledger, logger, bridge), ...health], { clock: systemClock, timer: systemTimer, logger });
+    jobs = createScheduler([...jobsFor(config, ledger, logger, bridge), ...health, ...site.jobs], { clock: systemClock, timer: systemTimer, logger });
     jobs.start();
     logger.info({ env: config.env, publicPort: config.publicPort, internalPort: config.internalPort, bridge: config.bridgeMode, zalo: config.zaloMode }, "platform.server.started");
     return parts();

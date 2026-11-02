@@ -14,3 +14,4 @@ export { ALERT_DELIVERIES } from "./schema";
 export { ASSISTANT_DOWN_AFTER_MS, assistantHeartbeats, type AssistantHeartbeats, type AssistantLiveness, type AssistantState, type ReceivedHeartbeat } from "./assistant-heartbeat.command";
 export { ASSISTANT_DOWN_ALERT, runAssistantHealthCheck, type AssistantHealthDeps, type AssistantHealthStep } from "./assistant-health.job";
 export { assistantHeartbeatRoutes, type AssistantHeartbeatRouteDeps } from "./http/assistant-heartbeat.routes";
+export { siteStatusRoutes, type SiteStatusRouteDeps } from "./http/site-status.routes";

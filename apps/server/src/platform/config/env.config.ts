@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
+import { FALLBACK_CONTACT_URL, ZALO_CHAT_URL } from "@cashback/contracts";
 import { z } from "zod";
 
 import { BRIDGE_MODES, type BridgeMode } from "../ports/bridge.port";
@@ -88,6 +89,16 @@ export interface ServerConfig {
   telegram: { botToken: string; chatId: string } | null;
   /** The public origin links and pages are built on; empty in dev, which has no tunnel (AD-25). */
   publicBaseUrl: string | null;
+  /**
+   * Where customers reach the operator while the Zalo assistant is down (FR-36, Story 7.1): an
+   * https page or a tel: number, shown in the website's banner; null until the owner sets one.
+   */
+  fallbackContactUrl: string | null;
+  /**
+   * The Zalo assistant's private chat (https://zalo.me/<number or id>) the website's Zalo buttons
+   * open (Story 7.1); null falls back to the community group link in the label file.
+   */
+  zaloAssistantUrl: string | null;
   /** ALLOW_PROD_ACCESSTRADE_KEY=1: dev may share the production AccessTrade report key (logged as a warning). */
   allowProdAccesstradeKey: boolean;
   /** What the isolation check allowed but a start should log (keys only); filled by `loadConfigFor`. */
@@ -174,6 +185,8 @@ function fileSchema(env: Environment) {
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().regex(/^-?\d+$/).optional(),
     PUBLIC_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
+    FALLBACK_CONTACT_URL: z.string().regex(FALLBACK_CONTACT_URL).optional(),
+    ZALO_ASSISTANT_URL: z.string().regex(ZALO_CHAT_URL).optional(),
     ALLOW_PROD_ACCESSTRADE_KEY: z.enum(["0", "1"]).optional(),
   });
 }
@@ -217,6 +230,8 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     browserProfileDir: file.BROWSER_PROFILE_DIR ?? null,
     telegram: telegramOf(file),
     publicBaseUrl: file.PUBLIC_BASE_URL ?? null,
+    fallbackContactUrl: file.FALLBACK_CONTACT_URL ?? null,
+    zaloAssistantUrl: file.ZALO_ASSISTANT_URL ?? null,
     allowProdAccesstradeKey: file.ALLOW_PROD_ACCESSTRADE_KEY === "1",
     isolationWarnings: [],
   };

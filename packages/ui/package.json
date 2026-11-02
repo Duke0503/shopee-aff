@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
   "description": "shadcn/ui components on the DESIGN.md tokens, the one DataList, money and date formatters, status badge and code chip (AD-21, AD-12). Shared by the admin desk and the customer website.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

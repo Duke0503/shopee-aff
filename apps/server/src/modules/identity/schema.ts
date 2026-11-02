@@ -22,7 +22,9 @@ export const customers = sqliteTable("customers", {
   sortKey: text("sort_key").notNull().default(""),
   passwordHash: text("password_hash"),
   passwordSetAt: text("password_set_at"),
+  /** Carried from the live system; no longer read: customer throttles live in customer_sign_in_throttles (0029). */
   failedSignIns: integer("failed_sign_ins").notNull().default(0),
+  /** Carried from the live system; no longer read (see failedSignIns). */
   lockedUntil: text("locked_until"),
   lastSignInAt: text("last_sign_in_at"),
   createdAt: text("created_at"),
@@ -82,6 +84,27 @@ export const staffSignInThrottles = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.username, t.accessSubject] })],
 );
+
+/** Failed customer sign-ins per (code, client key) for the doubling delay (migrations/0029, Story 7.2). */
+export const customerSignInThrottles = sqliteTable(
+  "customer_sign_in_throttles",
+  {
+    customerCode: text("customer_code").notNull(),
+    clientKey: text("client_key").notNull(),
+    failures: integer("failures").notNull(),
+    lockedUntil: text("locked_until"),
+    lastFailedAt: text("last_failed_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.customerCode, t.clientKey] })],
+);
+
+/** One client's failed customer sign-ins across codes in a 10-minute window (migrations/0029). */
+export const customerSignInClients = sqliteTable("customer_sign_in_clients", {
+  clientKey: text("client_key").primaryKey().notNull(),
+  windowStartedAt: text("window_started_at").notNull(),
+  failures: integer("failures").notNull(),
+  lockedUntil: text("locked_until"),
+});
 
 export const SESSION_KINDS = ["CUSTOMER", "STAFF"] as const;
 export type SessionKind = (typeof SESSION_KINDS)[number];

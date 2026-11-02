@@ -32,7 +32,13 @@ export { DEFAULT_ARGON2, hashPassword, MAX_PASSWORD_LENGTH, verifyPassword, type
 export { newSessionToken, SESSION_TOKEN_BYTES, sessionTokenHash, type SessionToken } from "./session-token";
 export { endSession, openSession, STAFF_SESSION_MS, type OpenedSession, type SessionOwner } from "./session.command";
 export { staffNamesOf, staffSessionOf, staffSessionsFor } from "./staff-session.query";
-export { customerSessionOf } from "./customer-session.query";
+export { customerSessionOf, customerSessionStateOf, type CustomerSessionState } from "./customer-session.query";
+export { CUSTOMER_SIGN_IN_ACTOR, SIGN_IN_BURST_ALERT, signInCode, signInCustomer, type CustomerSignIn, type CustomerSignInDeps, type CustomerSignInInput } from "./customer-sign-in.command";
+export { SIGN_IN_BURST, signInBurstWatch, type SignInBurstWatch } from "./domain/sign-in-burst";
+export { CLIENT_SIGN_IN_LIMIT, clientAfterFailure, type ClientWindow } from "./domain/sign-in-client-window";
+export { unknownSignInTally, type UnknownSignInTally } from "./sign-in-tally";
+export { MAX_THROTTLE_ROWS, runSignInHousekeeping, THROTTLE_QUIET_MS, type SignInHousekeeping, type SignInHousekeepingDeps } from "./sign-in-housekeeping.job";
+export { CUSTOMER_COOKIE_MAX_AGE_S, customerSessionRoutes, type CustomerSessionRouteDeps } from "./http/customer-session.routes";
 export { DUMMY_HASH, signInStaff, type StaffSignIn, type StaffSignInDeps, type StaffSignInInput } from "./staff-sign-in.command";
 export { staffSessionRoutes, type StaffSessionRouteDeps } from "./http/staff-session.routes";
 export {

@@ -85,7 +85,15 @@ ASSISTANT_TOKEN=<at least 32 random characters, different from INTERNAL_TOKEN>
 # FINGERPRINT_KEY=<a dev key, never the production key>
 # ACCESSTRADE_API_KEY=<a dev key; the production key also needs ALLOW_PROD_ACCESSTRADE_KEY=1>
 # LIVE_LEDGER_PATH=<absolute path of the live copy a rehearsal reads, outside data/dev>
-# PUBLIC_BASE_URL stays unset in dev.
+# PUBLIC_BASE_URL stays unset in dev. Production requires it; the website accepts sign-ins from it
+# and from its www twin (https://hoantiendp.com and https://www.hoantiendp.com).
+# The customer website (Stories 7.1, 7.2), same keys in prod.env:
+# ZALO_ASSISTANT_URL=<the assistant's private chat, https://zalo.me/<number or id>; unset, the
+#   website's Zalo buttons open the community group link from packages/labels/vi/web.json>
+# FALLBACK_CONTACT_URL=<where customers reach the operator while Zalo is down: an https page or
+#   tel:+84...; unset, the Zalo-down banner shows no contact and the Zalo buttons hide>
+# Sign-in throttles key each caller by an HMAC of its address with FINGERPRINT_KEY (a random key
+#   per process when it is unset, as in a fresh dev setup); no address is ever stored.
 # With ZALO_MODE=relay (see below) the live bot's broadcast token and exactly the Dev group:
 # LIVE_BOT_TOKEN=<read on the production host only, never committed>
 ```

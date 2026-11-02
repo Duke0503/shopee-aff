@@ -335,3 +335,18 @@ export {
   type NotificationAcked,
   type NotificationNext,
 } from "./notification.schema";
+export {
+  CUSTOMER_CODE_INPUT,
+  CUSTOMER_PATHS,
+  CUSTOMER_SESSION_PATH,
+  customerSessionResponseSchema,
+  customerSignInRequestSchema,
+  FALLBACK_CONTACT_URL,
+  MAX_CUSTOMER_PASSWORD,
+  SITE_STATUS_PATH,
+  siteStatusResponseSchema,
+  type CustomerSessionResponse,
+  type CustomerSignInRequest,
+  type SiteStatusResponse,
+  ZALO_CHAT_URL,
+} from "./customer-session.schema";

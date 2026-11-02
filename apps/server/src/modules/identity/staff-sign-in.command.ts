@@ -10,16 +10,16 @@
  * token is stored. A failed attempt is audited under the sign-in system actor, never as the
  * staff member it targeted, with the target and the Access identity as ids.
  */
-import { toMs, instantFromMs, type Clock } from "@cashback/core";
+import type { Clock } from "@cashback/core";
 import { and, eq } from "drizzle-orm";
 
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { Actor, AuditPort } from "../../platform/ports/audit.port";
 import type { StaffPrincipal } from "../../platform/ports/staff-session.port";
-import { signInDelayMs } from "./domain/sign-in-delay";
 import { MAX_PASSWORD_LENGTH, verifyPassword } from "./password-hash";
 import { staff, staffSignInThrottles, type StaffRow } from "./schema";
 import { openSession, STAFF_SESSION_MS, type OpenedSession } from "./session.command";
+import { countFailure, waitingUntil, type ThrottleStore } from "./sign-in-throttle";
 
 export interface StaffSignInInput {
   readonly username: string;
@@ -50,7 +50,6 @@ const MAX_USERNAME = 64;
 export const DUMMY_HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2lnbi1pbi1kdW1teS1zYWx0$5rnTNcg0vmr6C5hVfzJs1x3QTv1Ku8DAfQXT9+lhVFY";
 
 type Pair = { readonly username: string; readonly accessSubject: string };
-type Throttle = typeof staffSignInThrottles.$inferSelect;
 
 const staffNamed = (db: LedgerDb, username: string): StaffRow | null => db.select().from(staff).where(eq(staff.username, username)).get() ?? null;
 const activeStaff = (db: LedgerDb, username: string): StaffRow | null => {
@@ -58,27 +57,24 @@ const activeStaff = (db: LedgerDb, username: string): StaffRow | null => {
   return row !== null && row.status === "ACTIVE" ? row : null;
 };
 
-const throttleOf = (db: LedgerDb, pair: Pair): Throttle | null =>
-  db
-    .select()
-    .from(staffSignInThrottles)
-    .where(and(eq(staffSignInThrottles.username, pair.username), eq(staffSignInThrottles.accessSubject, pair.accessSubject)))
-    .get() ?? null;
-
-function waitingUntil(db: LedgerDb, pair: Pair, clock: Clock): string | null {
-  const t = throttleOf(db, pair);
-  return t !== null && t.lockedUntil !== null && t.lockedUntil > clock.now() ? t.lockedUntil : null;
-}
+/** The pair's row in staff_sign_in_throttles, through one transaction handle. */
+const staffThrottle = (db: LedgerDb, pair: Pair): ThrottleStore => ({
+  read: () =>
+    db
+      .select()
+      .from(staffSignInThrottles)
+      .where(and(eq(staffSignInThrottles.username, pair.username), eq(staffSignInThrottles.accessSubject, pair.accessSubject)))
+      .get() ?? null,
+  save: (next, at) =>
+    void db
+      .insert(staffSignInThrottles)
+      .values({ ...pair, ...next, lastFailedAt: at })
+      .onConflictDoUpdate({ target: [staffSignInThrottles.username, staffSignInThrottles.accessSubject], set: { ...next, lastFailedAt: at } })
+      .run(),
+});
 
 function failed(db: LedgerDb, pair: Pair, target: StaffRow | null, deps: StaffSignInDeps): StaffSignIn {
-  const now = deps.clock.now();
-  const failures = (throttleOf(db, pair)?.failures ?? 0) + 1;
-  const delay = signInDelayMs(failures);
-  const lockedUntil = delay > 0 ? instantFromMs(toMs(now) + delay) : null;
-  db.insert(staffSignInThrottles)
-    .values({ ...pair, failures, lockedUntil, lastFailedAt: now })
-    .onConflictDoUpdate({ target: [staffSignInThrottles.username, staffSignInThrottles.accessSubject], set: { failures, lockedUntil, lastFailedAt: now } })
-    .run();
+  const { failures, lockedUntil } = countFailure(staffThrottle(db, pair), deps.clock);
   deps.auditFor(db).record({
     actor: STAFF_SIGN_IN_ACTOR,
     event: "identity.staff.sign_in_failed",
@@ -101,7 +97,7 @@ function succeeded(db: LedgerDb, pair: Pair, row: StaffRow, deps: StaffSignInDep
 
 /** Records the checked attempt in one transaction; the rows are re-read, so a concurrent change wins. */
 function record(db: LedgerDb, pair: Pair, hashChecked: string, passwordOk: boolean, deps: StaffSignInDeps): StaffSignIn {
-  const retryAt = waitingUntil(db, pair, deps.clock);
+  const retryAt = waitingUntil(staffThrottle(db, pair), deps.clock);
   if (retryAt !== null) return { outcome: "refused", reason: "waiting", retryAt };
   const target = staffNamed(db, pair.username);
   // A password changed, or the account disabled, while the hash was checked: the check proves nothing.
@@ -112,7 +108,7 @@ function record(db: LedgerDb, pair: Pair, hashChecked: string, passwordOk: boole
 export async function signInStaff(ledger: Ledger, input: StaffSignInInput, deps: StaffSignInDeps): Promise<StaffSignIn> {
   const pair: Pair = { username: input.username.trim().toLowerCase().slice(0, MAX_USERNAME), accessSubject: input.accessSubject };
   if (pair.username === "" || input.password.length === 0 || input.password.length > MAX_PASSWORD_LENGTH) return { outcome: "refused", reason: "bad_credentials" };
-  const retryAt = waitingUntil(ledger.db, pair, deps.clock);
+  const retryAt = waitingUntil(staffThrottle(ledger.db, pair), deps.clock);
   if (retryAt !== null) return { outcome: "refused", reason: "waiting", retryAt };
   const row = activeStaff(ledger.db, pair.username);
   const hash = row?.passwordHash ?? DUMMY_HASH;

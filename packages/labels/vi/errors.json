@@ -81,5 +81,11 @@
   "error.link.request_not_found": "Không tìm thấy yêu cầu link này.",
   "error.notification.not_found": "Không tìm thấy thông báo này.",
   "error.registration.zalo_id_invalid": "Mã Zalo không hợp lệ.",
-  "error.registration.zalo_id_held": "Mã Zalo này đang thuộc một khách đã gộp. Vui lòng nhắn quản trị viên."
+  "error.registration.zalo_id_held": "Mã Zalo này đang thuộc một khách đã gộp. Vui lòng nhắn quản trị viên.",
+  "error.customer_sign_in_refused": "Mã khách hàng hoặc mật khẩu chưa đúng.",
+  "error.customer_sign_in_waiting": "Bạn nhập sai nhiều lần. Thử lại lúc {time}, hoặc nhắn /matkhau cho trợ lý Zalo để nhận mật khẩu mới.",
+  "error.session_ended_new_password": "Phiên đăng nhập đã kết thúc vì có mật khẩu mới.",
+  "error.customer_code_format": "Mã khách hàng có dạng DP00012.",
+  "error.password_required": "Nhập mật khẩu.",
+  "error.reload_page": "Trang này đã cũ. Tải lại trang rồi thử lại."
 }

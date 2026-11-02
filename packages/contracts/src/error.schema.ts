@@ -1,9 +1,10 @@
 /**
  * The one error envelope (AD-20): `{ error: { code, messageKey, fields? } }`.
  * `messageKey` points into the label files; no human text and no stack trace
- * ever leaves the server.
+ * ever leaves the server. Written with zod/mini, the tree-shakable form of the same Zod, because
+ * the customer website reads it on its first page load (Story 7.1 AC3).
  */
-import { z } from "zod";
+import { z } from "zod/mini";
 
 export const ERROR_CODES = [
   "not_found",
@@ -22,8 +23,8 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 export const errorEnvelopeSchema = z.object({
   error: z.object({
     code: z.enum(ERROR_CODES),
-    messageKey: z.string().min(1),
-    fields: z.record(z.string(), z.string()).optional(),
+    messageKey: z.string().check(z.minLength(1)),
+    fields: z.optional(z.record(z.string(), z.string())),
   }),
 });
 

@@ -3,8 +3,9 @@
  * characters drawn with `crypto.randomInt` from letters and digits that cannot be misread
  * (no 0/O, 1/l/I); it is returned once, for the reply in the private chat, and only its argon2id
  * hash is stored. Issuing it ends every open session of the customer (from the chat there is no
- * session of their own to keep) and clears the sign-in failures, so the new password works at
- * once. The hash is made by the caller before the transaction (password-hash.ts); `setCustomerPassword`
+ * session of their own to keep) and deletes the customer's sign-in throttle rows from every
+ * client (customer_sign_in_throttles, Story 7.2), so the new password works at once.
+ * The hash is made by the caller before the transaction (password-hash.ts); `setCustomerPassword`
  * is called inside `tx` and writes one audit entry that names no password.
  */
 import { randomInt } from "node:crypto";
@@ -13,7 +14,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
-import { customers, sessions } from "./schema";
+import { customerSignInThrottles, customers, sessions } from "./schema";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
 export const ISSUED_PASSWORD_CHARS = 8;
@@ -33,6 +34,8 @@ export function setCustomerPassword(db: LedgerDb, customerId: string, hash: stri
     .where(and(eq(customers.customerId, customerId), eq(customers.role, "USER"), eq(customers.status, "ACTIVE")))
     .run();
   if (updated.changes !== 1) return null;
+  const code = db.select({ customerCode: customers.customerCode }).from(customers).where(eq(customers.customerId, customerId)).get()?.customerCode ?? null;
+  if (code !== null) db.delete(customerSignInThrottles).where(eq(customerSignInThrottles.customerCode, code)).run();
   const sessionsEnded = db
     .update(sessions)
     .set({ endedAt: now, endReason: "NEW_PASSWORD" })
