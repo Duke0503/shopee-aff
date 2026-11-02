@@ -53,6 +53,12 @@ export const assistantBankReplySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("not_registered") }),
   z.object({ kind: z.literal("contact_admin") }),
   z.object({ kind: z.literal("none") }),
+  /** "/stk xacnhan <last four>" matched the account waiting for confirmation (or one already confirmed): it is the one money goes to (Story 7.5). */
+  z.object({ kind: z.literal("confirmed"), bankName: z.string().max(120), lastFour: z.string().regex(/^[A-Z0-9]{4}$/) }),
+  /** The digits did not match (or were missing): nothing confirmed; the reply names the account that waits, by its last four. */
+  z.object({ kind: z.literal("confirm_mismatch"), lastFour: z.string().regex(/^[A-Z0-9]{4}$/) }),
+  /** "/stk xacnhan" with no account saved: nothing to confirm. */
+  z.object({ kind: z.literal("nothing_to_confirm") }),
   /** A quoted reply that is not bank details after all: nothing saved, nothing to say about a bank. */
   z.object({ kind: z.literal("not_bank_details") }),
 ]);

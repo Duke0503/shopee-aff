@@ -10,6 +10,7 @@ import { buttonVariants, cn, formatMoney, TriangleAlertIcon } from "@cashback/ui
 import { Link } from "@tanstack/react-router";
 
 import { webText } from "../labels";
+import { CommandHint } from "../shell/command-hint";
 import { FOCUS_RING } from "../shell/nav-items";
 
 const ACCOUNT_LINK = cn("inline-flex h-11 shrink-0 items-center rounded-lg px-3 text-[15px] font-semibold text-primary hover:bg-muted", FOCUS_RING);
@@ -62,7 +63,7 @@ export function BankCard({ money }: { readonly money: MyMoney }) {
       {bank.held && (
         <div className="rounded-md bg-status-attention-soft px-3 py-2 text-status-attention">
           <p className="text-[15px] font-semibold">{webText("bank_held")}</p>
-          <p className="text-meta">{webText("bank_held_body")}</p>
+          <CommandHint className="text-meta text-status-attention" template={webText("bank_held_body")} command={webText("command_bank_confirm", { lastFour: bank.lastFour })} />
         </div>
       )}
     </section>

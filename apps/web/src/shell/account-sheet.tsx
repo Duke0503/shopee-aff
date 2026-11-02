@@ -1,10 +1,11 @@
 /**
  * The signed-in customer's menu in the top bar (EXPERIENCE.md navigation: the customer code on
  * the right opens the account menu). For now it holds the code as a copyable chip and sign-out;
- * the Account page (Story 7.5) adds its link here. A bottom sheet on phone, a right sheet wider.
+ * the link to Account (the bank account and the password, Story 7.5). A bottom sheet on phone, a right sheet wider.
  */
-import { Button, CircleUserIcon, CodeChip, LogOutIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, useLayout } from "@cashback/ui";
-import { useNavigate } from "@tanstack/react-router";
+import { Button, buttonVariants, CircleUserIcon, cn, CodeChip, LandmarkIcon, LogOutIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, useLayout } from "@cashback/ui";
+import { CUSTOMER_PATHS } from "@cashback/contracts";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { webText } from "../labels";
@@ -41,6 +42,10 @@ export function AccountSheet({ customerCode }: { readonly customerCode: string }
             <span className="text-meta text-muted-foreground">{webText("account_code")}</span>
             <CodeChip code={customerCode} className="bg-card" />
           </div>
+          <Link to={CUSTOMER_PATHS.account} onClick={() => setOpen(false)} className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full justify-start text-[15px]")}>
+            <LandmarkIcon aria-hidden />
+            {webText("account_menu_link")}
+          </Link>
           {signOut.isError && (
             <p role="alert" className="text-sm font-medium text-destructive">
               {webText("sign_out_failed")}

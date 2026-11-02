@@ -2,8 +2,10 @@
  * Saving a bank account from the Zalo private chat (AD-15, FR-10, M-7, INV-9; Story 6.9): the
  * details after `/stk`, or a reply (a quote) in the private chat that reads as bank details, go
  * to the server, which reads, matches and saves them; the reply names the bank and the last four
- * digits only. Details written in the group never leave the assistant: the group gets the pointer
- * to the private chat (the server's `private_only`, asked without the details). Details longer
+ * digits only. "/stk xacnhan 6789" goes the same way: the server confirms the account saved on
+ * the website with those last four digits (Story 7.5), or names the account that waits when
+ * the digits differ. Details written in the group never leave the assistant: the group gets the
+ * pointer to the private chat (the server's `private_only`, asked without the details). Details longer
  * than any real account are answered with the rule's message without asking the server. Neither
  * the details nor the number are ever logged; an error names the path and the status only.
  */
@@ -30,6 +32,12 @@ export function bankReplyMessage(reply: AssistantBankReply): ReplyMessage | null
       return { key: "bank_choose", values: { banks: reply.banks.map((bank) => messageText("bank_choice_line", { bank })).join("\n") } };
     case "invalid":
       return { key: RULE_MESSAGES[reply.rule], values: {} };
+    case "confirmed":
+      return { key: "bank_confirmed", values: { bank: reply.bankName, lastFour: reply.lastFour } };
+    case "confirm_mismatch":
+      return { key: "bank_confirm_mismatch", values: { lastFour: reply.lastFour } };
+    case "nothing_to_confirm":
+      return { key: "command_bank_none", values: {} };
     case "private_only":
       return { key: "command_private_only", values: {} };
     case "not_registered":

@@ -58,3 +58,5 @@ export {
 export { checkErase, CustomerEraseError, ERASE_REASON_MAX, eraseCustomer, type EraseErrorCode, type EraseInput, type ErasedCustomer, type OwedMoney } from "./customer-erase.command";
 export { applyMerge, CustomerMergeError, planMerge, type MergeErrorCode, type MergePlan, type MergeSide } from "./customer-merge.command";
 export { LIVE_ZALO_UID, zaloRecipientOf, type ZaloRecipient } from "./zalo-recipient.query";
+export { BANK_ERASED_MESSAGE, BANK_WEBSITE_MESSAGE, confirmHeldBankAccount, eraseWebsiteBankAccount, saveWebsiteBankAccount, type BankConfirmation, type WebsiteBankAccount, type WebsiteBankSaved } from "./bank-account-website.command";
+export { changeCustomerPassword, chosenPasswordProblem, type PasswordChange, type PasswordChangeDeps, type PasswordChangeInput } from "./customer-password-change.command";

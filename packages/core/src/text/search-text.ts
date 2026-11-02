@@ -3,6 +3,7 @@
  * `search_text` column built here, never raw text or JSON with `LIKE`, so a staff member
  * typing "nguyen" finds every spelling of the name and `%` or `_` never acts as a wildcard.
  */
+import { foldDiacritics } from "./fold";
 
 /**
  * Text a list may search; built only by `searchText`. It takes text fields only: an
@@ -15,14 +16,12 @@ export const LIKE_ESCAPE = "\\";
 
 /** Joins the fields of one row so a query never matches across two of them. */
 const FIELD_SEPARATOR = "|";
-const COMBINING_MARKS = /[\u0300-\u036f]/g;
-const D_STROKE = /\u0111/g;
 const WHITESPACE = /\s+/g;
 const LIKE_SPECIAL = /[\\%_]/g;
 
 /** Lowercase, diacritics folded (d-stroke to d), whitespace removed. */
 function fold(text: string): string {
-  return text.toLowerCase().normalize("NFD").replace(COMBINING_MARKS, "").replace(D_STROKE, "d").replace(WHITESPACE, "");
+  return foldDiacritics(text.toLowerCase()).replace(WHITESPACE, "");
 }
 
 function textPart(part: unknown): string {

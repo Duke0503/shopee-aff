@@ -19,7 +19,7 @@ import { adminBuildRoutes } from "./admin/admin-build";
 import { adminDesk } from "./admin/admin-desk";
 import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
-import { environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, type LinkBridge } from "./links/link-jobs";
+import { accessTradeLinksFor, environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, subIdPrefixFor, type LinkBridge } from "./links/link-jobs";
 import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit, ledgerAlerts, runAssistantHealthCheck, type AssistantHeartbeats } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { notificationJobs } from "./notifications/notification-expiry.job";
@@ -105,7 +105,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const share = sharePageRoutes({ ledger, clock: systemClock, baseUrl: config.publicBaseUrl, acceptFakeHost: bridge.port.mode === "fake" });
     // The customer website (Stories 7.1, 7.2): site status, sign-in, and the built pages behind the server pages;
     // the admin desk's built pages on the admin host only.
-    const site = customerSite({ config, ledger, clock: systemClock, heartbeats, logger });
+    const site = customerSite({ config, ledger, clock: systemClock, heartbeats, logger, links: { requestIdPrefix: subIdPrefixFor(config.env), tikTok: accessTradeLinksFor(config) !== null } });
     const pages = [receiptPageRoutes({ ledger, clock: systemClock }), share, customerProofRoutes({ ledger, clock: systemClock, proofs }), ...site.routes, ...adminBuildRoutes(config, { logger })];
     servers = buildServers({ clock: systemClock, internalToken: config.internalToken, assistantToken: config.assistantToken, bridgeToken: config.bridgeToken, logger, internal, public: pages, ...(staff ? { staff } : {}) });
     await listen(servers, { public: config.publicPort, internal: config.internalPort });

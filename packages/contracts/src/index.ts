@@ -368,3 +368,24 @@ export {
 } from "./customer-money.schema";
 export { MY_ORDERS_SEARCH_SPEC, MY_PAYOUTS_SEARCH_SPEC } from "./customer-money-search";
 export { listResponseMiniSchema } from "./list-mini.schema";
+export {
+  BANK_HOLDER_INPUT_MAX,
+  BANK_LIST_PATH,
+  BANK_NUMBER_INPUT_MAX,
+  bankAccountErasedSchema,
+  bankAccountSavedSchema,
+  bankAccountSaveSchema,
+  bankListSchema,
+  MIN_CUSTOMER_PASSWORD,
+  MY_BANK_ACCOUNT_PATH,
+  MY_PASSWORD_PATH,
+  passwordChangedSchema,
+  passwordChangeSchema,
+  type BankAccountSave,
+  type BankAccountSaved,
+  type BankChoice,
+  type BankList,
+  type PasswordChange,
+} from "./customer-account.schema";
+export { WEB_LINK_PATH, WEB_LINK_POLL_MS, WEB_LINK_STATES, WEB_LINK_URL_MAX, webLinkPath, webLinkQueuedSchema, webLinkRequestSchema, webLinkResultSchema, type WebLinkQueued, type WebLinkRequest, type WebLinkResult } from "./web-link.schema";
+export { GUIDE_PATH, guideFiguresSchema, type GuideFigures } from "./guide.schema";

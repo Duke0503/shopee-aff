@@ -46,6 +46,8 @@ export interface LinkRequestInput {
   readonly customer: string;
   readonly url: string;
   readonly channel: LinkChannel;
+  /** A website request: how it was made and the caller's client key, for the website quota (Story 7.6). */
+  readonly web?: { readonly access: "SESSION" | "CODE" | "GUEST"; readonly clientKey: string };
 }
 
 export interface QueuedLinkRequest {
@@ -103,9 +105,10 @@ function reusableRequest(db: LedgerDb, requester: Requester, productKey: string,
 
 /**
  * Writes one QUEUED request, or hands back the requester's own reusable one; call inside `tx`.
- * `requestIdPrefix` is `DEV` in dev, empty in production.
+ * `requestIdPrefix` is `DEV` in dev, empty in production. `beforeNew` runs only when a new request
+ * is about to be written and may throw to refuse it (the website's quota).
  */
-export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: Clock, requestIdPrefix = "", note: LinkRequestNote = () => undefined, tikTok = true): QueuedLinkRequest {
+export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: Clock, requestIdPrefix = "", note: LinkRequestNote = () => undefined, tikTok = true, beforeNew: (customerId: string) => void = () => undefined): QueuedLinkRequest {
   const customer = resolveCustomer(db, input.customer);
   if (customer === null) throw new LinkRequestError("customer_not_found");
   if (customer.status === "DISABLED") throw new LinkRequestError("customer_disabled");
@@ -118,9 +121,11 @@ export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: C
   // Only a link that names one product is ever reused (Story 5.2); a search or shop link is always new.
   const reused = productKey === null ? null : reusableRequest(db, { customerId: customer.customerId, guest: customer.role === "HOUSE" }, productKey, clock, requestIdPrefix, note);
   if (reused !== null) return reused;
+  // A quota counts new requests only (the website's, Story 7.6): a reused link costs nothing.
+  beforeNew(customer.customerId);
   const requestId = nextRequestId(db, clock, requestIdPrefix);
   db.insert(linkRequests)
-    .values({ requestId, customerId: customer.customerId, network, platform, channel: input.channel, status: "QUEUED", sourceUrl, productKey, createdAt: clock.now(), origin: "REQUEST" })
+    .values({ requestId, customerId: customer.customerId, network, platform, channel: input.channel, status: "QUEUED", sourceUrl, productKey, createdAt: clock.now(), origin: "REQUEST", webAccess: input.web?.access ?? null, webClientKey: input.web?.clientKey ?? null })
     .run();
   return { requestId, customerId: customer.customerId, status: "QUEUED", reused: false, shareCode: null };
 }

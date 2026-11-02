@@ -57,6 +57,9 @@ export const linkRequests = sqliteTable("link_requests", {
   // The chat reply's claim on the link and the notification key in use (migration 0027, Story 6.5).
   deliveryClaimedUntil: text("delivery_claimed_until"),
   deliveryAttempt: integer("delivery_attempt").notNull().default(0),
+  // How a website request was made and the HMAC of its caller's address (migration 0030, Story 7.6).
+  webAccess: text("web_access", { enum: ["SESSION", "CODE", "GUEST"] }),
+  webClientKey: text("web_client_key"),
 });
 
 export const shareCodes = sqliteTable("share_codes", {

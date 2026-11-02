@@ -87,5 +87,16 @@
   "error.session_ended_new_password": "Phiên đăng nhập đã kết thúc vì có mật khẩu mới.",
   "error.customer_code_format": "Mã khách hàng có dạng DP00012.",
   "error.password_required": "Nhập mật khẩu.",
-  "error.reload_page": "Trang này đã cũ. Tải lại trang rồi thử lại."
+  "error.reload_page": "Trang này đã cũ. Tải lại trang rồi thử lại.",
+  "error.bank.bank_unknown": "Chọn ngân hàng trong danh sách.",
+  "error.bank.number_rule": "Số tài khoản gồm 4 đến 30 chữ số hoặc chữ cái.",
+  "error.bank.holder_rule": "Tên chủ tài khoản chỉ gồm chữ cái, viết như trên thẻ ngân hàng.",
+  "error.bank.consent_required": "Đánh dấu ô đồng ý để lưu tài khoản.",
+  "error.bank.unavailable": "Chưa lưu được tài khoản lúc này. Nhắn trợ lý Zalo giúp mình.",
+  "error.password.too_short": "Mật khẩu cần ít nhất 8 ký tự.",
+  "error.password.too_long": "Mật khẩu quá dài.",
+  "error.password.is_code": "Mật khẩu không được trùng mã khách hàng.",
+  "error.password.wrong_current": "Mật khẩu hiện tại chưa đúng.",
+  "error.web_link.customer_unknown": "Không tìm thấy mã khách hàng",
+  "error.link.web_busy": "Web đang bận. Gửi link cho mình trên Zalo, bên đó không giới hạn."
 }

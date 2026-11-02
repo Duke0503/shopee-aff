@@ -4,12 +4,15 @@
  * Copied from the admin desk.
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { setViewportWidth } from "./viewport";
 
 const browser = typeof window !== "undefined";
+
+// A lazy page chunk may take over a second to load while the bundle scan builds beside the tests.
+configure({ asyncUtilTimeout: 4000 });
 
 afterEach(() => {
   vi.unstubAllGlobals();

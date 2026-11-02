@@ -50,7 +50,7 @@
   "command_orders_line_amount": "• {orderId}: {state} ({cashback})",
   "command_orders_none": "Bạn chưa có đơn nào. Mua qua link hoàn tiền mình gửi, đơn sẽ hiện ở đây khi sàn báo về.",
   "command_bank_saved": "Tài khoản nhận tiền của bạn: {bank} •• {lastFour}.",
-  "command_bank_held": "Tài khoản nhận tiền của bạn: {bank} •• {lastFour}. Tài khoản này đang chờ bạn xác nhận nên chưa dùng để chuyển tiền.",
+  "command_bank_held": "Tài khoản nhận tiền của bạn: {bank} •• {lastFour}. Tài khoản này đang chờ bạn xác nhận nên chưa dùng để chuyển tiền. Để xác nhận, bạn nhắn mình: /stk xacnhan {lastFour}",
   "command_bank_none": "Bạn chưa có tài khoản ngân hàng nhận tiền. Bạn gửi mình theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>\nVí dụ: /stk Vietcombank 0123456789 NGUYEN VAN A",
   "bank_unnamed": "Ngân hàng chưa rõ tên",
   "command_private_only": "Lệnh này chỉ dùng trong tin nhắn riêng với mình, để thông tin của bạn không hiện trong nhóm. Bạn nhắn riêng cho mình nhé.",
@@ -66,5 +66,9 @@
   "bank_rule_number": "Số tài khoản phải có từ 4 đến 30 chữ cái hoặc chữ số; khoảng trắng và dấu gạch ngang được bỏ qua. Bạn kiểm tra rồi gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
   "bank_rule_holder": "Tên chủ tài khoản chỉ gồm chữ cái, ghi đúng như ngân hàng in trên thẻ. Bạn gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
   "bank_rule_bank": "Mình không tìm thấy ngân hàng này. Bạn ghi tên ngân hàng như Vietcombank, MB, Techcombank rồi gửi lại theo mẫu:\n/stk <ngân hàng> <số tài khoản> <tên chủ tài khoản>",
-  "merge_claim_noted": "Mình đã ghi nhận mã khách {claimedCode} bạn gửi. Quản trị viên sẽ kiểm tra rồi gộp mã này với tài khoản Zalo bạn đang nhắn, để tiền hoàn của bạn nằm ở một chỗ."
+  "merge_claim_noted": "Mình đã ghi nhận mã khách {claimedCode} bạn gửi. Quản trị viên sẽ kiểm tra rồi gộp mã này với tài khoản Zalo bạn đang nhắn, để tiền hoàn của bạn nằm ở một chỗ.",
+  "bank_changed_website": "Tài khoản nhận tiền của bạn vừa được đổi trên hoantiendp.com thành {bank} •• {lastFour}.\nMình chỉ chuyển tiền vào tài khoản này sau khi bạn xác nhận. Để xác nhận, bạn nhắn mình:\n/stk xacnhan {lastFour}\n\nNếu không phải bạn đổi, bạn đừng xác nhận và nhắn quản trị viên ngay nhé.",
+  "bank_erased": "Tài khoản nhận tiền {bank} •• {lastFour} của bạn vừa được xoá trên hoantiendp.com. Mình chưa chuyển tiền được cho bạn cho đến khi bạn thêm tài khoản mới. Nếu không phải bạn xoá, bạn nhắn quản trị viên ngay nhé.",
+  "bank_confirmed": "Mình đã xác nhận tài khoản nhận tiền của bạn: {bank} •• {lastFour}. Tiền hoàn của bạn sẽ được chuyển vào tài khoản này.",
+  "bank_confirm_mismatch": "Tài khoản đang chờ bạn xác nhận có 4 số cuối là {lastFour}. Bạn kiểm tra lại: nếu đúng là tài khoản của bạn, bạn nhắn mình:\n/stk xacnhan {lastFour}\n\nNếu không phải tài khoản của bạn, bạn đừng xác nhận và nhắn quản trị viên ngay nhé."
 }

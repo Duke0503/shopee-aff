@@ -8,6 +8,8 @@
  * are dropped as whole words before the letters are joined, never as letters inside a word, so
  * "Thinh Vuong" stays "thinhvuong" and "Ngoai thuong" stays "ngoaithuong".
  */
+import { foldDiacritics } from "@cashback/core";
+
 import CATALOGUE from "./vietqr-banks.json" with { type: "json" };
 
 export interface VietQrBank {
@@ -22,12 +24,10 @@ export const VIETQR_BANKS: readonly VietQrBank[] = CATALOGUE.banks.filter((b): b
 
 /** Whole words, after folding, that never tell banks apart. */
 const BOILERPLATE = /(?:^| )(?:ngan hang|thuong mai|co phan|viet nam|vietnam|tmcp|nhtmcp|bank|jsc|limited|ltd|nh|vn)(?= |$)/g;
-const COMBINING_MARKS = /[̀-ͯ]/g;
-const D_STROKE = /đ/g;
 
 /** Lower case, diacritics and the d-stroke folded, words separated by one space. */
 function words(text: string): string {
-  return text.normalize("NFD").replace(COMBINING_MARKS, "").toLowerCase().replace(D_STROKE, "d").replace(/[^a-z0-9]+/g, " ").trim();
+  return foldDiacritics(text).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 /** Letters and digits only, for comparing spellings. */

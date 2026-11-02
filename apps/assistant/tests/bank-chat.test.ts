@@ -147,3 +147,24 @@ describe("Story 6.9: bank account saved or changed from the Zalo private chat", 
     expect(JSON.stringify([...server.calls, ...quoted.calls])).not.toMatch(/0123|nguyen/i);
   });
 });
+
+describe("Story 7.5: confirming a bank account saved on the website from the private chat", () => {
+  it("AC2: \"/stk xacnhan 6789\" reaches the server as the details \"xacnhan 6789\" and the confirmation names the account", async () => {
+    const server = fakeServer();
+    answering(server, { kind: "confirmed", bankName: "Vietcombank", lastFour: "6789" });
+    const sent = await sentFor(server, privately("/stk xacnhan 6789"));
+    expect(server.callsTo(ASSISTANT_BANK_PATH)).toEqual([{ zaloUserId: "70001", displayName: "Lan", chat: "private", details: "xacnhan 6789" }]);
+    expect(server.callsTo(ASSISTANT_COMMAND_PATH)).toEqual([]);
+    expect(sent).toEqual([messageText("bank_confirmed", { bank: "Vietcombank", lastFour: "6789" })]);
+  });
+
+  it("AC2: other digits confirm nothing: the reply names the account that waits with the exact command; with no account there is nothing to confirm", async () => {
+    const server = fakeServer();
+    answering(server, { kind: "confirm_mismatch", lastFour: "9999" });
+    const mismatch = await sentFor(server, privately("/stk xacnhan 1234"));
+    expect(mismatch).toEqual([messageText("bank_confirm_mismatch", { lastFour: "9999" })]);
+    expect(mismatch[0]).toContain("/stk xacnhan 9999");
+    answering(server, { kind: "nothing_to_confirm" });
+    expect(await sentFor(server, privately("/stk xacnhan 1234"))).toEqual([messageText("command_bank_none")]);
+  });
+});

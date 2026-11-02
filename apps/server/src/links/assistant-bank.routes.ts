@@ -13,12 +13,14 @@
  * for a change, the change message (`saveChatBankAccount`). Without a FINGERPRINT_KEY of 32
  * characters or more nothing can be saved and the customer is sent to an admin. The answer and the
  * log line carry the bank's short name and the last four digits at most; the details are never
- * logged.
+ * logged. "/stk xacnhan" confirms a bank account saved on the website and lifts its hold
+ * (Story 7.5); its consent time, and so the 72-hour flag, stays.
  */
 import { ASSISTANT_BANK_PATH, assistantBankAnswerSchema, assistantBankSaveSchema, BANK_CHOICES_MAX, type AssistantBankReply } from "@cashback/contracts";
+import { foldDiacritics } from "@cashback/core";
 import type { FastifyInstance } from "fastify";
 
-import { customerCodeOf, readBankDetails, resolveCustomer, saveChatBankAccount, type Registered } from "../modules/identity/index";
+import { confirmHeldBankAccount, customerCodeOf, readBankDetails, resolveCustomer, saveChatBankAccount, type Registered } from "../modules/identity/index";
 import { outboxFor } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import type { LedgerDb } from "../platform/db/ledger";
@@ -27,6 +29,32 @@ import { ASSISTANT_ROUTE } from "../platform/http/internal-token.guard";
 import { register, type AssistantChatRouteDeps } from "./assistant-chat.routes";
 
 export const FINGERPRINT_KEY_MIN = 32;
+
+/**
+ * "/stk xacnhan 6789": the customer confirms the bank account saved on the website whose last four
+ * digits the change message showed (Story 7.5, M-7). The words are compared with accents, case and
+ * spaces folded (packages/core's fold) and nothing else, so "Xac Nhan 6789" with or without
+ * accents is the same command; any other text after the word is not four digits and confirms
+ * nothing.
+ */
+const CONFIRM_WORD = "xacnhan";
+const CONFIRM_TAIL = /^[a-z0-9]{4}$/;
+
+/** Null when the details are not the confirm command; else the last four digits it names, or null for none or a malformed tail. */
+export function confirmCommandOf(details: string): { readonly lastFour: string | null } | null {
+  const folded = foldDiacritics(details).toLowerCase().replace(/\s+/g, "");
+  if (!folded.startsWith(CONFIRM_WORD)) return null;
+  const tail = folded.slice(CONFIRM_WORD.length);
+  return { lastFour: CONFIRM_TAIL.test(tail) ? tail.toUpperCase() : null };
+}
+
+/** The confirmation of a held website change, by its last four digits (Story 7.5). */
+function confirmReply(db: LedgerDb, deps: AssistantBankRouteDeps, customerId: string, lastFour: string | null): AssistantBankReply {
+  const confirmed = confirmHeldBankAccount(db, customerId, lastFour, { by: commandAudit(db, deps.clock, { kind: "customer", id: customerId }) });
+  if (confirmed.result === "none") return { kind: "nothing_to_confirm" };
+  if (confirmed.result === "mismatch") return { kind: "confirm_mismatch", lastFour: confirmed.lastFour };
+  return { kind: "confirmed", bankName: confirmed.bankName, lastFour: confirmed.lastFour };
+}
 
 export type AssistantBankRouteDeps = Pick<AssistantChatRouteDeps, "ledger" | "clock"> & {
   /** FINGERPRINT_KEY; null when the config has none. */
@@ -39,6 +67,8 @@ export function bankReplyOf(db: LedgerDb, deps: AssistantBankRouteDeps, key: str
   if (customer === null) return { kind: "not_registered" };
   if (customer.role === "HOUSE") return { kind: "none" };
   if (customer.role !== "USER" || customer.status !== "ACTIVE" || customerCodeOf(db, customer.customerId) === null) return { kind: "contact_admin" };
+  const confirm = quoted ? null : confirmCommandOf(details);
+  if (confirm !== null) return confirmReply(db, deps, customer.customerId, confirm.lastFour);
   const read = readBankDetails(details);
   // A quoted reply is bank details only when a bank and a number were read; the rest is ordinary chat.
   if (quoted && read.kind === "invalid") return { kind: "not_bank_details" };

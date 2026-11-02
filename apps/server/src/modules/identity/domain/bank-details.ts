@@ -7,6 +7,8 @@
  * bank: a name that matches several is a choice for the customer, never a guess, because the same
  * number can exist at another bank and a wrong BIN pays a stranger.
  */
+import { foldDiacritics } from "@cashback/core";
+
 import { normaliseAccountNumber } from "./account-number";
 import { vietQrBankMatches, type VietQrBank } from "./bank-match";
 
@@ -25,10 +27,7 @@ const hasDigit = (word: string): boolean => /\d/.test(word);
 
 /** Upper case, diacritics and the d-stroke folded, one space between words: how two spellings of a holder compare. */
 export function foldHolderName(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[\u0111\u0110]/g, "D")
+  return foldDiacritics(text)
     .toUpperCase()
     .replace(/\s+/g, " ")
     .trim();

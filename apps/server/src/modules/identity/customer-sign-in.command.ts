@@ -58,7 +58,7 @@ export const CUSTOMER_SIGN_IN_ACTOR: Actor = { kind: "system", id: "customer-sig
 export const SIGN_IN_BURST_ALERT = { kind: "customer_sign_in_burst", severity: "high" } as const;
 
 const CODE = /^DP\d{1,9}$/;
-const CLIENT_KEY = /^[0-9a-f]{32}$/;
+export const CLIENT_KEY = /^[0-9a-f]{32}$/;
 
 /** The code as the server compares it, or null when it is not one. */
 export function signInCode(typed: string): string | null {
@@ -67,7 +67,8 @@ export function signInCode(typed: string): string | null {
 }
 
 type CustomerRecord = typeof customers.$inferSelect;
-type Attempt = { readonly code: string; readonly clientKey: string };
+export type SignInAttempt = { readonly code: string; readonly clientKey: string };
+type Attempt = SignInAttempt;
 
 const customerWithCode = (db: LedgerDb, code: string): CustomerRecord | null => db.select().from(customers).where(eq(customers.customerCode, code)).get() ?? null;
 
@@ -102,13 +103,14 @@ function countClientFailure(db: LedgerDb, clientKey: string, clock: Clock): void
   db.insert(customerSignInClients).values({ clientKey, ...values }).onConflictDoUpdate({ target: customerSignInClients.clientKey, set: values }).run();
 }
 
-/** The later of the code's wait and the client's wait, or null. */
-function waiting(db: LedgerDb, attempt: Attempt, clock: Clock): string | null {
+/** The later of the code's wait and the client's wait, or null (also checked by a password change, Story 7.5). */
+export function signInWaiting(db: LedgerDb, attempt: Attempt, clock: Clock): string | null {
   const waits = [waitingUntil(codeThrottle(db, attempt), clock), clientWaitingUntil(db, attempt.clientKey, clock)].filter((w): w is string => w !== null);
   return waits.length === 0 ? null : (waits.sort().at(-1) ?? null);
 }
 
-function failed(db: LedgerDb, attempt: Attempt, target: CustomerRecord | null, deps: CustomerSignInDeps): CustomerSignIn {
+/** Counts one wrong password for the code and the client, audited for a real customer (also a password change, Story 7.5). */
+export function signInFailed(db: LedgerDb, attempt: Attempt, target: CustomerRecord | null, deps: Omit<CustomerSignInDeps, "verify">): CustomerSignIn {
   const { failures, lockedUntil } = countFailure(codeThrottle(db, attempt), deps.clock);
   countClientFailure(db, attempt.clientKey, deps.clock);
   if (target === null) deps.unknown.note();
@@ -129,10 +131,10 @@ function succeeded(db: LedgerDb, row: CustomerRecord, attempt: Attempt, deps: Cu
 
 /** Records the checked attempt; the customer is read once more, so a password issued meanwhile wins. */
 function record(db: LedgerDb, attempt: Attempt, hashChecked: string, passwordOk: boolean, deps: CustomerSignInDeps): CustomerSignIn {
-  const retryAt = waiting(db, attempt, deps.clock);
+  const retryAt = signInWaiting(db, attempt, deps.clock);
   if (retryAt !== null) return { outcome: "refused", reason: "waiting", retryAt };
   const target = customerWithCode(db, attempt.code);
-  if (!canSignIn(target) || target.passwordHash !== hashChecked || !passwordOk) return failed(db, attempt, target, deps);
+  if (!canSignIn(target) || target.passwordHash !== hashChecked || !passwordOk) return signInFailed(db, attempt, target, deps);
   return succeeded(db, target, attempt, deps);
 }
 
@@ -140,7 +142,7 @@ export async function signInCustomer(ledger: Ledger, input: CustomerSignInInput,
   const code = signInCode(input.customerCode);
   if (code === null || !CLIENT_KEY.test(input.clientKey) || input.password.length === 0 || input.password.length > MAX_PASSWORD_LENGTH) return { outcome: "refused", reason: "bad_credentials" };
   const attempt: Attempt = { code, clientKey: input.clientKey };
-  const retryAt = waiting(ledger.db, attempt, deps.clock);
+  const retryAt = signInWaiting(ledger.db, attempt, deps.clock);
   if (retryAt !== null) return { outcome: "refused", reason: "waiting", retryAt };
   const row = customerWithCode(ledger.db, code);
   const hash = canSignIn(row) ? row.passwordHash : DUMMY_HASH;

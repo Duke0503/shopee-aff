@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchesSearch, searchPattern, searchText, sortKey, LIKE_ESCAPE } from "../src/index";
+import { foldDiacritics, matchesSearch, searchPattern, searchText, sortKey, LIKE_ESCAPE } from "../src/index";
 
 describe("search_text (Story 1.9, AD-12, list-defects root cause 7)", () => {
   it("AC1: folds 'Nguyễn Thị Đào' to 'nguyenthidao' and the query 'nguyen thi dao' matches it", () => {
@@ -76,5 +76,12 @@ describe("sort_key (Story 1.9, Vietnamese collation)", () => {
 
   it("builds an ASCII key, so SQLite's binary collation gives the same order", () => {
     expect(sortKey("Nguyễn Thị Đào")).toMatch(/^[\x20-\x7e]*$/);
+  });
+});
+
+describe("foldDiacritics: the one Vietnamese fold (Story 7.5 review 10)", () => {
+  it("removes accents and turns both d-strokes into d, keeping case and spaces", () => {
+    expect(foldDiacritics("X\u00e1c Nh\u1eadn \u0110\u00e0o \u0111\u1ed3ng")).toBe("Xac Nhan Dao dong");
+    expect(foldDiacritics("NGUYEN 6789")).toBe("NGUYEN 6789");
   });
 });

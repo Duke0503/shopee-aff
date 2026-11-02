@@ -2,7 +2,9 @@
  * The composition of the customer website's server side (AD-18, AD-21; Stories 7.1 and 7.2): the
  * site status every page reads (assistant down, the fallback contact path, the assistant's chat),
  * the customer sign-in routes with their Origin check, client keys, burst watch and the hourly
- * housekeeping job, the signed-in customer's money, orders and payouts (Stories 7.3 and 7.4), and the built website itself when apps/web/dist exists (a dev start without a
+ * housekeeping job, the signed-in customer's money, orders and payouts (Stories 7.3 and 7.4), the
+ * account's bank form and password, the home page's link converter and the guide's figures
+ * (Stories 7.5 to 7.7), and the built website itself when apps/web/dist exists (a dev start without a
  * build serves the API only; the Vite dev server serves the pages then). The receipt, share and
  * proof routes stay as they are and win over the website's catch-all. Later customer stories add
  * their routes here.
@@ -17,7 +19,7 @@ import { customerSessionRoutes, runSignInHousekeeping, signInBurstWatch, unknown
 import { alertsFor, auditFor, siteStatusRoutes, type AssistantHeartbeats } from "../modules/operations/index";
 import type { ServerConfig } from "../platform/config/env.config";
 import { REPOSITORY_ROOT } from "../platform/config/env.config";
-import type { Ledger } from "../platform/db/ledger";
+import type { Ledger, LedgerDb } from "../platform/db/ledger";
 import { clientKeyer } from "../platform/http/client-key";
 import { siteOrigins } from "../platform/http/origin.guard";
 import type { PublicRoutes } from "../platform/http/servers";
@@ -25,7 +27,10 @@ import { staticBuildRoutes } from "../platform/http/static-site";
 import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
 import type { Job } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
+import { accountRoutes } from "./account.routes";
+import { guideRoutes } from "./guide.routes";
 import { myMoneyRoutes } from "./my-money.routes";
+import { webLinkRoutes } from "./web-link.routes";
 
 export const WEB_DIST = join(REPOSITORY_ROOT, "apps", "web", "dist");
 /** The website's Vite dev server (apps/web/vite.config.ts), allowed as an origin in dev only. */
@@ -50,6 +55,8 @@ export interface CustomerSiteDeps {
   readonly clock: Clock;
   readonly heartbeats: AssistantHeartbeats;
   readonly logger?: Logger;
+  /** The link converter's request id prefix and whether TikTok Shop links can be made (Story 7.6). */
+  readonly links?: { readonly requestIdPrefix: string; readonly tikTok: boolean };
   /** The build folder; apps/web/dist unless a test names another. */
   readonly dist?: string;
 }
@@ -63,11 +70,18 @@ export function customerSite(deps: CustomerSiteDeps): CustomerSite {
   const { config, ledger, clock } = deps;
   const unknown = unknownSignInTally();
   // Client keys need a secret that outlives the request; without FINGERPRINT_KEY (dev) one per process.
-  const clientKey = clientKeyer(config.fingerprintKey ?? randomBytes(32).toString("hex"));
+  const secret = config.fingerprintKey ?? randomBytes(32).toString("hex");
+  const clientKey = clientKeyer(secret);
+  const origins = customerOrigins(config);
+  // One throttle for sign-in and the password change: a wrong current password counts like a wrong sign-in.
+  const throttle = { clock, auditFor: (db: LedgerDb) => auditFor(db, clock), alertsFor: (db: LedgerDb) => alertsFor(db, clock, deps.logger), burst: signInBurstWatch(), unknown };
   const routes: PublicRoutes[] = [
     siteStatusRoutes({ heartbeats: deps.heartbeats, fallbackContactUrl: config.fallbackContactUrl, assistantUrl: config.zaloAssistantUrl }),
-    customerSessionRoutes({ ledger, clock, auditFor: (db) => auditFor(db, clock), alertsFor: (db) => alertsFor(db, clock, deps.logger), burst: signInBurstWatch(), unknown, clientKey, origins: customerOrigins(config) }),
+    customerSessionRoutes({ ledger, ...throttle, clientKey, origins }),
     myMoneyRoutes({ ledger, clock }),
+    accountRoutes({ ledger, ...throttle, fingerprintKey: config.fingerprintKey, origins, clientKey }),
+    webLinkRoutes({ ledger, clock, origins, ...(deps.links ?? { requestIdPrefix: "", tikTok: false }), ticketSecret: secret, clientKey, ...(deps.logger ? { logger: deps.logger } : {}) }),
+    guideRoutes(),
   ];
   const dist = deps.dist ?? WEB_DIST;
   if (existsSync(join(dist, "index.html"))) routes.push(staticBuildRoutes({ kind: "site", root: dist, pagePaths: Object.values(CUSTOMER_PATHS), otherHosts: config.staffAccess ? [config.staffAccess.adminHost] : [] }));
