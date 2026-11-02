@@ -54,7 +54,12 @@ export function preflightVerdict(facts: PreflightFacts): PreflightVerdict {
   }
   if (facts.committed === null) problems.push("secrets_unchecked:main_ref_not_found");
   else for (const key of facts.committed) problems.push(`secrets_committed:${key}`);
-  for (const key of facts.carriedCommitted) problems.push(`secrets_committed:${key}`);
+  // The owner may keep a carried key whose live value was committed on main (2026-11-02 decision:
+  // keep the existing Telegram bot); it must be named in the accepted list and is reported.
+  for (const key of facts.carriedCommitted) {
+    if (facts.acceptedGaps.includes(key)) openGaps.push(`${key}:committed_kept`);
+    else problems.push(`secrets_committed:${key}`);
+  }
   const carriedSecrets: readonly string[] = CARRIED_SECRET_KEYS;
   for (const key of facts.shared) if (!carriedSecrets.includes(key)) problems.push(`secrets_shared:${key}`);
   for (const file of facts.missingBuilds) problems.push(`build_missing:${file}`);

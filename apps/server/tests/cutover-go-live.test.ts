@@ -254,6 +254,9 @@ describe("Story 8.8: carry-over and preflight never print a secret", () => {
     expect(preflightVerdict({ ...facts, acceptedGaps: [] }).problems).toEqual(["settings_missing:ADMIN_HOST+ACCESS_TEAM_DOMAIN+ACCESS_AUDIENCE"]);
     expect(preflightVerdict({ ...facts, shared: ["INTERNAL_TOKEN"] }).problems).toEqual(["secrets_shared:INTERNAL_TOKEN"]);
     expect(preflightVerdict({ ...facts, carriedCommitted: ["TELEGRAM_BOT_TOKEN"], committed: null, missingBuilds: ["apps/web/dist/index.html"] }).problems).toEqual(["secrets_unchecked:main_ref_not_found", "secrets_committed:TELEGRAM_BOT_TOKEN", "build_missing:apps/web/dist/index.html"]);
+    const kept = preflightVerdict({ ...facts, carriedCommitted: ["TELEGRAM_BOT_TOKEN"], acceptedGaps: [...facts.acceptedGaps, "TELEGRAM_BOT_TOKEN"] });
+    expect(kept.problems).toEqual([]);
+    expect(kept.openGaps).toContain("TELEGRAM_BOT_TOKEN:committed_kept");
   });
 });
 
