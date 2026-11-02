@@ -257,6 +257,8 @@ describe("Story 8.8: carry-over and preflight never print a secret", () => {
     const kept = preflightVerdict({ ...facts, carriedCommitted: ["TELEGRAM_BOT_TOKEN"], acceptedGaps: [...facts.acceptedGaps, "TELEGRAM_BOT_TOKEN"] });
     expect(kept.problems).toEqual([]);
     expect(kept.openGaps).toContain("TELEGRAM_BOT_TOKEN:committed_kept");
+    const keptInFile = preflightVerdict({ ...facts, committed: ["TELEGRAM_BOT_TOKEN"], acceptedGaps: [...facts.acceptedGaps, "TELEGRAM_BOT_TOKEN"] });
+    expect(keptInFile.problems).toEqual([]);
   });
 });
 
