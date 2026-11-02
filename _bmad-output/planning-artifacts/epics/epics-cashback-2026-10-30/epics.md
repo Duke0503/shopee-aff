@@ -152,7 +152,7 @@ From the architecture spine (AD-1 to AD-29), the code rules and the security mod
 - Shared Zod contracts and one error envelope (AD-20); two SPAs plus server-rendered share and receipt pages; proof images re-encoded and never public (AD-21).
 - One adapter per network with explicit status maps golden-tested on real rows (AD-22); immutable customer ids, DP codes, aliases, merge that moves nothing (AD-23).
 - Cutover import, per-column time table, seeded dedup keys, shadow parity, day-one sequence, 72-hour window (AD-24).
-- Host processes on the Mac under launchd, separated dev environment with DEV sub_id1 prefix (AD-25); backups with restore check, age and rclone to Google Drive (AD-26); pino with redaction, Telegram alerts with cooldowns, one health model (AD-27); external heartbeat (AD-29).
+- Host processes on the Windows VPS (D61), separated dev environment with DEV sub_id1 prefix (AD-25); backups with restore check, age and rclone to Google Drive (AD-26); pino with redaction, Telegram alerts with cooldowns, one health model (AD-27); external heartbeat (AD-29).
 - v1 cutover scope and build order (AD-28, D53).
 - Required checks before merge: typecheck, lint (naming, size, boundaries), depcruise, tests (golden and registry), secret scan (code.md §11).
 
@@ -295,7 +295,7 @@ A customer can sign in on the phone, see the money they are owed and every order
 **FRs covered:** FR-2, FR-3, FR-9, FR-10 (web), FR-15, FR-36 (banner), FR-37, NFR-2, NFR-3.
 
 ### Epic 8: Operations, rehearsal and go-live
-The owner can run production unattended on the Mac with separated dev, daily off-site backups that are checked, alerts and an external heartbeat, then rehearse and perform the cutover with a 72-hour no-payout window.
+The owner can run production unattended on the Windows VPS with separated dev, daily off-site backups that are checked, alerts and an external heartbeat, then rehearse and perform the cutover with a 72-hour no-payout window.
 **FRs covered:** FR-30, FR-32, FR-33 (rehearsal and day one), NFR-4, NFR-5.
 
 ### Epic 9: After cutover (deferred)
@@ -1578,7 +1578,7 @@ As a customer, I want a guide that explains the steps, the chat commands and how
 
 ## Epic 8: Operations, rehearsal and go-live
 
-The owner can run production unattended on the Mac with a separated dev environment, daily off-site
+The owner can run production unattended on the Windows VPS with a separated dev environment, daily off-site
 backups that are checked, alerts and an external heartbeat, then rehearse and perform the cutover
 with a 72-hour no-payout window. Spine build step 6 (AD-25, AD-26, AD-27, AD-29, AD-24 day one).
 Story 8.1 can be scheduled as soon as Epic 1 is done; it is planned before the bridge and assistant
@@ -1602,7 +1602,7 @@ As a developer, I want a dev environment with its own ports, database, secrets f
 
 ### Story 8.2: Daily and off-site encrypted backups that check their own restore
 
-As the owner, I want the ledger and proof images backed up every day, checked by a restore, encrypted and copied to Google Drive, so that losing the Mac never loses the money records.
+As the owner, I want the ledger and proof images backed up every day, checked by a restore, encrypted and copied to Google Drive, so that losing the VPS never loses the money records.
 
 **Context:** The backup job (03:00 Vietnam time and before every migration): SQLite online backup of the ledger with `data/<env>/files/`, `integrity_check`, restore into a temporary file and compare row counts, encrypt with age to the owner's public key, copy to Google Drive with rclone; retention 30 daily and 12 monthly. The off-site step never gates migrations. Any failure raises a high alert and shows on the Overview. Secrets and cloudflared credentials are not in the backup. Realises FR-32, FR-30. Follows AD-26, AD-13, AD-27. Decisions: D36, D52.
 **Screens:** none (health line on the Overview). **Skills:** cashback-infra, cashback-security-model.
@@ -1631,11 +1631,11 @@ As the owner, I want alerts on Telegram only when something needs me, with coold
 3. Given an alert text, when it is built, then it contains no personal data, bank number or token.
 4. Given Telegram unreachable, when an alert is due, then it is retried and the failure is logged, without blocking any command.
 
-### Story 8.4: External heartbeat alerts when the Mac goes silent
+### Story 8.4: External heartbeat alerts when the production host goes silent
 
-As the owner, I want an outside checker to alert me when the server stops reporting, so that a power cut, sleep or FileVault reboot never goes unnoticed.
+As the owner, I want an outside checker to alert me when the server stops reporting, so that a VPS outage, a lost internet link or a Windows Update reboot never goes unnoticed.
 
-**Context:** The server pings the external heartbeat checker (healthchecks.io free tier or a Cloudflare Worker cron) every 5 minutes while its health model is green; the checker alerts the owner on Telegram after 15 minutes of silence. The Mac is set with `pmset` to never sleep and to restart after power failure; the runbook has the FileVault reboot step. Realises FR-30, NFR-4. Follows AD-29. Decisions: D50.
+**Context:** The server pings the external heartbeat checker (healthchecks.io free tier or a Cloudflare Worker cron) every 5 minutes while its health model is green; the checker alerts the owner on Telegram after 15 minutes of silence. The VPS signs in automatically after a reboot and Windows Update has active hours and a restart window; the runbook has the after-reboot checks (D61). Realises FR-30, NFR-4. Follows AD-29. Decisions: D50, D61.
 **Screens:** none. **Skills:** cashback-infra.
 **Blocked by:** Story 8.3.
 **Size:** S
@@ -1644,19 +1644,19 @@ As the owner, I want an outside checker to alert me when the server stops report
 1. Given a green health model, when 5 minutes pass, then one ping reaches the heartbeat URL from config.
 2. Given a red health model, when the ping is due, then no ping is sent, so the checker alerts.
 3. Given the server stopped for 15 minutes in a test, when the checker evaluates, then the owner receives the Telegram alert (recorded manual test).
-4. Given the runbook, when it is read, then it contains the `pmset` settings and the FileVault reboot step.
+4. Given the runbook, when it is read, then it contains the auto-logon and Windows Update settings and the after-reboot checks (tasks running, tunnel service running, affiliate Edge open and signed in).
 
-### Story 8.5: Production host services on the Mac behind the tunnel
+### Story 8.5: Production host services on the Windows VPS behind the tunnel
 
-As the owner, I want production to run as launchd services on the Mac behind the Cloudflare tunnel with Access and rate limits, so that it restarts on its own and only the public listener is reachable.
+As the owner, I want production to run as Task Scheduler tasks and Windows services on the VPS behind the Cloudflare tunnel with Access and rate limits, so that it restarts on its own and only the public listener is reachable.
 
-**Context:** Server, assistant and cloudflared as launchd services; the affiliate Chrome as a LaunchAgent in the logged-in GUI session with its own profile; tunnel config exposes only 127.0.0.1:8080; the admin host behind Cloudflare Access; Cloudflare rate-limiting and WAF rules on `/api/session` and the link endpoints; production env file outside the repository; start and stop act on recorded PIDs. No containers in v1. Realises NFR-4, NFR-5. Follows AD-25, AD-18, AD-19. Decisions: D37, D48, D51.
+**Context:** Server and assistant as Task Scheduler tasks with a boot trigger, cloudflared as a Windows service; the affiliate Edge in the signed-in desktop session with its own profile, started by a log-on task after auto-logon (D61); the live tasks `CashbackBackend` and `CashbackAssistant` keep running beside it until cutover; tunnel config exposes only 127.0.0.1:8080; the admin host behind Cloudflare Access; Cloudflare rate-limiting and WAF rules on `/api/session` and the link endpoints; production env file outside the repository; start and stop act on recorded PIDs. No containers in v1. Realises NFR-4, NFR-5. Follows AD-25, AD-18, AD-19. Decisions: D37, D48, D51, D61.
 **Screens:** none. **Skills:** cashback-infra, cashback-security-model.
 **Blocked by:** Story 8.1, Story 4.2.
 **Size:** M
 
 **Acceptance criteria**
-1. Given the Mac rebooted and unlocked, when the login session starts, then the server, assistant, cloudflared and the affiliate Chrome start without manual steps.
+1. Given the VPS rebooted, when Windows starts and signs in automatically, then the server, assistant, cloudflared and the affiliate Edge start without manual steps.
 2. Given the tunnel config, when it is inspected, then only 127.0.0.1:8080 is exposed; a request to the internal port from outside fails.
 3. Given a request to the admin host without Cloudflare Access, when it is made, then Access blocks it; with Access and no staff session, the server returns 401.
 4. Given a burst of requests to `/api/session` above the configured rate, when they arrive, then Cloudflare limits them.

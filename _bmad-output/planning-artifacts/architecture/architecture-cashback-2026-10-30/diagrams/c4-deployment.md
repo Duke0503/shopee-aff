@@ -1,6 +1,6 @@
 # C4 Deployment — Production and development
 
-Legend: production runs on one operator machine (currently a Mac) as host processes under launchd;
+Legend: production runs on one Windows Server 2022 VPS as host processes (Task Scheduler tasks and Windows services, D61);
 there are no containers in v1 (AD-25). Only the public listener is reachable from the internet, and
 only through the Cloudflare tunnel. Development runs on a separate machine or the same machine with
 every resource different (ports, database, Zalo account, Chrome profile, no tunnel). Revised
@@ -25,7 +25,7 @@ C4Deployment
     Container(edge, "Tunnel + Access", "Cloudflare", "TLS, hoantiendp.com and admin host; Access gate on admin host")
   }
 
-  Deployment_Node(host, "Operator machine", "macOS, launchd, pmset no sleep, FileVault, one production instance") {
+  Deployment_Node(host, "Production VPS", "Windows Server 2022, Task Scheduler and services, auto-logon, one production instance") {
     Container(cloudflared, "cloudflared", "launchd service", "Outbound tunnel to 127.0.0.1:8080")
     Container(serverp, "Server", "Node 24, launchd service", "Public 127.0.0.1:8080, internal 127.0.0.1:8081, all jobs, lock file data/prod/server.lock")
     ContainerDb(dbp, "Ledger", "SQLite WAL file", "data/prod/cashback.db and data/prod/files/, local disk only")

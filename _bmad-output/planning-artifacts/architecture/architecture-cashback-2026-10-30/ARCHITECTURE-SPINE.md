@@ -271,7 +271,7 @@ and `payouts` publish events that `campaigns` and `messaging` consume in the sam
 
 - **Binds:** NFR-4, D37, constraints "Host" and "Cost", cashback-infra rules 1, 2, 10
 - **Prevents:** two production instances; dev touching the production Zalo account, database or affiliate session; dev links reconciling into production; stop scripts killing the wrong process
-- **Rule:** Production runs on the operator's Mac as host processes: server, assistant and cloudflared as launchd services, and the affiliate Chrome as a launchd LaunchAgent in the logged-in GUI session with its own profile. No containers in v1. Start and stop scripts act only on the PIDs they recorded; the server lock file (AD-13) refuses a second instance. Development differs in every resource (ports 9080/9081, database, its own Zalo account or the fake client (D37), the fake bridge or a Chrome profile never signed in to the production Shopee account, no tunnel, empty PUBLIC_BASE_URL, own secrets file), as listed in `diagrams/c4-deployment.md`. Dev sub_id1 values carry a `DEV` prefix, which production attribution never resolves, so a stray dev link reaches production only as a review case.
+- **Rule:** Production runs on the Windows Server 2022 VPS as host processes (D61): server and assistant as Task Scheduler tasks with a boot trigger, cloudflared as a Windows service, and the affiliate Edge in the signed-in desktop session with its own profile, started by a log-on task after Windows auto-logon. No containers in v1. Start and stop scripts act only on the PIDs they recorded; the server lock file (AD-13) refuses a second instance. Development differs in every resource (ports 9080/9081, database, its own Zalo account or the fake client (D37), the fake bridge or a Chrome profile never signed in to the production Shopee account, no tunnel, empty PUBLIC_BASE_URL, own secrets file), as listed in `diagrams/c4-deployment.md`. Dev sub_id1 values carry a `DEV` prefix, which production attribution never resolves, so a stray dev link reaches production only as a review case.
 
 ### AD-26 — Backups before migrations, daily, off the machine, checked automatically (revised 2026-10-30 after independent review)
 
@@ -294,8 +294,8 @@ and `payouts` publish events that `campaigns` and `messaging` consume in the sam
 ### AD-29 — Liveness checked from outside the machine
 
 - **Binds:** FR-30, NFR-4, D37, D50
-- **Prevents:** total silence when the Mac loses power, sleeps, loses its internet, or waits at the FileVault pre-boot screen after a reboot
-- **Rule:** The server pings an external heartbeat checker (healthchecks.io free tier, or a Cloudflare Worker cron) every 5 minutes while its health model is green; the checker alerts the owner on Telegram when pings stop for 15 minutes. The Mac is set with `pmset` to never sleep and to restart after a power failure, sits on a UPS if possible, and the runbook has a FileVault reboot step (someone types the password at the machine, then the LaunchAgents start Chrome and the services).
+- **Prevents:** total silence when the VPS is down, loses its internet, reboots for Windows Update, or comes back without the desktop session signed in
+- **Rule:** The server pings an external heartbeat checker (healthchecks.io free tier, or a Cloudflare Worker cron) every 5 minutes while its health model is green; the checker alerts the owner on Telegram when pings stop for 15 minutes. The VPS signs the operator in automatically after a reboot (Windows auto-logon, password in LSA secrets), Windows Update has active hours and a restart window, and the runbook has the steps to check the tasks, the tunnel service and the affiliate Edge after a reboot (D61).
 
 ## Consistency Conventions
 
@@ -470,7 +470,7 @@ C4 views: [Context](diagrams/c4-context.md), [Container](diagrams/c4-container.m
 
 - **PostgreSQL.** Revisit only when a second writer process is needed (AD-2, D33).
 - **Redis or any broker.** The link queue and outbox are tables; revisit if a second server process is ever needed.
-- **Containers (Docker Compose).** Host processes are simpler on one Mac with a host Chrome and Zalo session; revisit when the server moves to a VPS. cashback-infra compose rules apply then.
+- **Containers (Docker Compose).** Host processes are simpler on one Windows VPS with a host Edge and Zalo session (D61); revisit if the host changes. cashback-infra compose rules apply then.
 - **AccessTrade postback webhook.** Hourly polling meets FR-12; the webhook can be added behind the same `ReportSource` port.
 - **Staging with its own Zalo account.** Out of MVP scope (PRD §8.2); a dev environment with its own Zalo account exists before the rehearsal (D37).
 - **Screens after cutover.** The FR list in AD-28 "after cutover", and the PRD Release scope section.
