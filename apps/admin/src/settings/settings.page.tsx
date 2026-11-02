@@ -84,9 +84,9 @@ function PeriodRow({ period, current, shown, saving, onToggle }: { readonly peri
   return (
     <li data-period={keyOf(period)} className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
       <span className="flex min-w-0 flex-col">
-        <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
+        <span className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] font-semibold">
           <span className="tabular-nums">{name}</span>
-          {current && <span className="rounded-sm bg-secondary px-1.5 text-caption font-medium text-secondary-foreground">{adminText("settings_current")}</span>}
+          {current && <span className="rounded-full bg-secondary px-2 text-caption font-medium text-secondary-foreground">{adminText("settings_current")}</span>}
         </span>
         {period.editable && <span className="text-meta text-muted-foreground">{adminText("settings_withheld_switch")}</span>}
         {period.editable && (
@@ -103,7 +103,7 @@ function PeriodRow({ period, current, shown, saving, onToggle }: { readonly peri
           <Switch checked={shown} disabled={saving} label={adminText("settings_withheld_switch_aria", { period: name, network })} onToggle={onToggle} />
         </span>
       ) : (
-        <span className="shrink-0 text-sm font-medium">{adminText("settings_always_withheld")}</span>
+        <span className="shrink-0 text-meta text-muted-foreground">{adminText("settings_always_withheld")}</span>
       )}
     </li>
   );
@@ -138,9 +138,9 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title={adminText("nav_settings")} lead={adminText("settings_lead")} />
-      <section aria-labelledby="periods-title" className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4">
+      <section aria-labelledby="periods-title" className="flex max-w-[760px] min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-5">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 id="periods-title" className="text-base font-semibold">
+          <h2 id="periods-title" className="text-[17px] font-bold">
             {adminText("settings_periods_title")}
           </h2>
           <p className="text-sm break-words text-muted-foreground">{adminText("settings_periods_hint")}</p>

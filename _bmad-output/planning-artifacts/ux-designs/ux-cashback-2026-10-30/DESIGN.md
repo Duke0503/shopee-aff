@@ -33,6 +33,7 @@ colors:
   destructive: '#B91C1C'
   destructive-foreground: '#FFFFFF'
   brand-mark: '#059669'
+  ink: '#0B1F17'
   # Brand-specific tokens with no shadcn slot.
   money: '#047857'
   money-soft: '#ECFDF5'

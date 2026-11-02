@@ -33,11 +33,11 @@ function ProfitCard({ b, segments }: { readonly b: Business; readonly segments: 
   const margin = formatBps(b.margin.bps);
   return (
     <Card>
-      <p className="text-sm font-medium text-muted-foreground">{adminText("ov_profit")}</p>
+      <p className="text-meta text-muted-foreground">{adminText("ov_profit")}</p>
       {b.totalProfit.value === null ? (
         <MissingValue className="text-[48px] leading-none" />
       ) : (
-        <span data-profit className={cn("text-[44px] leading-none font-bold tracking-tight break-all md:text-[52px]", b.totalProfit.value < 0 ? "text-status-rejected" : "text-money")}>
+        <span data-profit className={cn("text-[36px] leading-none font-bold tracking-tight break-all md:text-[40px]", b.totalProfit.value < 0 ? "text-status-rejected" : "text-money")}>
           {b.totalProfit.value < 0 ? "\u2212" : ""}
           {formatMoney(Math.abs(b.totalProfit.value))}
         </span>
@@ -72,11 +72,11 @@ function ProfitCard({ b, segments }: { readonly b: Business; readonly segments: 
 
 function Line({ label, amount, definition, swatch, minus = false, name }: { readonly label: string; readonly amount: number | null; readonly definition: string; readonly swatch?: string; readonly minus?: boolean; readonly name: string }) {
   return (
-    <li data-line={name} className="flex min-w-0 items-start justify-between gap-3 py-2">
+    <li data-line={name} className="flex min-w-0 items-start justify-between gap-3 py-2.5">
       <div className="flex min-w-0 items-start gap-2">
         <span aria-hidden className={cn("mt-1.5 size-2.5 shrink-0 rounded-sm", swatch ?? "bg-transparent")} />
         <div className="min-w-0">
-          <p className="text-sm font-medium break-words">{label}</p>
+          <p className="text-[15px] break-words">{label}</p>
           <p className="text-meta break-words text-muted-foreground">{definition}</p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export function BusinessBlock({ b }: { readonly b: Business }) {
   const taxDef = b.withheldPeriods.length === 0 ? adminText("ov_line_tax_none") : adminText("ov_line_tax_def", { periods: b.withheldPeriods.map((p) => `${p.slice(5, 7)}/${p.slice(0, 4)}`).join(", ") });
   return (
     <Block title={adminText("ov_business_title")} basis={adminText("ov_business_basis")}>
-      <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="grid min-w-0 grid-cols-1 gap-5">
         <ProfitCard b={b} segments={segments} />
         <Card>
           <ul className="flex min-w-0 flex-col divide-y divide-border">

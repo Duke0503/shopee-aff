@@ -38,7 +38,8 @@ describe("Story 4.17 acceptance criteria on the desk", () => {
     const eight: Overview = { ...GOLDEN, todo: { ...GOLDEN.todo, payable: { customers: 8, amount: 412580 } } };
     await overview("/admin/", overviewServer(() => eight));
     const tile = document.querySelector('[data-todo="payable"]') as HTMLAnchorElement;
-    expect(tile).toHaveTextContent(adminText("ov_todo_payable_value", { count: "8", amount: formatMoney(412580) ?? "" }));
+    expect(tile).toHaveTextContent(adminText("ov_todo_payable_value", { count: "8" }));
+    expect(tile).toHaveTextContent(formatMoney(412580) ?? "");
     expect(tile.getAttribute("href")).toBe("/admin/payouts?filter[queue]=PAYABLE");
     expect((document.querySelector('[data-todo="no-bank"]') as HTMLAnchorElement).getAttribute("href")).toBe("/admin/payouts?filter[queue]=ACTION");
   });

@@ -15,8 +15,8 @@ import { Block, Card, CountChange, RatioValue } from "./overview-parts";
 function CountCard({ label, figure, definition }: { readonly label: string; readonly figure: Overview["customers"]["withOrder"]; readonly definition: string }) {
   return (
     <Card>
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <span className="text-lg font-semibold">{figure.value === null ? "\u2013" : adminText("ov_count_customers", { count: formatCount(figure.value) })}</span>
+      <p className="text-meta text-muted-foreground">{label}</p>
+      <span className="text-xl font-bold">{figure.value === null ? "\u2013" : adminText("ov_count_customers", { count: formatCount(figure.value) })}</span>
       <p className="text-meta text-muted-foreground">{definition}</p>
       <div className="mt-auto pt-1">
         <CountChange figure={figure} />
@@ -33,11 +33,11 @@ export function CustomersBlock({ customers }: { readonly customers: Overview["cu
           {adminText("ov_concentration", { code: customers.concentration.customerCode ?? "", share: formatBps(customers.concentration.shareBps) ?? "" })}
         </p>
       )}
-      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
         <CountCard label={adminText("ov_with_order")} figure={customers.withOrder} definition={adminText("ov_with_order_def")} />
         <CountCard label={adminText("ov_new_customers")} figure={customers.newCustomers} definition={adminText("ov_new_customers_def")} />
         <Card>
-          <p className="text-sm font-medium text-muted-foreground">{adminText("ov_repeat")}</p>
+          <p className="text-meta text-muted-foreground">{adminText("ov_repeat")}</p>
           <span className="text-lg">
             <RatioValue ratio={customers.repeatShare} />
           </span>
@@ -67,7 +67,7 @@ const WORD_COLOUR: Record<OverviewHealth["state"], string> = { up: "text-muted-f
 export function HealthLine({ health }: { readonly health: readonly OverviewHealth[] }) {
   const down = health.filter(needsOwner);
   return (
-    <Block title={adminText("ov_health_title")}>
+    <Block title={adminText("ov_health_title")} plain>
       <ul data-health className="flex min-w-0 flex-wrap gap-x-5 gap-y-2 text-sm">
         {health.map((h) => (
           <li key={h.component} data-component={h.component} data-state={h.state} className="flex min-w-0 flex-wrap items-center gap-1.5">

@@ -16,7 +16,7 @@
  * (Story 4.9); closing the panel forgets a proof not yet sent.
  */
 import type { PayoutConfirmResponse, PayoutQueueRow } from "@cashback/contracts";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Skeleton, useLayout } from "@cashback/ui";
+import { CodeChip, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Skeleton, useLayout } from "@cashback/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError } from "../api/api.queries";
@@ -95,6 +95,21 @@ function PanelBody({ open, confirm, changed, onAck, onStale, onConfirm, onDone, 
   );
 }
 
+/** The panel's title, then the customer code as a chip and the bank with the masked account (wireframe payout panel). */
+function PanelHeader({ row, title }: { readonly row: PayoutQueueRow | null; readonly title: string }) {
+  return (
+    <SheetHeader className="gap-1.5 px-6 pt-6 pr-14 pb-2">
+      <SheetTitle className="text-xl leading-tight font-bold break-words">{title}</SheetTitle>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {row?.customerCode != null && <CodeChip code={row.customerCode} />}
+        <SheetDescription className="text-[15px] text-muted-foreground">
+          {row?.bankName ?? ""} {row?.accountLastFour == null ? "" : adminText("payout_masked_account", { lastFour: row.accountLastFour })}
+        </SheetDescription>
+      </div>
+    </SheetHeader>
+  );
+}
+
 /** The confirm step's state: the confirm call, and the "amount changed" notice until it is acknowledged. */
 function useConfirmStep(open: ReturnType<typeof useOpenPayout>, reload: () => void) {
   const confirm = useConfirmPayout();
@@ -168,15 +183,12 @@ export function PayoutPanel({ row, onClose }: PayoutPanelProps) {
         side={phone ? "bottom" : "right"}
         className={
           phone
-            ? "h-dvh max-h-dvh gap-0 overflow-y-auto rounded-none data-[side=bottom]:h-dvh"
+            ? "h-[calc(100dvh-48px)] max-h-dvh gap-0 overflow-y-auto rounded-t-2xl data-[side=bottom]:h-[calc(100dvh-48px)]"
             : "gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:max-w-[480px] data-[side=right]:sm:max-w-[480px]"
         }
       >
-        <SheetHeader className="border-b border-border pr-12">
-          <SheetTitle className="text-lg font-semibold break-words">{adminText(netting ? "panel_title_netting" : "panel_title", { name })}</SheetTitle>
-          <SheetDescription>{row?.customerCode ?? ""}</SheetDescription>
-        </SheetHeader>
-        <div data-panel={phone ? "drawer" : "sheet"} className="min-w-0 p-4">
+        <PanelHeader row={row} title={adminText(netting ? "panel_title_netting" : "panel_title", { name })} />
+        <div data-panel={phone ? "drawer" : "sheet"} className="flex min-w-0 flex-1 flex-col px-6 pt-2 pb-6">
           <PanelBody open={open} confirm={step.confirm} changed={step.changed} onAck={step.ack} onStale={reload} onConfirm={step.submit} onDone={close} proof={proof} onProof={setProof} />
         </div>
       </SheetContent>

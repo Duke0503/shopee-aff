@@ -186,7 +186,8 @@ describe("Story 4.5 AC5: phone at 390 px shows cards, the sort Select and the fi
     const sheet = await screen.findByRole("dialog");
     expect(within(sheet).getByRole("button", { name: `${statusLabel("status_approved")} 3` })).toBeInTheDocument();
     expect(within(sheet).getByRole("button", { name: `${statusLabel("status_awaiting_approval")} 0` })).toBeInTheDocument();
-    await user.click(within(sheet).getByRole("button", { name: uiText("list_filters_done") }));
+    // The sheet's button names the filtered count it will show (wireframe "show N orders").
+    await user.click(within(sheet).getByRole("button", { name: new RegExp(`^${uiText("list_filters_show", { summary: "" })}`) }));
 
     const sort = screen.getByRole("combobox", { name: uiText("list_sort_label") });
     expect(within(sort).getAllByRole("option")).toHaveLength(8);

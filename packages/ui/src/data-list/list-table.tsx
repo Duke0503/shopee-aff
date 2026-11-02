@@ -24,7 +24,7 @@ const features = tableFeatures({});
  */
 const WIDTH: Readonly<Record<ColumnKind, number | null>> = {
   code: 120,
-  status: 156,
+  status: 148,
   money: 112,
   instant: 108,
   integer: 96,
@@ -87,7 +87,7 @@ export function ListTable<R extends RowData>({ columns, rows, rowKey, sort, onSo
       <TableHeader className="bg-muted">
         <TableRow className="hover:bg-muted">
           {columns.map((column) => (
-            <TableHead key={column.key} aria-sort={ariaSortOf(column, sort)} style={columnWidth(column) === null ? undefined : { width: columnWidth(column) ?? undefined }} className={cn("h-11 px-3 py-1 text-[13px] whitespace-normal", isNumeric(column.kind) && "text-right")}>
+            <TableHead key={column.key} aria-sort={ariaSortOf(column, sort)} style={columnWidth(column) === null ? undefined : { width: columnWidth(column) ?? undefined }} className={cn("h-10 px-3 py-1 text-[13px] font-medium whitespace-normal text-muted-foreground", isNumeric(column.kind) && "text-right")}>
               <HeaderContent column={column} sort={sort} onSort={onSort} />
             </TableHead>
           ))}
@@ -95,11 +95,11 @@ export function ListTable<R extends RowData>({ columns, rows, rowKey, sort, onSo
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id} className="h-11">
+          <TableRow key={row.id} className="h-[52px]">
             {row.getAllCells().map((cell) => {
               const column = byId.get(cell.column.id);
               return (
-                <TableCell key={cell.id} className={cn("px-3 py-1.5 text-[13px]", column !== undefined && isNumeric(column.kind) && "text-right")}>
+                <TableCell key={cell.id} className={cn("px-3 py-2 text-sm", column !== undefined && isNumeric(column.kind) && "text-right")}>
                   <table.FlexRender cell={cell} />
                 </TableCell>
               );

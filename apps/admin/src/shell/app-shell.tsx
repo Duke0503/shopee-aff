@@ -1,6 +1,6 @@
 /**
- * The admin desk shell (Story 4.4, UX-DR4): sidebar from 1280 px, icon rail from 768 px, top bar
- * and bottom tabs below. The same pages at every width; only the navigation is re-composed.
+ * The admin desk shell (Story 4.4, UX-DR4): sidebar from 1280 px, icon rail from 768 px, bottom
+ * tabs below, where each page's header is the top bar (page-header.tsx). The same pages at every width; only the navigation is re-composed.
  * A skip link jumps past the navigation to the page.
  */
 import type { StaffSessionResponse } from "@cashback/contracts";
@@ -9,7 +9,6 @@ import type { ReactNode } from "react";
 
 import { adminText } from "../labels";
 import { BottomTabs } from "./bottom-tabs";
-import { BrandMark } from "./brand-mark";
 import { IconRail } from "./icon-rail";
 import { visibleItems } from "./nav-items";
 import { Sidebar } from "./sidebar";
@@ -27,20 +26,6 @@ function SkipLink() {
     <a href="#main" className="sr-only z-50 rounded-md bg-card px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:ring-3 focus:ring-ring/60">
       {adminText("skip_to_content")}
     </a>
-  );
-}
-
-function PhoneTopBar() {
-  return (
-    <header className="sticky top-0 z-30 border-b border-border bg-card pt-[env(safe-area-inset-top)]">
-      <div className="flex h-14 items-center gap-2.5 px-4">
-        <BrandMark className="size-[30px]" />
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold">{adminText("brand_name")}</p>
-          <p className="truncate text-caption text-muted-foreground">{adminText("brand_desk")}</p>
-        </div>
-      </div>
-    </header>
   );
 }
 
@@ -63,7 +48,6 @@ export function AppShell({ staff, onSignOut, notice = null, children }: AppShell
     return (
       <div data-layout="phone" className="min-h-dvh bg-background">
         <SkipLink />
-        <PhoneTopBar />
         {main("px-4 pt-4 pb-[calc(56px+env(safe-area-inset-bottom)+24px)]")}
         <BottomTabs {...nav} />
       </div>
@@ -73,7 +57,7 @@ export function AppShell({ staff, onSignOut, notice = null, children }: AppShell
     <div data-layout={layout} className="flex min-h-dvh bg-background">
       <SkipLink />
       {layout === "desktop" ? <Sidebar {...nav} /> : <IconRail {...nav} />}
-      {main(layout === "desktop" ? "px-8 py-6" : "px-6 py-5")}
+      {main(layout === "desktop" ? "px-8 pt-7 pb-10" : "px-6 pt-6 pb-8")}
     </div>
   );
 }

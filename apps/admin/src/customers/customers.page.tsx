@@ -45,7 +45,7 @@ function NameLink({
       params={{ customerKey: customerKeyOf(row) }}
       aria-label={adminText("customer_open_aria", { name: nameOf(row) })}
       className={cn(
-        "block min-w-0 font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        "block min-w-0 text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
         wrap ? "break-words" : "truncate",
       )}
       title={nameOf(row)}

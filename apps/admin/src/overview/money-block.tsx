@@ -15,10 +15,10 @@ type Money = Overview["money"];
 function NowFigure({ label, amount, definition, estimate = false, name, extra }: { readonly label: string; readonly amount: number; readonly definition: string; readonly estimate?: boolean; readonly name: string; readonly extra?: string }) {
   return (
     <Card>
-      <p data-now={name} className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p data-now={name} className="text-meta text-muted-foreground">{label}</p>
       <MoneyFigure amount={amount} size="md" estimate={estimate} />
       {extra !== undefined && <p data-processing className="text-sm break-words">{extra}</p>}
-      <p className="mt-auto text-meta text-muted-foreground">{definition}</p>
+      <p className="text-meta text-muted-foreground">{definition}</p>
     </Card>
   );
 }
@@ -27,7 +27,7 @@ function Cash({ cash }: { readonly cash: Money["cash"] }) {
   const received = cash.networkBatches === 0 ? adminText("ov_cash_received_none") : adminText("ov_cash_received_def", { count: formatCount(cash.networkBatches), gross: formatMoney(cash.networkGross.value ?? 0) ?? "", fee: formatMoney(cash.networkFee) ?? "", tax: formatMoney(cash.networkTax) ?? "" });
   return (
     <Block title={adminText("ov_cash_title")} basis={adminText("ov_cash_basis")}>
-      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-2">
         <MoneyCard label={adminText("ov_cash_received")} figure={cash.received} definition={received} />
         <MoneyCard label={adminText("ov_cash_paid")} figure={cash.paidOut} definition={adminText("ov_cash_paid_def", { count: formatCount(cash.payouts) })} />
         <MoneyCard label={adminText("ov_cash_difference")} figure={cash.difference} definition={adminText("ov_cash_difference_def")} />
@@ -38,14 +38,14 @@ function Cash({ cash }: { readonly cash: Money["cash"] }) {
 
 export function MoneyBlock({ money }: { readonly money: Money }) {
   return (
-    <div className="flex min-w-0 flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-5">
       <Block title={adminText("ov_money_title")} basis={adminText("ov_now_basis")}>
         {money.advanceWarning && (
           <p role="alert" className="rounded-md bg-status-attention-soft p-3 text-sm break-words text-status-attention">
             {adminText("ov_advance_warning", { received: formatMoney(money.last60Days.received) ?? "", paid: formatMoney(money.last60Days.paidOut) ?? "" })}
           </p>
         )}
-        <div className="grid min-w-0 grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2">
           <NowFigure
             name="networks-owe"
             label={adminText("ov_networks_owe")}

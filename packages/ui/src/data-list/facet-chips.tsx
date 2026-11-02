@@ -8,6 +8,7 @@
  * No count here is ever computed in the browser.
  */
 import { FilterChip } from "../brand/filter-chip";
+import { useFilterLayout } from "../brand/filter-layout";
 import { formatCount } from "../format/format-money";
 import { uiText } from "../labels";
 import type { FilterApi } from "./list-filters";
@@ -54,8 +55,10 @@ export function FacetChips({
   };
   const clear = (): void => api.setFilters(Object.fromEntries(fields.map((f) => [f, []])));
   const shown = choices.filter((c) => !hideEmpty || selected(c) || (countOf(api, c) ?? 0) > 0);
+  const sheet = useFilterLayout() === "sheet";
   return (
-    <div role="group" aria-label={label} className="flex min-w-0 flex-wrap gap-2">
+    <div role="group" aria-label={label} className={sheet ? "flex min-w-0 flex-col gap-2" : "order-last flex min-w-0 basis-full flex-wrap gap-2"}>
+      {sheet && <p aria-hidden className="text-sm font-medium text-muted-foreground">{label}</p>}
       {api.overall === undefined ? (
         <FilterChip
           label={uiText("list_all")}

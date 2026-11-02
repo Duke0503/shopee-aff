@@ -46,7 +46,7 @@ export function CodeChip({ code, className }: CodeChipProps) {
       aria-label={uiText("code_copy", { code })}
       title={code}
       className={cn(
-        "inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-sm bg-muted px-1.5 font-mono text-meta font-medium text-foreground outline-none",
+        "inline-flex h-[26px] max-w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2 font-mono text-meta font-medium text-foreground outline-none",
         "hover:bg-border focus-visible:ring-3 focus-visible:ring-ring/50",
         // On touch screens the tap area grows to 44 px tall around the 24 px chip.
         "relative coarse:after:absolute coarse:after:inset-x-0 coarse:after:-inset-y-2.5 coarse:after:content-['']",

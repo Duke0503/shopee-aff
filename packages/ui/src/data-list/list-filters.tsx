@@ -11,7 +11,10 @@ import type { FacetCount, ListSearchState } from "@cashback/contracts";
 import { formatVnDate, systemClock, vnDatePreset, vnDayStart, VN_DATE_PRESETS, type Clock, type VnDate, type VnDatePreset } from "@cashback/core";
 import { useState } from "react";
 
+import { useFilterLayout } from "../brand/filter-layout";
+import { ChevronDownIcon } from "../icons";
 import { uiText, type UiKey } from "../labels";
+import { cn } from "../lib/utils";
 
 export interface FilterApi {
   readonly state: ListSearchState;
@@ -28,27 +31,61 @@ export interface SelectOption {
   readonly label: string;
 }
 
-const SELECT = "h-11 w-full min-w-0 truncate rounded-lg border border-input bg-card px-2.5 text-[15px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-9 md:text-sm";
-
 export interface ListSelectProps {
   readonly label: string;
   readonly value: string;
   readonly options: readonly SelectOption[];
   readonly onChange: (value: string) => void;
+  /** Show "label:" before the value on the toolbar; off where the values name themselves (the date kind). */
+  readonly prefix?: boolean;
 }
 
-/** One labelled native select; the first option is the "all" choice. */
-export function ListSelect({ label, value, options, onChange }: ListSelectProps) {
+/**
+ * One labelled one-of choice; the first option is the "all" choice. On the toolbar a native select
+ * drawn as the wireframe's dropdown button ("label: value"); inside the phone filter sheet the
+ * options as full-width rows, the chosen one filled (wireframe phone filter sheet).
+ */
+export function ListSelect({ label, value, options, onChange, prefix = true }: ListSelectProps) {
+  if (useFilterLayout() === "sheet") {
+    return (
+      <div role="radiogroup" aria-label={label} className="flex min-w-0 flex-col gap-2">
+        <p aria-hidden className="text-sm font-medium text-muted-foreground">{label}</p>
+        {options.map((o) => {
+          const chosen = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={chosen}
+              onClick={() => onChange(o.value)}
+              className={cn(
+                "flex h-11 w-full min-w-0 items-center rounded-lg border px-3.5 text-left text-[15px] font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                chosen ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted",
+              )}
+            >
+              <span className="truncate">{o.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1 md:w-auto md:flex-none">
-      <span className="text-caption text-muted-foreground">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={SELECT}>
+    <label className="relative inline-flex h-9 max-w-full min-w-0 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-card pr-8 pl-3 text-sm font-medium focus-within:ring-3 focus-within:ring-ring/50 hover:bg-muted coarse:h-11">
+      {prefix && (
+        <span aria-hidden className="shrink-0 whitespace-nowrap">
+          {label}:
+        </span>
+      )}
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 cursor-pointer appearance-none truncate bg-transparent font-medium outline-none">
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
       </select>
+      <ChevronDownIcon aria-hidden className="pointer-events-none absolute right-2.5 size-4 text-muted-foreground" />
     </label>
   );
 }
@@ -102,7 +139,7 @@ export function DateFilter({ api, fields, clock = systemClock }: DateFilterProps
   if (fields.length === 1) return <ListSelect label={fields[0]?.label ?? uiText("list_date_days")} value={range} options={days} onChange={setDays} />;
   return (
     <>
-      <ListSelect label={uiText("list_date_kind")} value={field} options={fields} onChange={setKind} />
+      <ListSelect label={uiText("list_date_kind")} value={field} options={fields} onChange={setKind} prefix={false} />
       <ListSelect label={uiText("list_date_days")} value={range} options={days} onChange={setDays} />
     </>
   );

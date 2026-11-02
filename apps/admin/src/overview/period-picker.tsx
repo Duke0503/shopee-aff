@@ -1,9 +1,9 @@
 /**
- * The one period picker above everything it scopes (dashboard-spec "Period", dataviz filters):
- * presets first (today, 7 days, this month, last month), then "custom" with two native date
+ * The one period picker above everything it scopes (dashboard-spec "Period", dataviz filters),
+ * drawn as the wireframe row of square buttons, the chosen one filled: presets first (today, 7 days, this month, last month), then "custom" with two native date
  * inputs. The choice lives in the URL, so a shared link opens the same period.
  */
-import { FilterChip, Input, Button } from "@cashback/ui";
+import { Button, cn, Input } from "@cashback/ui";
 import { useState } from "react";
 
 import { adminText, type AdminKey } from "../labels";
@@ -26,18 +26,27 @@ export function PeriodPicker({ search, onChange }: { readonly search: OverviewSe
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div role="group" aria-label={adminText("ov_period_label")} className="flex min-w-0 flex-wrap gap-2">
-        {PRESETS.map((p) => (
-          <FilterChip
-            key={p.preset}
-            label={adminText(p.label)}
-            pressed={p.preset === "custom" ? custom : !custom && current === p.preset}
-            onToggle={() => {
-              if (p.preset === "custom") return setCustom(true);
-              setCustom(false);
-              onChange(p.preset === "thisMonth" ? {} : { period: p.preset });
-            }}
-          />
-        ))}
+        {PRESETS.map((p) => {
+          const pressed = p.preset === "custom" ? custom : !custom && current === p.preset;
+          return (
+            <button
+              key={p.preset}
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => {
+                if (p.preset === "custom") return setCustom(true);
+                setCustom(false);
+                onChange(p.preset === "thisMonth" ? {} : { period: p.preset });
+              }}
+              className={cn(
+                "inline-flex h-10 shrink-0 items-center rounded-lg border px-3.5 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50 coarse:h-11",
+                pressed ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted",
+              )}
+            >
+              {adminText(p.label)}
+            </button>
+          );
+        })}
       </div>
       {custom && (
         <form

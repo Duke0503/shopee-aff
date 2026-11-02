@@ -158,8 +158,9 @@ function ReviewCard({
   );
 }
 
+// The wireframe draws the two queues as pills, the chosen one filled, like the list chips.
 const TAB_CLASS =
-  "-mb-px inline-flex min-h-11 min-w-0 items-center justify-center gap-2 border-b-2 px-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:justify-start";
+  "inline-flex h-8 min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 coarse:h-11";
 
 function Tabs({
   tab,
@@ -178,7 +179,7 @@ function Tabs({
     <div
       role="tablist"
       aria-label={adminText("review_tabs")}
-      className="grid min-w-0 grid-cols-2 gap-x-1 border-b border-border sm:flex sm:gap-1"
+      className="flex min-w-0 flex-wrap gap-2"
     >
       {tabs.map((t) => (
         <button
@@ -190,14 +191,15 @@ function Tabs({
           className={cn(
             TAB_CLASS,
             t.tab === tab
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
+              ? "border-primary bg-primary text-primary-foreground [&_[data-count]]:text-primary-foreground/85"
+              : "border-border bg-card text-foreground hover:bg-muted",
           )}
         >
           <span>{t.label}</span>
           {t.count !== undefined && (
             <span
-              className="rounded-full bg-muted px-1.5 text-caption tabular-nums"
+              data-count
+              className="text-meta font-normal text-muted-foreground tabular-nums"
               aria-label={adminText("review_tab_count", { count: formatCount(t.count) })}
             >
               {formatCount(t.count)}

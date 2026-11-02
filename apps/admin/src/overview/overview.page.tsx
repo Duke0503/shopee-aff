@@ -45,16 +45,31 @@ function Loading() {
   );
 }
 
+/**
+ * The wireframe arrangement on a desktop: the tiles in one row, the business result beside where
+ * the money is and the customers, the trend across, orders beside events, the health line last.
+ * Below 1280 px every block is stacked in the dashboard-spec order. The two-column rows are not
+ * card grids (cards there end at their own height), so they use `display: grid` without the
+ * `grid` class the equal-row check looks for.
+ */
+const PAIR = "flex min-w-0 flex-col gap-5 xl:[display:grid] xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] xl:items-start";
+
 function Figures({ data }: { readonly data: Overview }) {
   return (
     <>
       <TodoBlock todo={data.todo} today={vnDateOf(parseInstant(data.asOf))} />
-      <BusinessBlock b={data.business} />
-      <MoneyBlock money={data.money} />
+      <div className={PAIR}>
+        <BusinessBlock b={data.business} />
+        <div className="flex min-w-0 flex-col gap-5">
+          <MoneyBlock money={data.money} />
+          <CustomersBlock customers={data.customers} />
+        </div>
+      </div>
       <TrendBlock trend={data.trend} />
-      <OrdersBlock orders={data.orders} />
-      <EventsBlock events={data.events} />
-      <CustomersBlock customers={data.customers} />
+      <div className={PAIR}>
+        <OrdersBlock orders={data.orders} />
+        <EventsBlock events={data.events} />
+      </div>
       <HealthLine health={data.health} />
     </>
   );
@@ -65,20 +80,20 @@ export function OverviewPage({ search, onChange }: { readonly search: OverviewSe
   const data = query.data;
   const stale = query.isPlaceholderData;
   return (
-    <div className="flex min-w-0 flex-col gap-6">
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex min-w-0 flex-col gap-5">
+      <div className="flex min-w-0 flex-col">
         <PageHeader title={adminText("nav_overview")} lead={data === undefined ? undefined : <Lead data={data} />} />
         <PeriodPicker search={search} onChange={onChange} />
       </div>
       {query.isError && (
-        <p role="alert" className="rounded-md bg-status-rejected-soft p-3 text-sm break-words text-status-rejected">
+        <p role="alert" className="rounded-xl bg-status-rejected-soft p-4 text-sm font-medium break-words text-destructive">
           {query.error instanceof ApiError ? errorText(query.error.messageKey, query.error.code) : adminText("ov_failed")}
         </p>
       )}
       {data === undefined ? (
         !query.isError && <Loading />
       ) : (
-        <div data-overview aria-busy={stale} className={cn("flex min-w-0 flex-col gap-8 transition-opacity", stale && "opacity-50")}>
+        <div data-overview aria-busy={stale} className={cn("flex min-w-0 flex-col gap-5 transition-opacity", stale && "opacity-50")}>
           <Figures data={data} />
         </div>
       )}

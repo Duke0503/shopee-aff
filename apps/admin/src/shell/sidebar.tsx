@@ -22,20 +22,20 @@ export const roleText = (staff: StaffSessionResponse): string => adminText(staff
 export function Sidebar({ items, staff, onSignOut }: ShellNavProps) {
   return (
     <aside className="sticky top-0 flex h-dvh w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
-        <BrandMark className="size-[30px]" />
+      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
+        <BrandMark className="size-8" />
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold">{adminText("brand_name")}</p>
-          <p className="truncate text-caption text-muted-foreground">{adminText("brand_desk")}</p>
+          <p className="truncate text-base leading-tight font-bold">{adminText("brand_name")}</p>
+          <p className="truncate text-meta text-muted-foreground">{adminText("brand_desk")}</p>
         </div>
       </div>
-      <nav aria-label={adminText("nav_label")} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-4">
+      <nav aria-label={adminText("nav_label")} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4">
         {NAV_GROUPS.map((group) => {
           const groupItems = items.filter((item) => item.group === group.id);
           if (groupItems.length === 0) return null;
           return (
             <section key={group.id} aria-labelledby={`nav-group-${group.id}`}>
-              <h2 id={`nav-group-${group.id}`} className="px-2 pb-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
+              <h2 id={`nav-group-${group.id}`} className="px-0.5 pb-1.5 text-caption font-medium tracking-wider text-muted-foreground uppercase">
                 {adminText(group.labelKey)}
               </h2>
               <ul className="flex flex-col gap-0.5">
@@ -43,9 +43,9 @@ export function Sidebar({ items, staff, onSignOut }: ShellNavProps) {
                   <li key={item.id}>
                     <NavLink
                       item={item}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-sm text-foreground hover:bg-muted data-[status=active]:bg-sidebar-accent data-[status=active]:font-semibold data-[status=active]:text-sidebar-accent-foreground coarse:h-11"
+                      className="flex h-9 items-center gap-3 rounded-lg px-2.5 text-[15px] font-medium text-foreground hover:bg-muted data-[status=active]:bg-sidebar-accent data-[status=active]:font-semibold data-[status=active]:text-sidebar-accent-foreground coarse:h-11"
                     >
-                      <item.icon aria-hidden className="size-[17px] shrink-0 text-muted-foreground in-data-[status=active]:text-sidebar-accent-foreground" />
+                      <item.icon aria-hidden className="size-[18px] shrink-0 text-muted-foreground in-data-[status=active]:text-primary" />
                       <span className="truncate">{adminText(item.labelKey)}</span>
                     </NavLink>
                   </li>

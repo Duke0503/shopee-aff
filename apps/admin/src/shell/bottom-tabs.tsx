@@ -4,7 +4,7 @@
  * safe-area inset. More opens a bottom sheet with every other page this role may open and
  * sign-out.
  */
-import { Button, EllipsisIcon, LogOutIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, cn } from "@cashback/ui";
+import { Button, LogOutIcon, MenuIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, cn } from "@cashback/ui";
 import { useState } from "react";
 
 import { adminText } from "../labels";
@@ -33,7 +33,7 @@ export function BottomTabs({ items, staff, onSignOut }: ShellNavProps) {
           <Sheet open={more} onOpenChange={setMore}>
             <SheetTrigger asChild>
               <button type="button" className={cn(TAB, FOCUS_RING, "w-full")}>
-                <EllipsisIcon aria-hidden className="size-5 shrink-0" />
+                <MenuIcon aria-hidden className="size-5 shrink-0" />
                 <span className="line-clamp-2 max-w-full text-center break-words">{adminText("tab_more")}</span>
               </button>
             </SheetTrigger>

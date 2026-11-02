@@ -86,8 +86,8 @@ export function DangerZone({ page, customerKey }: { readonly page: CustomerPage;
   const [open, setOpen] = useState(false);
   const erased = page.status === "ERASED";
   return (
-    <section data-danger-zone aria-label={adminText("erase_title")} className="flex min-w-0 flex-col gap-2 rounded-xl border border-destructive/30 bg-card p-3">
-      <h2 className="text-sm font-semibold">{adminText("erase_title")}</h2>
+    <section data-danger-zone aria-label={adminText("erase_title")} className="flex min-w-0 flex-col gap-2 rounded-xl border border-destructive/30 bg-card p-5">
+      <h2 className="text-sm font-semibold text-destructive">{adminText("erase_title")}</h2>
       <p className="text-meta break-words text-muted-foreground">{erased ? adminText("erased_actions_off") : adminText("erase_lead")}</p>
       <div>
         <Button type="button" variant="outline" className="h-11 border-destructive/40 text-destructive hover:bg-destructive/5 md:h-9" disabled={erased} onClick={() => setOpen(true)}>

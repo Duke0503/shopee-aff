@@ -16,6 +16,7 @@ import {
   formatMoney,
   MissingValue,
   MoneyFigure,
+  QrCodeIcon,
   Skeleton,
   StatusBadge,
 } from "@cashback/ui";
@@ -29,28 +30,31 @@ import { DangerZone } from "./customer-erase";
 import { CustomerLists } from "./customer-lists";
 import { useCustomerPage, type CustomerTab } from "./customers.queries";
 
+/** One line of the balance card (wireframe customer page): the label left, the amount right. */
 function Figure({ label, children }: { readonly label: string; readonly children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card p-3">
-      <dt className="text-meta text-muted-foreground">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
+    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+      <dt className="text-[15px] text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right">{children}</dd>
     </div>
   );
 }
 
+const CARD = "flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-5";
+
 function Balance({ page }: { readonly page: Page }) {
   const { balance } = page;
   return (
-    <section aria-label={adminText("customer_money")} className="flex min-w-0 flex-col gap-2">
-      <dl data-balance className="grid min-w-0 grid-cols-1 gap-2 min-[400px]:grid-cols-3">
+    <section aria-label={adminText("customer_money")} className={CARD}>
+      <dl data-balance className="flex min-w-0 flex-col gap-2">
         <Figure label={adminText("balance_payable")}>
-          <MoneyFigure amount={balance.payable} size="md" />
+          <MoneyFigure amount={balance.payable} className="text-[15px] font-bold" />
         </Figure>
         <Figure label={adminText("balance_waiting")}>
-          <MoneyFigure amount={balance.waiting} estimate size="md" />
+          <MoneyFigure amount={balance.waiting} estimate className="text-foreground [&_[aria-label]]:font-bold" />
         </Figure>
         <Figure label={adminText("balance_paid")}>
-          <MoneyFigure amount={balance.paid} size="md" />
+          <MoneyFigure amount={balance.paid} className="text-[15px] font-bold text-foreground" />
         </Figure>
       </dl>
       {balance.deductedNext > 0 && (
@@ -70,18 +74,15 @@ const timeOf = (at: string): string => formatVnDateTime(parseInstant(at), system
 function BankCard({ page }: { readonly page: Page }) {
   const bank = page.bank;
   return (
-    <section
-      data-bank
-      className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3"
-    >
-      <h2 className="text-sm font-semibold">{adminText("customer_bank_title")}</h2>
+    <section data-bank className={CARD}>
+      <h2 className="text-sm font-medium text-muted-foreground">{adminText("customer_bank_title")}</h2>
       {page.status === "ERASED" ? (
         <MissingValue className="text-sm" />
       ) : bank === null ? (
         <p className="text-sm text-muted-foreground">{adminText("customer_bank_none")}</p>
       ) : (
         <>
-          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[15px] font-medium">
+          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[17px] font-bold">
             <span className="min-w-0 break-words">{bank.bankName}</span>
             <MaskedAccount lastFour={bank.lastFour} />
           </p>
@@ -118,8 +119,8 @@ function BankCard({ page }: { readonly page: Page }) {
 function Clawbacks({ page }: { readonly page: Page }) {
   if (page.clawbacks.length === 0) return null;
   return (
-    <section className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3">
-      <h2 className="text-sm font-semibold">{adminText("customer_clawbacks_title")}</h2>
+    <section className={CARD}>
+      <h2 className="text-sm font-medium text-muted-foreground">{adminText("customer_clawbacks_title")}</h2>
       <ul className="flex min-w-0 flex-col divide-y divide-border">
         {page.clawbacks.map((c) => (
           <li
@@ -155,7 +156,7 @@ function Header({ page }: { readonly page: Page }) {
   return (
     <header className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="flex min-w-0 flex-col gap-1.5">
-        <h1 className="text-[22px] leading-tight font-bold tracking-tight break-words md:text-2xl">
+        <h1 className="text-2xl leading-tight font-bold tracking-tight break-words md:text-[26px]">
           {erased
             ? erasedOn === null
               ? adminText("customer_erased")
@@ -170,7 +171,7 @@ function Header({ page }: { readonly page: Page }) {
           )}
         </div>
         {facts.length > 0 && (
-          <p className="text-meta break-words text-muted-foreground">{facts.join(" · ")}</p>
+          <p className="text-[15px] break-words text-muted-foreground">{facts.join(" · ")}</p>
         )}
         {erased && <p data-erased className="text-meta break-words text-muted-foreground">{adminText("erased_note")}</p>}
       </div>
@@ -180,9 +181,10 @@ function Header({ page }: { readonly page: Page }) {
           search={{ q: page.customerCode }}
           className={buttonVariants({
             size: "lg",
-            className: "w-full shrink-0 md:w-auto coarse:h-11",
+            className: "h-10 w-full shrink-0 rounded-lg px-4 text-[15px] font-semibold md:w-auto coarse:h-11",
           })}
         >
+          <QrCodeIcon aria-hidden />
           {adminText("customer_go_payout", { amount: formatMoney(page.balance.payable) ?? "" })}
         </Link>
       )}
@@ -247,19 +249,22 @@ export function CustomerPage({ customerKey, tab, state, onChange }: CustomerPage
     <div data-customer={page.customerId} className="flex min-w-0 flex-col gap-4">
       {back}
       <Header page={page} />
-      <Balance page={page} />
-      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-        <BankCard page={page} />
-        <Clawbacks page={page} />
+      {/* Wireframe customer page: the facts in a 360 px column beside the lists from 1536 px (the lists keep every column), above them below. */}
+      <div className="flex min-w-0 flex-col gap-4 2xl:[display:grid] 2xl:grid-cols-[360px_minmax(0,1fr)] 2xl:items-start 2xl:gap-5">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:flex 2xl:flex-col">
+          <Balance page={page} />
+          <BankCard page={page} />
+          <Clawbacks page={page} />
+          <DangerZone page={page} customerKey={customerKey} />
+        </div>
+        <CustomerLists
+          customerKey={customerKey}
+          counts={page.counts}
+          tab={tab}
+          state={state}
+          onChange={onChange}
+        />
       </div>
-      <CustomerLists
-        customerKey={customerKey}
-        counts={page.counts}
-        tab={tab}
-        state={state}
-        onChange={onChange}
-      />
-      <DangerZone page={page} customerKey={customerKey} />
     </div>
   );
 }

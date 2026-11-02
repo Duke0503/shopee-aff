@@ -9,7 +9,7 @@
  * because no money moves.
  */
 import { BLOCKING_FLAGS, type PayoutQueueRow } from "@cashback/contracts";
-import { Button, CodeChip, MoneyFigure, type ListColumn } from "@cashback/ui";
+import { Button, cn, CodeChip, MoneyFigure, QrCodeIcon, type ListColumn } from "@cashback/ui";
 
 import { adminText } from "../labels";
 import { FlagBadges, flagsOf, MaskedAccount, SettlementBadge } from "./payout-badges";
@@ -22,7 +22,9 @@ export interface RowActions {
 
 export function PayoutAction({ row, actions, wide = false }: { readonly row: PayoutQueueRow; readonly actions: RowActions; readonly wide?: boolean }) {
   if (row.claimStaffId !== null && row.claimStaffId !== actions.staffId) {
-    return <span className="block text-meta font-medium break-words whitespace-normal text-status-waiting">{adminText("payout_taken", { name: row.claimStaffName ?? row.claimStaffId })}</span>;
+    const taken = adminText("payout_taken", { name: row.claimStaffName ?? row.claimStaffId });
+    if (wide) return <span className="inline-flex h-6 max-w-full items-center rounded-full bg-muted px-2.5 text-meta font-medium text-muted-foreground">{taken}</span>;
+    return <span className="block text-meta break-words whitespace-normal text-muted-foreground">{taken}</span>;
   }
   const flags = flagsOf(row.flags);
   const netting = flags.includes("NETTING_ONLY");
@@ -33,8 +35,13 @@ export function PayoutAction({ row, actions, wide = false }: { readonly row: Pay
   const name = row.customerName ?? row.customerCode ?? row.customerId;
   const label = mine ? adminText("payout_continue") : adminText(netting ? "payout_open_netting" : "payout_open");
   const aria = mine ? "payout_continue_aria" : netting ? "payout_open_netting_aria" : "payout_open_aria";
+  // The phone card is itself the "open" control (wireframe phone payouts): a button stretched over it.
+  if (wide && !mine && !netting) {
+    return <button type="button" aria-label={adminText(aria, { name })} onClick={() => actions.onOpen(row)} className="absolute inset-0 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/60" />;
+  }
   return (
-    <Button type="button" size={wide ? "lg" : "sm"} variant={netting && !mine ? "outline" : "default"} className={wide ? "w-full coarse:h-11" : "coarse:h-11"} aria-label={adminText(aria, { name })} onClick={() => actions.onOpen(row)}>
+    <Button type="button" variant={netting && !mine ? "outline" : "default"} className={wide ? "h-11 w-full" : "h-8 px-3 coarse:h-11"} aria-label={adminText(aria, { name })} onClick={() => actions.onOpen(row)}>
+      {!netting && <QrCodeIcon aria-hidden />}
       {label}
     </Button>
   );
@@ -50,35 +57,37 @@ export function payoutColumns(actions: RowActions): readonly ListColumn<PayoutQu
     { key: "settlement", header: adminText("col_settlement"), kind: "text", desktopOnly: true, width: 156, render: (row) => <SettlementBadge row={row} /> },
     { key: "flags", header: adminText("col_flags"), kind: "text", width: 128, render: (row) => <FlagBadges flags={flagsOf(row.flags)} changedAt={row.bankChangedAt} /> },
     { key: "payable", header: adminText("col_payable"), kind: "money", sortable: true },
-    { key: "claimStaffName", header: adminText("col_payout_action"), kind: "text", width: 108, render: (row) => <PayoutAction row={row} actions={actions} /> },
+    { key: "claimStaffName", header: adminText("col_payout_action"), kind: "text", width: 128, render: (row) => <PayoutAction row={row} actions={actions} /> },
   ];
 }
 
-/** The phone card: who and how much first, then the code chip, orders and settlement, then the account and flags, then the action. */
+/** The phone card (wireframe phone payouts): name and amount, then the code chip and the order count, then the bank, account and flags; a row someone else holds is greyed. */
 export function PayoutCard({ row, actions }: { readonly row: PayoutQueueRow; readonly actions: RowActions }) {
   const flags = flagsOf(row.flags);
+  const taken = row.claimStaffId !== null && row.claimStaffId !== actions.staffId;
   return (
-    <article data-card="payout" className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3">
+    <article data-card="payout" className={cn("relative flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-card p-4", taken && "bg-muted/40 [&_[data-money]]:opacity-60 [&_p]:text-muted-foreground")}>
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <p className="min-w-0 text-[15px] leading-snug font-semibold break-words">{row.customerName ?? row.customerCode ?? row.customerId}</p>
-        <span className="shrink-0 text-right">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <p className="min-w-0 text-base leading-snug font-semibold break-words">{row.customerName ?? row.customerCode ?? row.customerId}</p>
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-meta text-muted-foreground">
+            {row.customerCode !== null && <CodeChip code={row.customerCode} className="relative z-10 shrink-0" />}
+            <span className="tabular-nums">{adminText("payout_order_count", { count: row.orderCount })}</span>
+            <SettlementBadge row={row} />
+          </div>
+        </div>
+        <span className="mt-2 shrink-0 text-right">
           <span className="sr-only">{adminText("col_payable")} </span>
-          <MoneyFigure amount={row.payable} size="md" />
+          <MoneyFigure amount={row.payable} size="md" className="text-xl font-bold" />
         </span>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
-        {row.customerCode !== null && <CodeChip code={row.customerCode} className="shrink-0" />}
-        <span className="tabular-nums">{adminText("payout_order_count", { count: row.orderCount })}</span>
-        <SettlementBadge row={row} />
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-meta text-muted-foreground">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {row.bankName !== null && <span className="min-w-0 truncate">{row.bankName}</span>}
         <MaskedAccount lastFour={row.accountLastFour} />
         {flags.length > 0 && <FlagBadges flags={flags} changedAt={row.bankChangedAt} />}
+        {taken && <PayoutAction row={row} actions={actions} wide />}
       </div>
-      <div className="flex min-w-0 justify-end">
-        <PayoutAction row={row} actions={actions} wide />
-      </div>
+      {!taken && <PayoutAction row={row} actions={actions} wide />}
     </article>
   );
 }

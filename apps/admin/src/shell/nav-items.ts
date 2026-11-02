@@ -5,7 +5,7 @@
  * disabled; the server refuses them anyway (403).
  */
 import type { StaffRole } from "@cashback/core";
-import { BanknoteIcon, ClipboardCheckIcon, GiftIcon, LayoutDashboardIcon, LinkIcon, ReceiptIcon, ScrollTextIcon, SettingsIcon, UserCogIcon, UsersIcon, type LucideIcon } from "@cashback/ui";
+import { BanknoteIcon, ClipboardCheckIcon, GiftIcon, LayoutGridIcon, LinkIcon, ReceiptIcon, ScrollTextIcon, SettingsIcon, UserCogIcon, UsersIcon, type LucideIcon } from "@cashback/ui";
 
 import type { AdminKey } from "../labels";
 
@@ -30,7 +30,7 @@ export const NAV_GROUPS: readonly { readonly id: NavGroup; readonly labelKey: Ad
 ];
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { id: "overview", to: "/", labelKey: "nav_overview", icon: LayoutDashboardIcon, group: "daily", tabKey: "tab_overview" },
+  { id: "overview", to: "/", labelKey: "nav_overview", icon: LayoutGridIcon, group: "daily", tabKey: "tab_overview" },
   { id: "payouts", to: "/payouts", labelKey: "nav_payouts", icon: BanknoteIcon, group: "daily", tabKey: "tab_payouts" },
   { id: "review", to: "/review", labelKey: "nav_review", icon: ClipboardCheckIcon, group: "daily" },
   { id: "orders", to: "/orders", labelKey: "nav_orders", icon: ReceiptIcon, group: "daily", tabKey: "tab_orders" },

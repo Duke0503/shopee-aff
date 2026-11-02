@@ -28,13 +28,13 @@ const TABS: readonly TabSpec[] = [
 ];
 
 // Four tabs fit a phone as two rows of two; from the small breakpoint they sit in one row.
-const TAB_CLASS = "-mb-px inline-flex min-h-11 min-w-0 items-center justify-center gap-2 border-b-2 px-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:shrink-0 sm:justify-start";
-const tone = (selected: boolean): string => (selected ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground");
+const TAB_CLASS = "-mb-px inline-flex min-h-11 min-w-0 items-center justify-center gap-2 border-b-2 px-3.5 text-[15px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:shrink-0 sm:justify-start";
+const tone = (selected: boolean): string => (selected ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground");
 
 function Count({ count }: { readonly count: number | undefined }) {
   if (count === undefined) return null;
   return (
-    <span className="rounded-full bg-muted px-1.5 text-caption tabular-nums" aria-label={adminText("payouts_tab_count", { count: formatCount(count) })}>
+    <span className="text-meta font-normal text-muted-foreground tabular-nums" aria-label={adminText("payouts_tab_count", { count: formatCount(count) })}>
       {formatCount(count)}
     </span>
   );

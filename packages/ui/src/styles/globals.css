@@ -33,6 +33,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-brand-mark: var(--brand-mark);
+  --color-ink: var(--ink);
   --color-money: var(--money);
   --color-money-soft: var(--money-soft);
   --color-warning: var(--warning);

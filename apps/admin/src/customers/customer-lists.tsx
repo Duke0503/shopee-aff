@@ -157,7 +157,7 @@ export interface CustomerListsProps {
 }
 
 const TAB_CLASS =
-  "-mb-px inline-flex min-h-11 min-w-0 items-center justify-center gap-2 border-b-2 px-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:justify-start";
+  "-mb-px inline-flex min-h-11 min-w-0 items-center justify-center gap-2 border-b-2 px-3.5 text-[15px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:justify-start";
 
 function Tabs({
   tab,
@@ -189,13 +189,13 @@ function Tabs({
           className={cn(
             TAB_CLASS,
             t === tab
-              ? "border-primary text-foreground"
+              ? "border-primary font-semibold text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
           <span>{adminText(TAB_LABEL[t])}</span>
           <span
-            className="rounded-full bg-muted px-1.5 text-caption tabular-nums"
+            className="text-meta font-normal text-muted-foreground tabular-nums"
             aria-label={adminText("customer_tab_count", { count: formatCount(countOf[t]) })}
           >
             {formatCount(countOf[t])}

@@ -29,7 +29,7 @@ const isAccountChanged = (error: unknown): boolean => error instanceof ApiError 
 function Warning({ warning }: { readonly warning: NonNullable<Preview["warning"]> }) {
   const text = adminText("panel_warning", { amount: formatMoney(warning.amount) ?? "", time: formatVnDateTime(parseInstant(warning.at), systemClock) });
   return (
-    <p role="alert" className="flex min-w-0 items-start gap-2 rounded-md bg-status-attention-soft p-3 text-sm font-medium text-status-attention">
+    <p role="alert" className="flex min-w-0 items-start gap-2 rounded-xl bg-warning-soft p-3 text-sm font-medium text-warning">
       <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
       <span className="min-w-0 break-words">{text}</span>
     </p>
@@ -42,8 +42,10 @@ function QrBlock({ preview, phone }: { readonly preview: Preview; readonly phone
   }
   const label = adminText("panel_qr_label", { amount: formatMoney(preview.amount) ?? "", bank: preview.bankName ?? "", account: adminText("payout_masked_account", { lastFour: preview.accountLastFour }) });
   return (
-    <div data-qr-well="" className="mx-auto w-full rounded-xl border border-border bg-white p-4" style={phone ? undefined : { maxWidth: 220 + 34 }}>
-      <VietQrCode payload={preview.qrPayload} label={label} className="block aspect-square w-full" />
+    <div data-qr-well="" className="mx-auto w-full shrink-0 rounded-xl bg-muted p-3 sm:mx-0" style={phone ? undefined : { maxWidth: 220 }}>
+      <div className="rounded-lg bg-white p-2">
+        <VietQrCode payload={preview.qrPayload} label={label} className="block aspect-square w-full" />
+      </div>
     </div>
   );
 }
@@ -82,28 +84,44 @@ function NettingFacts({ preview }: { readonly preview: Preview }) {
 function TransferFacts({ preview, onStale }: { readonly preview: Preview; readonly onStale: () => void }) {
   if (preview.amount === 0) return <NettingFacts preview={preview} />;
   return (
-    <dl className="divide-y divide-border">
-      <Fact label={adminText("panel_amount")} copy={<CopyButton label={adminText("panel_copy_amount")} value={() => String(preview.amount)} />}>
-        <MoneyFigure amount={preview.amount} size="md" />
-      </Fact>
-      <Fact label={adminText("panel_bank")}>{preview.bankName ?? "–"}</Fact>
-      <Fact label={adminText("panel_holder")}>{preview.holderName ?? "–"}</Fact>
-      <Fact label={adminText("panel_account")} copy={<CopyButton label={adminText("panel_copy_account")} value={() => revealAccountNumber(preview.claimId)} onError={(error) => isAccountChanged(error) && onStale()} />}>
-        <MaskedAccount lastFour={preview.accountLastFour} />
-      </Fact>
-      <Fact label={adminText("panel_reference")} copy={<CopyButton label={adminText("panel_copy_reference")} value={() => preview.transferReference} />}>
-        <span className="font-mono text-sm font-medium">{preview.transferReference}</span>
-      </Fact>
+    <dl data-facts="transfer" className="flex min-w-0 flex-1 flex-col gap-2.5">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="text-meta text-muted-foreground">{adminText("panel_amount")}</dt>
+        <dd className="flex min-w-0 flex-wrap items-center gap-2">
+          <MoneyFigure amount={preview.amount} className="text-[28px] leading-tight font-bold tracking-tight" />
+          <CopyButton label={adminText("panel_copy_amount")} value={() => String(preview.amount)} />
+        </dd>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <dt className="text-sm text-muted-foreground">{adminText("panel_reference")}</dt>
+        <dd className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="inline-flex h-[26px] items-center rounded-md border border-border bg-muted px-2 font-mono text-sm font-medium break-all">{preview.transferReference}</span>
+          <CopyButton label={adminText("panel_copy_reference")} value={() => preview.transferReference} />
+        </dd>
+      </div>
+      <div className="flex min-w-0 flex-col gap-0.5 text-meta text-muted-foreground">
+        <dt className="sr-only">{adminText("panel_holder")}</dt>
+        <dd className="break-words uppercase">{preview.holderName ?? "–"}</dd>
+        <dt className="sr-only">{adminText("panel_bank")}</dt>
+        <dd className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="break-words">{preview.bankName ?? "–"}</span>
+          <MaskedAccount lastFour={preview.accountLastFour} />
+        </dd>
+        <dt className="sr-only">{adminText("panel_account")}</dt>
+        <dd>
+          <CopyButton label={adminText("panel_copy_account")} value={() => revealAccountNumber(preview.claimId)} onError={(error) => isAccountChanged(error) && onStale()} />
+        </dd>
+      </div>
     </dl>
   );
 }
 
 function Line({ title, amount, image, note }: { readonly title: string; readonly amount: ReactNode; readonly image?: string | null; readonly note?: string }) {
   return (
-    <li className="flex min-w-0 items-center gap-2.5 py-2">
+    <li className="flex min-w-0 items-center gap-2.5 py-2.5">
       {image !== undefined && <ProductThumb src={image} />}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-2 text-sm leading-snug break-words">{title}</span>
+        <span className="line-clamp-2 text-[15px] leading-snug break-words">{title}</span>
         {note !== undefined && <span className="text-caption text-muted-foreground">{note}</span>}
       </span>
       <span className="shrink-0 text-right">{amount}</span>
@@ -115,8 +133,8 @@ function CoveredLines({ preview }: { readonly preview: Preview }) {
   const count = preview.orders.length + preview.bonuses.length + preview.refunds.length;
   return (
     <section className="min-w-0">
-      <h3 className="text-sm font-semibold">{adminText("panel_covered", { count })}</h3>
-      <ul className="divide-y divide-border">
+      <h3 className="text-sm font-semibold text-muted-foreground">{adminText("panel_covered", { count })}</h3>
+      <ul className="divide-y divide-border border-b border-border">
         {preview.orders.map((o) => (
           <Line key={o.orderId} title={o.productName ?? adminText("panel_product_missing", { order: o.orderId })} image={o.productImageUrl} note={settledNote(o)} amount={<MoneyFigure amount={o.cashback} />} />
         ))}
@@ -153,7 +171,7 @@ export function PayoutPreview({ preview, onStale, notice, footer }: PayoutPrevie
   const phone = useLayout() === "phone";
   const checks = preview.flags.filter((flag) => CHECK_FLAGS.has(flag));
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-4">
       {notice}
       {preview.warning !== null && <Warning warning={preview.warning} />}
       {checks.length > 0 && (
@@ -164,8 +182,10 @@ export function PayoutPreview({ preview, onStale, notice, footer }: PayoutPrevie
           ))}
         </div>
       )}
-      <QrBlock preview={preview} phone={phone} />
-      <TransferFacts preview={preview} onStale={onStale} />
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+        <QrBlock preview={preview} phone={phone} />
+        <TransferFacts preview={preview} onStale={onStale} />
+      </div>
       <CoveredLines preview={preview} />
       <p className="text-caption text-muted-foreground">{adminText("panel_snapshot", { time: formatVnTime(parseInstant(preview.openedAt)) })}</p>
       {footer}

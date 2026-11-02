@@ -14,11 +14,16 @@ import { adminText } from "../labels";
 /** "01/10" (or "01/10/2025" in another year) for a Vietnam day the server named. */
 export const dayText = (day: string): string => formatVnDate(vnDayStart(parseVnDate(day)), systemClock);
 
-export function Block({ title, basis, children, className, id }: { readonly title: string; readonly basis?: string; readonly children: ReactNode; readonly className?: string; readonly id?: string }) {
+/**
+ * One block of the Overview: a white card with its title and the time base it is read on inside
+ * (wireframe Overview). A `plain` block (the to-do tiles, the health line) has no card of its own
+ * and keeps its title for screen readers only.
+ */
+export function Block({ title, basis, children, className, id, plain = false }: { readonly title: string; readonly basis?: string; readonly children: ReactNode; readonly className?: string; readonly id?: string; readonly plain?: boolean }) {
   return (
-    <section id={id} aria-label={title} className={cn("flex min-w-0 flex-col gap-3", className)}>
-      <header className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <h2 className="text-base font-semibold">{title}</h2>
+    <section id={id} aria-label={title} className={cn("flex min-w-0 flex-col gap-4", !plain && "rounded-xl border border-border bg-card p-5 md:p-6", className)}>
+      <header className={cn("flex min-w-0 flex-col gap-0.5", plain && "sr-only")}>
+        <h2 className="text-[17px] leading-tight font-bold">{title}</h2>
         {basis !== undefined && <p className="text-meta text-muted-foreground">{basis}</p>}
       </header>
       {children}
@@ -26,8 +31,9 @@ export function Block({ title, basis, children, className, id }: { readonly titl
   );
 }
 
+/** A figure inside a block: no frame of its own, the block's card is the frame. */
 export function Card({ children, className, tone = "plain" }: { readonly children: ReactNode; readonly className?: string; readonly tone?: "plain" | "attention" }) {
-  return <div className={cn("flex h-full min-w-0 flex-col gap-1.5 rounded-xl border bg-card p-4", tone === "attention" ? "border-status-attention/40" : "border-border", className)}>{children}</div>;
+  return <div className={cn("flex h-full min-w-0 flex-col gap-1", tone === "attention" && "border-l-2 border-status-attention/50 pl-3", className)}>{children}</div>;
 }
 
 /** The change line of a money figure (+7,067 dong against the previous period), or that there is no previous figure. */
@@ -53,7 +59,7 @@ export function SignedMoney({ amount, size = "md" }: { readonly amount: number |
 export function MoneyCard({ label, figure, definition, size = "md", children }: { readonly label: string; readonly figure: Figure; readonly definition: ReactNode; readonly size?: "md" | "lg"; readonly children?: ReactNode }) {
   return (
     <Card>
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="text-meta text-muted-foreground">{label}</p>
       <SignedMoney amount={figure.value} size={size} />
       <p className="text-meta text-muted-foreground">{definition}</p>
       <div className="mt-auto pt-1">

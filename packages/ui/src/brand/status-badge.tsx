@@ -1,11 +1,11 @@
 /**
  * Status badge (LC-13, DESIGN.md): label and tone from the status registry only; text always
- * present, so colour is never the only signal. Paid-like done states carry a check, rejected a
- * cross. An unknown stored value shows the value itself in the neutral tone rather than nothing.
+ * present, so colour is never the only signal; a pill with no icon, as the wireframe draws it (the
+ * DESIGN.md icon is optional). An unknown stored value shows the value itself in the neutral tone
+ * rather than nothing.
  */
 import { statusesOf, type EntityName, type Tone } from "@cashback/core";
 
-import { CheckIcon, XIcon } from "../icons";
 import { statusLabel } from "../labels";
 import { cn } from "../lib/utils";
 
@@ -31,10 +31,8 @@ export function StatusBadge({ entity, value, className }: StatusBadgeProps) {
   return (
     <span
       data-tone={tone}
-      className={cn("inline-flex min-h-[22px] max-w-full items-center gap-1 rounded-[11px] px-2 py-0.5 text-caption leading-tight font-medium whitespace-normal", TONE_CLASSES[tone], className)}
+      className={cn("inline-flex min-h-6 max-w-full items-center rounded-xl px-2.5 py-0.5 text-meta leading-tight font-medium whitespace-normal", TONE_CLASSES[tone], className)}
     >
-      {tone === "done" && <CheckIcon aria-hidden className="size-3 shrink-0" />}
-      {tone === "rejected" && <XIcon aria-hidden className="size-3 shrink-0" />}
       {/* Never cut off: a label wider than its column wraps to a second line (owner request, Sprint 18). */}
       <span className="min-w-0 break-words">{label}</span>
     </span>

@@ -8,7 +8,7 @@
  * small so staff can see it is the right screenshot; nothing is uploaded until the payout is
  * recorded.
  */
-import { Button, ImageUpIcon, XIcon } from "@cashback/ui";
+import { Button, ImagePlusIcon, XIcon } from "@cashback/ui";
 import { useEffect, useId, useRef, useState, type DragEvent } from "react";
 
 import { adminText, errorText } from "../labels";
@@ -91,19 +91,15 @@ export function ProofPicker({ file, onChange, disabled = false, hint }: ProofPic
   };
   return (
     <section data-proof="" className="flex min-w-0 flex-col gap-2" aria-labelledby={`${id}-label`}>
-      <p id={`${id}-label`} className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
-        {adminText("proof_label")}
-        <span className="text-caption font-normal text-muted-foreground">{adminText("proof_optional")}</span>
+      <p id={`${id}-label`} className="sr-only">
+        {adminText("proof_label")}, {adminText("proof_optional")}
       </p>
-      <div onDragOver={dragOver} onDragLeave={() => setOver(false)} onDrop={drop} className={`flex min-w-0 flex-col gap-3 rounded-xl border border-dashed p-3 ${over ? "border-primary bg-secondary" : "border-input bg-background"}`}>
+      <div onDragOver={dragOver} onDragLeave={() => setOver(false)} onDrop={drop} className={`flex min-w-0 flex-col gap-3 rounded-xl border ${file === null ? "" : "p-3"} ${over ? "border-primary bg-secondary" : "border-input bg-card"}`}>
         {file === null ? (
-          <div className="flex min-w-0 flex-col items-start gap-2">
-            <p className="text-meta break-words text-muted-foreground">{adminText("proof_hint")}</p>
-            <Button type="button" variant="outline" className="h-11 bg-background md:h-9" disabled={disabled} onClick={() => input.current?.click()}>
-              <ImageUpIcon aria-hidden />
-              {adminText("proof_choose")}
-            </Button>
-          </div>
+          <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="flex min-h-12 w-full min-w-0 items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50">
+            <ImagePlusIcon aria-hidden className="size-5 shrink-0" />
+            <span className="min-w-0 break-words">{adminText("proof_choose")}</span>
+          </button>
         ) : (
           <Chosen file={file} disabled={disabled} onRemove={() => onChange(null)} />
         )}
@@ -119,6 +115,7 @@ export function ProofPicker({ file, onChange, disabled = false, hint }: ProofPic
           {errorText(refused, "invalid_request")}
         </p>
       )}
+      {file === null && <p className="text-caption break-words text-muted-foreground">{adminText("proof_hint")}</p>}
       {hint !== undefined && file !== null && <p className="text-caption text-muted-foreground">{hint}</p>}
     </section>
   );

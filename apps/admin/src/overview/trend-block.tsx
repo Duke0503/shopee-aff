@@ -36,7 +36,7 @@ export function TrendBlock({ trend }: { readonly trend: Overview["trend"] }) {
   return (
     <Block title={adminText("ov_trend_title")} basis={adminText("ov_trend_basis")}>
       <Card>
-        <div role="tablist" aria-label={adminText("ov_trend_title")} className="flex min-w-0 flex-wrap gap-1">
+        <div role="tablist" aria-label={adminText("ov_trend_title")} className="flex w-fit max-w-full min-w-0 flex-wrap gap-1 rounded-lg bg-muted p-1">
           {TABS.map((t) => (
             <button
               key={t.measure}
@@ -44,7 +44,7 @@ export function TrendBlock({ trend }: { readonly trend: Overview["trend"] }) {
               role="tab"
               aria-selected={t.measure === measure}
               onClick={() => setMeasure(t.measure)}
-              className={cn("min-h-9 rounded-md px-3 text-sm font-medium coarse:min-h-11", t.measure === measure ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-accent")}
+              className={cn("min-h-8 rounded-md px-3 text-sm font-medium coarse:min-h-11", t.measure === measure ? "bg-card font-semibold text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
             >
               {adminText(t.label)}
             </button>

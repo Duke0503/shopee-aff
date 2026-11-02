@@ -1,13 +1,13 @@
 /**
  * The tablet icon rail (UX-DR4): the same items as the sidebar as 44 px icon links, each with
  * its name as the accessible name and a tooltip that opens on hover and on keyboard focus, so a
- * keyboard user sees where focus is and what the icon means. Groups are split by a rule.
+ * keyboard user sees where focus is and what the icon means. Groups are split by a rule. The brand
+ * is the "DP" square of the wireframe's rail.
  */
 import { Button, LogOutIcon, Tooltip, TooltipContent, TooltipTrigger } from "@cashback/ui";
 import type { ReactElement } from "react";
 
 import { adminText } from "../labels";
-import { BrandMark } from "./brand-mark";
 import { NAV_GROUPS } from "./nav-items";
 import { NavLink } from "./nav-link";
 import type { ShellNavProps } from "./sidebar";
@@ -25,8 +25,10 @@ function WithTooltip({ label, children }: { readonly label: string; readonly chi
 
 export function IconRail({ items, onSignOut }: ShellNavProps) {
   return (
-    <aside className="sticky top-0 flex h-dvh w-16 shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar py-3">
-      <BrandMark className="mb-3 size-[30px]" />
+    <aside className="sticky top-0 flex h-dvh w-16 shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar py-4">
+      <span aria-hidden className="mb-3 flex size-8 items-center justify-center rounded-lg bg-primary text-meta font-bold text-primary-foreground">
+        {adminText("brand_initials")}
+      </span>
       <nav aria-label={adminText("nav_label")} className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
         {NAV_GROUPS.map((group, index) => {
           const groupItems = items.filter((item) => item.group === group.id);

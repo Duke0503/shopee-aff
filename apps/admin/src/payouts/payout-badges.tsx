@@ -1,6 +1,6 @@
 /**
  * The Payouts row's facts as badges (EXPERIENCE.md flag badge, DESIGN.md flag-badge): each flag
- * as a square attention tag with its own words, the bank-change flag with its change time on hover
+ * as an attention pill with its own words, the bank-change flag with its change time on hover
  * and for screen readers, and the settlement fact (D27) as its own small badge, never folded into
  * a status or an amount. Colour is never the only signal: every badge has its text.
  */
@@ -33,7 +33,7 @@ export function FlagBadge({ flag, changedAt = null }: { readonly flag: PayoutFla
       data-flag={flag}
       title={title}
       className={cn(
-        "inline-flex min-h-[22px] max-w-full items-center rounded-sm px-1.5 py-0.5 text-caption leading-tight font-medium",
+        "inline-flex min-h-6 max-w-full items-center rounded-xl px-2.5 py-0.5 text-meta leading-tight font-medium",
         flag === "NETTING_ONLY" ? "bg-status-neutral-soft text-status-neutral" : "bg-status-attention-soft text-status-attention",
       )}
     >
@@ -65,7 +65,7 @@ export function SettlementBadge({ row }: { readonly row: Pick<PayoutQueueRow, "s
   const text =
     row.settlement === "SETTLED" ? adminText("settlement_settled") : row.settlement === "PARTLY_SETTLED" ? adminText("settlement_partly", { settled: row.settledCount, total: row.orderCount }) : adminText("settlement_unsettled");
   return (
-    <span data-settlement={row.settlement} className={cn("inline-flex h-[22px] max-w-full items-center rounded-full px-2 text-caption font-medium whitespace-nowrap", SETTLEMENT_TONE[row.settlement])}>
+    <span data-settlement={row.settlement} className={cn("inline-flex h-6 max-w-full items-center rounded-full px-2.5 text-meta font-medium whitespace-nowrap", SETTLEMENT_TONE[row.settlement])}>
       <span className="truncate">{text}</span>
     </span>
   );
@@ -74,5 +74,5 @@ export function SettlementBadge({ row }: { readonly row: Pick<PayoutQueueRow, "s
 /** "•• 6789": only the last four digits, everywhere but the panel's audited copy button. */
 export function MaskedAccount({ lastFour }: { readonly lastFour: string | null }) {
   if (lastFour === null || lastFour === "") return <MissingValue />;
-  return <span className="font-mono text-meta whitespace-nowrap tabular-nums">{adminText("payout_masked_account", { lastFour })}</span>;
+  return <span className="whitespace-nowrap tabular-nums">{adminText("payout_masked_account", { lastFour })}</span>;
 }

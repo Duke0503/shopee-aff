@@ -386,13 +386,17 @@ await shoot("overview-desktop-1440-trend-tooltip-sheet", 1440, 960, "/admin/", (
 await shoot("customer-tablet-768-columns", 768, 1024, "/admin/customers/DP00012", (page) => page.getByRole("button", { name: /^C\u1ed9t$/ }).click());
 await shoot("payout-panel-phone-390-scrolled-sheet", 390, 844, "/admin/payouts", (page) =>
   page.getByRole("button", { name: /^Chuy/ }).first().click().then(() => page.getByRole("img").last().waitFor({ timeout: 10_000 })).then(() => page.locator("[data-slot=sheet-content]").evaluate((el) => el.scrollTo(0, el.scrollHeight))));
-await shoot("orders-phone-390-filter-sheet", 390, 844, "/admin/orders", (page) => page.getByRole("button", { name: /^B/ }).first().click());
+await shoot("orders-phone-390-filter-sheet", 390, 844, "/admin/orders", (page) => page.getByRole("button", { name: /^L\u1ecdc/ }).first().click());
 await shoot("shell-phone-390-more-sheet", 390, 844, "/admin/", (page) => page.locator("nav button").last().click());
 for (const [label, width, height] of WIDTHS) {
   await shoot(`links-${label}`, width, height, "/admin/links");
   await shoot(`links-${label}-failed-today`, width, height, "/admin/links?filter[status]=FAILED&filter[createdAt]=2026-10-30..2026-10-30");
 }
 await shoot("orders-desktop-1440-error", 1440, 960, "/admin/orders?q=x", (page) => page.route("**/api/admin/orders**", (route) => route.fulfill({ status: 500, json: { error: { code: "internal", messageKey: "error.internal" } } })).then(() => page.reload()).then(() => page.getByRole("alert").waitFor({ timeout: 10_000 })));
+// The list states of the wireframe: no matches (a filter that finds nothing, LC-9) and the first load's skeleton (LC-8).
+const NO_MATCH = { rows: [], total: 0, page: 1, pageSize: 25, facets: { status: [] }, summary: { approvedCommission: 0, cashback: 0 }, asOf: "2026-10-30T12:42:00.000Z", overall: 4912 };
+await shoot("orders-desktop-1440-no-match", 1440, 960, "/admin/orders?q=DP00099", (page) => page.route("**/api/admin/orders**", (route) => route.fulfill({ json: NO_MATCH })).then(() => page.reload()).then(() => page.getByRole("button", { name: /^Xo\u00e1 b\u1ed9 l\u1ecdc$/ }).first().waitFor({ timeout: 10_000 })));
+await shoot("orders-desktop-1440-first-load", 1440, 960, "/admin/orders", (page) => page.route("**/api/admin/orders**", () => new Promise(() => {})).then(() => page.reload({ waitUntil: "domcontentloaded" })).then(() => page.locator("[aria-busy=true]").first().waitFor({ timeout: 10_000 })));
 
 await browser.close();
 await server.close();

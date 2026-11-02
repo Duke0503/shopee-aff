@@ -10,6 +10,7 @@ import type { FacetCount } from "@cashback/contracts";
 import { statusesOf, type EntityName } from "@cashback/core";
 
 import { FilterChip } from "../brand/filter-chip";
+import { useFilterLayout } from "../brand/filter-layout";
 import { formatCount } from "../format/format-money";
 import { statusLabel, uiText } from "../labels";
 
@@ -31,8 +32,10 @@ export interface StatusChipsProps {
 export function StatusChips({ entity, facets, total, selected, onChange, overall, hideEmpty = false }: StatusChipsProps) {
   const counts = new Map((facets ?? []).map((f) => [f.value, f.count]));
   const toggle = (value: string): void => onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+  const sheet = useFilterLayout() === "sheet";
   return (
-    <div role="group" aria-label={uiText("list_status_group")} className="flex min-w-0 flex-wrap gap-2">
+    <div role="group" aria-label={uiText("list_status_group")} className={sheet ? "flex min-w-0 flex-col gap-2" : "order-last flex min-w-0 basis-full flex-wrap gap-2"}>
+      {sheet && <p aria-hidden className="text-sm font-medium text-muted-foreground">{uiText("list_status_title")}</p>}
       {overall === undefined ? (
         <FilterChip label={uiText("list_all")} count={selected.length === 0 ? total : undefined} pressed={selected.length === 0} onToggle={() => onChange([])} />
       ) : (

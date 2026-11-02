@@ -83,23 +83,26 @@ export function OrdersBlock({ orders }: { readonly orders: Overview["orders"] })
 
 const when = (at: string): string => formatVnDateTime(parseInstant(at), systemClock);
 
-/** On a phone each event is a short card of label and value pairs instead of a wide table. */
+/** Each event as a framed card of label and value pairs (wireframe events card), at every width. */
 function EventCards({ events }: { readonly events: Overview["events"] }) {
   const pair = (label: AdminKey, value: ReactNode) => (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-meta text-muted-foreground">{adminText(label)}</dt>
-      <dd className="text-right tabular-nums">{value}</dd>
+      <dt className="text-sm text-muted-foreground">{adminText(label)}</dt>
+      <dd className="text-right font-semibold tabular-nums">{value}</dd>
     </div>
   );
   return (
-    <ul data-event-cards className="flex flex-col divide-y divide-border md:hidden">
+    <ul data-events className="flex flex-col gap-3">
       {events.map((e) => (
-        <li key={e.campaignId} className="flex flex-col gap-1.5 py-2">
-          <p className="font-medium break-words">{e.name}</p>
-          <p className="text-caption text-muted-foreground">{adminText("ov_ev_window", { from: when(e.startsAt), to: when(e.endsAt) })}</p>
+        <li key={e.campaignId} className="flex flex-col gap-2 rounded-lg border border-border p-4">
+          <div>
+            <p className="font-semibold break-words">{e.name}</p>
+            <p className="text-meta text-muted-foreground">
+              {adminText("ov_ev_window", { from: when(e.startsAt), to: when(e.endsAt) })} · {adminText("ov_ev_slots_value", { used: formatCount(e.slotsUsed), total: formatCount(e.slots) })}
+            </p>
+          </div>
           <dl className="flex flex-col gap-1 text-sm">
-            {pair("ov_ev_slots", adminText("ov_ev_slots_value", { used: formatCount(e.slotsUsed), total: formatCount(e.slots) }))}
-            {pair("ov_ev_bonus", formatMoney(e.bonus))}
+            {pair("ov_ev_bonus", formatMoney(e.bonus) ?? <MissingValue />)}
             {pair("ov_ev_commission", <MoneyFigure amount={e.commission} />)}
             {pair("ov_ev_share", <SignedMoney amount={e.operatorShare} size="sm" />)}
             {pair("ov_ev_result", <SignedMoney amount={e.result} size="sm" />)}
@@ -117,35 +120,7 @@ export function EventsBlock({ events }: { readonly events: Overview["events"] })
         {events.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">{adminText("ov_events_empty")}</p>
         ) : (
-          <>
           <EventCards events={events} />
-          <div className="hidden overflow-x-auto md:block">
-            <table data-events className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-meta text-muted-foreground">
-                  {(["ov_ev_name", "ov_ev_slots", "ov_ev_bonus", "ov_ev_commission", "ov_ev_share", "ov_ev_result"] as const).map((k, i) => (
-                    <th key={k} scope="col" className={cn("py-2 font-medium", i === 0 ? "pr-3" : "pl-3 text-right")}>{adminText(k)}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((e) => (
-                  <tr key={e.campaignId} className="border-b border-border align-top last:border-0">
-                    <th scope="row" className="py-2 pr-3 text-left font-normal">
-                      <span className="block font-medium break-words">{e.name}</span>
-                      <span className="block text-caption text-muted-foreground">{adminText("ov_ev_window", { from: when(e.startsAt), to: when(e.endsAt) })}</span>
-                    </th>
-                    <td className="py-2 pl-3 text-right tabular-nums">{adminText("ov_ev_slots_value", { used: formatCount(e.slotsUsed), total: formatCount(e.slots) })}</td>
-                    <td className="py-2 pl-3 text-right tabular-nums">{formatMoney(e.bonus) ?? <MissingValue />}</td>
-                    <td className="py-2 pl-3 text-right"><MoneyFigure amount={e.commission} /></td>
-                    <td className="py-2 pl-3 text-right"><SignedMoney amount={e.operatorShare} size="sm" /></td>
-                    <td className="py-2 pl-3 text-right"><SignedMoney amount={e.result} size="sm" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </>
         )}
         <p className="text-meta text-muted-foreground">{adminText("ov_events_note")}</p>
       </Card>
