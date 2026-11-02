@@ -7,7 +7,8 @@
 // Customers with one customer's page and the review queue with a case's panel (Stories 4.14, 4.15).
 // The Overview at every period preset, the erase flow on a customer's page and the erased page (Stories 4.16, 4.17)
 // are shot too; every grid row of the Overview is checked for cards of equal height. The link requests list
-// (Story 5.10), whole and as the Overview's failed-links tile opens it, is shot too.
+// (Story 5.10), whole and as the Overview's failed-links tile opens it, is shot too. The campaign and staff screens,
+// the merge proposals tab and the merge dialog (from Review and from a customer's danger zone), and the sidebar counts are shot too.
 // Usage: node scripts/take-screenshots.mjs <output folder> [name prefix, to shoot only those]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -215,6 +216,9 @@ function overviewOf(url) {
   return { ...base, business: { ...b, commission: NONE, approvedOrders: NONE, fee: NONE, tax: NONE, cashback: NONE, eventBonus: NONE, clawbackNetted: NONE, profit: NONE, margin: { bps: null, previousBps: null, changeBps: null, enoughData: true }, split: null, byNetwork: [], byCampaign: [], withheldPeriods: [], cashbackPaid: 0, cashbackOwed: 0 }, events: [], customers: { ...base.customers, concentration: null } };
 }
 
+const DESK = JSON.parse(readFileSync(join(root, "tests/fixtures/desk-screens.json"), "utf8"));
+const REFUSED = { ...DESK.mergePreview, ...DESK.mergeRefused, merged: { ...DESK.mergePreview.merged, bank: { bankName: "Techcombank", lastFour: "1180" } } };
+
 const REVIEW_ROWS = [
   { caseId: 7, network: "shopee", subject: "241027F3HQ", orderId: null, reason: "unattributed_sub_id1", status: "OPEN", resolution: null, openedAt: "2026-10-27T03:10:00.000Z", resolvedAt: null },
   { caseId: 9, network: "accesstrade", subject: "AT8812300417", orderId: "AT8812300417", reason: "unknown_status", status: "OPEN", resolution: null, openedAt: "2026-10-28T08:40:00.000Z", resolvedAt: null },
@@ -262,6 +266,13 @@ async function shoot(name, width, height, path, after, answers = {}) {
     if (url.pathname === "/api/admin/customers/DP00099") return route.fulfill({ json: ERASED_PAGE });
     if (/^\/api\/admin\/customers\/[^/]+$/.test(url.pathname)) return route.fulfill({ json: CUSTOMER_PAGE });
     if (url.pathname === "/api/admin/overview") return route.fulfill({ json: overviewOf(url) });
+    if (url.pathname === "/api/admin/counts") return route.fulfill({ json: DESK.counts });
+    if (url.pathname === "/api/admin/campaigns") return route.fulfill({ json: DESK.campaigns });
+    if (url.pathname === "/api/admin/campaigns/preview") return route.fulfill({ json: DESK.campaignPreview });
+    if (url.pathname === "/api/admin/staff") return route.fulfill({ json: DESK.staff });
+    if (/^\/api\/admin\/staff\/[^/]+\/password$/.test(url.pathname)) return route.fulfill({ json: DESK.issued });
+    if (url.pathname === "/api/admin/merges/proposals") return route.fulfill({ json: DESK.proposals });
+    if (url.pathname === "/api/admin/merges/preview") return route.fulfill({ json: answers.merge === "refused" ? REFUSED : DESK.mergePreview });
     if (url.pathname === "/api/admin/review-cases") return route.fulfill({ json: reviewRows(url) });
     if (/^\/api\/admin\/review-cases\/\d+$/.test(url.pathname)) return route.fulfill({ json: REVIEW_DETAIL });
     if (url.pathname.endsWith("/preview")) return route.fulfill({ json: REVIEW_PREVIEW });
@@ -378,7 +389,7 @@ for (const [label, width, height] of WIDTHS) {
     await shoot(`overview-${preset}-${label}`, width, height, `/admin/${query}`);
   }
   await shoot(`customer-erase-${label}-sheet`, width, height, "/admin/customers/DP00012", (page) =>
-    page.locator("[data-danger-zone] button").click().then(() => page.locator("[data-erase-dialog] textarea").fill("Kh\u00e1ch y\u00eau c\u1ea7u xo\u00e1 qua Zalo")));
+    page.locator("[data-danger-zone]").getByRole("button", { name: /^Xo\u00e1 d\u1eef li\u1ec7u/ }).click().then(() => page.locator("[data-erase-dialog] textarea").fill("Kh\u00e1ch y\u00eau c\u1ea7u xo\u00e1 qua Zalo")));
   await shoot(`customer-erased-${label}`, width, height, "/admin/customers/DP00099");
 }
 await shoot("overview-desktop-1440-trend-table", 1440, 960, "/admin/", (page) => page.getByRole("button", { name: /^Xem b\u1ea3ng s\u1ed1$/ }).click());
@@ -397,6 +408,34 @@ await shoot("orders-desktop-1440-error", 1440, 960, "/admin/orders?q=x", (page) 
 const NO_MATCH = { rows: [], total: 0, page: 1, pageSize: 25, facets: { status: [] }, summary: { approvedCommission: 0, cashback: 0 }, asOf: "2026-10-30T12:42:00.000Z", overall: 4912 };
 await shoot("orders-desktop-1440-no-match", 1440, 960, "/admin/orders?q=DP00099", (page) => page.route("**/api/admin/orders**", (route) => route.fulfill({ json: NO_MATCH })).then(() => page.reload()).then(() => page.getByRole("button", { name: /^Xo\u00e1 b\u1ed9 l\u1ecdc$/ }).first().waitFor({ timeout: 10_000 })));
 await shoot("orders-desktop-1440-first-load", 1440, 960, "/admin/orders", (page) => page.route("**/api/admin/orders**", () => new Promise(() => {})).then(() => page.reload({ waitUntil: "domcontentloaded" })).then(() => page.locator("[aria-busy=true]").first().waitFor({ timeout: 10_000 })));
+
+// The campaign and staff screens, the merge proposals and the merge dialog.
+const fillCampaign = async (page) => {
+  const form = page.locator("[data-campaign-form]");
+  const inputs = form.locator("input:not([type=checkbox])");
+  const values = ["15 \u0111\u01a1n th\u00e1ng 12", "DEC15", "15/11/2026 00:00", "22/11/2026 00:00", "20", "20000", "150000", "1"];
+  for (let i = 0; i < values.length; i++) await inputs.nth(i).fill(values[i]);
+  await form.locator("[data-campaign-preview]").filter({ hasText: /su\u1ea5t/ }).waitFor({ timeout: 10_000 });
+};
+const openProposal = (page) => page.getByRole("button", { name: /^Xem g\u1ed9p/ }).first().click().then(() => page.locator("[data-merge-plan], [data-merge-refusal]").waitFor({ timeout: 10_000 }));
+for (const [label, width, height] of WIDTHS) {
+  await shoot(`campaigns-${label}`, width, height, "/admin/campaigns");
+  await shoot(`campaigns-${label}-preview`, width, height, "/admin/campaigns", fillCampaign);
+  await shoot(`staff-${label}`, width, height, "/admin/staff");
+  await shoot(`review-merges-${label}`, width, height, "/admin/review?filter[status]=MERGES");
+  await shoot(`merge-dialog-${label}-sheet`, width, height, "/admin/review?filter[status]=MERGES", openProposal);
+  await shoot(`customer-merge-${label}-sheet`, width, height, "/admin/customers/DP00012", (page) =>
+    page.locator("[data-danger-zone]").getByRole("button", { name: /^G\u1ed9p/ }).click()
+      .then(() => page.locator("[data-merge-dialog] input").fill("DP00064"))
+      .then(() => page.locator("[data-merge-dialog] form button[type=submit]").click())
+      .then(() => page.locator("[data-merge-plan]").waitFor({ timeout: 10_000 })));
+}
+await shoot("merge-dialog-desktop-1440-refused-sheet", 1440, 960, "/admin/review?filter[status]=MERGES", openProposal, { merge: "refused" });
+await shoot("staff-desktop-1440-password-sheet", 1440, 960, "/admin/staff", (page) =>
+  page.getByRole("button", { name: /^\u0110\u1eb7t l\u1ea1i m\u1eadt kh\u1ea9u$/ }).first().click()
+    .then(() => page.locator("[data-staff-confirm]").getByRole("button", { name: /^\u0110\u1eb7t l\u1ea1i$/ }).click())
+    .then(() => page.locator("[data-staff-password]").waitFor({ timeout: 10_000 })));
+await shoot("staff-desktop-1440-add-sheet", 1440, 960, "/admin/staff", (page) => page.getByRole("button", { name: /^Th\u00eam nh\u00e2n vi\u00ean$/ }).click().then(() => page.locator("[data-staff-add] input").first().fill("thao.nguyen")));
 
 await browser.close();
 await server.close();

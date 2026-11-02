@@ -107,6 +107,13 @@ export function customerCodeOf(db: LedgerDb, customerId: string): string | null 
   return db.select({ code: customers.customerCode }).from(customers).where(eq(customers.customerId, customerId)).get()?.code ?? null;
 }
 
+/** What the website greets a customer with: the stored display name and when they joined, nothing else. */
+export function customerGreetingOf(db: LedgerDb, customerId: string): { displayName: string | null; joinedAt: string | null } {
+  const row = db.select({ displayName: customers.displayName, joinedAt: customers.createdAt }).from(customers).where(eq(customers.customerId, customerId)).get();
+  const name = row?.displayName?.trim() ?? "";
+  return { displayName: name === "" ? null : name, joinedAt: row?.joinedAt ?? null };
+}
+
 export interface CustomerKeys {
   readonly customer: ResolvedCustomer;
   /** The survivor's id and every alias that leads to it, merged ids through a chain included. */

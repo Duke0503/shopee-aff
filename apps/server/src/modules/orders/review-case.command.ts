@@ -22,13 +22,19 @@ import { reviewCases } from "./schema";
  * approval or payout), attribution's (D58), a row whose order id belongs to another network, and
  * an awaiting order the report has not shown for 14 days (R5, D43), and a wrong rejection staff
  * reported (D38, Story 3.9), and a network payout that did not match its orders to the dong or
- * listed an order another payout already settled (D59, Story 4.21).
+ * listed an order another payout already settled (D59, Story 4.21), and a purchase a customer
+ * reported missing on the website (Story 7.4).
  */
-export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report" | "wrong_rejection" | SettlementCaseReason;
+export type CaseReason = ReviewCaseReason | "network_mismatch" | "not_seen_in_report" | "wrong_rejection" | SettlementCaseReason | typeof MISSING_ORDER_REASON;
+
+/** A customer's report of a purchase the list does not show (pen.dev Gc1Zb). */
+export const MISSING_ORDER_REASON = "missing_order_report";
 
 export type SettlementCaseReason = "settlement_mismatch" | "settlement_conflict" | "settlement_not_approved" | "settlement_facts_changed";
 /** The reasons of network payout cases: they change no order, so they are only ever dismissed. */
 export const SETTLEMENT_CASE_REASONS: readonly string[] = ["settlement_mismatch", "settlement_conflict", "settlement_not_approved", "settlement_facts_changed"] satisfies readonly SettlementCaseReason[];
+/** The reasons of cases that change no order: staff check them and dismiss them, never apply them. */
+export const DISMISS_ONLY_CASE_REASONS: readonly string[] = [...SETTLEMENT_CASE_REASONS, MISSING_ORDER_REASON];
 
 export interface CaseEvidence {
   readonly network: AffiliateNetwork;

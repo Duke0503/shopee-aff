@@ -55,10 +55,12 @@ export {
   type OrdersImport,
   type OrdersImportResult,
 } from "./order-import.command";
-export { caseResolvedWith, openOrRefreshCase, resolveOpenCase, SETTLEMENT_CASE_REASONS, type CaseEvidence, type CaseReason, type CaseWrite, type SettlementCaseReason } from "./review-case.command";
+export { caseResolvedWith, DISMISS_ONLY_CASE_REASONS, MISSING_ORDER_REASON, openOrRefreshCase, resolveOpenCase, SETTLEMENT_CASE_REASONS, type CaseEvidence, type CaseReason, type CaseWrite, type SettlementCaseReason } from "./review-case.command";
 export { latestWithholding, observeWithholding, settleOrders, settlementCandidates, settlementOrdersOf, type SettleInput, type SettlementOrder, type SettlementWindow, type WithholdingObservation } from "./order-settlement.command";
 export { answerCustomerOrders, answerOrdersList, ORDERS_LIST } from "./orders.list";
 export { answerMyOrders, CUSTOMER_ORDERS_LIST } from "./customer-orders.list";
+export { customerOrderFacts, orderMoneyOf, type CustomerOrderFacts } from "./customer-order-detail.query";
+export { MISSING_ORDER_DAILY_LIMIT, MISSING_ORDER_WINDOW_MS, reportMissingOrder, type MissingOrderOutcome, type MissingOrderReport } from "./missing-order-report.command";
 export { answerReviewCases, REVIEW_CASES_LIST } from "./review-cases.list";
 export { reviewCaseDetail } from "./review-case-detail.query";
 export { chatOrdersOf, openSettlementCaseIds, orderCardsOf, orderCountOf, orderCountsByCustomer, recentOrdersOf, type ChatOrder, type OrderCard, type RecentOrder } from "./order-cards.query";

@@ -45,15 +45,21 @@ export const REVIEW_CASE_REASONS = [
   "settlement_conflict",
   "settlement_not_approved",
   "settlement_facts_changed",
+  "missing_order_report",
 ] as const;
 export type ReviewCaseReasonName = (typeof REVIEW_CASE_REASONS)[number];
 
-/** Network payout cases (D59): checked against the network and dismissed, never applied. */
+/**
+ * Cases that change no order, checked and dismissed, never applied: network payout cases (D59) and
+ * a customer's report of a purchase that did not show (no report row to apply; when the network
+ * reports the order, its own case or the customer's link records it).
+ */
 export const DISMISS_ONLY_REASONS: readonly ReviewCaseReasonName[] = [
   "settlement_mismatch",
   "settlement_conflict",
   "settlement_not_approved",
   "settlement_facts_changed",
+  "missing_order_report",
 ];
 
 export const REVIEW_NETWORKS = ["shopee", "accesstrade"] as const;

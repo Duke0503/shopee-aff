@@ -1,0 +1,84 @@
+{
+  "$comment": "Fake answers for the campaign, staff and merge screens and the sidebar counts (admin tests and screenshots). No real person; account digits are made up.",
+  "counts": { "payable": 12, "openReviewCases": 3 },
+  "campaigns": {
+    "asOf": "2026-11-03T12:42:00.000Z",
+    "campaigns": [
+      {
+        "campaignId": "NOV20",
+        "name": "20 đơn đầu tháng 11",
+        "startsAt": "2026-10-31T17:00:00.000Z",
+        "endsAt": "2026-11-07T17:00:00.000Z",
+        "endsBefore": { "time": "00:00", "date": "08/11" },
+        "slots": 20,
+        "bonus": 20000,
+        "minOrderValue": 150000,
+        "platforms": ["shopee", "tiktok"],
+        "perCustomer": 1,
+        "state": "RUNNING",
+        "awards": { "held": 3, "confirmed": 6, "paid": 2, "void": 1 },
+        "slotsUsed": 11,
+        "result": { "cost": 160000, "commission": 412300, "operatorShare": 92450, "result": -67550 },
+        "latest": [
+          { "awardId": 31, "orderId": "241101A1BC", "customerCode": "DP00012", "customerName": "Nguyễn Thị Lan", "createdAt": "2026-11-01T01:14:00.000Z", "status": "CONFIRMED" },
+          { "awardId": 30, "orderId": "241101C7KD", "customerCode": "DP00031", "customerName": "Trần Minh Khoa", "createdAt": "2026-11-01T02:02:00.000Z", "status": "HELD" },
+          { "awardId": 29, "orderId": "TT88301122", "customerCode": "DP00007", "customerName": "Lê Hoàng Yến", "createdAt": "2026-11-01T04:40:00.000Z", "status": "VOID" }
+        ]
+      },
+      {
+        "campaignId": "TRUNGTHU",
+        "name": "Trung thu",
+        "startsAt": "2026-09-14T17:00:00.000Z",
+        "endsAt": "2026-09-21T17:00:00.000Z",
+        "endsBefore": { "time": "00:00", "date": "22/09" },
+        "slots": 10,
+        "bonus": 15000,
+        "minOrderValue": 0,
+        "platforms": ["shopee"],
+        "perCustomer": 0,
+        "state": "ENDED",
+        "awards": { "held": 0, "confirmed": 0, "paid": 10, "void": 0 },
+        "slotsUsed": 10,
+        "result": { "cost": 150000, "commission": 386000, "operatorShare": 231600, "result": 81600 },
+        "latest": []
+      }
+    ]
+  },
+  "campaignPreview": {
+    "campaignId": "DEC15",
+    "name": "15 đơn tháng 12",
+    "startsAt": "2026-11-14T17:00:00.000Z",
+    "endsAt": "2026-11-21T17:00:00.000Z",
+    "endsBefore": { "time": "00:00", "date": "22/11" },
+    "slots": 20,
+    "bonus": 20000,
+    "minOrderValue": 150000,
+    "platforms": ["shopee"],
+    "perCustomer": 1,
+    "excludedCustomerIds": []
+  },
+  "staff": {
+    "staff": [
+      { "staffId": "admin", "username": "admin", "role": "ADMIN", "status": "ACTIVE", "root": true, "lastSignInAt": "2026-10-30T12:30:00.000Z", "createdAt": "2026-09-01T00:00:00.000Z" },
+      { "staffId": "minh", "username": "minh", "role": "EMPLOYEE", "status": "ACTIVE", "root": false, "lastSignInAt": "2026-10-30T11:02:00.000Z", "createdAt": "2026-09-01T00:00:00.000Z" },
+      { "staffId": "thao", "username": "thao", "role": "EMPLOYEE", "status": "DISABLED", "root": false, "lastSignInAt": "2025-09-02T02:00:00.000Z", "createdAt": "2025-08-01T00:00:00.000Z" }
+    ]
+  },
+  "issued": { "staffId": "minh", "username": "minh", "password": "Kp7vRq2mXc9wTa4h", "sessionsEnded": 1 },
+  "proposals": {
+    "since": "2026-10-20T00:00:00.000Z",
+    "proposals": [
+      { "merged": { "customerId": "C64", "customerCode": "DP00064", "customerName": "Trần Minh Khoa" }, "survivor": { "customerId": "C31", "customerCode": "DP00031", "customerName": "Trần Minh Khoa" }, "reason": "code_claimed" }
+    ]
+  },
+  "mergePreview": {
+    "survivor": { "customerId": "C31", "customerCode": "DP00031", "customerName": "Trần Minh Khoa", "zaloUserId": "881200714432", "balance": { "gross": 24860, "payable": 24860, "waiting": 0, "paid": 61300, "deductedNext": 0 }, "orders": 7, "linkRequests": 12, "bank": { "bankName": "MB Bank", "lastFour": "0921" } },
+    "merged": { "customerId": "C64", "customerCode": "DP00064", "customerName": "Trần Minh Khoa", "zaloUserId": "553099210018", "balance": { "gross": 9263, "payable": 9263, "waiting": 0, "paid": 0, "deductedNext": 0 }, "orders": 2, "linkRequests": 3, "bank": { "bankName": "MB Bank", "lastFour": "0921" } },
+    "plan": { "bankMoves": false, "result": { "gross": 34123, "payable": 34123, "waiting": 0, "paid": 61300, "deductedNext": 0 } },
+    "refusal": null
+  },
+  "mergeRefused": {
+    "plan": null,
+    "refusal": { "code": "conflict", "messageKey": "error.merge.bank_differs", "fields": { "mergedBank": "Techcombank 1180", "survivorBank": "MB Bank 0921" } }
+  }
+}

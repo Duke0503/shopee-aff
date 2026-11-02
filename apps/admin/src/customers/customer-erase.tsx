@@ -3,7 +3,8 @@
  * customer's personal data at their request. The dialog says what goes and what stays. While the
  * customer is owed money (payable or waiting, from the page's `getBalances`), an employee can only
  * read why it is refused; an admin may force it with a reason. The server checks all of it again
- * and its refusal is shown as it says. An erased customer's page shows the zone switched off.
+ * and its refusal is shown as it says. An erased customer's page shows the zone switched off. An
+ * admin also finds the merge with another record here (merges/merge-dialog.tsx).
  */
 import type { CustomerPage } from "@cashback/contracts";
 import {
@@ -23,6 +24,7 @@ import { useId, useState } from "react";
 
 import { ApiError } from "../api/api.queries";
 import { adminText, errorText } from "../labels";
+import { MergeDialog } from "../merges/merge-dialog";
 import { useStaff } from "../session/staff-context";
 import { useEraseCustomer } from "./customers.queries";
 
@@ -82,19 +84,47 @@ function EraseDialog({ page, customerKey, open, onOpenChange }: { readonly page:
   );
 }
 
+function DangerItem({ title, lead, disabled = false, onClick }: { readonly title: string; readonly lead: string; readonly disabled?: boolean; readonly onClick: () => void }) {
+  const id = useId();
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      aria-describedby={id}
+      disabled={disabled}
+      onClick={onClick}
+      className="-mx-2 flex min-h-11 min-w-0 flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-destructive/5 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+    >
+      <span className="text-[15px] leading-snug font-semibold break-words text-foreground">{title}</span>
+      <span id={id} className="text-meta break-words text-muted-foreground">{lead}</span>
+    </button>
+  );
+}
+
+/**
+ * The danger zone (wireframe customer page): merging with another record (admin only, the merge
+ * dialog) and erasing the personal data, each a row with what it is for.
+ */
 export function DangerZone({ page, customerKey }: { readonly page: CustomerPage; readonly customerKey: string }) {
   const [open, setOpen] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const admin = useStaff().role === "ADMIN";
   const erased = page.status === "ERASED";
+  const owed = page.balance.payable > 0;
   return (
-    <section data-danger-zone aria-label={adminText("erase_title")} className="flex min-w-0 flex-col gap-2 rounded-xl border border-destructive/30 bg-card p-5">
-      <h2 className="text-sm font-semibold text-destructive">{adminText("erase_title")}</h2>
-      <p className="text-meta break-words text-muted-foreground">{erased ? adminText("erased_actions_off") : adminText("erase_lead")}</p>
-      <div>
-        <Button type="button" variant="outline" className="h-11 border-destructive/40 text-destructive hover:bg-destructive/5 md:h-9" disabled={erased} onClick={() => setOpen(true)}>
-          {adminText("erase_button")}
-        </Button>
+    <section data-danger-zone aria-label={adminText("danger_title")} className="flex min-w-0 flex-col gap-2 rounded-xl border border-destructive/30 bg-card p-4 md:px-4 md:py-5">
+      <h2 className="text-sm font-semibold text-destructive">{adminText("danger_title")}</h2>
+      <div className="flex min-w-0 flex-col gap-1">
+        {admin && !erased && <DangerItem title={adminText("danger_merge")} lead={adminText("danger_merge_lead")} onClick={() => setMerging(true)} />}
+        <DangerItem
+          title={adminText("erase_button")}
+          lead={erased ? adminText("erased_actions_off") : owed ? adminText("danger_erase_lead", { amount: formatMoney(page.balance.payable) ?? "" }) : adminText("danger_erase_lead_free")}
+          disabled={erased}
+          onClick={() => setOpen(true)}
+        />
       </div>
       {!erased && <EraseDialog page={page} customerKey={customerKey} open={open} onOpenChange={setOpen} />}
+      {!erased && admin && merging && <MergeDialog open onOpenChange={setMerging} survivor={page.customerId} merged={null} />}
     </section>
   );
 }

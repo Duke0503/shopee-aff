@@ -8,14 +8,16 @@ import { Button, LogOutIcon, MenuIcon, Sheet, SheetContent, SheetDescription, Sh
 import { useState } from "react";
 
 import { adminText } from "../labels";
+import { countOf, useDeskCounts } from "./desk-counts.queries";
 import { isTab } from "./nav-items";
 import { FOCUS_RING, NavLink } from "./nav-link";
-import { roleText, type ShellNavProps } from "./sidebar";
+import { NavCount, roleText, type ShellNavProps } from "./sidebar";
 
 const TAB = "flex h-14 min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 px-0.5 text-caption leading-[1.15] font-medium text-muted-foreground";
 
 export function BottomTabs({ items, staff, onSignOut }: ShellNavProps) {
   const [more, setMore] = useState(false);
+  const counts = useDeskCounts().data;
   const tabs = items.filter(isTab);
   const rest = items.filter((item) => !isTab(item));
   return (
@@ -50,6 +52,7 @@ export function BottomTabs({ items, staff, onSignOut }: ShellNavProps) {
                     <NavLink item={item} onNavigate={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-md px-3 text-[15px] hover:bg-muted data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground">
                       <item.icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{adminText(item.labelKey)}</span>
+                      <NavCount count={countOf(counts, item.id)} />
                     </NavLink>
                   </li>
                 ))}

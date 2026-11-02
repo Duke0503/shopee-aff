@@ -8,7 +8,7 @@
  */
 import { MY_MONEY_PATH, MY_ORDERS_PATH, MY_PAYOUTS_PATH, type ListResponse, type MyMoney, type MyOrderRow } from "@cashback/contracts";
 import messages from "@cashback/labels/vi/messages.json";
-import { fillLabel, formatMoney, statusLabel, uiText } from "@cashback/ui";
+import { formatMoney, statusLabel, uiText } from "@cashback/ui";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -165,7 +165,7 @@ describe("Sprint 30 review: the customer is never shown misleading money", () =>
     expect(cancelled).toHaveTextContent(messages.order_reversed);
     expect(within(cancelled).queryByRole("list", { name: webText("order_progress") })).toBeNull();
     expect(cancelled).toHaveTextContent(webText("order_deducted", { amount: amountText(9263) }));
-    expect(cancelled.querySelector("[data-line-amount]")).toHaveTextContent("–");
+    expect(cancelled.querySelector("[data-line-amount]")).toHaveTextContent(amountText(0));
   });
 
   it("the payable figure opens rows that add up to it: approved lines, the deduction and the refunded credit, with the card's total", async () => {
@@ -206,21 +206,23 @@ describe("Sprint 30 review: the customer is never shown misleading money", () =>
 });
 
 describe("Story 7.4: My orders list with states in words", () => {
-  it("AC1: each card shows one date with its kind (recorded 12/10); the other dates only in its history", async () => {
+  it("AC1: each card shows one date with its kind, the step the order reached (pen.dev ktmGZ: recorded, approved, paid), and opens the order in full", async () => {
     const user = userEvent.setup();
     setViewportWidth(390);
     server();
-    renderSite("/tien-cua-toi");
+    const { router } = renderSite("/tien-cua-toi");
     await waitFor(() => expect(cards()).toHaveLength(6));
     const approved = cards()[1] as HTMLElement;
-    expect(approved).toHaveTextContent(webText("order_date_recorded", { date: "12/10" }));
-    expect(approved).not.toHaveTextContent(/20\/10/);
-    expect(cards()[4]).toHaveTextContent(webText("order_date_recorded", { date: "18/12/2025" }));
-    for (const c of cards()) expect((c.textContent ?? "").match(/\d{2}\/\d{2}/g)).toHaveLength(1);
-    await user.click(within(approved).getByRole("button", { name: webText("order_history_show") }));
-    const history = within(approved).getByRole("list", { name: webText("order_progress") });
-    expect(history).toHaveTextContent(`${webText("order_step_recorded")}12/10 10:00`);
-    expect(history).toHaveTextContent(`${webText("order_step_approved")}20/10 10:00`);
+    expect(cards()[0]).toHaveTextContent(webText("order_date_recorded", { date: "26/10" }));
+    expect(approved).toHaveTextContent(webText("order_date_approved", { date: "20/10" }));
+    expect(approved).not.toHaveTextContent(/12\/10/);
+    expect(cards()[4]).toHaveTextContent(webText("order_date_paid", { date: "01/10" }));
+    expect(cards()[4]).not.toHaveTextContent(/18\/12/);
+    for (const c of cards()) expect((c.textContent ?? "").match(/\d{2}\/\d{2}/g) ?? []).toHaveLength(c === cards()[3] ? 0 : 1);
+    expect(approved).toHaveAttribute("href", "/don-hang?ma=261012A0001");
+    await user.click(approved);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/don-hang"));
+    expect(router.state.location.search).toEqual({ ma: "261012A0001" });
   });
 
   it("AC2: the sort control changes the order on the server; nothing else looks sortable", async () => {
@@ -235,19 +237,16 @@ describe("Story 7.4: My orders list with states in words", () => {
     await waitFor(() => expect(site.requests.some((r) => r.url.pathname === MY_ORDERS_PATH && r.url.searchParams.get("sort") === "recordedAt:asc")).toBe(true));
   });
 
-  it("AC3: a rejected order shows the rejected state with the reason in words instead of the progress", async () => {
-    const user = userEvent.setup();
+  it("AC3: a rejected order shows the rejected badge with the reason in words in place of a date, and 0 dong", async () => {
     server();
     renderSite("/tien-cua-toi");
     await waitFor(() => expect(cards()).toHaveLength(6));
     const rejected = cards()[3] as HTMLElement;
-    expect(rejected).toHaveTextContent(fillLabel(messages.order_rejected, { reason: messages.rejection_reason_order_cancelled }));
-    await user.click(within(rejected).getByRole("button", { name: webText("order_history_show") }));
-    expect(within(rejected).queryByRole("list", { name: webText("order_progress") })).toBeNull();
-    const waiting = cards()[0] as HTMLElement;
-    await user.click(within(waiting).getByRole("button", { name: webText("order_history_show") }));
-    expect(within(waiting).getByRole("list", { name: webText("order_progress") })).toBeInTheDocument();
-    expect(waiting.querySelector("[data-line-amount]")).toHaveTextContent(estimateText(9263));
+    const reason = messages.rejection_reason_order_cancelled;
+    expect(rejected).toHaveTextContent(statusLabel("status_rejected"));
+    expect(rejected).toHaveTextContent(`${webText("platform_shopee")} · ${reason.charAt(0).toUpperCase()}${reason.slice(1)}`);
+    expect(rejected.querySelector("[data-line-amount]")).toHaveTextContent(amountText(0));
+    expect(cards()[0]?.querySelector("[data-line-amount]")).toHaveTextContent(estimateText(9263));
   });
 
   it("AC4: a bonus is its own row, and a paid order cancelled afterwards says what is deducted", async () => {
@@ -259,7 +258,7 @@ describe("Story 7.4: My orders list with states in words", () => {
     expect(bonus).toHaveTextContent(webText("order_bonus_title", { campaign }));
     expect(bonus.querySelector("[data-line-amount]")).toHaveTextContent(amountText(20000));
     expect(cards()[5]).toHaveTextContent(webText("order_deducted", { amount: amountText(9263) }));
-    expect(screen.getByRole("button", { name: `${statusLabel("status_awaiting_approval")} 1` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${webText("status_chip_awaiting")} 1` })).toBeInTheDocument();
   });
 
   it("AC5: with no orders the empty text links to Home; an error shows the error state, never the empty text", async () => {

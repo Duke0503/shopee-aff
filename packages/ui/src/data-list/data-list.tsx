@@ -19,6 +19,7 @@ import { cn } from "../lib/utils";
 import type { DataListProps, ListColumn } from "./data-list.types";
 import { FilterSheet } from "./filter-sheet";
 import { ColumnsMenu } from "./columns-menu";
+import { CardsFilterButton, CardsFoot, CardsHead } from "./list-cards-controls";
 import { ListCards } from "./list-cards";
 import { ListPagination } from "./list-pagination";
 import { ListEmpty, ListError, ListNoMatches, ListSkeleton, ProgressLine } from "./list-states";
@@ -136,7 +137,7 @@ function filterControls<R>({ statusFilter, filters, state, shown, change, hideEm
   const selected = statusFilter === undefined ? [] : (state.filters[statusFilter.field] ?? []);
   const statusChips =
     statusFilter === undefined ? null : (
-      <StatusChips entity={statusFilter.entity} facets={shown?.facets[statusFilter.field]} total={shown?.total} overall={shown?.overall} hideEmpty={hideEmpty} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
+      <StatusChips entity={statusFilter.entity} labels={statusFilter.labels} facets={shown?.facets[statusFilter.field]} total={shown?.total} overall={shown?.overall} hideEmpty={hideEmpty} selected={selected} onChange={(values) => change({ filters: withFilter(state, statusFilter.field, values) })} />
     );
   const extra = filters?.({ state, setFilters: (patch) => change({ filters: withFilters(state, patch) }), facets: shown?.facets, total: shown?.total, overall: shown?.overall }) ?? null;
   return { extra, statusChips };
@@ -153,24 +154,35 @@ function stacked({ extra, statusChips }: Filters): ReactNode {
   );
 }
 
+interface CardsControlsProps<R> {
+  readonly list: DataListProps<R>;
+  readonly layout: Layout;
+  readonly filters: Filters;
+  readonly sheetFilters: ReactNode;
+  readonly search: ReactNode;
+  readonly shown: ListResponse<R> | undefined;
+  readonly summary: string;
+}
+
 /**
- * The customer website's controls: the search alone on its line above (so its placeholder reads in
- * full on a phone), then the sort choice (when the list offers one) with the refresh button, then
- * the chips in line; no filter sheet.
+ * The customer website's controls (list-cards-controls.tsx): a search only for a list that has one,
+ * then on a phone the one filter button with its sheet, wider the chips in line.
  */
-function CardsControls<R>({ columns, state, chips, refresh, sortLabel, onSort }: { columns: readonly ListColumn<R>[]; state: ListSearchState; chips: ReactNode; refresh: ReactNode; sortLabel: DataListProps<R>["sortLabel"]; onSort: (sort: ListSort) => void }) {
-  const sortable = columns.some((c) => c.sortable === true);
-  if (!sortable && chips === null && refresh === null) return null;
+function CardsControls<R>({ list, layout, filters, sheetFilters, search, shown, summary }: CardsControlsProps<R>) {
+  const { statusFilter, state } = list;
+  const sheet = layout === "phone" && statusFilter !== undefined;
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      {(sortable || refresh !== null) && (
-        <div className="flex min-w-0 items-end justify-between gap-2">
-          {sortable && <SortSelect columns={columns} sort={state.sort} onChange={onSort} label={sortLabel} className="flex min-w-0 flex-1 flex-col gap-1 md:max-w-[280px]" />}
-          {refresh}
-        </div>
+    <>
+      {search}
+      {sheet ? (
+        <CardsFilterButton statusFilter={statusFilter} selected={state.filters[statusFilter.field] ?? []} total={shown?.total} summary={summary}>
+          {filters.statusChips}
+          {filters.extra}
+        </CardsFilterButton>
+      ) : (
+        sheetFilters
       )}
-      {chips}
-    </div>
+    </>
   );
 }
 
@@ -247,26 +259,22 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
   const filters = filterControls({ statusFilter, filters: props.filters, state, shown, change, hideEmpty: cardsOnly });
   const summaryText = shown === undefined ? "" : countLabel(shown.total);
   const refresh = <RefreshButton asOf={shown?.asOf} onRefresh={() => void query.refetch()} />;
-  const searchOwnLine = cardsOnly && props.searchable !== false;
   // The card form names the overall total only beside a filtered count, where it says something.
   const overallText = shown?.overall === undefined || (cardsOnly && !filtered) ? null : uiText("list_total_overall", { total: countLabel(shown.overall) });
   // A customer with no record at all gets the empty state alone: no search, sort or chips over nothing.
   const bare = cardsOnly && !filtered && shown?.overall === 0;
 
-  const summary = shown !== undefined && !bare ? <SummaryLine shown={shown} text={summaryText} fields={props.summary} overallText={overallText} /> : null;
+  // The card form says its count in the filter and the range; a summary line only for figures (the payouts' total).
+  const summaryShown = shown !== undefined && !bare && (!cardsOnly || (props.summary ?? []).length > 0);
+  const summary = summaryShown ? <SummaryLine shown={shown} text={summaryText} fields={props.summary} overallText={overallText} /> : null;
   const searchBox = props.searchable === false ? null : <SearchBox committed={state.q} placeholder={props.searchPlaceholder} onCommit={(q) => change({ q })} />;
   const sheetFilters = stacked(filters);
 
   return (
     <section className="flex min-w-0 flex-col gap-3">
+      {cardsOnly && <CardsHead title={props.title ?? null} columns={bare ? [] : columns} sort={state.sort} sortLabel={props.sortLabel} onSort={(sort) => change({ sort })} />}
       {bare ? null : cardsOnly ? (
-        <>
-          <div className="flex min-w-0 items-center gap-2">
-            {searchBox ?? <span className="flex-1" />}
-            {!searchOwnLine && refresh}
-          </div>
-          <CardsControls columns={columns} state={state} chips={sheetFilters} refresh={searchOwnLine ? refresh : null} sortLabel={props.sortLabel} onSort={(sort) => change({ sort })} />
-        </>
+        <CardsControls list={props} layout={measured} filters={filters} sheetFilters={sheetFilters} search={searchBox} shown={shown} summary={summaryText} />
       ) : layout === "phone" ? (
         <PhoneToolbar search={searchBox} filters={sheetFilters === null ? null : filters} activeCount={activeFilters} summary={summaryText} />
       ) : (
@@ -282,7 +290,10 @@ export function DataList<R extends RowData>(props: DataListProps<R>) {
       </div>
       {query.isError && <ListError error={query.error} staleAsOf={shown?.asOf ?? null} onRetry={() => void query.refetch()} onClear={filtered ? () => change({ q: "", filters: {} }) : undefined} />}
       <ListBody {...props} shown={shown} layout={layout} filtered={filtered} extraColumns={extraColumns} onClear={() => change({ q: "", filters: {} })} onSort={(column) => change({ sort: nextSort(state.sort, column) })} />
-      {shown !== undefined && shown.total > 0 && (
+      {shown !== undefined && shown.total > 0 && cardsOnly && (
+        <CardsFoot facts={{ page: shown.page, pageSize: shown.pageSize, total: shown.total }} search={search} state={state} onState={(next) => onStateChange(next)} link={props.footerLink ?? null} />
+      )}
+      {shown !== undefined && shown.total > 0 && !cardsOnly && (
         <ListPagination
           facts={{ page: shown.page, pageSize: shown.pageSize, total: shown.total }}
           compact={layout === "phone"}

@@ -4,7 +4,7 @@
  * the customer sign-in routes with their Origin check, client keys, burst watch and the hourly
  * housekeeping job, the signed-in customer's money, orders and payouts (Stories 7.3 and 7.4), the
  * account's bank form and password, the home page's link converter and the guide's figures
- * (Stories 7.5 to 7.7), and the built website itself when apps/web/dist exists (a dev start without a
+ * (Stories 7.5 to 7.7), the missing-order report (Story 7.4), and the built website itself when apps/web/dist exists (a dev start without a
  * build serves the API only; the Vite dev server serves the pages then). The receipt, share and
  * proof routes stay as they are and win over the website's catch-all. Later customer stories add
  * their routes here.
@@ -29,6 +29,7 @@ import type { Job } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
 import { accountRoutes } from "./account.routes";
 import { guideRoutes } from "./guide.routes";
+import { missingOrderRoutes } from "./missing-order.routes";
 import { myMoneyRoutes } from "./my-money.routes";
 import { webLinkRoutes } from "./web-link.routes";
 
@@ -79,6 +80,7 @@ export function customerSite(deps: CustomerSiteDeps): CustomerSite {
     siteStatusRoutes({ heartbeats: deps.heartbeats, fallbackContactUrl: config.fallbackContactUrl, assistantUrl: config.zaloAssistantUrl }),
     customerSessionRoutes({ ledger, ...throttle, clientKey, origins }),
     myMoneyRoutes({ ledger, clock }),
+    missingOrderRoutes({ ledger, clock, origins }),
     accountRoutes({ ledger, ...throttle, fingerprintKey: config.fingerprintKey, origins, clientKey }),
     webLinkRoutes({ ledger, clock, origins, ...(deps.links ?? { requestIdPrefix: "", tikTok: false }), ticketSecret: secret, clientKey, ...(deps.logger ? { logger: deps.logger } : {}) }),
     guideRoutes(),

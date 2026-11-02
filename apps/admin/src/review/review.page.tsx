@@ -5,7 +5,9 @@
  * them, one chip per reason counts the filtered set (LC-6) and only reasons present are shown.
  * One value per column: the order id (a code chip), the reason in words, the network, the day it
  * opened. "Xem" opens the case's panel (a right sheet, a drawer on phone); the list stops
- * refreshing while it is open (LC-11). An empty open queue reads `review_empty_open`.
+ * refreshing while it is open (LC-11). An empty open queue reads `review_empty_open`. An admin
+ * also has the merge proposals tab (`review_tab_merges`, merges/merge-proposals.tsx); while it is
+ * shown the case list is not fetched again.
  */
 import { REVIEW_CASE_REASONS, type ListSearchState, type ReviewCaseRow } from "@cashback/contracts";
 import { formatVnDateOf, systemClock } from "@cashback/core";
@@ -21,10 +23,12 @@ import {
 import { useMemo, useState } from "react";
 
 import { adminText } from "../labels";
+import { MergeProposals, useProposalCount } from "../merges/merge-proposals";
+import { useStaff } from "../session/staff-context";
 import { PageHeader } from "../shell/page-header";
 import { ReviewPanel } from "./review-panel";
 import { reasonLabel, networkName, subjectText } from "./review-text";
-import { REVIEW_SEARCH, tabOfState, useReviewCases, type ReviewTab } from "./review.queries";
+import { REVIEW_SEARCH, tabOfState, useReviewCases, type ReviewStatus, type ReviewTab } from "./review.queries";
 
 function Subject({ row }: { readonly row: ReviewCaseRow }) {
   const s = subjectText(row.subject);
@@ -85,7 +89,7 @@ const RESOLVED_COLUMNS: readonly ListColumn<ReviewCaseRow>[] = [
 ];
 
 function reviewColumns(
-  tab: ReviewTab,
+  tab: ReviewStatus,
   onOpen: (row: ReviewCaseRow) => void,
 ): readonly ListColumn<ReviewCaseRow>[] {
   const resolved = tab === "RESOLVED" ? RESOLVED_COLUMNS : [];
@@ -165,15 +169,19 @@ const TAB_CLASS =
 function Tabs({
   tab,
   counts,
+  merges,
   onSelect,
 }: {
   readonly tab: ReviewTab;
   readonly counts: { open: number; resolved: number } | undefined;
+  /** The merge proposals' count, or null when the tab is not shown (an employee). */
+  readonly merges: number | undefined | null;
   readonly onSelect: (tab: ReviewTab) => void;
 }) {
   const tabs = [
-    { tab: "OPEN" as const, label: adminText("review_tab_open"), count: counts?.open },
-    { tab: "RESOLVED" as const, label: adminText("review_tab_resolved"), count: counts?.resolved },
+    { tab: "OPEN" as const, label: adminText("review_tab_open"), count: counts?.open, countKey: "review_tab_count" as const },
+    ...(merges === null ? [] : [{ tab: "MERGES" as const, label: adminText("review_tab_merges"), count: merges, countKey: "merges_tab_count" as const }]),
+    { tab: "RESOLVED" as const, label: adminText("review_tab_resolved"), count: counts?.resolved, countKey: "review_tab_count" as const },
   ];
   return (
     <div
@@ -200,7 +208,7 @@ function Tabs({
             <span
               data-count
               className="text-meta font-normal text-muted-foreground tabular-nums"
-              aria-label={adminText("review_tab_count", { count: formatCount(t.count) })}
+              aria-label={adminText(t.countKey, { count: formatCount(t.count) })}
             >
               {formatCount(t.count)}
             </span>
@@ -229,9 +237,13 @@ export interface ReviewPageProps {
 
 export function ReviewPage({ state, onStateChange }: ReviewPageProps) {
   const [opened, setOpened] = useState<ReviewCaseRow | null>(null);
-  const tab = tabOfState(state);
+  const admin = useStaff().role === "ADMIN";
+  const chosen = tabOfState(state);
+  const merging = chosen === "MERGES" && admin;
+  const tab: ReviewStatus = chosen === "RESOLVED" ? "RESOLVED" : "OPEN";
   const listState = useMemo(() => withoutStatus(state), [state]);
-  const query = useReviewCases(listState, tab, opened !== null);
+  const query = useReviewCases(listState, tab, opened !== null || merging);
+  const proposals = useProposalCount(admin);
   const columns = useMemo(() => reviewColumns(tab, setOpened), [tab]);
   const change = (next: ListSearchState, options?: { readonly replace?: boolean }): void => {
     onStateChange(
@@ -250,7 +262,10 @@ export function ReviewPage({ state, onStateChange }: ReviewPageProps) {
     <>
       <PageHeader title={adminText("nav_review")} lead={adminText("review_lead")} />
       <div className="flex min-w-0 flex-col gap-3">
-        <Tabs tab={tab} counts={query.data?.counts} onSelect={selectTab} />
+        <Tabs tab={merging ? "MERGES" : tab} counts={query.data?.counts} merges={admin ? proposals : null} onSelect={selectTab} />
+        {merging ? (
+          <MergeProposals />
+        ) : (
         <DataList
           search={REVIEW_SEARCH}
           state={listState}
@@ -266,6 +281,7 @@ export function ReviewPage({ state, onStateChange }: ReviewPageProps) {
             <FacetChips api={api} choices={CHOICES} label={adminText("review_reasons")} hideEmpty />
           )}
         />
+        )}
       </div>
       <ReviewPanel row={opened} onClose={() => setOpened(null)} />
     </>

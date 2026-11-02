@@ -47,6 +47,12 @@ const FACT_KEYS = new Set<string>([
   "status",
   "lastSeenInReportAt",
   "recordedAt",
+  "purchasedOn",
+  "productUrl",
+  "note",
+  "openedInZalo",
+  "otherCashbackLink",
+  "guestLink",
 ]);
 
 export const factLabel = (fact: ReviewFact): string =>

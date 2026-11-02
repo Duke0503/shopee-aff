@@ -60,6 +60,8 @@ export interface ListQueryResult<R> {
 export interface StatusFilter {
   readonly field: string;
   readonly entity: EntityName;
+  /** Shorter chip words by status value (the customer website's chips); the registry's otherwise. */
+  readonly labels?: Readonly<Record<string, string>>;
 }
 
 export interface SummaryField {
@@ -100,15 +102,20 @@ export interface DataListProps<R> {
    */
   readonly filters?: (api: FilterApi) => ReactNode;
   /**
-   * `cards` is the customer website's one column (Story 7.4): the `card` of every row at every
-   * width, the sort choice and the status chips in line above the rows (no filter sheet), and the
-   * short pager. `adaptive` (the default) is the desk's table on tablet and desktop.
+   * `cards` is the customer website's one column (Story 7.4, list-cards-controls.tsx): the `card`
+   * of every row at every width, the heading with the sort dropdown, the status filter (a sheet
+   * behind one button on a phone, chips in line wider) and the range with "show more" under the
+   * rows. `adaptive` (the default) is the desk's table on tablet and desktop.
    */
   readonly form?: "adaptive" | "cards";
   /** False for a list whose server spec searches nothing: no search box that could not find anything. */
   readonly searchable?: boolean;
   /** The words of one sort choice when "<column>: ascending" is not plain enough (the customer website). */
   readonly sortLabel?: (column: string, direction: "asc" | "desc") => string;
+  /** The card form's heading, drawn on one line with the sort dropdown. */
+  readonly title?: ReactNode;
+  /** The card form's own link after the range under the rows. */
+  readonly footerLink?: ReactNode;
 }
 
 /** A list fetch that failed with an HTTP status, or null status for no answer at all. */

@@ -16,6 +16,9 @@ import { NAV_ITEMS } from "../src/shell/nav-items";
 import { ASSISTANT_CHAT, asZaloBrowser, DOWN, FALLBACK, fakeServer, LAN, renderSite, UP } from "./app-harness";
 import { setViewportWidth } from "./viewport";
 
+/** My money greets the customer ("Chao <name>", or the plain greeting before the name is known). */
+const MY_MONEY_HEADING = new RegExp(`^${webText("my_money_greeting", { name: "" }).trim()}`);
+
 const HOME_TITLE = webText("home_title");
 const banner = () => screen.queryByRole("region", { name: webText("zalo_down_title") });
 const tabs = () => document.querySelector<HTMLElement>("[data-bottom-tabs]");
@@ -113,7 +116,7 @@ describe("Story 7.1 AC4: at 360 px in the Zalo in-app browser, each tab opens, t
     const bar = tabs() as HTMLElement;
     expect(bar).toHaveClass("fixed", "bottom-0", "pb-[env(safe-area-inset-bottom)]", "md:hidden");
     expect(within(bar).getAllByRole("listitem").map((li) => li.textContent)).toEqual(NAV_ITEMS.map((item) => webText(item.labelKey)));
-    const titles: Record<string, string> = { nav_home: HOME_TITLE, nav_my_money: webText("my_money_title"), nav_guide: webText("guide_title") };
+    const titles: Record<string, string | RegExp> = { nav_home: HOME_TITLE, nav_my_money: MY_MONEY_HEADING, nav_guide: webText("guide_title") };
     for (const item of NAV_ITEMS) {
       await user.click(within(tabs() as HTMLElement).getByRole("link", { name: webText(item.labelKey) }));
       await screen.findByRole("heading", { level: 1, name: titles[item.labelKey] });

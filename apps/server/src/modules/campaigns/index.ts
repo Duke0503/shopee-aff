@@ -24,3 +24,4 @@ export {
   type CampaignPreview,
 } from "./campaign-create.command";
 export { campaignNamesOf, campaignsOverlapping, liveAwards, type AwardFact, type CampaignWindow } from "./campaign-overview.query";
+export { campaignList, latestAwards, type CampaignAwardFact, type CampaignListRow } from "./campaign-list.query";

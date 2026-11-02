@@ -25,11 +25,11 @@ import { readCookie, STAFF_SESSION_COOKIE } from "./session-cookie";
 export const STAFF_PATH_PREFIX = "/api/admin/";
 
 /**
- * The admin-only actions of FR-24 by path: staff accounts, campaigns, payout void and forced
- * erase. A route on one of these paths is refused at registration unless it is `adminOnly`, so a
+ * The admin-only actions of FR-24 by path: staff accounts, campaigns, customer merges, payout
+ * void and forced erase. A route on one of these paths is refused at registration unless it is `adminOnly`, so a
  * later story cannot open one to employees by forgetting the flag.
  */
-export const ADMIN_ONLY_PATHS: readonly RegExp[] = [/^\/api\/admin\/staff(\/|$)/, /^\/api\/admin\/campaigns(\/|$)/, /^\/api\/admin\/payouts\/[^/]+\/void$/, /^\/api\/admin\/customers\/[^/]+\/force-erase$/];
+export const ADMIN_ONLY_PATHS: readonly RegExp[] = [/^\/api\/admin\/staff(\/|$)/, /^\/api\/admin\/campaigns(\/|$)/, /^\/api\/admin\/merges(\/|$)/, /^\/api\/admin\/payouts\/[^/]+\/void$/, /^\/api\/admin\/customers\/[^/]+\/force-erase$/];
 
 export interface StaffGate {
   readonly adminHost: string;

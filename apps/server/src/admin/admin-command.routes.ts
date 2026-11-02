@@ -76,7 +76,8 @@ function instantOrRefuse(text: string): Instant {
   }
 }
 
-function refusal(error: unknown): unknown {
+/** A command's own error as the HTTP refusal it means; anything else passes through. Shared with the desk routes. */
+export function refusal(error: unknown): unknown {
   if (error instanceof StaffAdminError) return new HttpError(STAFF_STATUS[error.code], `error.staff.${error.code}`, error.staffId === undefined ? undefined : { staffId: error.staffId });
   if (error instanceof CustomerMergeError) return new HttpError(MERGE_STATUS[error.code], `error.merge.${error.code}`, Object.keys(error.fields).length === 0 ? undefined : { ...error.fields });
   if (error instanceof CampaignCreateError) return new HttpError(CAMPAIGN_STATUS[error.code], `error.campaign.${error.code}`, error.field === undefined ? undefined : { field: error.field });
@@ -135,7 +136,7 @@ async function plannedHashes(plan: SeedPlan, passwords: Readonly<Record<string, 
   return hashes;
 }
 
-function campaignInput(db: LedgerDb, body: CampaignInputBody): CampaignInput {
+export function campaignInput(db: LedgerDb, body: CampaignInputBody): CampaignInput {
   const excluded = body.excludedCustomers.map((key) => {
     const found = resolveCustomer(db, key);
     if (found === null) throw new CampaignCreateError("bad_field", "excludedCustomers");
@@ -144,7 +145,7 @@ function campaignInput(db: LedgerDb, body: CampaignInputBody): CampaignInput {
   return { ...body, excludedCustomerIds: excluded };
 }
 
-function campaignAnswer(p: CampaignPreview, clock: Clock): CampaignPreviewResponse {
+export function campaignAnswer(p: CampaignPreview, clock: Clock): CampaignPreviewResponse {
   return { ...p, platforms: [...p.platforms], excludedCustomerIds: [...p.excludedCustomerIds], endsBefore: { time: formatVnTime(p.endsAt), date: formatVnDate(p.endsAt, clock) } };
 }
 
@@ -206,10 +207,10 @@ function campaignRoutes(app: FastifyInstance, deps: AdminCommandDeps): void {
 }
 
 const balanceFigures = (b: Omit<Balance, "customerId">) => ({ gross: b.gross, payable: b.payable, waiting: b.waiting, paid: b.paid, deductedNext: b.deductedNext });
-const balanceOf = (db: LedgerDb, customerId: string) => balanceFigures(getBalances(db, [customerId])[0] ?? NO_BALANCE);
-const openClaimOf = (db: LedgerDb) => (customerId: string) => hasOpenClaim(db, customerKeys(db, customerId)?.keys ?? [customerId]);
+export const balanceOf = (db: LedgerDb, customerId: string) => balanceFigures(getBalances(db, [customerId])[0] ?? NO_BALANCE);
+export const openClaimOf = (db: LedgerDb) => (customerId: string) => hasOpenClaim(db, customerKeys(db, customerId)?.keys ?? [customerId]);
 
-function mergePreview(db: LedgerDb, plan: MergePlan): CustomerMergePreview {
+export function mergePreview(db: LedgerDb, plan: MergePlan): CustomerMergePreview {
   const sideOf = (s: MergeSide) => ({ customerId: s.customerId, customerCode: s.customerCode, customerName: s.displayName, status: s.status, bank: s.bank, balance: balanceOf(db, s.customerId) });
   const merged = sideOf(plan.merged);
   const survivor = sideOf(plan.survivor);

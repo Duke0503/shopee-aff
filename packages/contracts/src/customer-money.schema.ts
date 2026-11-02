@@ -28,6 +28,8 @@ export const myProofPath = (payoutId: number): string => `/api/me/payouts/${payo
 
 export const myMoneySchema = z.object({
   customerCode: z.string(),
+  /** The greeting's name (the stored display name) and the month the customer joined; nothing else about them. */
+  customer: z.object({ displayName: nullable(z.string()), joinedAt: nullable(instant) }),
   balance: z.object({
     /** What the next payout sends: approved + refunded - deducted. */
     payable: dong,

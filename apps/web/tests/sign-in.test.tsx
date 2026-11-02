@@ -3,13 +3,16 @@
  * of the server shown where they belong, and the session a new password ended. The server side
  * (cookie, hash, delay, burst alert, Origin) is in apps/server/tests/customer-sign-in.test.ts.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { errorText, webText } from "../src/labels";
 import { asZaloBrowser, envelope, fakeServer, json, LAN, renderSite } from "./app-harness";
 import { setViewportWidth } from "./viewport";
+
+/** My money greets the customer ("Chao <name>", or the plain greeting before the name is known). */
+const MY_MONEY_HEADING = new RegExp(`^${webText("my_money_greeting", { name: "" }).trim()}`);
 
 const postSession = (answer: ReturnType<typeof json>) => (url: URL, init: RequestInit | undefined) => (url.pathname === "/api/session" && init?.method === "POST" ? answer : undefined);
 
@@ -97,7 +100,7 @@ describe("Story 7.2 AC6: at 360 px in the Zalo in-app browser the labels show, p
     await fill(user, " dp00012 ", "Kp7mWx3q");
     expect(server.requests.find((r) => r.method === "POST")?.body).toEqual({ customerCode: "dp00012", password: "Kp7mWx3q" });
     server.setSession(LAN);
-    await screen.findByRole("heading", { level: 1, name: webText("my_money_title") });
+    await screen.findByRole("heading", { level: 1, name: MY_MONEY_HEADING });
     expect(history.location.pathname).toBe("/tien-cua-toi");
   });
 
@@ -121,8 +124,8 @@ describe("Story 7.2 AC5: a session ended by a new password says so on any signed
     expect(screen.getByRole("heading", { level: 1, name: webText("sign_in_title") })).toBeInTheDocument();
     await fill(user, "DP00012", "Nw3pass8");
     server.setSession(LAN);
-    await screen.findByRole("heading", { level: 1, name: webText("my_money_title") });
-    expect(within(document.querySelector("main") as HTMLElement).getByRole("button", { name: new RegExp(LAN.customerCode) })).toBeInTheDocument();
+    await screen.findByRole("heading", { level: 1, name: MY_MONEY_HEADING });
+    expect(document.querySelector("main [data-greeting]")).toHaveTextContent(LAN.customerCode);
   });
 
   it("shows the plain form, without that sentence, to a customer who is simply signed out", async () => {
@@ -143,7 +146,7 @@ describe("Story 7.2 review items 3, 4, 5 and 10", () => {
     expect(screen.queryByLabelText(webText("sign_in_password"))).toBeNull();
     server.setSession(LAN);
     await user.click(screen.getByRole("button", { name: webText("retry") }));
-    await screen.findByRole("heading", { level: 1, name: webText("my_money_title") });
+    await screen.findByRole("heading", { level: 1, name: MY_MONEY_HEADING });
   });
 
   it("review item 4: the new-password sentence stays on every page after the server said it once, until dismissed", async () => {

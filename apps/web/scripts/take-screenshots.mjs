@@ -4,7 +4,9 @@
 // (normal, with a deduction, empty) and its order list (list, filtered, empty) from
 // tests/fixtures/my-money.json, Account (no bank, held, saved, the bank picker, password and
 // errors), the Home link converter (signed out, signed in, creating, result, guest, unsupported,
-// unknown code, busy, no estimate) and the Guide, at phone 390, tablet 768 and desktop 1440. Starts the Vite dev
+// unknown code, busy, no estimate) and the Guide, one order in full (approved, waiting, paid,
+// rejected, cancelled after payout, not found) and the missing-order page (form, field errors,
+// received), at phone 390, tablet 768 and desktop 1440. Starts the Vite dev
 // server and answers /api from fixtures in the browser. Every page is also opened at 360 px with
 // the Zalo in-app browser's user agent and checked (Story 7.1 AC4): nothing scrolls sideways or
 // pokes past the viewport, no text is under 12 px, on touch screens every link, button and field
@@ -68,6 +70,12 @@ async function open(width, height, path, { status = UP, session = SIGNED_OUT, si
     route.fulfill(answer === undefined ? { status: 503, json: { error: { code: "busy", messageKey: "error.busy" } } } : { json: answer });
   });
   await page.route("**/api/me/payouts?**", (route) => route.fulfill({ json: MONEY[my.payouts] }));
+  await page.route(/\/api\/me\/orders\/[^/?]+$/, (route) => {
+    const id = decodeURIComponent(new URL(route.request().url()).pathname.split("/").pop() ?? "");
+    const key = Object.keys(MONEY).find((k) => k.startsWith("order") && !k.startsWith("orders") && MONEY[k].orderId === id);
+    route.fulfill(key === undefined ? { status: 404, json: { error: { code: "not_found", messageKey: "error.not_found" } } } : { json: MONEY[key] });
+  });
+  await page.route("**/api/me/missing-orders", (route) => route.fulfill({ json: { result: "received", orderId: JSON.parse(route.request().postData() ?? "{}").orderId ?? "" } }));
   await page.route("**/api/banks", (route) => route.fulfill({ json: BANKS }));
   await page.route("**/api/guide", (route) => route.fulfill({ json: GUIDE }));
   await page.route("**/api/me/bank-account", (route) => route.fulfill({ json: { result: "saved", bank: MONEY.moneyHeld.bank } }));
@@ -152,8 +160,7 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`my-money-empty-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { money: "moneyEmpty", orders: "ordersEmpty", payouts: "payoutsEmpty" } }, (page) => page.locator("[data-list-empty]").waitFor());
   await shoot(`my-orders-list-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "money" } }, async (page) => {
     await page.locator("[data-order-line]").first().waitFor();
-    await page.locator("[data-order-line]").nth(1).getByRole("button").last().click();
-    await page.locator("[data-order-line]").nth(1).locator("ol").scrollIntoViewIfNeeded();
+    await page.locator("[data-order-line]").last().scrollIntoViewIfNeeded();
   });
   await shoot(`my-orders-filtered-${label}`, width, height, "/tien-cua-toi?filter[status]=APPROVED", { session: LAN, my: { ...MY, money: "money" } }, (page) => page.locator("[data-order-line]").first().waitFor());
   await shoot(`my-orders-empty-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, orders: "ordersEmpty" } }, (page) => page.locator("[data-list-empty]").waitFor());
@@ -241,20 +248,53 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`s31-guide-${label}`, width, height, "/huong-dan", {}, (page) => page.locator("[data-money-example]").waitFor());
 }
 
+// Story 7.4 (owner request 2026-11-03): one order in full and the missing-order page (pen.dev opJFP, Gc1Zb).
+const ORDER_SHOTS = [
+  ["approved", "261012A0001"],
+  ["awaiting", "261026W0001"],
+  ["paid", "260915P0001"],
+  ["rejected", "261002R0001"],
+  ["reversed", "260901C0001"],
+];
+for (const [label, width, height] of WIDTHS) {
+  for (const [state, id] of ORDER_SHOTS) await shoot(`s35-order-${state}-${label}`, width, height, `/don-hang?ma=${id}`, { session: LAN }, (page) => page.locator("[data-order-detail]").waitFor());
+  await shoot(`s35-order-not-found-${label}`, width, height, "/don-hang?ma=KHONGCO1234", { session: LAN }, (page) => page.locator("[data-order-missing]").waitFor());
+  await shoot(`s35-missing-${label}`, width, height, "/khong-thay-don", { session: LAN }, (page) => page.locator("[data-missing-form]").waitFor());
+  await shoot(`s35-missing-errors-${label}`, width, height, "/khong-thay-don", { session: LAN }, async (page) => {
+    await page.locator("#missing-order-id").fill("abc");
+    await page.locator("[data-missing-form] button[type=submit]").click();
+    await page.locator("#missing-order-id-error").waitFor();
+  });
+  await shoot(`s35-missing-received-${label}`, width, height, "/khong-thay-don", { session: LAN }, async (page) => {
+    await page.locator("#check-openedInZalo").check();
+    await page.locator("#missing-order-id").fill("241028D9TRX");
+    await page.locator("[data-missing-form] button[type=submit]").click();
+    await page.locator("[data-missing-answer]").waitFor();
+  });
+}
+await shoot("s35-my-money-filter-sheet-phone-390", 390, 844, "/tien-cua-toi", { session: LAN }, async (page) => {
+  await page.locator("[data-order-line]").first().waitFor();
+  await page.getByRole("button", { name: /^B\u1ed9 l\u1ecdc/ }).click();
+  await page.getByRole("dialog").waitFor();
+  await page.waitForTimeout(400);
+});
+
 // Story 7.1 AC4: 360 px in the Zalo in-app browser, each tab and the sign-in form.
 if (only === undefined || "zalo-360".startsWith(only) || only.startsWith("zalo-360")) {
-  for (const [path, status, session] of [["/", DOWN, SIGNED_OUT], ["/tien-cua-toi", UP, LAN], ["/huong-dan", UP, SIGNED_OUT], ["/dang-nhap", DOWN, SIGNED_OUT], ["/tai-khoan", UP, LAN]]) {
+  for (const [path, status, session] of [["/", DOWN, SIGNED_OUT], ["/tien-cua-toi", UP, LAN], ["/huong-dan", UP, SIGNED_OUT], ["/dang-nhap", DOWN, SIGNED_OUT], ["/tai-khoan", UP, LAN], ["/don-hang?ma=260915P0001", UP, LAN], ["/khong-thay-don", UP, LAN]]) {
     const page = await open(360, 740, path, { status, session, zalo: true, my: { ...MY, money: "money" } });
     if (path === "/tien-cua-toi") await page.locator("[data-order-line]").first().waitFor();
     if (path === "/huong-dan") await page.locator("[data-money-example]").waitFor();
     if (path === "/tai-khoan") await page.locator("[data-bank]").waitFor();
+    if (path.startsWith("/don-hang")) await page.locator("[data-order-detail]").waitFor();
+    if (path === "/khong-thay-don") await page.locator("[data-missing-form]").waitFor();
     record(`zalo-360${path}`, await page.evaluate(layoutProblems));
     if (path === "/dang-nhap") {
       await page.locator("#customer-code").focus();
       await page.waitForTimeout(100);
       if ((await page.locator("[data-bottom-tabs]").count()) !== 0) problems.push({ name: "zalo-360 keyboard", bar: "bottom bar still shown while a field has focus" });
       await page.screenshot({ path: join(out, "zalo-360-sign-in-keyboard.png"), fullPage: false });
-    } else await page.screenshot({ path: join(out, `zalo-360${path === "/" ? "-home" : path.replace("/", "-")}.png`), fullPage: true });
+    } else await page.screenshot({ path: join(out, `zalo-360${path === "/" ? "-home" : path.replace("/", "-").replace(/\?.*/, "")}.png`), fullPage: true });
     await page.close();
   }
 }

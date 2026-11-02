@@ -4,6 +4,7 @@
  */
 export {
   ArrowDownIcon,
+  ArrowLeftRightIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
   BanknoteIcon,

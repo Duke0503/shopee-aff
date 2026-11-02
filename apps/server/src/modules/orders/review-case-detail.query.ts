@@ -22,7 +22,7 @@ import { customerCardsOf, customerCodeOf, customerKeys } from "../identity/index
 import { httpsImageUrl, type NetworkStatus } from "../linking/index";
 import { recentOrdersOf } from "./order-cards.query";
 import { findOrder } from "./order-ledger.repository";
-import { SETTLEMENT_CASE_REASONS } from "./review-case.command";
+import { DISMISS_ONLY_CASE_REASONS } from "./review-case.command";
 import { caseCandidates, parseStored, storedRow } from "./review-plan.query";
 import { reviewCases } from "./schema";
 
@@ -181,7 +181,7 @@ export function reviewCaseDetail(db: LedgerDb, caseId: number): ReviewCaseDetail
     order,
     facts: reportFacts(c.observation, c.network) ?? otherFacts(c.observation),
     candidates: candidatesOf(db, c.candidates),
-    applicable: c.status === "OPEN" && !SETTLEMENT_CASE_REASONS.includes(c.reason),
+    applicable: c.status === "OPEN" && !DISMISS_ONLY_CASE_REASONS.includes(c.reason),
     frozen: stored?.status === "FROZEN",
   };
 }

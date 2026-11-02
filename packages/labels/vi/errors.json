@@ -72,6 +72,17 @@
   "error.merge.bank_differs": "Hai khách có số tài khoản khác nhau ({mergedBank} và {survivorBank}). Không gộp được.",
   "error.merge.claim_open": "Đang có người mở chuyển tiền cho {customer}. Đóng lần chuyển đó trước.",
   "error.merge.changed": "Dữ liệu đã đổi từ lúc xem trước. Xem trước lại rồi gộp.",
+  "error.staff.admin_only": "Chỉ quản trị viên được quản lý nhân viên.",
+  "error.staff.username_taken": "Tên đăng nhập này đã có người dùng.",
+  "error.staff.staff_not_found": "Không tìm thấy nhân viên này.",
+  "error.staff.root_protected": "Không đổi được vai trò hay tắt tài khoản quản trị gốc.",
+  "error.staff.root_differs": "Tài khoản quản trị gốc không khớp.",
+  "error.staff.password_required": "Thiếu mật khẩu cho nhân viên mới.",
+  "error.staff.no_root": "Chưa có tài khoản quản trị gốc. Tạo bằng lệnh staff-seed trước.",
+  "error.campaign.admin_only": "Chỉ quản trị viên được tạo campaign.",
+  "error.campaign.campaign_exists": "Đã có campaign mang mã này.",
+  "error.campaign.bad_window": "Thời gian chưa đúng. Nhập dạng 15/11/2026 00:00, lúc bắt đầu trước lúc kết thúc.",
+  "error.campaign.bad_field": "Một ô chưa đúng. Kiểm tra lại số suất, tiền thưởng và sàn.",
   "error.overview.bad_period": "Khoảng ngày không hợp lệ. Chọn từ 1 đến 366 ngày, ngày đầu trước ngày cuối.",
   "error.link.customer_not_found": "Không tìm thấy mã khách này.",
   "error.link.customer_disabled": "Tài khoản này đang tạm khoá nên chưa tạo được link. Vui lòng nhắn quản trị viên.",
@@ -100,5 +111,9 @@
   "error.password.is_code": "Mật khẩu không được trùng mã khách hàng.",
   "error.password.wrong_current": "Mật khẩu hiện tại chưa đúng.",
   "error.web_link.customer_unknown": "Không tìm thấy mã khách hàng",
-  "error.link.web_busy": "Web đang bận. Gửi link cho mình trên Zalo, bên đó không giới hạn."
+  "error.link.web_busy": "Web đang bận. Gửi link cho mình trên Zalo, bên đó không giới hạn.",
+  "error.missing_order.order_id_rule": "Mã đơn chưa đúng. Mã đơn Shopee như 241028D9TRX, mã đơn TikTok Shop gồm toàn chữ số.",
+  "error.missing_order.date_rule": "Chọn ngày mua trong 120 ngày qua.",
+  "error.missing_order.link_rule": "Link sản phẩm cần bắt đầu bằng https://",
+  "error.missing_order.too_many": "Hôm nay bạn đã báo nhiều đơn. Nhắn trợ lý Zalo giúp mình nhé."
 }

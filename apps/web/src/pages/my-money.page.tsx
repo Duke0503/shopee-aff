@@ -1,12 +1,15 @@
 /**
  * My money (W2, Stories 7.3 and 7.4, UJ-2): signed in only. One task: see where the money is.
- * The balance card, then the bank card (the one thing to fix when money waits for an account),
- * then the order lines or payouts. The card and the lists are separate reads: a failing list
+ * It greets the customer by the stored display name, with the code and the month they joined
+ * under it (pen.dev ktmGZ), then the balance card, the bank card (the one thing to fix when money
+ * waits for an account), then the order lines or payouts. The card and the lists are separate reads: a failing list
  * keeps the balance, a failing balance keeps the list, and each says so with its own retry.
  * Phone and tablet: one 640 px column (pen.dev ktmGZ, jW4fD, YtS6u). Desktop: the title across the
  * top, the money column on the left stays in view beside the list.
  */
-import { Button, CodeChip, RefreshCwIcon, Skeleton, type ChangeOptions } from "@cashback/ui";
+import type { MyMoney } from "@cashback/contracts";
+import { vnDateOf, type Instant } from "@cashback/core";
+import { Button, RefreshCwIcon, Skeleton, type ChangeOptions } from "@cashback/ui";
 import { useEffect, useMemo, useRef } from "react";
 
 import { webText } from "../labels";
@@ -15,7 +18,7 @@ import { BankCard } from "../money/bank-card";
 import { MoneyLists } from "../money/money-lists";
 import { moneySearch, viewOf } from "../money/money-search";
 import { useMyMoney } from "../money/money.queries";
-import { PageTitle } from "../shell/page-title";
+import { useDocumentTitle } from "../shell/use-document-title";
 import { SignedIn } from "./signed-in";
 
 export interface MyMoneyPageProps {
@@ -23,14 +26,22 @@ export interface MyMoneyPageProps {
   readonly onSearch: (next: Record<string, string>, options?: ChangeOptions) => void;
 }
 
-function Lead({ code }: { readonly code: string }) {
-  const [before = "", after = ""] = webText("my_money_lead", { code: "\u0000" }).split("\u0000");
+/** "09/2026": the Vietnam month the customer joined. */
+const monthOf = (instant: string): string => {
+  const [year = "", month = ""] = vnDateOf(instant as Instant).split("-");
+  return `${month}/${year}`;
+};
+
+/** The greeting by name, and the code with the month the customer joined; the code alone while the money loads or with no join time. */
+function Greeting({ code, money }: { readonly code: string; readonly money: MyMoney | undefined }) {
+  useDocumentTitle(webText("my_money_title"));
+  const name = money?.customer.displayName ?? null;
+  const joinedAt = money?.customer.joinedAt ?? null;
   return (
-    <p className="text-[15px] text-muted-foreground md:text-base">
-      {before}
-      <CodeChip code={code} className="mx-0.5 align-middle" />
-      {after}
-    </p>
+    <div className="flex min-w-0 flex-col gap-1.5" data-greeting>
+      <h1 className="text-[28px] leading-tight font-bold tracking-[-0.015em] break-words md:text-[32px]">{name === null ? webText("my_money_greeting_anonymous") : webText("my_money_greeting", { name })}</h1>
+      <p className="text-[15px] text-muted-foreground md:text-base">{joinedAt === null ? code : webText("my_money_joined", { code, month: monthOf(joinedAt) })}</p>
+    </div>
   );
 }
 
@@ -88,11 +99,8 @@ function MyMoney({ code, search: raw, onSearch }: MyMoneyPageProps & { readonly 
   const money = useMyMoney();
   const search = useCanonicalSearch(raw, onSearch);
   return (
-    <div className="mx-auto flex max-w-[640px] flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10 xl:max-w-[1024px] xl:gap-8 xl:px-8 xl:pt-16">
-      <div className="flex flex-col gap-1.5">
-        <PageTitle>{webText("my_money_title")}</PageTitle>
-        <Lead code={code} />
-      </div>
+    <div className="mx-auto flex max-w-[640px] flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10 xl:max-w-[1184px] xl:gap-8 xl:px-8 xl:pt-16">
+      <Greeting code={code} money={money.data} />
       <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[400px_minmax(0,1fr)] xl:items-start xl:gap-x-10">
         <div className="flex flex-col gap-4 xl:sticky xl:top-20">
           <MoneyColumn money={money} />

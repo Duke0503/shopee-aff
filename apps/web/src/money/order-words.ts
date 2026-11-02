@@ -33,6 +33,12 @@ function reasonWords(code: string | null): string {
   return words ?? webText("order_reason_fallback");
 }
 
+/** A rejected order's reason as a line of its own (the list's meta line, the order page). */
+export function reasonText(code: string | null): string {
+  const words = reasonWords(code);
+  return words.charAt(0).toLocaleUpperCase("vi") + words.slice(1);
+}
+
 /** The sentence a line shows under its badge, or null when the badge and the progress say it all. */
 export function stateSentence(status: string, rejectionReason: string | null): string | null {
   if (!SENTENCE_STATES.includes(status)) return null;

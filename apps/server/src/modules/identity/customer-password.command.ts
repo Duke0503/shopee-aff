@@ -19,10 +19,15 @@ import { customerSignInThrottles, customers, sessions } from "./schema";
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
 export const ISSUED_PASSWORD_CHARS = 8;
 
-export function newCustomerPassword(pick: (max: number) => number = randomInt): string {
+/** A password of `length` characters from the unambiguous alphabet; the staff screen issues longer ones. */
+export function issuedPassword(length: number, pick: (max: number) => number = randomInt): string {
   let password = "";
-  for (let i = 0; i < ISSUED_PASSWORD_CHARS; i++) password += ALPHABET[pick(ALPHABET.length)];
+  for (let i = 0; i < length; i++) password += ALPHABET[pick(ALPHABET.length)];
   return password;
+}
+
+export function newCustomerPassword(pick: (max: number) => number = randomInt): string {
+  return issuedPassword(ISSUED_PASSWORD_CHARS, pick);
 }
 
 /** Null, and nothing written, when the record is no longer an active customer (USER). */

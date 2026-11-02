@@ -27,9 +27,11 @@ export interface StatusChipsProps {
    * selected has no chip. The desk keeps every chip, 0 included.
    */
   readonly hideEmpty?: boolean;
+  /** Shorter words by status value; the registry's label otherwise. */
+  readonly labels?: Readonly<Record<string, string>> | undefined;
 }
 
-export function StatusChips({ entity, facets, total, selected, onChange, overall, hideEmpty = false }: StatusChipsProps) {
+export function StatusChips({ entity, facets, total, selected, onChange, overall, hideEmpty = false, labels }: StatusChipsProps) {
   const counts = new Map((facets ?? []).map((f) => [f.value, f.count]));
   const toggle = (value: string): void => onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   const sheet = useFilterLayout() === "sheet";
@@ -45,7 +47,7 @@ export function StatusChips({ entity, facets, total, selected, onChange, overall
         .filter((s) => s.derivedFrom === null)
         .filter((s) => !hideEmpty || facets === undefined || (counts.get(s.value) ?? 0) > 0 || selected.includes(s.value))
         .map((s) => (
-          <FilterChip key={s.value} label={statusLabel(s.labelKey)} count={facets === undefined ? undefined : (counts.get(s.value) ?? 0)} pressed={selected.includes(s.value)} onToggle={() => toggle(s.value)} />
+          <FilterChip key={s.value} label={labels?.[s.value] ?? statusLabel(s.labelKey)} count={facets === undefined ? undefined : (counts.get(s.value) ?? 0)} pressed={selected.includes(s.value)} onToggle={() => toggle(s.value)} />
         ))}
     </div>
   );

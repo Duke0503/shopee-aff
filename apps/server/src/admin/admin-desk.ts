@@ -18,9 +18,13 @@ import type { Logger } from "../platform/log/logger";
 import { cloudflareAccessKeys, type AccessKeySource } from "../platform/http/access-jwt.guard";
 import type { StaffGate, StaffRoutes } from "../platform/http/staff-routes";
 import { applyDepsFor, reviewReadDepsFor } from "../reconcile/apply-deps";
+import { campaignDeskRoutes } from "./campaign-desk.routes";
 import { customerDeskRoutes } from "./customer-desk.routes";
 import { customerEraseRoutes } from "./customer-erase.routes";
+import { deskCountsRoutes } from "./desk-counts.routes";
+import { mergeDeskRoutes } from "./merge-desk.routes";
 import { overviewRoutes } from "./overview.routes";
+import { staffDeskRoutes } from "./staff-desk.routes";
 
 export interface AdminDeskDeps {
   readonly access: StaffAccessConfig;
@@ -67,6 +71,10 @@ export function adminDesk(deps: AdminDeskDeps): AdminDesk {
     linkRequestDeskRoutes({ ledger, clock }),
     customerEraseRoutes({ ledger, clock }),
     overviewRoutes({ ledger, clock, ...(deps.health ? { health: deps.health } : {}) }),
+    deskCountsRoutes({ ledger, clock }),
+    staffDeskRoutes({ ledger, clock }),
+    campaignDeskRoutes({ ledger, clock }),
+    mergeDeskRoutes({ ledger, clock }),
   ];
   return { gate, routes };
 }

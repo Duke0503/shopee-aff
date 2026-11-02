@@ -1,23 +1,31 @@
 /**
- * My money's server reads (Stories 7.3 and 7.4, code.md §10): the balance card, the order lines
- * and the payouts of the signed-in customer. The session cookie names the customer; nothing here
- * sends an id. The URL state is in money-search.ts.
+ * My money's server calls (Stories 7.3 and 7.4, code.md §10): the balance card, the order lines,
+ * the payouts and one order in full of the signed-in customer, and the report of a purchase that
+ * did not show. The session cookie names the customer; nothing here sends a customer id. The URL
+ * state is in money-search.ts.
  */
 import {
+  MY_MISSING_ORDERS_PATH,
   MY_MONEY_PATH,
   MY_ORDERS_PATH,
   MY_PAYOUTS_PATH,
+  missingOrderResponseSchema,
   myMoneySchema,
+  myOrderDetailSchema,
+  myOrderPath,
   myOrdersResponseSchema,
   myPayoutsResponseSchema,
   type ListResponse,
   type ListSearchState,
+  type MissingOrderRequest,
+  type MissingOrderResponse,
   type MyMoney,
+  type MyOrderDetail,
   type MyOrderRow,
   type MyPayoutRow,
 } from "@cashback/contracts";
 import { ListFetchError, useListQuery } from "@cashback/ui";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, apiRequest, isUnauthorized } from "../api/api.queries";
 import { MONEY_KEY, SESSION_KEY } from "../session/session.queries";
@@ -69,5 +77,31 @@ export function useMyPayouts(state: ListSearchState) {
     search: MY_PAYOUTS_SEARCH,
     state,
     fetchList: async (query, signal): Promise<ListResponse<MyPayoutRow>> => myPayoutsResponseSchema.parse(await read(`${MY_PAYOUTS_PATH}?${query}`, signal, true)),
+  });
+}
+
+/** One of the customer's orders in full; a 404 (not theirs, or no such order) is not retried. */
+export function useMyOrder(orderId: string) {
+  const read = useCustomerRead();
+  return useQuery({
+    queryKey: [...MONEY_KEY, "order", orderId],
+    queryFn: async ({ signal }): Promise<MyOrderDetail> => myOrderDetailSchema.parse(await read(myOrderPath(orderId), signal, false)),
+    retry: (failures, error) => !(error instanceof ApiError && error.status !== null && error.status < 500) && failures < 1,
+    enabled: orderId !== "",
+  });
+}
+
+/** The report of a purchase the list does not show; a session that ended on the way shows the sign-in form. */
+export function useReportMissingOrder() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: MissingOrderRequest): Promise<MissingOrderResponse> => {
+      try {
+        return missingOrderResponseSchema.parse(await apiRequest(MY_MISSING_ORDERS_PATH, { method: "POST", body }));
+      } catch (error) {
+        if (isUnauthorized(error)) void client.resetQueries({ queryKey: SESSION_KEY, exact: true });
+        throw error;
+      }
+    },
   });
 }

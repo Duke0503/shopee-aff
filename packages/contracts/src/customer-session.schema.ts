@@ -48,4 +48,7 @@ export const CUSTOMER_PATHS = {
   myMoney: "/tien-cua-toi",
   account: "/tai-khoan",
   guide: "/huong-dan",
+  /** One order in full; the order id travels as `?ma=<orderId>`. */
+  orderDetail: "/don-hang",
+  missingOrder: "/khong-thay-don",
 } as const;

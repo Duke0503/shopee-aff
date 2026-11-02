@@ -12,7 +12,8 @@ export const MY_ORDERS_SEARCH_SPEC: ListSearchSpec = {
   sortable: ["recordedAt"],
   filters: [{ field: "status", values: storedValues("order") }],
   defaultSort: { field: "recordedAt", direction: "desc" },
-  pageSizes: [20],
+  // The "show more" link grows the page by 20 lines at a time (pen.dev ktmGZ footer).
+  pageSizes: [20, 40, 60, 80, 100],
 };
 
 export const MY_PAYOUTS_SEARCH_SPEC: ListSearchSpec = {

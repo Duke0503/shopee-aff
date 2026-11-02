@@ -8,6 +8,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, type RouterHistory } from "@tanstack/react-router";
 import { useMemo } from "react";
 
+import { CampaignsPage } from "./campaigns/campaigns.page";
 import { CustomerPage } from "./customers/customer.page";
 import { CustomersPage } from "./customers/customers.page";
 import { CUSTOMERS_SEARCH, TAB_SEARCH, tabOf } from "./customers/customers.queries";
@@ -31,6 +32,7 @@ import { PAYOUTS_SEARCH } from "./payouts/payouts.queries";
 import { ReviewPage } from "./review/review.page";
 import { REVIEW_SEARCH } from "./review/review.queries";
 import { SettingsPage } from "./settings/settings.page";
+import { StaffPage } from "./staff/staff.page";
 import { SignInRoute } from "./pages/sign-in-route";
 import { parseSearch, stringifySearch } from "./search-params";
 
@@ -184,6 +186,10 @@ export const reviewRoute = createRoute({
 
 const settingsRoute = createRoute({ getParentRoute: () => deskRoute, path: "settings", component: SettingsPage });
 
+/** Admin-only pages (FR-24): an employee who types the address sees the permission line; the server refuses their data too. */
+const campaignsRoute = createRoute({ getParentRoute: () => deskRoute, path: "campaigns", component: () => <AdminOnly>{<CampaignsPage />}</AdminOnly> });
+const staffRoute = createRoute({ getParentRoute: () => deskRoute, path: "staff", component: () => <AdminOnly>{<StaffPage />}</AdminOnly> });
+
 const routeTree = rootRoute.addChildren([
   signInRoute,
   deskRoute.addChildren([
@@ -196,8 +202,8 @@ const routeTree = rootRoute.addChildren([
     customersRoute,
     customerRoute,
     linksRoute,
-    pendingRoute("campaigns", "nav_campaigns", true),
-    pendingRoute("staff", "nav_staff", true),
+    campaignsRoute,
+    staffRoute,
     pendingRoute("audit", "nav_audit"),
     settingsRoute,
   ]),

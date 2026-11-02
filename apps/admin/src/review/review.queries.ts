@@ -28,18 +28,22 @@ import { apiRequest } from "../api/api.queries";
 import { CUSTOMERS_KEY } from "../customers/customers.queries";
 import { ORDERS_KEY } from "../orders/orders.queries";
 import { PAYOUTS_KEY } from "../payouts/payouts.queries";
+import { COUNTS_KEY } from "../shell/desk-counts.queries";
 
 export const REVIEW_KEY = ["admin", "review-cases"] as const;
 /** The Overview figures (its "cases to review" tile); the page that reads them is Story 4.5's. */
 export const OVERVIEW_KEY = ["admin", "overview"] as const;
 
 export const REVIEW_STATUSES = ["OPEN", "RESOLVED"] as const;
-export type ReviewTab = (typeof REVIEW_STATUSES)[number];
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+/** The tabs: the two queues and, for an admin, the merge proposals (never sent to the review list). */
+export const REVIEW_TABS = [...REVIEW_STATUSES, "MERGES"] as const;
+export type ReviewTab = (typeof REVIEW_TABS)[number];
 
 export const REVIEW_SEARCH = listSearch({
   sortable: ["caseId", "network", "orderId", "reason", "openedAt", "resolvedAt"],
   filters: [
-    { field: "status", values: REVIEW_STATUSES },
+    { field: "status", values: REVIEW_TABS },
     { field: "reason", values: REVIEW_CASE_REASONS },
     { field: "network", values: REVIEW_NETWORKS },
     { field: "openedAt" },
@@ -48,8 +52,10 @@ export const REVIEW_SEARCH = listSearch({
 });
 
 /** The tab a URL state shows: open cases unless it names the resolved ones. */
-export const tabOfState = (state: ListSearchState): ReviewTab =>
-  state.filters["status"]?.[0] === "RESOLVED" ? "RESOLVED" : "OPEN";
+export const tabOfState = (state: ListSearchState): ReviewTab => {
+  const status = state.filters["status"]?.[0];
+  return status === "RESOLVED" || status === "MERGES" ? status : "OPEN";
+};
 
 export async function fetchReviewCases(
   query: string,
@@ -61,7 +67,7 @@ export async function fetchReviewCases(
 }
 
 /** One tab of the queue; `paused` while a case's panel is open (LC-11). */
-export function useReviewCases(state: ListSearchState, tab: ReviewTab, paused: boolean) {
+export function useReviewCases(state: ListSearchState, tab: ReviewStatus, paused: boolean) {
   const withTab: ListSearchState = { ...state, filters: { ...state.filters, status: [tab] } };
   return useListQuery({
     key: REVIEW_KEY,
@@ -107,7 +113,7 @@ export function usePreviewReview() {
 /** Every query a resolved case can change (LC-10). */
 export function refreshAfterReview(client: QueryClient): Promise<unknown> {
   return Promise.all(
-    [REVIEW_KEY, ORDERS_KEY, PAYOUTS_KEY, CUSTOMERS_KEY, OVERVIEW_KEY].map((queryKey) =>
+    [REVIEW_KEY, ORDERS_KEY, PAYOUTS_KEY, CUSTOMERS_KEY, OVERVIEW_KEY, COUNTS_KEY].map((queryKey) =>
       client.invalidateQueries({ queryKey }),
     ),
   );

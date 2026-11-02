@@ -18,8 +18,8 @@ import {
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  DISMISS_ONLY_CASE_REASONS,
   REVIEW_CASES_LIST,
-  SETTLEMENT_CASE_REASONS,
   type CaseReason,
   type ReviewCaseErrorCode,
 } from "../src/modules/orders/index";
@@ -385,9 +385,9 @@ describe("Story 4.15 review fixes", () => {
 });
 
 describe("Story 4.15 shared definitions", () => {
-  it("every reason the server opens a case with is one the screen names, and the dismiss-only reasons are the settlement ones", () => {
+  it("every reason the server opens a case with is one the screen names, and the dismiss-only reasons are the settlement ones and the missing-order report", () => {
     expectTypeOf<CaseReason>().toEqualTypeOf<ReviewCaseReasonName>();
-    expect([...SETTLEMENT_CASE_REASONS].sort()).toEqual([...DISMISS_ONLY_REASONS].sort());
+    expect([...DISMISS_ONLY_CASE_REASONS].sort()).toEqual([...DISMISS_ONLY_REASONS].sort());
     expect(new Set(REVIEW_CASE_REASONS).size).toBe(REVIEW_CASE_REASONS.length);
   });
 

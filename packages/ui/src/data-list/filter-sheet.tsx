@@ -15,11 +15,13 @@ export interface FilterSheetProps {
   readonly activeCount: number;
   readonly summary: string;
   readonly children: ReactNode;
+  /** The button's own words (the customer website names the chosen status and its count). */
+  readonly label?: string;
 }
 
-export function FilterSheet({ activeCount, summary, children }: FilterSheetProps) {
+export function FilterSheet({ activeCount, summary, children, label: own }: FilterSheetProps) {
   const [open, setOpen] = useState(false);
-  const label = activeCount > 0 ? uiText("list_filters_button_active", { count: activeCount }) : uiText("list_filters_button");
+  const label = own ?? (activeCount > 0 ? uiText("list_filters_button_active", { count: activeCount }) : uiText("list_filters_button"));
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>

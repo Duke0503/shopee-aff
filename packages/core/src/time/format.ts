@@ -61,6 +61,11 @@ export function formatVnDateOf(value: unknown, clock: Clock): string | null {
   return isInstant(value) ? formatVnDate(value, clock) : null;
 }
 
+/** The same for the display date and time (`30/10 19:42`, the year only in another year), or null when the value is not a stored instant. */
+export function formatVnDateTimeOf(value: unknown, clock: Clock): string | null {
+  return isInstant(value) ? formatVnDateTime(value, clock) : null;
+}
+
 /** The same with the year always (`30/10/2026 19:42`), or null when the value is not a stored instant. */
 export function formatVnDateTimeWithYearOf(value: unknown): string | null {
   return isInstant(value) ? formatVnDateTimeWithYear(value) : null;

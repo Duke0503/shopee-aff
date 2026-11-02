@@ -373,6 +373,7 @@ export {
   type MyPayoutRow,
 } from "./customer-money.schema";
 export { MY_ORDERS_SEARCH_SPEC, MY_PAYOUTS_SEARCH_SPEC } from "./customer-money-search";
+export { MISSING_ORDER_ID, MISSING_ORDER_NOTE_MAX, MISSING_ORDER_RESULTS, MISSING_ORDER_URL_MAX, missingOrderRequestSchema, missingOrderResponseSchema, MY_MISSING_ORDERS_PATH, myOrderDetailSchema, myOrderMoneySchema, myOrderPath, type MissingOrderRequest, type MissingOrderResponse, type MyOrderDetail, type MyOrderMoney } from "./customer-order.schema";
 export { listResponseMiniSchema } from "./list-mini.schema";
 export {
   BANK_HOLDER_INPUT_MAX,
@@ -395,3 +396,4 @@ export {
 } from "./customer-account.schema";
 export { WEB_LINK_PATH, WEB_LINK_POLL_MS, WEB_LINK_STATES, WEB_LINK_URL_MAX, webLinkPath, webLinkQueuedSchema, webLinkRequestSchema, webLinkResultSchema, type WebLinkQueued, type WebLinkRequest, type WebLinkResult } from "./web-link.schema";
 export { GUIDE_PATH, guideFiguresSchema, type GuideFigures } from "./guide.schema";
+export { CAMPAIGN_AWARD_STATES, CAMPAIGN_AWARDS_SHOWN, CAMPAIGN_STATES, campaignAwardRowSchema, deskCampaignPreviewSchema, deskCampaignRequestSchema, deskCampaignSchema, deskCampaignsSchema, deskCountsSchema, deskMergePreviewSchema, deskMergeRequestSchema, deskMergeSideSchema, staffAddRequestSchema, staffIssuedPasswordSchema, staffListSchema, staffMemberSchema, type CampaignAwardRow, type CampaignState, type DeskCampaign, type DeskCampaigns, type DeskCounts, type DeskMergePreview, type DeskMergeSide, type StaffAddRequest, type StaffIssuedPassword, type StaffList, type StaffMember } from "./admin-desk.schema";

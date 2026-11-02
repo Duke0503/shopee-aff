@@ -20,6 +20,8 @@ const SignInRoute = lazy(() => import("./pages/sign-in-route").then((m) => ({ de
 const MyMoneyPage = lazy(() => import("./pages/my-money.page").then((m) => ({ default: m.MyMoneyPage })));
 const AccountPage = lazy(() => import("./pages/account.page").then((m) => ({ default: m.AccountPage })));
 const GuidePage = lazy(() => import("./pages/guide.page").then((m) => ({ default: m.GuidePage })));
+const OrderDetailPage = lazy(() => import("./pages/order-detail.page").then((m) => ({ default: m.OrderDetailPage })));
+const MissingOrderPage = lazy(() => import("./pages/missing-order.page").then((m) => ({ default: m.MissingOrderPage })));
 
 const rootRoute = createRootRoute({ component: SiteShell, notFoundComponent: NotFoundPage });
 
@@ -49,8 +51,18 @@ const myMoneyRoute = createRoute({
 });
 const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.account, component: AccountPage });
 const guideRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.guide, component: GuidePage });
+/** One order in full: the order id as `?ma=` (the page asks the server; an unknown id reads as no such order). */
+const orderDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: CUSTOMER_PATHS.orderDetail,
+  validateSearch: (raw: Record<string, unknown>): { ma: string } => ({ ma: typeof raw["ma"] === "string" ? raw["ma"].trim().slice(0, 40) : "" }),
+  component: function OrderDetailScreen() {
+    return <OrderDetailPage orderId={orderDetailRoute.useSearch().ma} />;
+  },
+});
+const missingOrderRoute = createRoute({ getParentRoute: () => rootRoute, path: CUSTOMER_PATHS.missingOrder, component: MissingOrderPage });
 
-const routeTree = rootRoute.addChildren([homeRoute, signInRoute, myMoneyRoute, accountRoute, guideRoute]);
+const routeTree = rootRoute.addChildren([homeRoute, signInRoute, myMoneyRoute, accountRoute, guideRoute, orderDetailRoute, missingOrderRoute]);
 
 export function createAppRouter(history?: RouterHistory) {
   return createRouter({ routeTree, parseSearch, stringifySearch, defaultPreload: false, scrollRestoration: true, ...(history === undefined ? {} : { history }) });

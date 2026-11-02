@@ -32,6 +32,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../api/api.queries";
 import { CUSTOMERS_KEY } from "../customers/customers.queries";
 import { ORDERS_KEY } from "../orders/orders.queries";
+import { COUNTS_KEY } from "../shell/desk-counts.queries";
 
 export const PAYOUTS_KEY = ["admin", "payouts"] as const;
 
@@ -104,6 +105,6 @@ export function useConfirmPayout() {
   return useMutation({
     mutationFn: async ({ claimId, snapshotHash }: ConfirmRequest): Promise<PayoutConfirmResponse> =>
       payoutConfirmResponseSchema.parse(await apiRequest(`/api/admin/payout-claims/${encodeURIComponent(claimId)}/confirm`, { method: "POST", body: { snapshotHash } })),
-    onSuccess: () => Promise.all([PAYOUTS_KEY, ORDERS_KEY, CUSTOMERS_KEY].map((queryKey) => client.invalidateQueries({ queryKey }))),
+    onSuccess: () => Promise.all([PAYOUTS_KEY, ORDERS_KEY, CUSTOMERS_KEY, COUNTS_KEY].map((queryKey) => client.invalidateQueries({ queryKey }))),
   });
 }

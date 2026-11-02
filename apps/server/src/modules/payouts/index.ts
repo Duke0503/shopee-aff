@@ -41,4 +41,5 @@ export { importNetworkSettlements, type ImportedNetworkSettlement, type NetworkS
 export { answerCustomersList, bankStateOf, CUSTOMERS_LIST, customerFlags, customerRows } from "./customers.list";
 export { customerMoney, type CustomerMoney } from "./customer-money.query";
 export { answerMyPayouts, CUSTOMER_PAYOUTS_LIST } from "./customer-payouts.list";
+export { cancelledAfterPayout, orderPayoutOf, type OrderPayout } from "./customer-order-payout.query";
 export { networkCash, networkProcessing, nettingFacts, owedNow, payoutsSent, type CashOrigin, type NettingFact, type NetworkCash, type OwedNow, type PayoutCash, type ProcessingBatches } from "./payout-overview.query";
