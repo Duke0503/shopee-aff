@@ -21,7 +21,7 @@ param(
 $ctx = New-CutoverContext "Live" $WorkDir
 $ctx.Node = Get-NodePath
 $ctx.StepEnv = @{ CASHBACK_ENV = "prod" }
-if ($null -eq $ctx.State.goLiveAt) { throw "Refused: the cutover state has no go-live time." }
+if ($null -eq (Get-StateValue $ctx "goLiveAt")) { throw "Refused: the cutover state has no go-live time." }
 if ($ctx.State.ContainsKey("rolledBackAt")) { throw "Refused: this cutover was rolled back." }
 if (Test-InsideWindow $ctx) { throw "Refused: the 72-hour window has not ended; rollback must stay possible." }
 

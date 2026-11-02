@@ -72,6 +72,14 @@ function ConvertTo-PlainHashtable($Value) {
   return $Value
 }
 
+function Get-StateValue($Ctx, [string]$Key) {
+  # Strict mode: a key the state never had reads as null, never as an error.
+  if ($null -eq $Ctx.State) { return $null }
+  if ($Ctx.State -is [System.Collections.IDictionary]) { if ($Ctx.State.Contains($Key)) { return $Ctx.State[$Key] } else { return $null } }
+  $prop = $Ctx.State.PSObject.Properties[$Key]
+  if ($null -eq $prop) { return $null } else { return $prop.Value }
+}
+
 function Read-CutoverState($Ctx) {
   if (-not (Test-Path -LiteralPath $Ctx.StateFile)) { return @{ mode = $Ctx.Mode; phases = @{} } }
   $state = ConvertTo-PlainHashtable (Get-Content -LiteralPath $Ctx.StateFile -Raw | ConvertFrom-Json)
@@ -94,7 +102,7 @@ function Test-PhaseDone($Ctx, [string]$Phase) {
 function Invoke-CutoverPlan($Ctx, [string[]]$Phases, [switch]$NoAutoRollback) {
   # A rolled-back run is over: its ledger, backup and import belong to a live system that kept
   # working afterwards. A new cutover starts in a new work folder and redoes every phase.
-  if ($Ctx.State.ContainsKey("rolledBackAt")) { throw "Refused: this work folder was rolled back at $($Ctx.State.rolledBackAt); start a new cutover with a new -WorkDir." }
+  if ($Ctx.State.ContainsKey("rolledBackAt")) { throw "Refused: this work folder was rolled back at $((Get-StateValue $Ctx "rolledBackAt")); start a new cutover with a new -WorkDir." }
   foreach ($phase in $Phases) {
     if (-not ($script:CutoverPhases -contains $phase)) { throw "Unknown phase $phase." }
     if (Test-PhaseDone $Ctx $phase) {
@@ -219,7 +227,7 @@ function Get-ConfiguredLedger($Ctx, [string]$Environment) {
 
 # The window in which a rollback is still offered: 72 hours after the new system went live.
 function Test-InsideWindow($Ctx) {
-  $goLive = $Ctx.State.goLiveAt
+  $goLive = (Get-StateValue $Ctx "goLiveAt")
   if ($null -eq $goLive) { return $true }
   if ($goLive -is [DateTime]) { $start = $goLive.ToUniversalTime() }
   else { $start = [DateTime]::Parse([string]$goLive, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal) }

@@ -80,7 +80,7 @@ function Invoke-Phase-preflight($Ctx) {
   $Ctx.State.openGaps = @($answer.line.openGaps)
   Save-CutoverState $Ctx
   $detail.openGaps = @($answer.line.openGaps)
-  $detail.runner = ($null -ne $Ctx.State.runner)
+  $detail.runner = ($null -ne (Get-StateValue $Ctx "runner"))
   return $detail
 }
 
@@ -89,12 +89,12 @@ function Invoke-Phase-stop-old($Ctx) {
     return [ordered]@{ dryRun = $true; wouldStopTasks = $script:CutoverLiveTasks; wouldDisableRunner = "actions.runner.*"; wouldWaitPortsFree = $script:CutoverLivePorts }
   }
   if (-not $Ctx.ConfirmOldExtensionRemoved) { throw "old_extension_not_confirmed" }
-  if ($null -ne $Ctx.State.runner) {
-    Stop-Service -Name $Ctx.State.runner.name -ErrorAction SilentlyContinue
-    Set-Service -Name $Ctx.State.runner.name -StartupType Disabled
+  if ($null -ne (Get-StateValue $Ctx "runner")) {
+    Stop-Service -Name (Get-StateValue $Ctx "runner").name -ErrorAction SilentlyContinue
+    Set-Service -Name (Get-StateValue $Ctx "runner").name -StartupType Disabled
   }
   foreach ($name in $script:CutoverLiveTasks) { Stop-CutoverLiveTask $Ctx $name }
-  $free = Wait-Until { (Get-ListeningPorts $script:CutoverLivePorts).Count -eq 0 } 60
+  $free = Wait-Until { @(Get-ListeningPorts $script:CutoverLivePorts).Count -eq 0 } 60
   $stopped = @()
   if (-not $free) {
     # Children the live tasks started (scripts/start-all.ps1 windows) can outlive the task: stop
@@ -106,10 +106,10 @@ function Invoke-Phase-stop-old($Ctx) {
         Stop-Process -Id $owner.Id -Force
       }
     }
-    $free = Wait-Until { (Get-ListeningPorts $script:CutoverLivePorts).Count -eq 0 } 20
+    $free = Wait-Until { @(Get-ListeningPorts $script:CutoverLivePorts).Count -eq 0 } 20
   }
   if (-not $free) { throw "live_ports_still_listening" }
-  return [ordered]@{ stoppedTasks = $script:CutoverLiveTasks; runnerDisabled = ($null -ne $Ctx.State.runner); stoppedByPort = $stopped }
+  return [ordered]@{ stoppedTasks = $script:CutoverLiveTasks; runnerDisabled = ($null -ne (Get-StateValue $Ctx "runner")); stoppedByPort = $stopped }
 }
 
 function Invoke-Phase-final-backup($Ctx) {

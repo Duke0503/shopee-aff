@@ -24,7 +24,7 @@ function Invoke-RehearsalCarryOver($Ctx) {
 
 function Invoke-Phase-carry-over($Ctx) {
   if ($Ctx.Mode -eq "Rehearsal") { return Invoke-RehearsalCarryOver $Ctx }
-  if ((Get-ListeningPorts @(8891)).Count -gt 0) { throw "live_assistant_still_running" }
+  if (@(Get-ListeningPorts @(8891)).Count -gt 0) { throw "live_assistant_still_running" }
   $zaloDir = Join-Path $env:USERPROFILE ".config\cashback\zalo"
   $credentials = Join-Path $zaloDir "credentials.json"
   $sets = @("--set", "PUBLIC_PORT=$($Ctx.PublicPort)", "--set", "LIVE_LEDGER_PATH=$($Ctx.LiveDb)", "--set", "ZALO_CREDENTIALS_PATH=$credentials")
@@ -69,7 +69,7 @@ function Invoke-Phase-start-new($Ctx) {
     $Ctx.State.rehearsalServer = $true
     Save-CutoverState $Ctx
     if (-not (Wait-Until { Test-HttpOk "http://127.0.0.1:$($Ctx.RehearsalPort)/api/health" } 120)) { throw "health_not_ok" }
-    return [ordered]@{ port = $Ctx.RehearsalPort; ledgerInstalled = $true; goLiveAt = $Ctx.State.goLiveAt; payoutWindowEndsAt = $Ctx.State.payoutWindowEndsAt; quiet = $true }
+    return [ordered]@{ port = $Ctx.RehearsalPort; ledgerInstalled = $true; goLiveAt = (Get-StateValue $Ctx "goLiveAt"); payoutWindowEndsAt = (Get-StateValue $Ctx "payoutWindowEndsAt"); quiet = $true }
   }
   Switch-MachineNode $Ctx
   # A shadow-run server of the new platform holds the ledger: stop it before the ledger changes.
@@ -78,11 +78,11 @@ function Invoke-Phase-start-new($Ctx) {
   if ($answer.code -ne 0) { throw (Get-PhaseFailure $answer "install_ledger_failed") }
   Start-GoLive $Ctx $answer.line.target
   $installArgs = @{}
-  if (@($Ctx.State.openGaps).Count -gt 0) { $installArgs.AllowGaps = $true }
+  if (@((Get-StateValue $Ctx "openGaps")).Count -gt 0) { $installArgs.AllowGaps = $true }
   & (Join-Path $PSScriptRoot "..\install-tasks.ps1") @installArgs | Out-Host
   & (Join-Path $PSScriptRoot "..\start.ps1") | Out-Host
   if (-not (Wait-Until { Test-HttpOk "http://127.0.0.1:$($Ctx.PublicPort)/api/health" } 600)) { throw "health_not_ok" }
-  return [ordered]@{ port = $Ctx.PublicPort; movedAside = $answer.line.movedAside; goLiveAt = $Ctx.State.goLiveAt; payoutWindowEndsAt = $Ctx.State.payoutWindowEndsAt; quiet = $true }
+  return [ordered]@{ port = $Ctx.PublicPort; movedAside = $answer.line.movedAside; goLiveAt = (Get-StateValue $Ctx "goLiveAt"); payoutWindowEndsAt = (Get-StateValue $Ctx "payoutWindowEndsAt"); quiet = $true }
 }
 
 # The full sample on 127.0.0.1, then one share link and receipt by localhost and [::1] (the tunnel's
@@ -109,7 +109,7 @@ function Stop-RehearsalServer($Ctx, [bool]$Complete = $false) {
 
 # A closed payout window means payouts may exist in the new ledger: the old system would pay again.
 function Assert-PayoutWindowOpen($Ctx) {
-  if ($null -eq $Ctx.State.goLiveAt) { return }
+  if ($null -eq (Get-StateValue $Ctx "goLiveAt")) { return }
   $ledger = Get-ConfiguredLedger $Ctx "prod"
   if (-not (Test-Path -LiteralPath $ledger)) { return }
   $flags = Invoke-CutoverStep $Ctx @("flags", $ledger)
@@ -128,7 +128,7 @@ function Invoke-CutoverRollback($Ctx, [string]$Reason) {
   Assert-PayoutWindowOpen $Ctx
   $steps = [ordered]@{}
   try { & (Join-Path $PSScriptRoot "..\stop.ps1") | Out-Host; $steps.newStopped = $true } catch { $steps.newStopped = $false }
-  $steps.port80Free = Wait-Until { (Get-ListeningPorts @($Ctx.PublicPort)).Count -eq 0 } 60
+  $steps.port80Free = Wait-Until { @(Get-ListeningPorts @($Ctx.PublicPort)).Count -eq 0 } 60
   if ($Ctx.State.ContainsKey("machinePath") -and $null -ne $Ctx.State.machinePath) {
     [Environment]::SetEnvironmentVariable("Path", $Ctx.State.machinePath, "Machine")
     $steps.machinePathRestored = $true
@@ -138,15 +138,15 @@ function Invoke-CutoverRollback($Ctx, [string]$Reason) {
     if ($null -ne $Ctx.State.liveTasks) { $before = $Ctx.State.liveTasks[$name] }
     if ($before -ne "Disabled") { Start-CutoverLiveTask $Ctx $name }
   }
-  $steps.livePort80 = Wait-Until { (Get-ListeningPorts @(80)).Count -gt 0 } 180
-  if ($null -ne $Ctx.State.runner) {
-    Set-Service -Name $Ctx.State.runner.name -StartupType $Ctx.State.runner.startType
-    if ($Ctx.State.runner.status -eq "Running") { Start-Service -Name $Ctx.State.runner.name }
+  $steps.livePort80 = Wait-Until { @(Get-ListeningPorts @(80)).Count -gt 0 } 180
+  if ($null -ne (Get-StateValue $Ctx "runner")) {
+    Set-Service -Name (Get-StateValue $Ctx "runner").name -StartupType (Get-StateValue $Ctx "runner").startType
+    if ((Get-StateValue $Ctx "runner").status -eq "Running") { Start-Service -Name (Get-StateValue $Ctx "runner").name }
     $steps.runnerRestored = $true
   }
   $Ctx.State.rolledBackAt = Get-UtcStamp
   Save-CutoverState $Ctx
-  Write-CutoverLog $Ctx ([ordered]@{ event = "cutover.rollback"; reason = $Reason; at = $Ctx.State.rolledBackAt; steps = $steps; manual = "re-enable the old extension in the old Edge profile (go-live-runbook.md section 7)" })
+  Write-CutoverLog $Ctx ([ordered]@{ event = "cutover.rollback"; reason = $Reason; at = (Get-StateValue $Ctx "rolledBackAt"); steps = $steps; manual = "re-enable the old extension in the old Edge profile (go-live-runbook.md section 7)" })
 }
 
 function Write-GoNoGo($Ctx, [bool]$Succeeded, [int]$PlannedDowntimeMinutes) {

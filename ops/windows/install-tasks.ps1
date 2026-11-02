@@ -36,7 +36,7 @@ $code = Invoke-Host $root $check
 if ($code -ne 0 -and -not $AllowGaps) { throw "pnpm host check failed (exit $code). Fix what it names, or pass -AllowGaps for the shadow run." }
 
 $node = Get-NodePath
-$user = "$env:USERDOMAIN\$env:USERNAME"
+$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 $serverDir = Join-Path $root "apps\server"
 
 function New-OwnAction([string]$Role) {
