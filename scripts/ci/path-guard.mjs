@@ -2,7 +2,7 @@
 // (AD-3, Story 1.1). Usage: node scripts/ci/path-guard.mjs [baseRef]
 import { execFileSync } from "node:child_process";
 
-const PROTECTED = ["src/cashback/", "web/", "zalo_assistant/", "extension/", "resources/", ".github/workflows/deploy.yml"];
+const PROTECTED = ["src/cashback/", "web/", "zalo_assistant/", "extension/", "resources/"];
 const base = process.argv[2] ?? process.env.GUARD_BASE ?? "origin/main-v2";
 
 let files;

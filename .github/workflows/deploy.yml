@@ -1,119 +1,36 @@
-name: CI/CD Auto Deploy to VPS
+name: Deploy to VPS
 
+# Every push to main deploys the new platform to the production VPS through the self-hosted runner
+# there (ops/windows/deploy.ps1): build first, then stop, mirror, install, start, and check health
+# and that exactly one Zalo assistant runs. A deploy never overlaps another.
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to Windows VPS
     runs-on: self-hosted
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Deploy & Sync to Production Directory
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Deploy
+        shell: powershell
         env:
-          RUNNER_TRACKING_ID: ""
+          USERPROFILE: C:\Users\Administrator
+          HOME: C:\Users\Administrator
+          LOCALAPPDATA: C:\Users\Administrator\AppData\Local
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\deploy.ps1 -Source "$env:GITHUB_WORKSPACE"
+      - name: Bridge changed
         shell: powershell
         run: |
-          # 0. Dam bao uv co trong PATH
-          $uvCandidateDirs = @(
-              "$env:USERPROFILE\.local\bin",
-              "$env:USERPROFILE\.cargo\bin",
-              "$env:LOCALAPPDATA\Programs\uv",
-              "C:\Users\Administrator\.local\bin",
-              "C:\Users\Administrator\.cargo\bin",
-              "C:\Program Files\uv"
-          )
-          foreach ($dir in $uvCandidateDirs) {
-              if (Test-Path (Join-Path $dir "uv.exe")) {
-                  $env:Path = "$dir;$env:Path"
-                  break
-              }
-          }
-
-          $prodDir = "C:\Project\mmo"
-          Write-Host ">>> [1/4] Kiem tra thu muc ung dung $prodDir..."
-          if (Test-Path $prodDir) {
-            Set-Location $prodDir
-            
-            Write-Host ">>> [2/4] Dong bo ma nguon moi nhat tu Git..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            # Dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env
-            $envFile = "$prodDir\.env"
-            if (Test-Path $envFile) {
-                $rawEnv = Get-Content $envFile -Raw
-                $changed = $false
-                if ($rawEnv -notmatch "ADDLIVETAG_API_KEY=") {
-                    $rawEnv += "`r`nADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212"
-                    $changed = $true
-                } elseif ($rawEnv -match "ADDLIVETAG_API_KEY=\s*(`r?`n|$)") {
-                    $rawEnv = $rawEnv -replace "ADDLIVETAG_API_KEY=\s*(`r?`n|$)", "ADDLIVETAG_API_KEY=621afb52c48da0787188e4cbdc2425e389bfd30bd6fbc212`$1"
-                    $changed = $true
-                }
-                if ($rawEnv -notmatch "THIRD_PARTY_FALLBACK=") {
-                    $rawEnv += "`r`nTHIRD_PARTY_FALLBACK=true"
-                    $changed = $true
-                } elseif ($rawEnv -match "THIRD_PARTY_FALLBACK=\s*(false|0|no)") {
-                    $rawEnv = $rawEnv -replace "THIRD_PARTY_FALLBACK=\s*(false|0|no)", "THIRD_PARTY_FALLBACK=true"
-                    $changed = $true
-                }
-                if ($changed) {
-                    Set-Content -Path $envFile -Value $rawEnv -NoNewline
-                    Write-Host "  -> Da tu dong dong bo ADDLIVETAG_API_KEY va THIRD_PARTY_FALLBACK vao .env" -ForegroundColor Green
-                }
-            }
-            
-            Write-Host ">>> [3/4] Cai dat va cap nhat goi thu vien (uv sync & npm install)..."
-            uv sync
-            if (Test-Path "$prodDir\zalo_assistant\package.json") {
-              Set-Location "$prodDir\zalo_assistant"
-              npm install --omit=dev
-              Set-Location $prodDir
-            }
-            
-            Write-Host ">>> [4/4] Khoi dong lai Backend & Zalo Assistant Bot..."
-            powershell -ExecutionPolicy Bypass -File "$prodDir\scripts\start-all.ps1" -CodeOnly
-          } else {
-            Write-Host ">>> Thu muc $prodDir chua ton tai, chay tren workspace hien tai..."
-            uv sync
-            cd zalo_assistant
-            npm install --omit=dev
-          }
-
-      - name: Send Telegram Notification
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          ACTOR: ${{ github.actor }}
-          SHA: ${{ github.sha }}
-        shell: powershell
-        run: |
-          try {
-            $uvCandidateDirs = @(
-                "$env:USERPROFILE\.local\bin",
-                "$env:USERPROFILE\.cargo\bin",
-                "$env:LOCALAPPDATA\Programs\uv",
-                "C:\Users\Administrator\.local\bin",
-                "C:\Users\Administrator\.cargo\bin",
-                "C:\Program Files\uv"
-            )
-            foreach ($dir in $uvCandidateDirs) {
-                if (Test-Path (Join-Path $dir "uv.exe")) {
-                    $env:Path = "$dir;$env:Path"
-                    break
-                }
-            }
-            $prodDir = "C:\Project\mmo"
-            if (Test-Path "$prodDir\scripts\notify_deploy.py") {
-                Set-Location $prodDir
-                uv run python scripts/notify_deploy.py
-            }
-          } catch {
-            Write-Host "Warning: Failed to send Telegram notification: $_"
-          }
+          $changed = git diff --name-only HEAD~1 HEAD -- apps/bridge
+          if ($changed) { Write-Host "::warning::The browser extension changed: reload Cashback Bridge in edge://extensions on the VPS." }
