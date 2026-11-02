@@ -53,7 +53,12 @@ describe("Story 6.7: chat commands for balance, orders, code, bank and help", ()
     const [balance] = getBalances(ledger.db, ["P1"]);
     expect(balance).toMatchObject({ payable: 79216, waiting: 9263 });
     const res = await post(ask("balance"));
-    expect(res).toEqual({ status: 200, body: { registered: false, customerCode: "DP00012", reply: { kind: "balance", payable: balance?.payable, waiting: balance?.waiting, paid: balance?.paid, deducted: 0, owedAfter: 0 } } });
+    expect(res).toEqual({ status: 200, body: { registered: false, customerCode: "DP00012", reply: { kind: "balance", payable: balance?.payable, waiting: balance?.waiting, paid: balance?.paid, deducted: 0, owedAfter: 0, customerCode: "DP00012", bank: null } } });
+    // As the live /sodu: the code and the payout account, its bank name and last four digits only.
+    addBank(ledger, "P1", { number: "0071000123456" });
+    const withBank = await post(ask("balance"));
+    expect(withBank.body["reply"]).toMatchObject({ bank: { bankName: "Vietcombank", lastFour: "3456", held: false } });
+    expect(JSON.stringify(withBank.body)).not.toContain("0071000");
   });
 
   it("/sodu with open clawbacks above the gross: deducted is what the next payout nets (the gross), the rest is still owed", async () => {
@@ -62,7 +67,7 @@ describe("Story 6.7: chat commands for balance, orders, code, bank and help", ()
     addClawback(ledger, "P1", "260901C0001", 9263);
     const [balance] = getBalances(ledger.db, ["P1"]);
     expect(balance).toMatchObject({ gross: 5000, payable: 0, deductedNext: 9263 });
-    expect((await app(ledger)(ask("balance"))).body["reply"]).toEqual({ kind: "balance", payable: 0, waiting: 0, paid: 0, deducted: 5000, owedAfter: 4263 });
+    expect((await app(ledger)(ask("balance"))).body["reply"]).toEqual({ kind: "balance", payable: 0, waiting: 0, paid: 0, deducted: 5000, owedAfter: 4263, customerCode: "DP00012", bank: null });
     const covered = payoutLedger();
     addOrder(covered, { id: "261001A0002", customer: "P1", cashback: 20000 });
     addClawback(covered, "P1", "260901C0002", 9263);
@@ -80,21 +85,23 @@ describe("Story 6.7: chat commands for balance, orders, code, bank and help", ()
     }
   });
 
-  it("AC3: /donhang in a private chat lists the latest orders with their status values, newest first, and no date", async () => {
+  it("AC3: /donhang in a private chat lists the latest orders with their status values and the live amounts and record dates, newest first", async () => {
     const ledger = lan();
     ledger.sqlite.exec("UPDATE orders SET recorded_at = '2026-10-01T03:00:00.000Z' WHERE order_id = '261001A0001'; UPDATE orders SET recorded_at = '2026-10-02T03:00:00.000Z' WHERE order_id = '261001W0001'");
     ledger.sqlite.prepare("INSERT INTO orders (order_id, network, platform, customer_id, status, rejection_reason, recorded_at, origin) VALUES ('261001R0001', 'shopee', 'shopee', 'P1', 'REJECTED', 'all_items_cancelled', '2026-09-30T03:00:00.000Z', 'REPORT')").run();
     addOrder(ledger, { id: "261001X0001", customer: "P2", cashback: 5000 });
     const res = await app(ledger)(ask("orders"));
+    // The live /donhang: the estimated cashback of an awaiting order, 0 for a rejected one; none is today's.
     expect(res.body["reply"]).toEqual({
       kind: "orders",
+      todayTotal: 0,
       orders: [
-        { orderId: "261001W0001", status: "AWAITING_APPROVAL", cashback: null, rejectionReason: null },
-        { orderId: "261001A0001", status: "APPROVED", cashback: 79216, rejectionReason: null },
-        { orderId: "261001R0001", status: "REJECTED", cashback: null, rejectionReason: "all_items_cancelled" },
+        { orderId: "261001W0001", status: "AWAITING_APPROVAL", cashback: null, rejectionReason: null, amount: 9263, recordedAt: "2026-10-02T03:00:00.000Z", today: false },
+        { orderId: "261001A0001", status: "APPROVED", cashback: 79216, rejectionReason: null, amount: 79216, recordedAt: "2026-10-01T03:00:00.000Z", today: false },
+        { orderId: "261001R0001", status: "REJECTED", cashback: null, rejectionReason: "all_items_cancelled", amount: 0, recordedAt: "2026-09-30T03:00:00.000Z", today: false },
       ],
     });
-    expect(JSON.stringify(res.body)).not.toMatch(/_at"|\d{4}-\d{2}-\d{2}/);
+    expect(JSON.stringify(res.body)).not.toMatch(/_at"/);
   });
 
   it(`AC3: /donhang lists at most ${CHAT_ORDERS_MAX} orders`, async () => {

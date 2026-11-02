@@ -76,7 +76,7 @@ describe("Story 4.8 acceptance criteria", () => {
     expect(all(ledger, "SELECT status, paid_at FROM campaign_awards")).toEqual([{ status: "PAID", paid_at: NOW }]);
     expect(all(ledger, "SELECT status, confirmed_at FROM payout_claims")).toEqual([{ status: "CONFIRMED", confirmed_at: NOW }]);
     const outbox = all(ledger, "SELECT dedup_key, customer_id, message_key, params, due_at FROM outbox");
-    expect(outbox).toEqual([{ dedup_key: `payout:${payout.payoutId}:recorded`, customer_id: "P1", message_key: "payout_recorded", params: JSON.stringify({ payoutId: payout.payoutId, amount: 135216, receiptToken: "rcpt_test_token_0001" }), due_at: NOW }]);
+    expect(outbox).toEqual([{ dedup_key: `payout:${payout.payoutId}:recorded`, customer_id: "P1", message_key: "payout_recorded", params: JSON.stringify({ payoutId: payout.payoutId, amount: 135216, receiptToken: "rcpt_test_token_0001", totalPaid: 135216, paidAt: NOW }), due_at: NOW }]);
     expect(all(ledger, "SELECT actor_id, actor_role FROM audit_entries WHERE event = 'payouts.payout.recorded'")).toEqual([{ actor_id: "minh", actor_role: "ADMIN" }]);
     expect(getBalances(ledger.db, ["P1"])[0]).toMatchObject({ gross: 0, payable: 0, paid: 135216, waiting: expect.any(Number) });
   });

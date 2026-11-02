@@ -43,7 +43,14 @@ afterEach(closeLedgers);
 const BOT_TOKEN = "123456789:FAKE-test-token-never-real";
 const CHAT_ID = "-100200300400";
 const START = "2026-11-02T01:00:00.000Z";
-const LABELS: Readonly<Record<string, string>> = ALERT_LABELS;
+const LABELS = ALERT_LABELS as unknown as Readonly<Record<string, string>> & { readonly kinds: Readonly<Record<string, { title: string; details: string; source?: string; action?: string; badge?: string }>> };
+const OLD_TELEGRAM = JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", "old-telegram-alerts.json"), "utf8")) as { raisedAt: string; texts: Record<string, string> };
+
+/** The texts the stored alerts make, each stamped with the time it was raised. */
+function storedTexts(ledger: ReturnType<typeof freshLedger>): string[] {
+  const rows = ledger.sqlite.prepare("SELECT kind, severity, suppressed, raised_at AS raisedAt FROM alerts ORDER BY id").all() as { kind: string; severity: AlertSeverity; suppressed: number; raisedAt: string }[];
+  return rows.map((row) => telegramText(row));
+}
 
 function fakeTelegram() {
   const bodies: { chat_id: string; text: string }[] = [];
@@ -90,7 +97,7 @@ describe("Story 8.3: Telegram owner alerts with cooldowns", () => {
     ]);
     clock.advance(60_000);
     await deliverPendingAlerts(ledger, telegram.sender, clock, logger);
-    expect(telegram.bodies.map((b) => b.text)).toEqual([telegramText({ kind: "bridge_login_lost", severity: "critical", suppressed: 0 }), telegramText({ kind: "bridge_login_lost", severity: "critical", suppressed: 1 })]);
+    expect(telegram.bodies.map((b) => b.text)).toEqual(storedTexts(ledger));
   });
 
   it("cooldowns: critical 5 minutes, high 15, warning 30, counted from the last alert sent, and a FAILED one never silences the next", async () => {
@@ -138,7 +145,7 @@ describe("Story 8.3: Telegram owner alerts with cooldowns", () => {
     expect(telegram.bodies).toHaveLength(1);
     clock.advance(4 * 60_000);
     await deliverPendingAlerts(ledger, telegram.sender, clock, logger);
-    expect(telegram.bodies.map((b) => b.text)).toEqual([telegramText({ kind: "assistant_down", severity: "critical", suppressed: 0 }), telegramText({ kind: "assistant_down", severity: "critical", suppressed: 1 })]);
+    expect(telegram.bodies.map((b) => b.text)).toEqual(storedTexts(ledger));
   });
 
   it("review 4: a first deploy skips pending alerts older than 24 hours with one log line, and one run sends at most 10", async () => {
@@ -166,23 +173,38 @@ describe("Story 8.3: Telegram owner alerts with cooldowns", () => {
     expect([...kinds.keys()].filter((kind) => !hasAlertLabel(kind))).toEqual([]);
     for (const [kind, severity] of kinds) {
       for (const suppressed of [0, 3]) {
-        const text = telegramText({ kind, severity: severity as AlertSeverity, suppressed });
-        // Only the label file's words and the repeat count: nothing filled in from the ledger.
-        const repeats = suppressed > 0 ? ` ${(LABELS["repeated"] as string).replace("{count}", String(suppressed))}` : "";
-        expect(text).toBe(`[${LABELS[`severity_${severity}`]}] ${LABELS[kind]}${repeats}`);
-        expect(text).not.toMatch(/\d{4,}/);
+        const text = telegramText({ kind, severity: severity as AlertSeverity, suppressed, raisedAt: START });
+        // Only the label file's words, the time and the repeat count: nothing filled in from the ledger.
+        const label = LABELS.kinds[kind];
+        const header = (LABELS[`header_${label?.badge ?? severity}`] as string).replace("{title}", label?.title ?? "");
+        expect(text.startsWith(`${header}
+`)).toBe(true);
+        expect(text).toContain(label?.details ?? "-");
+        expect(text).toContain((LABELS["line_time"] as string).replace("{time}", "08:00:00 - 02/11/2026"));
+        expect(text.includes((LABELS["line_repeated"] as string).replace("{count}", "3"))).toBe(suppressed === 3);
+        expect(text.replace(/<code>\d\d:\d\d:\d\d - \d\d\/\d\d\/\d{4}<\/code>/, "")).not.toMatch(/\d{4,}/);
         expect(text).not.toContain(kind);
-        expect(text.startsWith("[")).toBe(true);
       }
     }
-    expect(telegramText({ kind: "brand_new_kind", severity: "warning", suppressed: 0 })).toContain("brand_new_kind");
+    expect(telegramText({ kind: "brand_new_kind", severity: "warning", suppressed: 0, raisedAt: START })).toContain("brand_new_kind");
     // The request carries the chat and the text only; the token is only in the URL, never in the body.
     const ledger = freshLedger();
     const telegram = fakeTelegram();
     ledgerAlerts(ledger, movingClock(START)).alert("customer_sign_in_burst", "high");
     await deliverPendingAlerts(ledger, telegram.sender, movingClock(START), memoryLogger().logger);
-    expect(telegram.bodies).toEqual([{ chat_id: CHAT_ID, text: telegramText({ kind: "customer_sign_in_burst", severity: "high", suppressed: 0 }), disable_web_page_preview: true }]);
+    expect(telegram.bodies).toEqual([{ chat_id: CHAT_ID, text: telegramText({ kind: "customer_sign_in_burst", severity: "high", suppressed: 0, raisedAt: START }), parse_mode: "HTML", disable_web_page_preview: true }]);
     expect(JSON.stringify(telegram.bodies)).not.toContain(BOT_TOKEN);
+  });
+
+  it("message parity: an alert reads exactly as the live system's Telegram message (telegram_alerts.py report_bug, HTML)", () => {
+    const at = OLD_TELEGRAM.raisedAt;
+    expect(telegramText({ kind: "bridge_captcha", severity: "high", suppressed: 0, raisedAt: at })).toBe(OLD_TELEGRAM.texts["bridge_captcha"]);
+    expect(telegramText({ kind: "bridge_login_lost", severity: "critical", suppressed: 0, raisedAt: at })).toBe(OLD_TELEGRAM.texts["bridge_login_lost"]);
+    expect(telegramText({ kind: "brand_new_kind", severity: "warning", suppressed: 0, raisedAt: at })).toBe(OLD_TELEGRAM.texts["unknown_kind"]);
+    // A repeat adds one line in the same format; every text is escaped for the HTML parse mode.
+    expect(telegramText({ kind: "bridge_login_lost", severity: "critical", suppressed: 2, raisedAt: at })).toBe(`${OLD_TELEGRAM.texts["bridge_login_lost"] ?? ""}
+${(LABELS["line_repeated"] as string).replace("{count}", "2")}`);
+    expect(telegramText({ kind: "brand<b>&", severity: "warning", suppressed: 0, raisedAt: at })).toContain("brand&lt;b&gt;&amp;");
   });
 
   it("AC4: given Telegram unreachable, when an alert is due, then it is retried and the failure is logged, without blocking any command", async () => {
@@ -216,16 +238,16 @@ describe("Story 8.3: Telegram owner alerts with cooldowns", () => {
   it("a start refused at its pre-migration backup sends the alert at once, and a failed send is logged, never thrown", async () => {
     const sent: string[] = [];
     const { logger, lines } = memoryLogger();
-    const now = immediateAlerts({ send: async (text) => void sent.push(text) }, logger);
+    const now = immediateAlerts({ send: async (text) => void sent.push(text) }, logger, movingClock(START));
     now.alert("backup_failed", "high");
     await now.settled();
-    expect(sent).toEqual([telegramText({ kind: "backup_failed", severity: "high", suppressed: 0 })]);
+    expect(sent).toEqual([telegramText({ kind: "backup_failed", severity: "high", suppressed: 0, raisedAt: START })]);
     const failing: AlertSender = { send: () => Promise.reject(new Error("offline")) };
-    const broken = immediateAlerts(failing, logger);
+    const broken = immediateAlerts(failing, logger, movingClock(START));
     broken.alert("backup_failed", "high");
     await broken.settled();
     expect(lines.some((l) => l.includes("operations.alert.delivery_failed"))).toBe(true);
-    const silent = startupAlerts({ telegram: null }, logger);
+    const silent = startupAlerts({ telegram: null }, logger, movingClock(START));
     silent.alert("backup_failed", "high");
     await silent.settled();
     expect(lines.some((l) => l.includes('"result":"not_sent"'))).toBe(true);

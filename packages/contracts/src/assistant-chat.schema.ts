@@ -88,7 +88,20 @@ export const assistantLinkReplySchema = z.object({
   perShop: z.boolean(),
   product: z.object({ name: z.string().max(400).nullable(), price: z.number().int().min(0).nullable() }),
   /** The estimated cashback and the customer's share of the net it is (each percentage with its amount); null shows no amount. */
-  estimate: z.object({ cashback: z.number().int().min(0), shareBps: z.number().int().min(0).max(10_000), withheld: z.boolean() }).nullable(),
+  estimate: z
+    .object({
+      cashback: z.number().int().min(0),
+      shareBps: z.number().int().min(0).max(10_000),
+      withheld: z.boolean(),
+      /**
+       * The commission parts the live assistant listed under "commission now" (Shopee's rate of the
+       * price and the shop's XTRA rate, each with its amount), and whether Shopee's part hit the cap.
+       * Absent from a server older than the message parity (2026-11-02): the reply lists none.
+       */
+      parts: z.array(z.object({ part: z.enum(["shopee", "seller"]), rateBps: z.number().int().min(0).max(10_000), amount: z.number().int().min(0) })).max(2).optional(),
+      capped: z.boolean().optional(),
+    })
+    .nullable(),
 });
 export type AssistantLinkReply = z.infer<typeof assistantLinkReplySchema>;
 

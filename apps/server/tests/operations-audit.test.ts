@@ -232,7 +232,7 @@ describe("Story 3.2: alerts", () => {
       },
     };
     expect(await deliverPendingAlerts(ledger, sender, clock, silent)).toEqual({ sent: 1, failed: 0 });
-    expect(sent).toEqual([telegramText({ kind: "backup_failed", severity: "high", suppressed: 1 })]);
+    expect(sent).toEqual([telegramText({ kind: "backup_failed", severity: "high", suppressed: 1, raisedAt: "2026-10-30T07:00:00.000Z" })]);
     expect(ledger.sqlite.prepare("SELECT delivery, attempts, delivered_at FROM alerts").all()).toEqual([{ delivery: "SENT", attempts: 1, delivered_at: "2026-10-30T07:00:00.000Z" }]);
     expect(await deliverPendingAlerts(ledger, sender, clock, silent)).toEqual({ sent: 0, failed: 0 });
 
@@ -252,7 +252,7 @@ describe("Story 3.2: alerts", () => {
       return { ok: true, status: 200 };
     };
     await telegramSender({ botToken: "123:SECRET", chatId: "-100200", fetch: ok }).send("[HIGH] backup_failed");
-    expect(calls).toEqual([{ url: "https://api.telegram.org/bot123:SECRET/sendMessage", body: '{"chat_id":"-100200","text":"[HIGH] backup_failed","disable_web_page_preview":true}' }]);
+    expect(calls).toEqual([{ url: "https://api.telegram.org/bot123:SECRET/sendMessage", body: '{"chat_id":"-100200","text":"[HIGH] backup_failed","parse_mode":"HTML","disable_web_page_preview":true}' }]);
 
     const down: FetchLike = () => Promise.reject(new Error("connect ECONNREFUSED https://api.telegram.org/bot123:SECRET/sendMessage"));
     await expect(telegramSender({ botToken: "123:SECRET", chatId: "-100200", fetch: down }).send("x")).rejects.toThrow(/^telegram: request failed$/);

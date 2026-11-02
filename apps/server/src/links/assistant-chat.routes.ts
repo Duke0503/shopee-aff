@@ -54,7 +54,7 @@ import type { Clock } from "@cashback/core";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
 import { CustomerRegisterError, isGuestCustomer, recordMergeClaim, registerCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
-import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery } from "../modules/linking/index";
+import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery, type LinkEstimate } from "../modules/linking/index";
 import { isSilent, keyState, withdrawPendingNotification } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { periodWithheld, settlementPeriodOf } from "../modules/orders/index";
@@ -86,6 +86,10 @@ export function register(deps: Pick<AssistantChatRouteDeps, "ledger" | "clock">,
   }
 }
 
+/** Shopee's and the shop's rate with their amounts, as the live reply listed them. */
+const commissionParts = (estimate: LinkEstimate): { part: "shopee" | "seller"; rateBps: number; amount: number }[] =>
+  estimate.rates.flatMap((r) => (r.part === "customer_share" ? [] : [{ part: r.part, rateBps: r.rateBps, amount: r.amount }]));
+
 /** What a reply (or a "link ready" notification, Story 6.5) to one request says, for the customer named; null for another customer's request. */
 export function linkReplyOf(db: LedgerDb, deps: Pick<AssistantChatRouteDeps, "clock" | "shareBaseUrl">, requestId: string, customerId: string): AssistantLinkReply | null {
   const facts = linkReplyFactsOf(db, requestId);
@@ -102,7 +106,7 @@ export function linkReplyOf(db: LedgerDb, deps: Pick<AssistantChatRouteDeps, "cl
     network: facts.network,
     perShop: reply.perShopKey !== null,
     product: { name: reply.product.name, price: reply.product.price },
-    estimate: reply.estimate === null || share === undefined ? null : { cashback: reply.estimate.cashback, shareBps: share.rateBps, withheld: reply.estimate.withheld },
+    estimate: reply.estimate === null || share === undefined ? null : { cashback: reply.estimate.cashback, shareBps: share.rateBps, withheld: reply.estimate.withheld, parts: commissionParts(reply.estimate), capped: reply.estimate.capped },
   };
 }
 

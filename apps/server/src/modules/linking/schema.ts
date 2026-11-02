@@ -10,6 +10,10 @@ export const LINK_REQUEST_STATUSES = ["QUEUED", "ISSUED", "DELIVERED", "CONVERTE
 export const LINK_NETWORKS = ["shopee", "accesstrade"] as const;
 export type LinkNetwork = (typeof LINK_NETWORKS)[number];
 
+/** The source of a product's rates (migration 0033), as the live `estimate_source` names it. */
+export const RATES_SOURCES = ["third_party", "shopee"] as const;
+export type RatesSource = (typeof RATES_SOURCES)[number];
+
 export const productOffers = sqliteTable("product_offers", {
   productOfferId: text("product_offer_id").primaryKey().notNull(),
   shopId: text("shop_id"),
@@ -22,6 +26,8 @@ export const productOffers = sqliteTable("product_offers", {
   firstSeenAt: text("first_seen_at"),
   updatedAt: text("updated_at"),
   origin: text("origin", { enum: ["CUTOVER", "LOOKUP"] }).notNull(),
+  // Where the shared rates came from (migration 0033): the third party first, the Shopee pages second.
+  ratesSource: text("rates_source", { enum: RATES_SOURCES }),
 });
 
 export const linkRequests = sqliteTable("link_requests", {
@@ -60,6 +66,8 @@ export const linkRequests = sqliteTable("link_requests", {
   // How a website request was made and the HMAC of its caller's address (migration 0030, Story 7.6).
   webAccess: text("web_access", { enum: ["SESSION", "CODE", "GUEST"] }),
   webClientKey: text("web_client_key"),
+  // The source of the snapshot's rates (migration 0033); null while no rate is known.
+  estimateSource: text("estimate_source", { enum: RATES_SOURCES }),
 });
 
 export const shareCodes = sqliteTable("share_codes", {

@@ -7,6 +7,10 @@
  * (zalo-target.guard.ts), so no group outside `ZALO_GROUP_IDS` is ever written to or listened to.
  */
 
+import type { TextStyle } from "./styled-text";
+
+export type { TextStyle } from "./styled-text";
+
 export const ZALO_MODES = ["fake", "account", "relay"] as const;
 export type ZaloMode = (typeof ZALO_MODES)[number];
 
@@ -68,8 +72,11 @@ export interface ZaloSession {
   accountId(): string | null;
   /** One handler; a second call replaces the first. */
   onMessage(handler: MessageHandler): void;
-  /** Called only by the pacer; `mentions` tag people in a group message. */
-  sendText(target: ChatTarget, text: string, mentions?: readonly Mention[]): Promise<void>;
+  /**
+   * Called only by the pacer; `mentions` tag people in a group message; `styles` are zca-js text
+   * style ranges (bold, as the live bot sent them), offsets in UTF-16 code units of `text`.
+   */
+  sendText(target: ChatTarget, text: string, mentions?: readonly Mention[], styles?: readonly TextStyle[]): Promise<void>;
   /** One handler for session events; a second call replaces the first. */
   onEvent(handler: SessionEventHandler): void;
   /** Called only by the friend-request queue, through the pacer. */

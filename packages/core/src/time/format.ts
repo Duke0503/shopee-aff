@@ -12,6 +12,7 @@ function vnParts(instant: Instant) {
     year: shifted.getUTCFullYear(),
     dayMonth: `${pad(shifted.getUTCDate())}/${pad(shifted.getUTCMonth() + 1)}`,
     time: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`,
+    seconds: pad(shifted.getUTCSeconds()),
   };
 }
 
@@ -29,6 +30,15 @@ export function formatVnDateTime(instant: Instant, clock: Clock): string {
 export function formatVnDateTimeWithYear(instant: Instant): string {
   const p = vnParts(instant);
   return `${p.dayMonth}/${p.year} ${p.time}`;
+}
+
+/**
+ * `19:42:05 - 30/10/2026` in Vietnam time: the stamp the live system's owner alerts on Telegram
+ * carried (telegram_alerts.py, `%H:%M:%S - %d/%m/%Y`).
+ */
+export function formatVnAlertStamp(instant: Instant): string {
+  const p = vnParts(instant);
+  return `${p.time}:${p.seconds} - ${p.dayMonth}/${p.year}`;
 }
 
 /** `19:42` in Vietnam time, for "updated at" and stale lines beside a list. */

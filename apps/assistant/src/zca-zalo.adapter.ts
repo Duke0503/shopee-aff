@@ -2,7 +2,8 @@
  * The real personal Zalo account (AD-15, D9), through zca-js 2.2.0, the exact version the live
  * assistant runs, used the way the live assistant uses it: `new Zalo({ logging: false })`,
  * `login(credentials)` with the session file its `login.js` wrote (cookie, imei, userAgent), the
- * websocket listener started with `retryOnClose`, and `sendMessage` with mentions in groups. Reusing
+ * websocket listener started with `retryOnClose`, and `sendMessage` with mentions in groups and
+ * the text styles (bold) the live bot sent, in both chats (`{ msg, mentions, styles }`). Reusing
  * that file at cutover keeps the account, so every customer keeps the Zalo id their customer id is
  * (no merge). One account carries one session: the live assistant must be stopped first.
  *
@@ -18,7 +19,7 @@
  * itself refuses any group outside `ZALO_GROUP_IDS`.
  */
 import { readFile } from "node:fs/promises";
-import type { API, Credentials, ThreadType } from "zca-js";
+import type { API, Credentials, Style as ZcaStyle, ThreadType } from "zca-js";
 import { z } from "zod";
 
 import { guardTargets } from "./zalo-target.guard";
@@ -234,12 +235,13 @@ export async function openZcaSession(
     onMessage: (next) => {
       handler = next;
     },
-    sendText: async (target, text, mentions) => {
+    sendText: async (target, text, mentions, styles) => {
+      const styled = styles === undefined || styles.length === 0 ? {} : { styles: styles.map((s) => ({ start: s.start, len: s.len, st: s.st as ZcaStyle["st"] })) };
       if (target.kind === "private")
-        return void (await api.sendMessage({ msg: text }, target.userId, THREAD.User));
+        return void (await api.sendMessage({ msg: text, ...styled }, target.userId, THREAD.User));
       const tags = (mentions ?? []).map((m) => ({ uid: m.userId, pos: m.pos, len: m.len }));
       await api.sendMessage(
-        tags.length === 0 ? { msg: text } : { msg: text, mentions: tags },
+        { msg: text, ...(tags.length === 0 ? {} : { mentions: tags }), ...styled },
         target.groupId,
         THREAD.Group,
       );

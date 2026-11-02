@@ -6,7 +6,8 @@
  * maps to the Dev group. It is held to that: a private target, any group other than the one Dev
  * group configured, and every friend request are refused before anything is sent; it never asks
  * for the main group and never names a user. It hears nothing, so it registers no one, accepts
- * no friend and welcomes no one.
+ * no friend and welcomes no one. The live bot's broadcast API reads `message`, `mentions` and
+ * attachments only, so text styles are not passed: a relayed message arrives as plain text.
  *
  * Only main.ts builds it, only with `ZALO_MODE=relay` in dev (assistant.config.ts); no test sends
  * through it except with a fake `fetch`.

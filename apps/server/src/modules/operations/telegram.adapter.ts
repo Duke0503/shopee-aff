@@ -5,26 +5,52 @@
  * network.
  *
  * The message is the owner's Vietnamese text for the alert kind from packages/labels/vi/alerts.json
- * (Story 8.3): the severity word, the label and the repeat count, nothing else, so no personal
- * data, bank number or token can reach the chat.
+ * (Story 8.3), in the live system's Telegram format (src/cashback/core/telegram_alerts.py
+ * `report_bug`, owner requirement 2026-11-02): the severity header with the title, the source, the
+ * Vietnam time `HH:MM:SS - DD/MM/YYYY`, the details and the action, sent with `parse_mode: HTML`.
+ * Every text is escaped as the live `_sanitize_html` did. Only the label file's words, the time and
+ * the repeat count are filled in, so no personal data, bank number or token can reach the chat.
  */
+import { formatVnAlertStamp, type Instant } from "@cashback/core";
 import ALERT_LABELS from "@cashback/labels/vi/alerts.json" with { type: "json" };
 
 import type { AlertSeverity } from "./domain/alert-cooldown";
 
-const LABELS: Readonly<Record<string, string>> = ALERT_LABELS;
+interface KindText {
+  readonly title: string;
+  readonly details: string;
+  readonly source?: string;
+  readonly action?: string;
+  /** The header of another severity, where the live system showed that one for the same alert. */
+  readonly badge?: string;
+}
+
+const LABELS = ALERT_LABELS as unknown as Readonly<Record<string, string>> & { readonly kinds: Readonly<Record<string, KindText>>; readonly unknown_kind: KindText };
 
 const fill = (text: string, values: Record<string, string>): string => text.replace(/\{(\w+)\}/g, (all, key: string) => values[key] ?? all);
 
-/** True when the alert kind has its own owner text. */
-export const hasAlertLabel = (kind: string): boolean => /^[a-z][a-z0-9_]*$/.test(kind) && !kind.startsWith("severity_") && kind !== "repeated" && kind !== "unknown_kind" && typeof LABELS[kind] === "string";
+/** As the live `_sanitize_html`: `&`, `<` and `>` escaped for Telegram's HTML mode. */
+const escapeHtml = (text: string): string => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** The Telegram text of one stored alert. */
-export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number }): string {
-  const severity = LABELS[`severity_${alert.severity}`] ?? alert.severity;
-  const body = hasAlertLabel(alert.kind) ? (LABELS[alert.kind] as string) : fill(LABELS["unknown_kind"] ?? "{kind}", { kind: alert.kind });
-  const repeats = alert.suppressed > 0 ? ` ${fill(LABELS["repeated"] ?? "", { count: String(alert.suppressed) })}` : "";
-  return `[${severity}] ${body}${repeats}`;
+/** True when the alert kind has its own owner text. */
+export const hasAlertLabel = (kind: string): boolean => /^[a-z][a-z0-9_]*$/.test(kind) && Object.hasOwn(LABELS.kinds, kind);
+
+const isSeverity = (value: string | undefined): value is AlertSeverity => value === "critical" || value === "high" || value === "warning";
+
+/** The Telegram text (HTML) of one stored alert, stamped with the time it was raised. */
+export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number; raisedAt: string }): string {
+  const known = hasAlertLabel(alert.kind) ? LABELS.kinds[alert.kind] : undefined;
+  const text: KindText = known ?? { title: LABELS.unknown_kind.title, details: fill(LABELS.unknown_kind.details, { kind: alert.kind }) };
+  const severity = isSeverity(text.badge) ? text.badge : alert.severity;
+  const lines = [
+    fill(LABELS[`header_${severity}`] ?? "{title}", { title: escapeHtml(text.title) }),
+    fill(LABELS["line_source"] ?? "", { source: escapeHtml(text.source ?? LABELS["default_source"] ?? "") }),
+    fill(LABELS["line_time"] ?? "", { time: formatVnAlertStamp(alert.raisedAt as Instant) }),
+    fill(LABELS["line_details"] ?? "", { details: escapeHtml(text.details) }),
+  ];
+  if (text.action !== undefined) lines.push(fill(LABELS["line_action"] ?? "", { action: escapeHtml(text.action) }));
+  if (alert.suppressed > 0) lines.push(fill(LABELS["line_repeated"] ?? "", { count: String(alert.suppressed) }));
+  return lines.join("\n");
 }
 
 export interface AlertSender {
@@ -58,7 +84,7 @@ export function telegramSender(options: TelegramOptions): AlertSender {
         response = await send(`${TELEGRAM_API}/bot${options.botToken}/sendMessage`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ chat_id: options.chatId, text, disable_web_page_preview: true }),
+          body: JSON.stringify({ chat_id: options.chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
           signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
         });
       } catch {

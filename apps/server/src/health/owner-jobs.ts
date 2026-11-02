@@ -99,9 +99,9 @@ export function heartbeatJob(deps: OwnerJobsDeps): Job | null {
 }
 
 /** The alert port of the startup migration gate: sent at once, since no job runs after a refused start. */
-export function startupAlerts(config: Pick<ServerConfig, "telegram">, logger: Logger): AlertPort & { settled(): Promise<void> } {
+export function startupAlerts(config: Pick<ServerConfig, "telegram">, logger: Logger, clock: Clock): AlertPort & { settled(): Promise<void> } {
   if (config.telegram === null) {
     return { alert: (kind, severity) => logger.error({ kind, severity, result: "not_sent" }, "operations.alert.raised"), settled: async () => undefined };
   }
-  return immediateAlerts(telegramSender(config.telegram), logger);
+  return immediateAlerts(telegramSender(config.telegram), logger, clock);
 }

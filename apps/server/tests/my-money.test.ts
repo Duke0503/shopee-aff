@@ -128,7 +128,7 @@ describe("Story 7.3: My money shows payable, waiting and paid amounts", () => {
     const admin = customerPage(ledger.db, { customerId: "P1", keys: customerKeys(ledger.db, "P1")?.keys ?? [] }, CLOCK);
     expect(admin.balance).toMatchObject({ payable: mine.balance.payable, waiting: mine.balance.waiting, paid: mine.balance.paid, deductedNext: mine.balance.deducted + mine.balance.owedAfter });
     const { approved: _approved, refunded: _refunded, ...said } = mine.balance;
-    expect(commandReplyOf(ledger.db, "balance", "P1")).toEqual({ kind: "balance", ...said });
+    expect(commandReplyOf(ledger.db, "balance", "P1", CLOCK.now())).toMatchObject({ kind: "balance", ...said, customerCode: "DP00012" });
     expect(mine.customerCode).toBe("DP00012");
   });
 
@@ -179,7 +179,7 @@ describe("Story 7.3: My money shows payable, waiting and paid amounts", () => {
     expect(mine.deductions.map((d) => d.amount)).toEqual([30000]);
     const { approved, refunded, ...said } = mine.balance;
     expect([approved, refunded]).toEqual([10000, 0]);
-    expect(commandReplyOf(ledger.db, "balance", "P2")).toEqual({ kind: "balance", ...said });
+    expect(commandReplyOf(ledger.db, "balance", "P2", CLOCK.now())).toMatchObject({ kind: "balance", ...said });
   });
 
   it("AC3: another customer's data is never reachable: the session alone names the customer", async () => {

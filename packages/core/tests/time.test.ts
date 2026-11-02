@@ -9,6 +9,7 @@ import {
   formatVnDateTimeWithYear,
   formatVnDateTimeWithYearOf,
   formatVnDateOf,
+  formatVnAlertStamp,
   formatVnTime,
   formatVnTimeOf,
   nextVnTimeOfDay,
@@ -70,6 +71,7 @@ describe("display formats", () => {
   it("formats a time of day alone in Vietnam time, across the UTC date line", () => {
     expect(formatVnTime(parseInstant("2026-10-30T12:42:00.000Z"))).toBe("19:42");
     expect(formatVnTime(parseInstant("2026-10-30T17:05:00.000Z"))).toBe("00:05");
+    expect(formatVnAlertStamp(parseInstant("2026-10-30T17:05:09.000Z"))).toBe("00:05:09 - 31/10/2026");
   });
   it("formats an outside value only when it is a stored instant, else null", () => {
     expect(formatVnTimeOf("2026-10-30T12:42:00.000Z")).toBe("19:42");

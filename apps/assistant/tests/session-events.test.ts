@@ -154,12 +154,17 @@ describe("review 5: an acceptance is recorded only once it went through, and is 
 });
 
 describe("cutover: a member who joins the main group is welcomed, tagged, once ever", () => {
-  it("welcomes the new members of one join in one message tagging each by name, with the group_welcome text", async () => {
+  it("welcomes the new members of one join in one message tagging each by name, with one of the live welcome texts and its bold parts", async () => {
     const { zalo, welcomeState, assistant } = setup();
     zalo.emit({ kind: "group_join", groupId: MAIN_GROUP, members: [{ userId: "70001", name: "Lan" }, { userId: "70002", name: "Minh Anh" }] });
     await vi.advanceTimersByTimeAsync(MINUTE);
     expect(zalo.sent).toHaveLength(1);
-    expect(zalo.sent[0]).toMatchObject({ target: { kind: "group", groupId: MAIN_GROUP }, text: `@Lan @Minh Anh\n${messageText("group_welcome")}`, mentions: [{ userId: "70001", pos: 0, len: 4 }, { userId: "70002", pos: 5, len: 9 }] });
+    const expected = welcomeMessage([{ userId: "70001", name: "Lan" }, { userId: "70002", name: "Minh Anh" }], "group_welcome_1");
+    const text = expected.message.text;
+    expect(text).toContain("@Lan & @Minh Anh");
+    expect(zalo.sent[0]).toMatchObject({ target: { kind: "group", groupId: MAIN_GROUP }, text, styles: expected.message.styles, mentions: [{ userId: "70001", pos: text.indexOf("@Lan"), len: 4 }, { userId: "70002", pos: text.indexOf("@Minh Anh"), len: 9 }] });
+    // The bold parts sit after the tags, moved by them.
+    expect(expected.message.styles.map((s) => text.slice(s.start, s.start + s.len))).toContain("https://hoantiendp.com");
     expect(welcomeState.saved).toEqual([`${MAIN_GROUP}:70001`, `${MAIN_GROUP}:70002`]);
     zalo.emit({ kind: "group_join", groupId: MAIN_GROUP, members: [{ userId: "70001", name: "Lan" }] });
     await vi.advanceTimersByTimeAsync(MINUTE);
@@ -175,8 +180,10 @@ describe("cutover: a member who joins the main group is welcomed, tagged, once e
     await assistant.stop();
   });
 
-  it("a member without a name is welcomed untagged; the welcomed list survives a restart in group-welcomes.json", () => {
-    expect(welcomeMessage([{ userId: "70003", name: null }])).toEqual({ text: messageText("group_welcome"), mentions: [] });
+  it("a member without a name is tagged by the live fallback name; the welcomed list survives a restart in group-welcomes.json", () => {
+    const { message, mentions } = welcomeMessage([{ userId: "70003", name: null }]);
+    const mark = `@${messageText("member_fallback_name", { suffix: "0003" })}`;
+    expect(mentions).toEqual([{ userId: "70003", pos: message.text.indexOf(mark), len: mark.length }]);
     const files = new Map<string, string>();
     const io = { readFile: (p: string) => files.get(p) ?? null, writeFile: (p: string, t: string) => void files.set(p, t), rename: (a: string, b: string) => void (files.set(b, files.get(a)!), files.delete(a)) };
     const warnings: string[] = [];

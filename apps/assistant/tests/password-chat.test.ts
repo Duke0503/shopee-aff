@@ -63,7 +63,7 @@ describe("Story 6.8: /matkhau issues a new password and ends other sessions", ()
   });
 
   it("AC2: the reply tells the customer every other sign-in has ended", () => {
-    expect(messageText("command_password", { password: PASSWORD, customerCode: "DP00012" })).toMatch(/\u0111\u0103ng xu\u1ea5t/u);
+    expect(messageText("command_password", { password: PASSWORD, customerCode: "DP00012" })).toMatch(/tho\u00e1t ra/u);
   });
 
   it("AC3: /matkhau in the group is refused with the pointer to the private chat and no password", async () => {
@@ -71,7 +71,12 @@ describe("Story 6.8: /matkhau issues a new password and ends other sessions", ()
     server.routes[ASSISTANT_COMMAND_PATH] = () => ok({ registered: false, customerCode: null, reply: { kind: "private_only" } });
     const { zalo } = await run(server, inGroup("/matkhau"));
     expect(server.callsTo(ASSISTANT_COMMAND_PATH)).toEqual([{ zaloUserId: "70001", displayName: "Lan", chat: "group", command: "password" }]);
-    expect(zalo.sent.map((s) => s.text)).toEqual([`@Lan\n${messageText("command_private_only")}`]);
+    // As the live bot: the pointer in the group, and the nudge to ask again in the private chat.
+    expect(zalo.sent.map((s) => [s.target.kind, s.text])).toEqual([
+      ["group", `@Lan\n${messageText("command_private_only")}`],
+      ["private", messageText("command_password_from_group", { name: "Lan" })],
+    ]);
+    expect(zalo.sent.some((s) => s.text.includes(PASSWORD))).toBe(false);
   });
 
   it("AC4: the password value never appears in a log: the logged events name the error only, and the logger redacts message text", async () => {

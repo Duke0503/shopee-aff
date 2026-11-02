@@ -13,7 +13,7 @@ import { BANK_DETAILS_MAX_LENGTH, type AssistantBankReply } from "@cashback/cont
 
 import type { InternalApi } from "./internal-api.adapter";
 import type { ReplyMessage } from "./link-reply-text";
-import { messageText, type MessageKey } from "./messages";
+import { messageText, type MessageKey, type MessageValues } from "./messages";
 import type { IncomingMessage } from "./zalo.port";
 
 const RULE_MESSAGES: Readonly<Record<Extract<AssistantBankReply, { kind: "invalid" }>["rule"], MessageKey>> = {
@@ -64,7 +64,7 @@ export function looksLikeBankDetails(text: string): boolean {
 
 export interface BankSaveDeps {
   readonly api: Pick<InternalApi, "saveBank">;
-  readonly send: (target: IncomingMessage["chat"], key: MessageKey, values?: Readonly<Record<string, string>>) => Promise<void>;
+  readonly send: (target: IncomingMessage["chat"], key: MessageKey, values?: MessageValues) => Promise<void>;
 }
 
 /**
@@ -80,7 +80,7 @@ export async function saveBankFromChat(deps: BankSaveDeps, message: IncomingMess
     return true;
   }
   const answer = await deps.api.saveBank({ zaloUserId: message.senderId, displayName, chat: "private", details, ...(quoted ? { quoted } : {}) });
-  if (answer.registered) await deps.send(message.chat, "welcome", { customerCode: answer.customerCode ?? "" });
+  if (answer.registered) await deps.send(message.chat, "welcome", { name: displayName ?? messageText("sender_fallback_name"), customerCode: answer.customerCode ?? "" });
   if (answer.reply.kind === "not_bank_details") return answer.registered;
   const reply = bankReplyMessage(answer.reply);
   if (reply !== null) await deps.send(message.chat, reply.key, reply.values);

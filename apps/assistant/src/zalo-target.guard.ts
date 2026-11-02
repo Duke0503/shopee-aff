@@ -26,9 +26,9 @@ export function guardTargets(session: ZaloSession, allowedGroupIds: readonly str
     conflicted: () => session.conflicted(),
     accountId: () => session.accountId(),
     onMessage: (handler) => session.onMessage(async (message) => (isAllowedTarget(message.chat, allowed) ? handler(message) : undefined)),
-    sendText: async (target, text, mentions) => {
+    sendText: async (target, text, mentions, styles) => {
       if (!isAllowedTarget(target, allowed)) throw new ZaloTargetRefused();
-      await session.sendText(target, text, mentions);
+      await session.sendText(target, text, mentions, styles);
     },
     onEvent: (handler) => session.onEvent((event) => (event.kind === "group_join" && !allowed.has(event.groupId) ? undefined : handler(event))),
     addFriend: (userId, greeting) => session.addFriend(userId, greeting),

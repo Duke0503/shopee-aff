@@ -1,0 +1,8 @@
+{
+  "raisedAt": "2026-11-02T01:05:09.000Z",
+  "texts": {
+    "bridge_captcha": "🚨🔴 <b>[BUG CRITICAL - KHẨN CẤP] Shopee dính Captcha Xác Minh (Slider/Traffic)</b>\n\n📍 <b>Nguồn phát sinh:</b> <code>shopee.link_generator</code>\n⏱ <b>Thời gian:</b> <code>08:05:09 - 02/11/2026</code>\n📝 <b>Chi tiết sự cố:</b>\nTrang tạo link Shopee Affiliate yêu cầu xác thực bảo mật.\nURL: affiliate.shopee.vn/verify/...\n\n👉 <b>Hành động xử lý:</b>\nMở trình duyệt Google Chrome trên máy chạy Extension và thực hiện kéo thanh trượt / giải Captcha để tiếp tục tạo link.",
+    "bridge_login_lost": "🚨🔴 <b>[BUG CRITICAL - KHẨN CẤP] Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất</b>\n\n📍 <b>Nguồn phát sinh:</b> <code>shopee.link_generator</code>\n⏱ <b>Thời gian:</b> <code>08:05:09 - 02/11/2026</code>\n📝 <b>Chi tiết sự cố:</b>\nTab tạo link đã bị chuyển hướng về trang đăng nhập hoặc hết hạn token.\nURL: passport.shopee.vn / login\n\n👉 <b>Hành động xử lý:</b>\nMở Google Chrome trên máy chủ, truy cập lại affiliate.shopee.vn và đăng nhập lại tài khoản Shopee Affiliate.",
+    "unknown_kind": "⚠️🟡 <b>[CẢNH BÁO HỆ THỐNG - WARNING] Cảnh báo hệ thống</b>\n\n📍 <b>Nguồn phát sinh:</b> <code>Backend Service</code>\n⏱ <b>Thời gian:</b> <code>08:05:09 - 02/11/2026</code>\n📝 <b>Chi tiết sự cố:</b>\nLoại cảnh báo: brand_new_kind"
+  }
+}

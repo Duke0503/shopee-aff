@@ -99,6 +99,9 @@ export { BRIDGE_ANSWER_GRACE_MS, BRIDGE_JOB_TIMEOUT_MS, BRIDGE_PICKUP_MS, BRIDGE
 export { bridgeInternalRoutes, type BridgeRouteDeps } from "./http/bridge.routes";
 export { claimLookupJob, linkWorkDue, LOOKUP_RETRY_MS, LOOKUP_WINDOW_MS, LOOKUPS_PER_REQUEST, PRODUCT_FACTS_FRESH_MS, recordLookupResult, recordSilentLookup, SILENT_LOOKUPS_BEFORE_FAILURE, type LookupRecorded, type RecordedLookupAnswer } from "./link-lookup.command";
 export { MAX_LOOKUPS_PER_RUN, runProductLookups, type LookupJobDeps } from "./link-lookup.job";
+export { ADDLIVETAG_API_URL, ADDLIVETAG_TIMEOUT_MS, addlivetagLookup, type AddlivetagOptions, type ThirdPartyFailure, type ThirdPartyLookup, type ThirdPartyLookupAnswer } from "./addlivetag-lookup.adapter";
+export { percentToBps, readThirdPartyAnswer, wholeDong, type ThirdPartyFacts, type ThirdPartyMiss, type ThirdPartyReading } from "./domain/third-party-product";
+export { RATES_SOURCES, type RatesSource } from "./schema";
 export { labelledRate, readLookupFacts, readPriceText, readRateText, splitRates, type LookupPageTexts, type ProductFacts } from "./domain/product-lookup";
 export { linkReplyData, SHOPEEFOOD_REPLY_KEY, type LinkEstimate, type LinkReplyData, type ProductSnapshotFacts, type RateExample, type ReplyContext } from "./domain/link-reply";
 export { chromeIntentUrl, shareAgentOf, shareDeviceOf, type ShareAgent, type ShareDevice } from "./domain/share-agent";

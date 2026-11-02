@@ -73,7 +73,7 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
   let jobs: Scheduler | null = null;
   const parts = (): RunningParts => ({ jobs, closeServers: async () => (servers ? close(servers) : undefined), ledger, lock, logger });
   // A refused start runs no delivery job: a failed pre-migration backup is sent to Telegram at once (Story 8.2).
-  const gateAlerts = startupAlerts(config, logger);
+  const gateAlerts = startupAlerts(config, logger, systemClock);
   let migrated = false;
   try {
     ledger = await openMigratedLedger({

@@ -41,11 +41,11 @@ import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply, t
 type LinkClaim = (typeof LINK_CLAIMS)[number];
 
 import { looksLikeBankDetails, saveBankFromChat } from "./bank-reply";
-import { answerCommand, commandOf } from "./chat-command";
+import { answerCommand, answerStaticCommand, commandOf, staticCommandOf } from "./chat-command";
 import type { InternalApi } from "./internal-api.adapter";
 import { linkReplyMessage, refusalMessage, type ReplyMessage } from "./link-reply-text";
 import { customerCodeIn, extractFirstUrl } from "./message-parse";
-import type { MessageKey } from "./messages";
+import { messageText, type MessageKey, type MessageValues } from "./messages";
 import type { Sleep } from "./pacer";
 import type { ChatTarget, IncomingMessage } from "./zalo.port";
 
@@ -61,7 +61,7 @@ export interface Tag {
   readonly name: string;
 }
 
-export type ChatSend = (target: ChatTarget, key: MessageKey, values?: Readonly<Record<string, string | number>>, tag?: Tag | null) => Promise<void>;
+export type ChatSend = (target: ChatTarget, key: MessageKey, values?: MessageValues, tag?: Tag | null) => Promise<void>;
 
 /**
  * Sends one message whose words are decided only when the pacer grants its turn, right before the
@@ -88,6 +88,9 @@ export function displayNameOf(message: IncomingMessage): string | null {
   const name = (message.senderName ?? "").trim().slice(0, DISPLAY_NAME_MAX_LENGTH).trim();
   return name === "" ? null : name;
 }
+
+/** The welcome's values: the person's Zalo name (the fallback name without one, as live) and their new code. */
+export const welcomeValues = (name: string | null, customerCode: string | null): MessageValues => ({ name: name ?? messageText("sender_fallback_name"), customerCode: customerCode ?? "" });
 
 /**
  * Polls the reply facts until they are complete or the wait ends; null when no link was made in
@@ -126,7 +129,7 @@ async function answerLink(deps: ChatReplyDeps, message: IncomingMessage, url: st
   const name = displayNameOf(message);
   const tag = chat === "group" && name !== null ? { userId: message.senderId, name } : null;
   const answer = await deps.api.requestLink({ zaloUserId: message.senderId, displayName: name, chat, url });
-  const welcomed = started(chat === "private" && answer.registered ? deps.send(message.chat, "welcome", { customerCode: answer.customerCode ?? "" }) : null);
+  const welcomed = started(chat === "private" && answer.registered ? deps.send(message.chat, "welcome", welcomeValues(name, answer.customerCode)) : null);
   if (answer.outcome === "refused") {
     await welcomed();
     const key = refusalMessage(answer.reason, chat);
@@ -180,6 +183,8 @@ export function chatReplier(deps: ChatReplyDeps): (message: IncomingMessage) => 
     const url = extractFirstUrl(message.text);
     const command = url === null ? commandOf(message.text) : null;
     if (command !== null) return answerCommand(deps, message, command, displayNameOf(message));
+    const fixed = url === null ? staticCommandOf(message.text) : null;
+    if (fixed !== null) return answerStaticCommand(deps, message, fixed, displayNameOf(message));
     if (message.chat.kind === "group") {
       if (url !== null) await answerLink(deps, message, url, "group");
       return;
@@ -188,7 +193,7 @@ export function chatReplier(deps: ChatReplyDeps): (message: IncomingMessage) => 
     if (message.quoted === true && looksLikeBankDetails(message.text) && (await saveBankFromChat(deps, message, message.text.trim(), displayNameOf(message), true))) return;
     const claimedCode = customerCodeIn(message.text);
     const person = await deps.api.register({ zaloUserId: message.senderId, displayName: displayNameOf(message), ...(claimedCode === null ? {} : { claimedCode }) });
-    if (person.created) await deps.send(message.chat, "welcome", { customerCode: person.customerCode ?? "" });
+    if (person.created) await deps.send(message.chat, "welcome", welcomeValues(displayNameOf(message), person.customerCode));
     if (claimedCode !== null && (person.claim === "recorded" || person.claim === "known")) return deps.send(message.chat, "merge_claim_noted", { claimedCode });
     if (!person.created) await askOnceToday(message);
   };

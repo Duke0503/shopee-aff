@@ -8,14 +8,15 @@
  * link job hands it one submission at a time. The job also gets the outbox and alerts of its
  * results (Story 5.5) and the AccessTrade creator (Story 5.7); without a creator the assistant's
  * route refuses TikTok Shop links when they are submitted. After its links the run makes the
- * product lookups (Story 5.6) through the same bridge. A job of its own, every 5 s, sends a link
+ * product lookups (Story 5.6), asking the third party first when THIRD_PARTY_LOOKUP is on (owner
+ * decision 2026-11-02) and the same bridge second. A job of its own, every 5 s, sends a link
  * not handed over 55 s after its request by notification and closes older ones without a
  * message (Story 6.5), so a busy bridge never delays that.
  */
 import type { Clock } from "@cashback/core";
 
 import { assistantChatRoutes } from "./assistant-chat.routes";
-import { accessTradeLinkCreator, bridgeInternalRoutes, browserBridge, checkLinkDeliveries, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkDeliveryCheck, type LinkEffects } from "../modules/linking/index";
+import { accessTradeLinkCreator, addlivetagLookup, bridgeInternalRoutes, browserBridge, checkLinkDeliveries, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkDeliveryCheck, type LinkEffects, type ThirdPartyLookup } from "../modules/linking/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
 import { DEV_SUB_ID_PREFIX } from "../modules/orders/index";
@@ -60,6 +61,7 @@ export function environmentModes(config: ServerConfig): Record<string, string | 
     tunnel: config.publicBaseUrl !== null,
     assistantRoutes: config.assistantToken !== null,
     bridgeRoutes: config.bridgeMode === "browser" && config.bridgeToken !== null,
+    thirdPartyLookup: thirdPartyLookupFor(config) !== null,
   };
 }
 
@@ -105,6 +107,15 @@ export function accessTradeLinksFor(config: Pick<ServerConfig, "env" | "accesstr
   return config.env === "dev" ? fakeAccessTradeLinks() : null;
 }
 
+/**
+ * The third party asked first for product facts (owner decision 2026-11-02): on when
+ * THIRD_PARTY_LOOKUP resolves on and the key is set (env.config.ts); otherwise none, and lookups
+ * use the bridge alone. Dev may hold the production key only with ALLOW_PROD_ADDLIVETAG_KEY=1.
+ */
+export function thirdPartyLookupFor(config: Pick<ServerConfig, "thirdPartyLookup" | "addlivetagApiKey">): ThirdPartyLookup | null {
+  return config.thirdPartyLookup && config.addlivetagApiKey !== null ? addlivetagLookup({ apiKey: config.addlivetagApiKey }) : null;
+}
+
 /** One delivery check in one transaction, with the outbox bound to it (Story 6.5). */
 export function runLinkDeliveryCheck(ledger: Ledger, clock: Clock, logger?: Logger): LinkDeliveryCheck {
   const checked = ledger.tx((db) => checkLinkDeliveries(db, clock, { outbox: outboxFor(db, clock, commandAudit(db, clock, LINKS_ACTOR)), alerts: alertsFor(db, clock, logger) }));
@@ -121,6 +132,7 @@ export function linkJobs(input: LinkWiringInput, bridge: LinkBridge): Job[] {
     logger: input.logger,
     effects: linkEffectsFor(input.clock, input.logger),
     accessTrade: accessTradeLinksFor(input.config),
+    thirdParty: thirdPartyLookupFor(input.config),
   };
   // Product lookups (Story 5.6) follow the run's link submissions and yield to any link that comes due.
   const run = async (signal: AbortSignal): Promise<void> => {

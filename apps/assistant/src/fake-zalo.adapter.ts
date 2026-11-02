@@ -6,10 +6,10 @@
  */
 import type { Clock, Instant } from "@cashback/core";
 
-import type { ChatTarget, IncomingMessage, Mention, MessageHandler, SessionEvent, SessionEventHandler, ZaloSession } from "./zalo.port";
+import type { ChatTarget, IncomingMessage, Mention, MessageHandler, SessionEvent, SessionEventHandler, TextStyle, ZaloSession } from "./zalo.port";
 
 export interface FakeZaloSession extends ZaloSession {
-  readonly sent: readonly { readonly target: ChatTarget; readonly text: string; readonly at: Instant; readonly mentions?: readonly Mention[] }[];
+  readonly sent: readonly { readonly target: ChatTarget; readonly text: string; readonly at: Instant; readonly mentions?: readonly Mention[]; readonly styles?: readonly TextStyle[] }[];
   readonly friendRequests: readonly { readonly userId: string; readonly greeting: string; readonly at: Instant }[];
   readonly accepted: readonly { readonly userId: string; readonly at: Instant }[];
   /** Test helper: the friend requests waiting in Zalo, which `pendingFriendRequests` reads. */
@@ -29,7 +29,7 @@ export interface FakeZaloSession extends ZaloSession {
 export const FAKE_ACCOUNT_ID = "fake0000000000000001";
 
 export function fakeZaloSession(clock: Clock, accountId: string = FAKE_ACCOUNT_ID): FakeZaloSession {
-  const sent: { target: ChatTarget; text: string; at: Instant; mentions?: readonly Mention[] }[] = [];
+  const sent: { target: ChatTarget; text: string; at: Instant; mentions?: readonly Mention[]; styles?: readonly TextStyle[] }[] = [];
   const friendRequests: { userId: string; greeting: string; at: Instant }[] = [];
   const accepted: { userId: string; at: Instant }[] = [];
   let handler: MessageHandler | null = null;
@@ -47,8 +47,8 @@ export function fakeZaloSession(clock: Clock, accountId: string = FAKE_ACCOUNT_I
     onMessage: (next) => {
       handler = next;
     },
-    sendText: async (target, text, mentions) => {
-      sent.push({ target, text, at: clock.now(), ...(mentions === undefined ? {} : { mentions }) });
+    sendText: async (target, text, mentions, styles) => {
+      sent.push({ target, text, at: clock.now(), ...(mentions === undefined ? {} : { mentions }), ...(styles === undefined || styles.length === 0 ? {} : { styles }) });
     },
     onEvent: (next) => {
       events = next;

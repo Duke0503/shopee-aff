@@ -26,6 +26,8 @@
  * refused, anyone else (a person the server does not know included) is accepted, as live.
  */
 import { ASSISTANT_COMMAND_PATH, ASSISTANT_FRIEND_CHECK_PATH, assistantCommandAnswerSchema, assistantFriendCheckedSchema, assistantFriendCheckSchema, assistantCommandSchema, CHAT_ORDERS_MAX, PRIVATE_ONLY_COMMANDS, type AssistantCommand, type AssistantCommandReply } from "@cashback/contracts";
+import { INSTANT_PATTERN, vnDateOf, type Instant } from "@cashback/core";
+import { sumDong } from "@cashback/money";
 import type { FastifyInstance } from "fastify";
 
 import { bankAccountsOf, bankDisplayName, customerCodeOf, customerKeys, hashPassword, newCustomerPassword, resolveCustomer, setCustomerPassword } from "../modules/identity/index";
@@ -55,16 +57,37 @@ function commandCustomer(db: LedgerDb, key: string): { readonly customerId: stri
   return { customerId: customer.customerId, customerCode: code };
 }
 
+const isInstant = (value: string): value is Instant => INSTANT_PATTERN.test(value);
+
 const isReply = (found: ReturnType<typeof commandCustomer>): found is AssistantCommandReply => "kind" in found;
 
-function balanceReply(db: LedgerDb, customerId: string): AssistantCommandReply {
-  const [balance] = getBalances(db, [customerId]);
+/** The payout account as a chat may show it: the bank name and the last four digits only. */
+function bankFactOf(db: LedgerDb, customerId: string): { bankName: string | null; lastFour: string; held: boolean } | null {
+  const bank = bankAccountsOf(db, [customerId]).get(customerId);
+  return bank === undefined ? null : { bankName: bankDisplayName(bank), lastFour: bank.lastFour, held: bank.held };
+}
+
+function balanceReply(db: LedgerDb, customer: { customerId: string; customerCode: string }): AssistantCommandReply {
+  const [balance] = getBalances(db, [customer.customerId]);
   const netting = nextPayoutNetting({ gross: balance?.gross ?? 0, deductedNext: balance?.deductedNext ?? 0 });
-  return { kind: "balance", payable: balance?.payable ?? 0, waiting: balance?.waiting ?? 0, paid: balance?.paid ?? 0, deducted: netting.deducted, owedAfter: netting.owedAfter };
+  return { kind: "balance", payable: balance?.payable ?? 0, waiting: balance?.waiting ?? 0, paid: balance?.paid ?? 0, deducted: netting.deducted, owedAfter: netting.owedAfter, customerCode: customer.customerCode, bank: bankFactOf(db, customer.customerId) };
+}
+
+/**
+ * The latest orders, each marked when it was recorded on today's Vietnam date, with the sum of
+ * today's amounts: the live `/donhang` listed today's orders and their total, else the latest five.
+ */
+function ordersReply(db: LedgerDb, customerId: string, now: Instant): AssistantCommandReply {
+  const today = vnDateOf(now);
+  const orders = chatOrdersOf(db, customerKeys(db, customerId)?.keys ?? [customerId], CHAT_ORDERS_MAX).map((o) => ({
+    ...o,
+    today: o.recordedAt === null || (isInstant(o.recordedAt) && vnDateOf(o.recordedAt) === today),
+  }));
+  return { kind: "orders", orders, todayTotal: sumDong(orders.filter((o) => o.today).map((o) => o.amount), "todayTotal") };
 }
 
 /** What one command about a customer says for the record `key` resolves to. */
-export function commandReplyOf(db: LedgerDb, command: CustomerCommand, key: string): AssistantCommandReply {
+export function commandReplyOf(db: LedgerDb, command: CustomerCommand, key: string, now: Instant): AssistantCommandReply {
   const customer = commandCustomer(db, key);
   if (isReply(customer)) return customer;
   const id = customer.customerId;
@@ -72,13 +95,11 @@ export function commandReplyOf(db: LedgerDb, command: CustomerCommand, key: stri
     case "id":
       return { kind: "id", customerCode: customer.customerCode };
     case "balance":
-      return balanceReply(db, id);
+      return balanceReply(db, customer);
     case "orders":
-      return { kind: "orders", orders: chatOrdersOf(db, customerKeys(db, id)?.keys ?? [id], CHAT_ORDERS_MAX) };
-    case "bank": {
-      const bank = bankAccountsOf(db, [id]).get(id);
-      return { kind: "bank", bank: bank === undefined ? null : { bankName: bankDisplayName(bank), lastFour: bank.lastFour, held: bank.held } };
-    }
+      return ordersReply(db, id, now);
+    case "bank":
+      return { kind: "bank", bank: bankFactOf(db, id) };
   }
 }
 
@@ -112,7 +133,7 @@ async function passwordReply(deps: AssistantCommandRouteDeps, key: string): Prom
 async function replyOf(deps: AssistantCommandRouteDeps, command: AssistantCommand["command"], key: string): Promise<AssistantCommandReply> {
   if (command === "help") return helpReply(deps.ledger, key);
   if (command === "password") return passwordReply(deps, key);
-  return deps.ledger.tx((db) => commandReplyOf(db, command, key));
+  return deps.ledger.tx((db) => commandReplyOf(db, command, key, deps.clock.now()));
 }
 
 export function assistantCommandRoutes(deps: AssistantCommandRouteDeps): (app: FastifyInstance) => void {

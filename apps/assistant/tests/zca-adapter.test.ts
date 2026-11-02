@@ -281,6 +281,18 @@ describe("zca adapter: sends", () => {
     ]);
   });
 
+  it("message parity: text styles go to zca-js as the live bot sent them, beside the mentions, in both chats", async () => {
+    const session = await open();
+    await session.sendText({ kind: "private", userId: "70001" }, "ab cd", undefined, [{ start: 3, len: 2, st: "b" }]);
+    await session.sendText({ kind: "group", groupId: MAIN_GROUP }, "@Lan\nab cd", [{ userId: "70001", pos: 0, len: 4 }], [{ start: 5, len: 2, st: "b" }]);
+    await session.sendText({ kind: "group", groupId: MAIN_GROUP }, "plain", undefined, []);
+    expect(api.sendMessage.mock.calls).toEqual([
+      [{ msg: "ab cd", styles: [{ start: 3, len: 2, st: "b" }] }, "70001", 0],
+      [{ msg: "@Lan\nab cd", mentions: [{ uid: "70001", pos: 0, len: 4 }], styles: [{ start: 5, len: 2, st: "b" }] }, MAIN_GROUP, 1],
+      [{ msg: "plain" }, MAIN_GROUP, 1],
+    ]);
+  });
+
   it("refuses a group outside ZALO_GROUP_IDS before zca-js: dev may only write to the Dev group", async () => {
     const session = await open([DEV_GROUP]);
     await expect(

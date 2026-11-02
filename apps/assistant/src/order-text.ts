@@ -1,19 +1,20 @@
 /**
- * How the assistant names an order's state (AD-10, D57; Stories 6.6 and 6.7): the customer sentence
- * the status registry points at for that status (docs/operations/status-flows.md, the one
- * source), with a rejected order's reason written from its reason code. A code the message file has
- * no sentence for points to the website instead of showing a raw code.
+ * How the assistant tells a customer about an order (AD-10, D57; Stories 6.6 and 6.7), in the live
+ * system's words (notifications.py `notify_order_changes`, owner requirement 2026-11-02): "recorded"
+ * with the estimated cashback and the payout window, "approved" with the cashback and what happens
+ * to the money (the bank account set, missing or waiting to be confirmed), "rejected" (and a reversal,
+ * which the live system told the same way) with the reason in words. Any other status falls back to
+ * the status sentence the registry points at (docs/operations/status-flows.md).
  *
- * An order notice is "update on order X: <status sentence>.", then the notice's own detail (the
- * cashback, a bank request). The server sends the target status with the notice; a row queued
- * before Story 6.6 under a registry key (`order_approved`) is written the same way from the status
- * that key belongs to, and an old rejection without a reason gets the neutral one. A notice
- * without its order id, or whose detail misses a value, has no sentence: never a bare status.
+ * The server sends the notice key and the target status; a row queued before Story 6.6 under a
+ * registry key (`order_approved`) is written the same way from the status that key belongs to, and
+ * an old rejection without a reason gets the neutral one. A notice without its order id, or whose
+ * message misses a value (an approval without its cashback), has no sentence: never a bare status.
  */
 import { statusesOf } from "@cashback/core";
 
 import { dongText, type ReplyMessage } from "./link-reply-text";
-import { isMessageKey, MessageIncompleteError, messageText, type MessageKey } from "./messages";
+import { isMessageKey, messageText, type MessageKey } from "./messages";
 
 const REASON_PREFIX = "rejection_reason_";
 
@@ -30,44 +31,59 @@ export function orderStateText(status: string, rejectionReason: string | null): 
   return messageText(key, { reason: rejectionReasonText(rejectionReason) });
 }
 
-/** The detail of each order notice key, and the status it is about when the server did not say. */
-const NOTICE_DETAILS: Readonly<Record<string, { readonly detail: MessageKey | null; readonly status: string | null }>> = {
-  notice_order: { detail: null, status: null },
-  notice_order_recorded: { detail: "notice_order_recorded", status: "AWAITING_APPROVAL" },
-  notice_order_approved: { detail: "notice_order_approved", status: "APPROVED" },
-  notice_order_approved_add_bank: { detail: "notice_order_approved_add_bank", status: "APPROVED" },
-  notice_order_approved_bank_held: { detail: "notice_order_approved_bank_held", status: "APPROVED" },
+/** The approved message by the state of the customer's bank account the server picked. */
+const APPROVED_KEYS: Readonly<Record<string, MessageKey>> = {
+  notice_order_approved: "notice_order_approved",
+  notice_order_approved_add_bank: "notice_order_approved_add_bank",
+  notice_order_approved_bank_held: "notice_order_approved_bank_held",
+};
+
+/** The status each notice key is about when the server did not say. */
+const NOTICE_STATUS: Readonly<Record<string, string | null>> = {
+  notice_order: null,
+  notice_order_recorded: "AWAITING_APPROVAL",
+  notice_order_approved: "APPROVED",
+  notice_order_approved_add_bank: "APPROVED",
+  notice_order_approved_bank_held: "APPROVED",
 };
 
 /** A row queued before Story 6.6 under the registry key of a status. */
-function legacyNotice(messageKey: string, params: Readonly<Record<string, string | number>>): { detail: MessageKey | null; status: string } | null {
-  const status = statusesOf("order").find((s) => s.messageKey === messageKey)?.value ?? null;
-  if (status === null) return null;
-  if (status === "AWAITING_APPROVAL") return { detail: "notice_order_recorded", status };
-  if (status === "APPROVED" && params["cashback"] !== undefined) return { detail: "notice_order_approved", status };
-  return { detail: null, status };
+function legacyStatus(messageKey: string): string | null {
+  return statusesOf("order").find((s) => s.messageKey === messageKey)?.value ?? null;
+}
+
+type Params = Readonly<Record<string, string | number>>;
+
+function noticeOf(messageKey: string, status: string, orderId: string, params: Params): ReplyMessage | null {
+  const cashback = typeof params["cashback"] === "number" ? dongText(params["cashback"]) : null;
+  switch (status) {
+    case "AWAITING_APPROVAL": {
+      const estimate = cashback ?? (typeof params["estimate"] === "number" ? dongText(params["estimate"]) : messageText("cashback_unknown"));
+      return { key: "notice_order_recorded", values: { orderId, cashback: estimate } };
+    }
+    case "APPROVED":
+      return cashback === null ? null : { key: APPROVED_KEYS[messageKey] ?? "notice_order_approved", values: { orderId, cashback } };
+    case "REJECTED":
+    case "REVERSED":
+      return { key: "notice_order_rejected", values: { orderId, reason: rejectionReasonText(params["reason"] === undefined ? null : String(params["reason"])) } };
+    default: {
+      const state = orderStateText(status, null);
+      return state === null ? null : { key: "notice_order", values: { orderId, state } };
+    }
+  }
 }
 
 /**
  * The message of an order notice, `undefined` when `messageKey` is no order notice, null when it is
  * one without a complete sentence.
  */
-export function orderNoticeMessage(messageKey: string, params: Readonly<Record<string, string | number>>): ReplyMessage | null | undefined {
-  const known = NOTICE_DETAILS[messageKey];
-  const notice = known === undefined ? legacyNotice(messageKey, params) : { detail: known.detail, status: typeof params["status"] === "string" ? params["status"] : known.status };
-  if (notice === null) return undefined;
+export function orderNoticeMessage(messageKey: string, params: Params): ReplyMessage | null | undefined {
+  const known = Object.hasOwn(NOTICE_STATUS, messageKey);
+  const legacy = known ? null : legacyStatus(messageKey);
+  if (!known && legacy === null) return undefined;
+  const status = typeof params["status"] === "string" ? params["status"] : known ? (NOTICE_STATUS[messageKey] ?? null) : legacy;
   const orderId = params["orderId"];
-  if (orderId === undefined || String(orderId) === "" || notice.status === null) return null;
-  const reason = params["reason"] === undefined ? null : String(params["reason"]);
-  const state = orderStateText(notice.status, reason);
-  if (state === null) return null;
-  if (notice.detail === null) return { key: "notice_order", values: { orderId: String(orderId), state } };
-  const values: Record<string, string> = {};
-  if (typeof params["cashback"] === "number") values["cashback"] = dongText(params["cashback"]);
-  try {
-    return { key: "notice_order_detail", values: { orderId: String(orderId), state, detail: messageText(notice.detail, values) } };
-  } catch (error) {
-    if (error instanceof MessageIncompleteError) return null;
-    throw error;
-  }
+  if (orderId === undefined || String(orderId) === "" || status === null) return null;
+  if (statusesOf("order").every((s) => s.value !== status)) return null;
+  return noticeOf(messageKey, status, String(orderId), params);
 }

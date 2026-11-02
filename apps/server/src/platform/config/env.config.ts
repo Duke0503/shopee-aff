@@ -113,6 +113,18 @@ export interface ServerConfig {
   zaloAssistantUrl: string | null;
   /** ALLOW_PROD_ACCESSTRADE_KEY=1: dev may share the production AccessTrade report key (logged as a warning). */
   allowProdAccesstradeKey: boolean;
+  /**
+   * The third party's product lookup key (addlivetag, owner decision 2026-11-02); carried over from
+   * the live `.env` at cutover. A secret: it travels in the lookup's URL, which is never logged.
+   */
+  addlivetagApiKey: string | null;
+  /**
+   * THIRD_PARTY_LOOKUP: whether product lookups ask the third party first. `on` needs the key;
+   * unset, production asks it when the key is set and dev does not (dev opts in with `on`).
+   */
+  thirdPartyLookup: boolean;
+  /** ALLOW_PROD_ADDLIVETAG_KEY=1: dev may use the production third-party key (logged as a warning). */
+  allowProdAddlivetagKey: boolean;
   /** What the isolation check allowed but a start should log (keys only); filled by `loadConfigFor`. */
   isolationWarnings: readonly string[];
 }
@@ -228,7 +240,18 @@ function fileSchema(env: Environment) {
     FALLBACK_CONTACT_URL: z.string().regex(FALLBACK_CONTACT_URL).optional(),
     ZALO_ASSISTANT_URL: z.string().regex(ZALO_CHAT_URL).optional(),
     ALLOW_PROD_ACCESSTRADE_KEY: z.enum(["0", "1"]).optional(),
+    ADDLIVETAG_API_KEY: z.string().optional(),
+    THIRD_PARTY_LOOKUP: z.enum(["on", "off"]).optional(),
+    ALLOW_PROD_ADDLIVETAG_KEY: z.enum(["0", "1"]).optional(),
   });
+}
+
+/** THIRD_PARTY_LOOKUP resolved: `on` needs the key; unset means on in production when the key is set, off in dev. */
+function thirdPartyLookupOf(env: Environment, file: { ADDLIVETAG_API_KEY?: string | undefined; THIRD_PARTY_LOOKUP?: "on" | "off" | undefined }): boolean {
+  const key = file.ADDLIVETAG_API_KEY !== undefined;
+  if (file.THIRD_PARTY_LOOKUP === "on" && !key) throw new ConfigError("config: missing or invalid ADDLIVETAG_API_KEY");
+  if (file.THIRD_PARTY_LOOKUP !== undefined) return file.THIRD_PARTY_LOOKUP === "on";
+  return env === "prod" && key;
 }
 
 export function configFilePath(env: Environment, home: string = homedir()): string {
@@ -275,6 +298,9 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     fallbackContactUrl: file.FALLBACK_CONTACT_URL ?? null,
     zaloAssistantUrl: file.ZALO_ASSISTANT_URL ?? null,
     allowProdAccesstradeKey: file.ALLOW_PROD_ACCESSTRADE_KEY === "1",
+    addlivetagApiKey: file.ADDLIVETAG_API_KEY?.trim() ?? null,
+    thirdPartyLookup: thirdPartyLookupOf(env, file),
+    allowProdAddlivetagKey: file.ALLOW_PROD_ADDLIVETAG_KEY === "1",
     isolationWarnings: [],
   };
 }

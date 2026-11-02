@@ -119,7 +119,7 @@ describe("Story 6.11: Zalo account loss keeps customers served and alerts the ow
     await vi.advanceTimersByTimeAsync(MINUTE);
     await done;
     expect(server.callsTo(ASSISTANT_REGISTRATION_PATH)).toEqual([{ zaloUserId: "80001", displayName: "Lan", claimedCode: "DP00012" }]);
-    expect(zalo.sent.filter((s) => s.target.kind === "private" && s.target.userId === "80001").map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00101" }), messageText("merge_claim_noted", { claimedCode: "DP00012" })]);
+    expect(zalo.sent.filter((s) => s.target.kind === "private" && s.target.userId === "80001").map((s) => s.text)).toEqual([messageText("welcome", { name: "Lan", customerCode: "DP00101" }), messageText("merge_claim_noted", { claimedCode: "DP00012" })]);
     await assistant.stop();
   });
 });

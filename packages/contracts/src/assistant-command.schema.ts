@@ -54,8 +54,20 @@ const chatOrder = z.object({
   cashback: dong.nullable(),
   /** The cancel reason code of a rejected order (`order_cancelled`), or null. */
   rejectionReason: z.string().max(64).nullable(),
+  /**
+   * What the live `/donhang` wrote after "HH:" for the order: the stored cashback, the estimated
+   * cashback of an awaiting order (0 without an estimate), 0 for a rejected or reversed one. The
+   * three fields below are absent from a server older than the message parity (2026-11-02).
+   */
+  amount: dong.optional(),
+  /** When the order was recorded (an instant), or null when the report gave no time. */
+  recordedAt: z.string().max(40).nullable().optional(),
+  /** Recorded on today's Vietnam date (or with no time, as the live system counted it). */
+  today: z.boolean().optional(),
 });
 export type AssistantChatOrder = z.infer<typeof chatOrder>;
+
+const bankFact = z.object({ bankName: z.string().max(120).nullable(), lastFour: z.string().regex(/^[A-Za-z0-9]{1,4}$/), held: z.boolean() });
 
 export const assistantCommandReplySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("id"), customerCode }),
@@ -68,12 +80,13 @@ export const assistantCommandReplySchema = z.discriminatedUnion("kind", [
     deducted: dong,
     /** What the open clawbacks still owe beyond that, carried to a later payout. */
     owedAfter: dong,
+    /** The customer code and the payout account (bank name and last four only), as the live `/sodu` showed them. */
+    customerCode: customerCode.optional(),
+    bank: bankFact.nullable().optional(),
   }),
-  z.object({ kind: z.literal("orders"), orders: z.array(chatOrder).max(CHAT_ORDERS_MAX) }),
-  z.object({
-    kind: z.literal("bank"),
-    bank: z.object({ bankName: z.string().max(120).nullable(), lastFour: z.string().regex(/^[A-Za-z0-9]{1,4}$/), held: z.boolean() }).nullable(),
-  }),
+  /** `todayTotal`: the sum of today's order amounts, the live `/donhang` total line. */
+  z.object({ kind: z.literal("orders"), orders: z.array(chatOrder).max(CHAT_ORDERS_MAX), todayTotal: dong.optional() }),
+  z.object({ kind: z.literal("bank"), bank: bankFact.nullable() }),
   z.object({ kind: z.literal("help") }),
   /** `/matkhau`: the new password, shown once; the customer code to sign in with. */
   z.object({ kind: z.literal("password"), customerCode, password: z.string().regex(ISSUED_PASSWORD_PATTERN) }),

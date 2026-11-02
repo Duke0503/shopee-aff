@@ -56,17 +56,17 @@ describe("Story 6.2: registration from Zalo", () => {
       { zaloUserId: "70001", displayName: "Lan" },
       { zaloUserId: "70002", displayName: "Lan" },
     ]);
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" })]);
+    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { name: "Lan", customerCode: "DP00001" })]);
     await vi.advanceTimersByTimeAsync(5_999);
     expect(zalo.sent).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     await Promise.all([first, second]);
     expect(zalo.sent.map((s) => [s.target, s.text])).toEqual([
-      [{ kind: "private", userId: "70001" }, messageText("welcome", { customerCode: "DP00001" })],
-      [{ kind: "private", userId: "70002" }, messageText("welcome", { customerCode: "DP00002" })],
+      [{ kind: "private", userId: "70001" }, messageText("welcome", { name: "Lan", customerCode: "DP00001" })],
+      [{ kind: "private", userId: "70002" }, messageText("welcome", { name: "Lan", customerCode: "DP00002" })],
     ]);
     expect(toMs(zalo.sent[1]!.at) - toMs(zalo.sent[0]!.at)).toBeGreaterThanOrEqual(6_000);
-    expect(messageText("welcome", { customerCode: "DP00001" })).toContain("DP00001");
+    expect(messageText("welcome", { name: "Lan", customerCode: "DP00001" })).toContain("DP00001");
     await stop();
   });
 
@@ -77,7 +77,7 @@ describe("Story 6.2: registration from Zalo", () => {
     const again = zalo.deliver(privateFrom("70001", "hello again"));
     await vi.advanceTimersByTimeAsync(12_000);
     await again;
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), messageText("send_a_link")]);
+    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { name: "Lan", customerCode: "DP00001" }), messageText("send_a_link")]);
     expect(server.callsTo(ASSISTANT_REGISTRATION_PATH)).toHaveLength(2);
     await stop();
   });
@@ -91,7 +91,7 @@ describe("Story 6.2: registration from Zalo", () => {
       await vi.advanceTimersByTimeAsync(12_000);
       await next;
     }
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), messageText("send_a_link")]);
+    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { name: "Lan", customerCode: "DP00001" }), messageText("send_a_link")]);
     await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
     const tomorrow = zalo.deliver(privateFrom("70001", "chao"));
     await vi.advanceTimersByTimeAsync(12_000);

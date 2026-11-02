@@ -21,11 +21,12 @@ import { friendAccepter } from "./friend-accept";
 import { friendRequestLimiter, requestFriend, type FriendRequestLimiter, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
 import { groupWelcomer, memoryWelcomeStore, type WelcomeStore } from "./group-welcome";
 import type { InternalApi } from "./internal-api.adapter";
-import { messageText } from "./messages";
+import { messageText, styledMessage } from "./messages";
 import { runNotifications } from "./notification.job";
 import { createPacer, type HumanDelay, type Pacer, type Sleep } from "./pacer";
 import { memorySentNotifications, type SentNotifications } from "./sent-notifications-file.adapter";
 import { rescanFriendRequests, sessionEventHandler } from "./session-events";
+import { shiftStyles, type StyledText } from "./styled-text";
 import { guardTargets } from "./zalo-target.guard";
 import type { ChatTarget, ZaloSession } from "./zalo.port";
 
@@ -66,7 +67,7 @@ export interface RunningAssistant {
 function listenToSessionEvents(deps: AssistantDeps, run: { zalo: ZaloSession; pacer: Pacer; limiter: FriendRequestLimiter; beat: () => AssistantHeartbeat; signal: AbortSignal }): void {
   const { zalo, pacer } = run;
   const friends = friendAccepter({ limiter: run.limiter, pacer, zalo, api: deps.api, clock: deps.clock, sleep: deps.sleep, random: deps.random ?? Math.random, signal: run.signal });
-  const welcome = groupWelcomer({ welcomeGroupIds: deps.welcomeGroupIds ?? [], store: deps.welcomeState ?? memoryWelcomeStore(), send: (target, text, mentions) => pacer.send(() => zalo.sendText(target, text, mentions)) });
+  const welcome = groupWelcomer({ welcomeGroupIds: deps.welcomeGroupIds ?? [], store: deps.welcomeState ?? memoryWelcomeStore(), random: deps.random ?? Math.random, send: (target, message, mentions) => pacer.send(() => zalo.sendText(target, message.text, mentions, message.styles)) });
   zalo.onEvent(sessionEventHandler({ friends, welcome, api: deps.api, beat: run.beat, onError: deps.onError }));
   rescanFriendRequests(friends, deps.onError);
 }
@@ -77,20 +78,21 @@ export function startAssistant(deps: AssistantDeps): RunningAssistant {
   const limiter = friendRequestLimiter(deps.clock, deps.friendRequestsPerDay, deps.friendState);
   const stopping = new AbortController();
   const startedAt = deps.clock.now();
-  const write = (target: ChatTarget, text: string, tag?: Tag | null): Promise<void> => {
-    if (target.kind !== "group" || !tag) return zalo.sendText(target, text);
-    // A group reply opens with "@Name" on its own line, tagged as a mention of the sender (as live).
+  const write = (target: ChatTarget, message: StyledText, tag?: Tag | null): Promise<void> => {
+    if (target.kind !== "group" || !tag) return zalo.sendText(target, message.text, undefined, message.styles);
+    // A group reply opens with "@Name" on its own line, tagged as a mention of the sender (as live);
+    // the message's bold runs move down by that line.
     const mark = `@${tag.name}`;
-    return zalo.sendText(target, `${mark}\n${text}`, [{ userId: tag.userId, pos: 0, len: mark.length }]);
+    return zalo.sendText(target, `${mark}\n${message.text}`, [{ userId: tag.userId, pos: 0, len: mark.length }], shiftStyles(message.styles, mark.length + 1));
   };
   const send: ChatSend = (target, key, values, tag) => {
-    const text = messageText(key, values);
-    return pacer.send(() => write(target, text, tag));
+    const message = styledMessage(key, values);
+    return pacer.send(() => write(target, message, tag));
   };
   const sendWhenDue: ChatSendWhenDue = (target, decide, tag) =>
     pacer.send(async () => {
       const message = await decide();
-      if (message !== null) await write(target, messageText(message.key, message.values), tag);
+      if (message !== null) await write(target, styledMessage(message.key, message.values), tag);
     });
   const answer = chatReplier({ api: deps.api, clock: deps.clock, sleep: deps.sleep, send, sendWhenDue, ...(deps.replyWaitMs === undefined ? {} : { replyWaitMs: deps.replyWaitMs }) });
   zalo.onMessage(async (message) => {

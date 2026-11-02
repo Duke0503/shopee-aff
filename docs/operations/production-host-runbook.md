@@ -65,6 +65,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 | `BACKUP_*` | `backup-and-alerts-runbook.md` section 1.4 |
 | `BROWSER_PROFILE_DIR` | `C:\Project\cashback\.browser-profile\prod` |
 | `ZALO_GROUP_IDS`, `ZALO_ASSISTANT_URL`, `FALLBACK_CONTACT_URL`, `ACCESSTRADE_API_KEY` | as in `dev-environment.md`, production values |
+| `ADDLIVETAG_API_KEY` | the third party's product lookup key, carried over from the live `C:\Project\mmo\.env` at cutover (`go-live-runbook.md`); leave `THIRD_PARTY_LOOKUP` unset (on in production when the key is set) or set `off` to use the Shopee pages alone |
 
 Then let only the operator read it:
 

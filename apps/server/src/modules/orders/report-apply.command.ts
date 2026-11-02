@@ -26,7 +26,7 @@
  *   network changes nothing and opens a `network_mismatch` case.
  */
 import type { Clock, Instant } from "@cashback/core";
-import { sumDong } from "@cashback/money";
+import { estimatedCashback, sumDong } from "@cashback/money";
 import { eq } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -284,6 +284,9 @@ function writeSteps(db: LedgerDb, a: Applying, order: TransitionOrder, customerI
   // The approved notice states the cashback: the new one, else the one stored before a freeze.
   const cashback = approval?.cashback ?? a.stored?.cashback ?? null;
   if (cashback !== null) params.cashback = cashback;
+  // A recorded order's notice states the estimated cashback, as the live order_recorded message did.
+  const estimate = rowCommission(a.row);
+  if (cashback === null && estimate !== null && !order.guest) params.estimate = estimatedCashback(estimate, a.row.network);
   const rejection = rejectionOf(a);
   if (rejection !== null) params.reason = rejection;
   const approvalReason = period === null || approval === null || a.review !== undefined ? undefined : `approved in settlement period ${a.row.network} ${period}, ${approval.withheld ? "withheld" : "not withheld"}`;

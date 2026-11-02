@@ -1,14 +1,18 @@
 /**
- * The text of a link reply (FR-1, D3, D60, money rule 11; Story 6.3), from the server's reply
- * facts and the message file. The reply carries the share link, never the affiliate link. An
- * estimate is always "about" an amount and names the customer's share with that amount; a
- * ShopeeFood link names no amount; a link without an estimate says so instead of showing 0 dong.
- * A refusal from the server maps to its own polite message.
+ * The text of a link reply (FR-1, D3, D60; Story 6.3), from the server's reply facts and the
+ * message file, in the live assistant's format (assistant_worker.js `_executeHandleProductLink`,
+ * owner requirement 2026-11-02): the ready line naming the shop, the product name cut to 60
+ * characters, the share link, the commission parts ("Shopee 5% -> 6.000d", the cap note when
+ * Shopee's part hit it), the customer's share with the estimated cashback, and the two tips, with
+ * the same parts in bold. A link without an estimate says the customer gets 80% of the commission;
+ * a ShopeeFood link names the shop and no amount. The reply carries the share link, never the
+ * affiliate link. A refusal from the server maps to its own polite message.
  */
 import { formatAmountDigits } from "@cashback/core";
 import type { AssistantChat, AssistantLinkReply, LinkRefusal } from "@cashback/contracts";
 
-import { messageText, type MessageKey } from "./messages";
+import { messageText, styledMessage, type MessageKey } from "./messages";
+import { joinStyled, plain, type StyledText, type StyledValue } from "./styled-text";
 
 export function dongText(amount: number | null): string {
   const digits = amount === null ? null : formatAmountDigits(amount);
@@ -24,18 +28,56 @@ export function percentText(bps: number): string {
 
 export interface ReplyMessage {
   readonly key: MessageKey;
-  readonly values: Readonly<Record<string, string>>;
+  readonly values: Readonly<Record<string, StyledValue>>;
+}
+
+const TITLE_MAX = 60;
+const TRAILING_SEPARATORS = /[,.\-_\u2013\s]+$/;
+
+/** The product name as the live bot cut it (`formatShortTitle`): one line, at most 60 characters, cut at a word. */
+export function shortTitle(name: string | null): string {
+  const cleaned = (name ?? "").trim().replace(/\s+/g, " ");
+  if (cleaned.length <= TITLE_MAX) return cleaned;
+  const cut = cleaned.slice(0, TITLE_MAX);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 25 ? cut.slice(0, lastSpace) : cut).replace(TRAILING_SEPARATORS, "")}...`;
+}
+
+const platformOf = (network: AssistantLinkReply["network"]): string => messageText(network === "accesstrade" ? "platform_accesstrade" : "platform_shopee");
+
+const productLineOf = (name: string | null): StyledValue => {
+  const short = shortTitle(name);
+  return short === "" ? "" : messageText("link_product_line", { product: short });
+};
+
+/** A ShopeeFood shop name worth showing: not the generic names the lookup gives when it found none. */
+function storeLineOf(name: string | null): StyledValue {
+  const store = (name ?? "").trim();
+  const generic = store === "" || store.toLowerCase() === messageText("shopeefood_generic_store") || /^shop(\s*\(.*?\))?$/i.test(store) || /^shopeefood$/i.test(store);
+  return generic ? "" : messageText("link_store_line", { store });
+}
+
+type Estimate = NonNullable<AssistantLinkReply["estimate"]>;
+
+/** The "commission now" lines, bold as live; "updating" when the server sent no parts. */
+function commissionLines(estimate: Estimate): StyledText {
+  const parts = estimate.parts ?? [];
+  if (parts.length === 0) return plain(messageText("link_commission_line_pending"));
+  const lines = parts.map((p) =>
+    p.part === "shopee"
+      ? styledMessage("link_commission_line_shopee", { rate: percentText(p.rateBps), amount: dongText(p.amount), capNote: estimate.capped === true ? messageText("link_commission_cap_note") : "" })
+      : styledMessage("link_commission_line_seller", { rate: percentText(p.rateBps), amount: dongText(p.amount) }),
+  );
+  return joinStyled(lines, "\n");
 }
 
 /** The reply for a link that is made (`shareUrl` set). */
 export function linkReplyMessage(reply: AssistantLinkReply & { readonly shareUrl: string }): ReplyMessage {
   const link = reply.shareUrl;
-  if (reply.perShop) return { key: "link_ready_shopeefood", values: { link } };
-  const product = reply.product.name ?? messageText("value_missing");
-  const price = dongText(reply.product.price);
-  if (reply.estimate === null) return { key: "link_ready_no_estimate", values: { link, product, price } };
-  const values = { link, product, price, cashback: dongText(reply.estimate.cashback), share: percentText(reply.estimate.shareBps) };
-  return { key: reply.estimate.withheld ? "link_ready_withheld" : "link_ready", values };
+  if (reply.perShop) return { key: "link_ready_shopeefood", values: { link, storeLine: storeLineOf(reply.product.name) } };
+  const base = { link, platform: platformOf(reply.network), productLine: productLineOf(reply.product.name) };
+  if (reply.estimate === null) return { key: "link_ready_no_estimate", values: base };
+  return { key: "link_ready", values: { ...base, commissionLines: commissionLines(reply.estimate), share: percentText(reply.estimate.shareBps), cashback: dongText(reply.estimate.cashback) } };
 }
 
 /**

@@ -152,7 +152,8 @@ describe("Story 6.2: registration from Zalo assigns a customer code", () => {
     expect(Math.abs(cashback - 7_100)).toBeLessThan(50);
     expect(MESSAGES["welcome"]).toContain("{customerCode}");
     expect(MESSAGES["welcome"]).toContain("80%");
-    expect(MESSAGES["welcome"]).toContain("7.100\u0111");
-    for (const key of ["link_ready", "link_ready_withheld"]) expect(MESSAGES[key]).toMatch(/\{cashback\}, t\u1ee9c \{share\}/);
+    // Message parity (owner requirement 2026-11-02): the welcome is the live bot's text, which names
+    // 80% without the example; the link reply names the share with its estimated amount, as live.
+    expect(MESSAGES["link_ready"]).toMatch(/\{share\} \u2192 d\u1ef1 ki\u1ebfn \{cashback\}/);
   });
 });

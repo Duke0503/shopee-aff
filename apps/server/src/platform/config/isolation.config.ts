@@ -63,6 +63,9 @@ export interface IsolationSubject {
   readonly accesstradeApiKey: string | null;
   /** ALLOW_PROD_ACCESSTRADE_KEY=1: dev may read the networks' report API with the production key. */
   readonly allowProdAccesstradeKey: boolean;
+  /** The third party's product lookup key; dev may share production's only with ALLOW_PROD_ADDLIVETAG_KEY=1. */
+  readonly addlivetagApiKey?: string | null;
+  readonly allowProdAddlivetagKey?: boolean;
   /** The live ledger, the read-only source of rehearsals; never the server's own ledger. */
   readonly liveLedgerPath: string | null;
 }
@@ -155,7 +158,7 @@ function sameUrl(one: string, other: string): boolean {
 }
 
 /** Secrets compared with the production env file's values; equal means a copied secret. */
-type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY";
+type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY" | "ADDLIVETAG_API_KEY";
 
 function secretsOf(config: IsolationSubject): Record<SharedSecretKey, string | null> {
   return {
@@ -168,6 +171,8 @@ function secretsOf(config: IsolationSubject): Record<SharedSecretKey, string | n
     FINGERPRINT_KEY: config.fingerprintKey,
     // The report API key may be shared only on purpose (read-only reports for a shadow run).
     ACCESSTRADE_API_KEY: config.allowProdAccesstradeKey ? null : config.accesstradeApiKey,
+    // The third party's key spends production's quota with that provider; shared only on purpose.
+    ADDLIVETAG_API_KEY: config.allowProdAddlivetagKey === true ? null : (config.addlivetagApiKey ?? null),
   };
 }
 
@@ -225,8 +230,13 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
 
 /** What a start should log: a production secret dev was allowed to share. Keys only. */
 export function isolationWarnings(config: IsolationSubject, context: IsolationContext): string[] {
-  if (config.env !== "dev" || !config.allowProdAccesstradeKey || context.prodEnv === null || config.accesstradeApiKey === null) return [];
-  return blank(context.prodEnv["ACCESSTRADE_API_KEY"]) === config.accesstradeApiKey ? ["ACCESSTRADE_API_KEY shared_with_production"] : [];
+  if (config.env !== "dev" || context.prodEnv === null) return [];
+  const prod = context.prodEnv;
+  const shared = (key: string, allowed: boolean, value: string | null): boolean => allowed && value !== null && blank(prod[key]) === value;
+  const out: string[] = [];
+  if (shared("ACCESSTRADE_API_KEY", config.allowProdAccesstradeKey, config.accesstradeApiKey)) out.push("ACCESSTRADE_API_KEY shared_with_production");
+  if (shared("ADDLIVETAG_API_KEY", config.allowProdAddlivetagKey === true, config.addlivetagApiKey ?? null)) out.push("ADDLIVETAG_API_KEY shared_with_production");
+  return out;
 }
 
 function sameFile(a: string, b: string): boolean {

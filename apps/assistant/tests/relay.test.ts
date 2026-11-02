@@ -83,6 +83,13 @@ describe("the relay Zalo session (ZALO_MODE=relay)", () => {
     expect(bot.calls[0]!.body).toEqual({ group: "test", message: "@Minh\nhello", mentions: [{ uid: "70005", pos: 0, len: 5 }] });
   });
 
+  it("message parity: the live broadcast API takes no styles, so a styled message is relayed as plain text", async () => {
+    const bot = liveBot();
+    const session = relayZaloSession({ token: LIVE_TOKEN, devGroupId: DEV_GROUP, fetch: bot.fetch });
+    await session.sendText({ kind: "group", groupId: DEV_GROUP }, "ab cd", undefined, [{ start: 3, len: 2, st: "b" }]);
+    expect(bot.calls[0]!.body).toEqual({ group: "test", message: "ab cd" });
+  });
+
   it("review 7: every session openZaloSession hands out is behind guardTargets, the relay included", async () => {
     const config = parseAssistantConfig("dev", { ASSISTANT_TOKEN: TOKEN, ZALO_MODE: "relay", ZALO_GROUP_IDS: DEV_GROUP, LIVE_BOT_TOKEN: LIVE_TOKEN }, ISOLATION);
     const clock = fixedClock("2026-11-01T03:00:00.000Z");

@@ -22,7 +22,8 @@ const START = "2026-11-01T03:00:00.000Z";
 const DEV_GROUP = "8786316503449470342";
 const PRODUCT = "https://shopee.vn/Ao-thun-i.11001.22001";
 const SHARE = "https://hoantiendp.com/s/AbCdEf1234";
-const ABOUT = "kho\u1ea3ng";
+const ESTIMATED = "d\u1ef1 ki\u1ebfn";
+const WELCOME = (customerCode: string) => messageText("welcome", { name: messageText("sender_fallback_name"), customerCode });
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -74,8 +75,7 @@ describe("Story 6.3: a product link pasted in Zalo", () => {
     expect(reply.target).toEqual({ kind: "private", userId: "70001" });
     expect(reply.text).toContain(SHARE);
     expect(reply.text).toContain("Ao thun");
-    expect(reply.text).toContain("150.000\u0111");
-    expect(reply.text).toContain(`${ABOUT} 12.345\u0111`);
+    expect(reply.text).toContain(`${ESTIMATED} 12.345\u0111`);
     expect(reply.text).toContain("80%");
     expect(reply.text).not.toContain("shopee.vn");
     expect(toMs(reply.at) - toMs(parseInstant(START))).toBeLessThan(30_000);
@@ -92,12 +92,12 @@ describe("Story 6.3: a product link pasted in Zalo", () => {
     const plain = zalo.deliver(privateFrom("70001", PRODUCT));
     await vi.advanceTimersByTimeAsync(30_000);
     await plain;
-    expect(zalo.sent[1]!.text).toBe(messageText("link_ready_no_estimate", { link: SHARE, product: "\u2013", price: "\u2013" }));
+    expect(zalo.sent[1]!.text).toBe(messageText("link_ready_no_estimate", { link: SHARE, platform: "Shopee", productLine: "" }));
     linkMadeAfter(server, 0, { perShop: true, estimate: null });
     const food = zalo.deliver(privateFrom("70001", "https://shopeefood.vn/ha-noi/quan-ngon"));
     await vi.advanceTimersByTimeAsync(30_000);
     await food;
-    expect(zalo.sent[2]!.text).toBe(messageText("link_ready_shopeefood", { link: SHARE }));
+    expect(zalo.sent[2]!.text).toBe(messageText("link_ready_shopeefood", { link: SHARE, storeLine: messageText("link_store_line", { store: "Ao thun" }) }));
     expect(zalo.sent[2]!.text).not.toMatch(/\d\u0111/);
     await stop();
   });
@@ -108,7 +108,7 @@ describe("Story 6.3: a product link pasted in Zalo", () => {
     const done = zalo.deliver(privateFrom("70001", PRODUCT));
     await vi.advanceTimersByTimeAsync(REPLY_WAIT_MS + 15_000);
     await done;
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), messageText("link_on_its_way")]);
+    expect(zalo.sent.map((s) => s.text)).toEqual([WELCOME("DP00001"), messageText("link_on_its_way")]);
     expect(server.callsTo(ASSISTANT_LINK_REQUEST_PATH)).toHaveLength(1);
     expect(server.callsTo(ASSISTANT_LINK_REPLY_PATH).length).toBeGreaterThan(1);
     await vi.advanceTimersByTimeAsync(120_000);
@@ -123,8 +123,8 @@ describe("Story 6.3: a product link pasted in Zalo", () => {
     const done = zalo.deliver(privateFrom("70001", "https://www.lazada.vn/products/ao-i123.html"));
     await vi.advanceTimersByTimeAsync(15_000);
     await done;
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), messageText("link_network_unsupported")]);
-    for (const network of ["Shopee", "ShopeeFood", "TikTok Shop"]) expect(zalo.sent[1]!.text).toContain(network);
+    expect(zalo.sent.map((s) => s.text)).toEqual([WELCOME("DP00001"), messageText("link_network_unsupported")]);
+    for (const network of ["Shopee", "TikTok Shop"]) expect(zalo.sent[1]!.text).toContain(network);
     expect(server.callsTo(ASSISTANT_LINK_REPLY_PATH)).toEqual([]);
     await stop();
   });
@@ -187,7 +187,7 @@ describe("Story 6.3: Sprint 25 review", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     await done;
     expect(server.calls.filter((c) => c.path !== ASSISTANT_LINK_REPLY_PATH && !c.path.includes("heartbeat") && !c.path.includes("notifications") && !c.path.includes("/link-replies/")).map((c) => c.path)).toEqual([ASSISTANT_LINK_REQUEST_PATH]);
-    expect(zalo.sent.map((s) => s.text)).toEqual([messageText("welcome", { customerCode: "DP00001" }), expect.stringContaining(SHARE)]);
+    expect(zalo.sent.map((s) => s.text)).toEqual([WELCOME("DP00001"), expect.stringContaining(SHARE)]);
     expect(toMs(zalo.sent[1]!.at) - toMs(parseInstant(START))).toBeLessThanOrEqual(12_000);
     expect(toMs(zalo.sent[1]!.at) - toMs(zalo.sent[0]!.at)).toBeGreaterThanOrEqual(12_000);
     await stop();

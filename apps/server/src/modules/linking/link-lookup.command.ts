@@ -16,6 +16,10 @@
  * out already. While the Shopee queue is held or paused no lookup is handed out, and a lookup that
  * meets a captcha or the login page holds or pauses the queue exactly as a link submission does
  * (Story 5.5), since it is the same session.
+ *
+ * The third party is asked first (owner decision 2026-11-02, the live order since 1819487): the
+ * job runner asks it for a claimed lookup before the bridge, and usable facts close the job here
+ * without the browser, their rates marked `third_party`. Rates the pages showed are marked `shopee`.
  */
 import { bridgeLookupValueSchema } from "@cashback/contracts";
 import { instantFromMs, searchText, toMs, type Clock, type Instant } from "@cashback/core";
@@ -29,7 +33,8 @@ import { readLookupFacts, type ProductFacts } from "./domain/product-lookup";
 import { closeJob } from "./link-issue.command";
 import { holdShopeeQueue, pauseShopeeQueue, shopeeQueueGate } from "./link-queue.command";
 import type { LinkEffects } from "./link-result.command";
-import { bridgeJobs, linkRequests, productOffers } from "./schema";
+import type { ThirdPartyFacts } from "./domain/third-party-product";
+import { bridgeJobs, linkRequests, productOffers, type RatesSource } from "./schema";
 
 /** A request older than this gets no lookup: its reply went out without one. */
 export const LOOKUP_WINDOW_MS = 2 * 60 * 60_000;
@@ -44,8 +49,16 @@ export const LOOKUP_RETRY_MS = 10 * 60_000;
 
 const minus = (at: Instant, ms: number): Instant => instantFromMs(toMs(at) - ms);
 
+const PRODUCT_KEY = /^shopee:(\d+)\.(\d+)$/;
 /** The item id in a `shopee:<shop>.<item>` product key. */
-const itemIdOf = (productKey: string | null): string | null => /^shopee:\d+\.(\d+)$/.exec(productKey ?? "")?.[1] ?? null;
+const itemIdOf = (productKey: string | null): string | null => PRODUCT_KEY.exec(productKey ?? "")?.[2] ?? null;
+
+/** The shop and item a lookup's request names, from its product key; null for a link without one (a short link not yet resolved). */
+export function lookupItemOf(db: LedgerDb, requestId: string): { shopId: string; itemId: string } | null {
+  const row = db.select({ productKey: linkRequests.productKey }).from(linkRequests).where(eq(linkRequests.requestId, requestId)).get();
+  const m = PRODUCT_KEY.exec(row?.productKey ?? "");
+  return m?.[1] && m[2] ? { shopId: m[1], itemId: m[2] } : null;
+}
 
 interface KnownRates {
   readonly shopeeRateBps: number | null;
@@ -56,9 +69,9 @@ interface KnownRates {
 const ratesOf = (fresh: ProductFacts, known: KnownRates): KnownRates => (fresh.shopeeRateBps !== null ? { shopeeRateBps: fresh.shopeeRateBps, sellerRateBps: fresh.sellerRateBps } : known);
 
 /** Writes the facts onto the request as its snapshot (D56), keeping what an earlier lookup read and this one could not. */
-function writeSnapshot(db: LedgerDb, requestId: string, facts: ProductFacts): void {
+function writeSnapshot(db: LedgerDb, requestId: string, facts: ProductFacts, source: RatesSource | null): void {
   const known = db
-    .select({ name: linkRequests.productName, imageUrl: linkRequests.productImageUrl, price: linkRequests.productPrice, shopeeRateBps: linkRequests.shopeeRateBps, sellerRateBps: linkRequests.sellerRateBps })
+    .select({ name: linkRequests.productName, imageUrl: linkRequests.productImageUrl, price: linkRequests.productPrice, shopeeRateBps: linkRequests.shopeeRateBps, sellerRateBps: linkRequests.sellerRateBps, estimateSource: linkRequests.estimateSource })
     .from(linkRequests)
     .where(eq(linkRequests.requestId, requestId))
     .get();
@@ -67,7 +80,7 @@ function writeSnapshot(db: LedgerDb, requestId: string, facts: ProductFacts): vo
   const rates = ratesOf(facts, known ?? { shopeeRateBps: null, sellerRateBps: null });
   const commission = price !== null && rates.shopeeRateBps !== null ? shopeeCommission(price, rates.shopeeRateBps, rates.sellerRateBps ?? 0).commission : null;
   db.update(linkRequests)
-    .set({ productOfferId: facts.productOfferId, productName: name, productImageUrl: facts.imageUrl ?? known?.imageUrl ?? null, productPrice: price, ...rates, estimatedCommission: commission, searchText: searchText(name) })
+    .set({ productOfferId: facts.productOfferId, productName: name, productImageUrl: facts.imageUrl ?? known?.imageUrl ?? null, productPrice: price, ...rates, estimatedCommission: commission, estimateSource: facts.shopeeRateBps !== null ? source : (known?.estimateSource ?? null), searchText: searchText(name) })
     .where(eq(linkRequests.requestId, requestId))
     .run();
 }
@@ -76,11 +89,11 @@ function writeSnapshot(db: LedgerDb, requestId: string, facts: ProductFacts): vo
  * The item's shared facts, inserted or merged: a field this lookup could not read keeps its known
  * value, and the facts count as refreshed (`updated_at`) only when it read both the price and the rates.
  */
-function saveOffer(db: LedgerDb, facts: ProductFacts, at: Instant, canonicalUrl: string): void {
+function saveOffer(db: LedgerDb, facts: ProductFacts, at: Instant, canonicalUrl: string, source: RatesSource): void {
   const complete = facts.price !== null && facts.shopeeRateBps !== null;
   const rates = facts.shopeeRateBps !== null;
   db.insert(productOffers)
-    .values({ productOfferId: facts.productOfferId, shopId: facts.shopId, name: facts.name, imageUrl: facts.imageUrl, price: facts.price, shopeeRateBps: facts.shopeeRateBps, sellerRateBps: facts.sellerRateBps, canonicalUrl, firstSeenAt: at, updatedAt: complete ? at : null, origin: "LOOKUP" })
+    .values({ productOfferId: facts.productOfferId, shopId: facts.shopId, name: facts.name, imageUrl: facts.imageUrl, price: facts.price, shopeeRateBps: facts.shopeeRateBps, sellerRateBps: facts.sellerRateBps, ratesSource: rates ? source : null, canonicalUrl, firstSeenAt: at, updatedAt: complete ? at : null, origin: "LOOKUP" })
     .onConflictDoUpdate({
       target: productOffers.productOfferId,
       set: {
@@ -91,6 +104,7 @@ function saveOffer(db: LedgerDb, facts: ProductFacts, at: Instant, canonicalUrl:
         price: facts.price ?? sql`${productOffers.price}`,
         shopeeRateBps: rates ? facts.shopeeRateBps : sql`${productOffers.shopeeRateBps}`,
         sellerRateBps: rates ? facts.sellerRateBps : sql`${productOffers.sellerRateBps}`,
+        ratesSource: rates ? source : sql`${productOffers.ratesSource}`,
         updatedAt: complete ? at : sql`${productOffers.updatedAt}`,
       },
     })
@@ -103,11 +117,11 @@ function saveOffer(db: LedgerDb, facts: ProductFacts, at: Instant, canonicalUrl:
  * product its offer search never listed as "0%", which is "not found" (live fix 2326e07, item
  * 43733512926 was 4% + 10%); the cutover imported such rows, so the item is looked up again.
  */
-function freshOffer(db: LedgerDb, itemId: string, now: Instant): ProductFacts | null {
+function freshOffer(db: LedgerDb, itemId: string, now: Instant): { facts: ProductFacts; source: RatesSource | null } | null {
   const row = db.select().from(productOffers).where(and(eq(productOffers.productOfferId, itemId), gte(productOffers.updatedAt, minus(now, PRODUCT_FACTS_FRESH_MS)))).get();
   if (row === undefined || row.price === null || row.shopId === null || row.shopeeRateBps === null || row.sellerRateBps === null) return null;
   if (row.shopeeRateBps === 0 && row.sellerRateBps === 0) return null;
-  return { productOfferId: row.productOfferId, shopId: row.shopId, name: row.name, imageUrl: row.imageUrl, price: row.price, shopeeRateBps: row.shopeeRateBps, sellerRateBps: row.sellerRateBps };
+  return { facts: { productOfferId: row.productOfferId, shopId: row.shopId, name: row.name, imageUrl: row.imageUrl, price: row.price, shopeeRateBps: row.shopeeRateBps, sellerRateBps: row.sellerRateBps }, source: row.ratesSource };
 }
 
 /** The oldest request with a link and no estimate yet whose next lookup is due, Zalo first. */
@@ -149,7 +163,7 @@ export function claimLookupJob(db: LedgerDb, clock: Clock): LookupBridgeJob | nu
     const shared = itemId === null ? null : freshOffer(db, itemId, now);
     if (shared === null) return { jobId: inserted.jobId, requestId: request.requestId, url: request.sourceUrl };
     // Fresh shared facts: the snapshot is taken from them and the job is done without the browser.
-    writeSnapshot(db, request.requestId, shared);
+    writeSnapshot(db, request.requestId, shared.facts, shared.source);
     db.update(bridgeJobs).set({ status: "DONE", finishedAt: now }).where(eq(bridgeJobs.jobId, inserted.jobId)).run();
   }
   return null;
@@ -189,9 +203,27 @@ export function recordLookupResult(db: LedgerDb, job: LookupBridgeJob, answer: R
   const facts = readLookupFacts(value.data);
   db.update(bridgeJobs).set({ status: "DONE", failure: facts === null ? "not_found" : null, finishedAt: at }).where(eq(bridgeJobs.jobId, job.jobId)).run();
   if (facts === null) return done("not_found");
-  saveOffer(db, facts, at, `https://shopee.vn/product/${facts.shopId}/${facts.productOfferId}`);
-  writeSnapshot(db, job.requestId, facts);
+  saveOffer(db, facts, at, `https://shopee.vn/product/${facts.shopId}/${facts.productOfferId}`, "shopee");
+  writeSnapshot(db, job.requestId, facts, "shopee");
   return done("found");
+}
+
+const isPending = (db: LedgerDb, jobId: number): boolean => db.select({ status: bridgeJobs.status }).from(bridgeJobs).where(eq(bridgeJobs.jobId, jobId)).get()?.status === "PENDING";
+
+/** Records the third party's usable facts for a claimed lookup and closes it without the browser; call inside `tx`. */
+export function recordThirdPartyFacts(db: LedgerDb, job: LookupBridgeJob, shopId: string, found: ThirdPartyFacts, clock: Clock): LookupRecorded {
+  const at = clock.now();
+  if (!isPending(db, job.jobId)) return { requestId: job.requestId, outcome: "stale", reason: null };
+  const facts: ProductFacts = { ...found, shopId };
+  db.update(bridgeJobs).set({ status: "DONE", failure: null, finishedAt: at }).where(eq(bridgeJobs.jobId, job.jobId)).run();
+  saveOffer(db, facts, at, `https://shopee.vn/product/${shopId}/${facts.productOfferId}`, "third_party");
+  writeSnapshot(db, job.requestId, facts, "third_party");
+  return { requestId: job.requestId, outcome: "found", reason: "third_party" };
+}
+
+/** Closes a claimed lookup no source could answer (a bridge without lookups); call inside `tx`. */
+export function closeUnansweredLookup(db: LedgerDb, job: LookupBridgeJob, reason: string, clock: Clock): void {
+  if (isPending(db, job.jobId)) closeJob(db, job.jobId, reason, clock.now());
 }
 
 /** The browser took the lookup and never answered; the second time in a row it is given up. Call inside `tx`. */

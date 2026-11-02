@@ -71,7 +71,7 @@ describe("Story 6.3: a product link pasted in Zalo gets a share link reply", () 
       network: "shopee",
       perShop: false,
       product: { name: "Noi com dien 1.8L", price: 450_000 },
-      estimate: { cashback: expected.cashback, shareBps: expected.cashbackShareBps, withheld: true },
+      estimate: { cashback: expected.cashback, shareBps: expected.cashbackShareBps, withheld: true, parts: [{ part: "shopee", rateBps: 260, amount: expected.shopeePart }], capped: expected.capped },
     });
     expect(JSON.stringify(reply)).not.toContain("invalid");
     expect(shareBaseUrlFor({ publicBaseUrl: null, publicPort: 9080 })).toBe("http://127.0.0.1:9080");

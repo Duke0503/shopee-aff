@@ -22,7 +22,7 @@ done. No phase prints a secret.
 | parity | the gate: counts of customers, aliases, orders, link requests, share codes, payouts, campaign awards, clicks equal; paid cashback, payout total and paid bonus equal per customer to the dong; import report clean. Fail = abort | the same |
 | audit | the numbers audit (`cutover:step audit`): every order (owner after merges, status mapping, value, commissions, cashback, paid time, covering payout, platform, link), every transfer (amount, owner, covered orders and bonuses, covered sum), every customer (paid, payable and waiting against what the live payout screen showed) and every network batch (received and gross against its raw report, fee plus tax). Writes `audit.json` and `audit.md`. Any difference without a documented reason = abort | the same |
 | first-run | the quiet first reconciliation (`cutover:first-run`), would-be sends in `first-run.json`; checks both flags are on | the same |
-| carry-over | copies `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ACCESSTRADE_API_KEY` and the Zalo group ids from the live `.env` into unset keys of `prod.env`; sets `PUBLIC_PORT=80`, `LIVE_LEDGER_PATH`, `ZALO_CREDENTIALS_PATH`; copies `credentials.json` (live assistant stopped); key names only | runs on throw-away files and proves no value reached the output |
+| carry-over | copies `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ACCESSTRADE_API_KEY`, `ADDLIVETAG_API_KEY` and the Zalo group ids from the live `.env` into unset keys of `prod.env`; sets `PUBLIC_PORT=80`, `LIVE_LEDGER_PATH`, `ZALO_CREDENTIALS_PATH`; copies `credentials.json` (live assistant stopped); key names only | runs on throw-away files and proves no value reached the output |
 | start-new | puts Node 24 on the machine PATH instead of Node 20, stops a shadow-run server, installs only the ledger file (an older ledger and its WAL are moved aside; proofs, backups and logs stay), starts the 72-hour no-payout window at this moment (go-live), installs and starts the `CashbackV2*` tasks; waits for `/api/health` on port 80 | the same on the rehearsal's own data folder; the server on 127.0.0.1:9180 and [::1]:9180, fake bridge and Zalo |
 | smoke | health, website, 20 old share links and the receipts on `127.0.0.1:80`; one of each by `localhost:80` and `[::1]:80` (the tunnel's route names `localhost`) and through `https://hoantiendp.com`; fails on a short sample | the same without the tunnel; then stops the server |
 
@@ -81,8 +81,15 @@ never run both systems at once.
    cutover only takes it off the PATH and keeps it on disk for the rollback.
 5. `prod.env` as in `production-host-runbook.md` section 2.2, with `PUBLIC_BASE_URL=https://hoantiendp.com`
    and `BROWSER_PROFILE_DIR=C:\Project\cashback\.browser-profile\prod`. Leave
-   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ACCESSTRADE_API_KEY` and `ZALO_GROUP_IDS` unset: the
-   carry-over fills them. Every other secret is new (D51).
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ACCESSTRADE_API_KEY`, `ADDLIVETAG_API_KEY` and
+   `ZALO_GROUP_IDS` unset: the carry-over fills them. Every other secret is new (D51).
+   `ADDLIVETAG_API_KEY` is the third party's product lookup key (owner decision 2026-11-02: the
+   third party is asked first for a product's rates, the Shopee pages second). It is in the live
+   `C:\Project\mmo\.env` on the VPS; never print it or put it in the repository. With the key set,
+   production asks the third party by default (`THIRD_PARTY_LOOKUP` unset means on in production;
+   `THIRD_PARTY_LOOKUP=off` switches it off in one line). Its value was committed on `main` (the live
+   default key) and the owner keeps it, so add `ADDLIVETAG_API_KEY` to `-AcceptGaps` below; the
+   preflight then reports `ADDLIVETAG_API_KEY:committed_kept` instead of refusing.
 6. In the Cloudflare dashboard, open the tunnel's public hostname for `hoantiendp.com` (read only)
    and check its service is `http://localhost:80` (verified: it is), `http://127.0.0.1:80` or
    `http://[::1]:80`. If it names the VPS's own public address instead, change it to
@@ -92,7 +99,7 @@ never run both systems at once.
 
    ```powershell
    cd C:\Project\cashback
-   .\ops\windows\cutover\cutover.ps1 -Mode Live -WorkDir C:\Project\cutover -Node24Dir C:\Tools\node-v24 -Phase preflight -AcceptGaps "ADMIN_HOST,ACCESS_TEAM_DOMAIN,ACCESS_AUDIENCE"
+   .\ops\windows\cutover\cutover.ps1 -Mode Live -WorkDir C:\Project\cutover -Node24Dir C:\Tools\node-v24 -Phase preflight -AcceptGaps "ADMIN_HOST,ACCESS_TEAM_DOMAIN,ACCESS_AUDIENCE,ADDLIVETAG_API_KEY"
    ```
 
    Expected: `"phase":"preflight","status":"ok"` with `openGaps` listing only what you accepted.

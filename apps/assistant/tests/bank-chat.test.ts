@@ -70,7 +70,7 @@ describe("Story 6.9: bank account saved or changed from the Zalo private chat", 
     expect(server.callsTo(ASSISTANT_BANK_PATH)).toEqual([{ zaloUserId: "70001", displayName: "Lan", chat: "private", details: AC1_DETAILS }]);
     expect(server.callsTo(ASSISTANT_COMMAND_PATH)).toEqual([]);
     expect(sent).toEqual([messageText("bank_saved", { bank: "Vietcombank", lastFour: "6789" })]);
-    expect(sent[0]).toContain("\u2022\u2022 6789");
+    expect(sent[0]).toContain("\u00b7\u00b7\u00b76789");
     expect(sent[0]).not.toMatch(/0123|NGUYEN|nguyen/i);
   });
 
@@ -93,7 +93,7 @@ describe("Story 6.9: bank account saved or changed from the Zalo private chat", 
     expect(["m\u00ecnh \u0111\u1eb7t 2 \u0111\u01a1n r\u1ed3i", "\u0111\u01a1n 12345 \u0111\u00e3 giao", "MB 0123 456 789 NGUYEN"].map(looksLikeBankDetails)).toEqual([false, false, true]);
     const server = fakeServer();
     answering(server, saved);
-    expect(await sentFor(server, privately("m\u00ecnh \u0111\u1eb7t 2 \u0111\u01a1n r\u1ed3i", true))).toEqual([messageText("welcome", { customerCode: "DP00001" })]);
+    expect(await sentFor(server, privately("m\u00ecnh \u0111\u1eb7t 2 \u0111\u01a1n r\u1ed3i", true))).toEqual([messageText("welcome", { name: "Lan", customerCode: "DP00001" })]);
     expect(server.callsTo(ASSISTANT_BANK_PATH)).toEqual([]);
   });
 
@@ -133,7 +133,7 @@ describe("Story 6.9: bank account saved or changed from the Zalo private chat", 
   it("AC4: the change message the server enqueues is sent with the new last four digits only", () => {
     const message = notificationMessage({ id: 1, dedupKey: "bank_account:P1.1:changed", zaloUserId: "70001", messageKey: "bank_changed", params: { bank: "Techcombank", lastFour: "6789" }, link: null });
     expect(message?.text).toBe(messageText("bank_changed", { bank: "Techcombank", lastFour: "6789" }));
-    expect(message?.text).toContain("\u2022\u2022 6789");
+    expect(message?.text).toContain("\u00b7\u00b7\u00b76789");
   });
 
   it("AC5: bank details sent in the group are refused with the pointer to the private chat and never reach the server", async () => {

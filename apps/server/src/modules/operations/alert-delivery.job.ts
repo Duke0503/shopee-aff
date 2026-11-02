@@ -87,12 +87,12 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
  * 8.2): no scheduler will deliver a stored alert, so each alert is sent at once, and `settled`
  * waits for the sends before the process exits. A failed send is logged, never thrown.
  */
-export function immediateAlerts(sender: AlertSender, logger: DeliveryLogger): AlertPort & { settled(): Promise<void> } {
+export function immediateAlerts(sender: AlertSender, logger: DeliveryLogger, clock: Clock): AlertPort & { settled(): Promise<void> } {
   const sends: Promise<void>[] = [];
   return {
     alert(kind, severity) {
       logger.warn({ kind, severity, result: "immediate" }, "operations.alert.raised");
-      sends.push(sender.send(telegramText({ kind, severity, suppressed: 0 })).catch((error: unknown) => logger.warn({ kind, error: error instanceof Error ? error.name : "unknown" }, "operations.alert.delivery_failed")));
+      sends.push(sender.send(telegramText({ kind, severity, suppressed: 0, raisedAt: clock.now() })).catch((error: unknown) => logger.warn({ kind, error: error instanceof Error ? error.name : "unknown" }, "operations.alert.delivery_failed")));
     },
     settled: async () => void (await Promise.all(sends)),
   };

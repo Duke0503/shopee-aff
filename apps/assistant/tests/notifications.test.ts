@@ -223,7 +223,7 @@ describe("Story 6.4: notification outbox delivered by pull and acknowledgement (
     expect(server.calls).toEqual([]);
     const open = { ...deps, connected: () => true };
     expect(await deliverNext(open)).toBe("sent");
-    expect(zalo.sent[0]!.text).toBe(messageText("payout_recorded", { amount: "79.216\u0111", receiptToken: "tok123" }));
+    expect(zalo.sent[0]!.text).toBe(messageText("payout_recorded_basic", { amount: "79.216\u0111", receiptToken: "tok123" }));
   });
 
   it("the sent-notifications file forgets keys older than 8 days and survives a corrupt file", () => {

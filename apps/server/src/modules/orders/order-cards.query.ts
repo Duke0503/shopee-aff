@@ -7,6 +7,7 @@
  * reply (Story 6.7). Read only.
  */
 import type { OrderStatus } from "@cashback/core";
+import { estimatedCashback, type AffiliateNetwork } from "@cashback/money";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
@@ -131,16 +132,30 @@ export interface ChatOrder {
   readonly cashback: number | null;
   /** The cancel reason code of a REJECTED order, as reconciliation stored it. */
   readonly rejectionReason: string | null;
+  /**
+   * What the live `/donhang` wrote for the order (notifications.py order_history): the stored
+   * cashback, else the estimated cashback of an awaiting order (0 without an estimate); 0 for a
+   * rejected or reversed order.
+   */
+  readonly amount: number;
+  readonly recordedAt: string | null;
+}
+
+function chatAmount(r: { status: OrderStatus; cashback: number | null; estimatedCommission: number | null; network: AffiliateNetwork | null }): number {
+  if (r.status === "REJECTED" || r.status === "REVERSED") return 0;
+  if (r.cashback !== null) return r.cashback;
+  return r.status === "AWAITING_APPROVAL" ? estimatedCashback(r.estimatedCommission, r.network) : 0;
 }
 
 /** The latest orders under the stored ids, newest first, with what the `/donhang` reply says of each. */
 export function chatOrdersOf(db: LedgerDb, customerIds: readonly string[], limit: number): ChatOrder[] {
   if (customerIds.length === 0) return [];
   return db
-    .select({ orderId: orders.orderId, status: orders.status, cashback: orders.cashback, rejectionReason: orders.rejectionReason })
+    .select({ orderId: orders.orderId, status: orders.status, cashback: orders.cashback, rejectionReason: orders.rejectionReason, estimatedCommission: orders.estimatedCommission, network: orders.network, recordedAt: orders.recordedAt })
     .from(orders)
     .where(inArray(orders.customerId, [...customerIds]))
     .orderBy(sql`${orders.recordedAt} DESC NULLS LAST`, desc(orders.orderId))
     .limit(limit)
-    .all();
+    .all()
+    .map(({ estimatedCommission, network, ...r }) => ({ ...r, amount: chatAmount({ ...r, estimatedCommission, network }) }));
 }

@@ -34,6 +34,7 @@ import { dedupKey, type OutboxPort } from "../../platform/ports/outbox.port";
 import { orderAwardsFor, payAwards } from "../campaigns/index";
 import { markOrderPaid } from "../orders/index";
 import { openClaimOf, ownClaim, PayoutClaimError } from "./payout-claim.command";
+import { getBalances } from "./balance.query";
 import { nettingOf, payoutSnapshot, type PayoutSnapshot } from "./payout-snapshot.query";
 import { ledgerEntries, payoutClaims, payoutItems, payouts, type PayoutClaimRow, type RecordedPayoutRow } from "./schema";
 
@@ -182,7 +183,8 @@ function record(db: LedgerDb, claim: PayoutClaimRow, snapshot: PayoutSnapshot, d
     dedupKey: dedupKey("payout", String(row.payoutId), "recorded"),
     customerId: snapshot.customerId,
     messageKey: PAYOUT_RECORDED_MESSAGE,
-    params: { payoutId: row.payoutId, amount: row.transferAmount, receiptToken: row.receiptToken ?? "" },
+    // As the live payout message: this transfer, everything paid so far, and when.
+    params: { payoutId: row.payoutId, amount: row.transferAmount, receiptToken: row.receiptToken ?? "", totalPaid: getBalances(db, [snapshot.customerId])[0]?.paid ?? row.transferAmount, paidAt: now },
     transferAmount: row.transferAmount,
   });
   return {

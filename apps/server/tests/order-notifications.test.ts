@@ -196,7 +196,6 @@ describe("Story 6.6: order, clawback and payout notifications told once", () => 
     const sentences = statusesOf("order").map((s) => (MESSAGES[s.messageKey ?? ""] ?? "").replace(": {reason}", ""));
     for (const key of Object.values(ORDER_NOTICES)) for (const sentence of sentences) expect(MESSAGES[key], key).not.toContain(sentence);
     expect(MESSAGES["notice_order"]).toContain("{state}");
-    expect(MESSAGES["notice_order_detail"]).toContain("{state}");
     for (const key of producerKeys) expect(MESSAGES[key], key).not.toMatch(/\d{1,2}\/\d{1,2}|\{(date|day|days|payoutDate)\}/);
   });
 

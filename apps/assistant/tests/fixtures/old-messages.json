@@ -1,0 +1,1288 @@
+{
+  "$comment": "Generated from the live system's own code (scratch generator old-messages.mjs, kept out of the repository); see docs/operations/message-parity.md. Never edit by hand.",
+  "cases": [
+    {
+      "name": "link reply, Shopee with both commission parts (private)",
+      "source": "zalo_assistant/assistant_worker.js:749-810",
+      "kind": "link",
+      "facts": {
+        "requestId": "R1",
+        "status": "ISSUED",
+        "shareUrl": "https://hoantiendp.com/s/AbCdEf1234",
+        "factsSettled": true,
+        "network": "shopee",
+        "perShop": false,
+        "product": {
+          "name": "Áo thun nam nữ cotton 100% form rộng oversize basic nhiều màu, hàng loại 1 chính hãng",
+          "price": 150000
+        },
+        "estimate": {
+          "cashback": 8725,
+          "shareBps": 8000,
+          "withheld": true,
+          "capped": false,
+          "parts": [
+            {
+              "part": "shopee",
+              "rateBps": 500,
+              "amount": 7500
+            },
+            {
+              "part": "seller",
+              "rateBps": 300,
+              "amount": 4500
+            }
+          ]
+        }
+      },
+      "text": "🎉 Link hoàn tiền Shopee của bạn đã sẵn sàng\n\n📦 Áo thun nam nữ cotton 100% form rộng oversize basic nhiều...\n🔗 https://hoantiendp.com/s/AbCdEf1234\n\n📊 Hoa hồng hiện tại:\n• Shopee 5% → 7.500đ\n• Shop 3% → 4.500đ\n\n🎁 Bạn nhận 80% → dự kiến 8.725đ\n\n👉 Bấm link trên và đặt hàng trực tiếp trên Shopee.\n💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.",
+      "bold": [
+        [
+          3,
+          41
+        ],
+        [
+          174,
+          18
+        ],
+        [
+          195,
+          16
+        ],
+        [
+          216,
+          29
+        ],
+        [
+          250,
+          47
+        ],
+        [
+          302,
+          28
+        ]
+      ],
+      "mentions": []
+    },
+    {
+      "name": "link reply, Shopee capped, decimal rate, in the group (tagged)",
+      "source": "zalo_assistant/assistant_worker.js:749-810",
+      "kind": "link",
+      "tag": {
+        "userId": "70005",
+        "name": "Minh"
+      },
+      "facts": {
+        "requestId": "R1",
+        "status": "ISSUED",
+        "shareUrl": "https://hoantiendp.com/s/AbCdEf1234",
+        "factsSettled": true,
+        "network": "shopee",
+        "perShop": false,
+        "product": {
+          "name": "Xe đạp",
+          "price": 8400000
+        },
+        "estimate": {
+          "cashback": 28000,
+          "shareBps": 8000,
+          "withheld": false,
+          "capped": true,
+          "parts": [
+            {
+              "part": "shopee",
+              "rateBps": 250,
+              "amount": 40000
+            }
+          ]
+        }
+      },
+      "text": "@Minh\n🎉 Link hoàn tiền Shopee của bạn đã sẵn sàng\n\n📦 Xe đạp\n🔗 https://hoantiendp.com/s/AbCdEf1234\n\n📊 Hoa hồng hiện tại:\n• Shopee 2.5% → 40.000đ (tối đa 40.000đ/sản phẩm theo quy định Shopee)\n\n🎁 Bạn nhận 80% → dự kiến 28.000đ\n\n👉 Bấm link trên và đặt hàng trực tiếp trên Shopee.\n💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.",
+      "bold": [
+        [
+          9,
+          41
+        ],
+        [
+          126,
+          21
+        ],
+        [
+          199,
+          30
+        ],
+        [
+          234,
+          47
+        ],
+        [
+          286,
+          28
+        ]
+      ],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 5
+        }
+      ]
+    },
+    {
+      "name": "link reply, TikTok Shop without figures",
+      "source": "zalo_assistant/assistant_worker.js:811-822",
+      "kind": "link",
+      "facts": {
+        "requestId": "R1",
+        "status": "ISSUED",
+        "shareUrl": "https://hoantiendp.com/s/AbCdEf1234",
+        "factsSettled": true,
+        "network": "accesstrade",
+        "perShop": false,
+        "product": {
+          "name": null,
+          "price": null
+        },
+        "estimate": null
+      },
+      "text": "🎉 Link hoàn tiền TikTok Shop của bạn đã sẵn sàng\n\n🔗 https://hoantiendp.com/s/AbCdEf1234\n\n🎁 Bạn sẽ nhận 80% hoa hồng của đơn hàng này sau khi đặt mua thành công (tiền hoàn sẽ tự động ghi nhận và cộng vào tài khoản khi đơn hàng đồng bộ)!\n\n👉 Bấm link trên và đặt hàng trực tiếp trên TikTok Shop.\n💡 Nên mua ngay sau khi mở link và hạn chế bấm thêm link Affiliate khác trước khi đặt hàng.",
+      "bold": [
+        [
+          3,
+          46
+        ],
+        [
+          101,
+          17
+        ],
+        [
+          243,
+          52
+        ],
+        [
+          300,
+          28
+        ]
+      ],
+      "mentions": []
+    },
+    {
+      "name": "link reply, ShopeeFood with a shop name",
+      "source": "zalo_assistant/assistant_worker.js:723-748",
+      "kind": "link",
+      "facts": {
+        "requestId": "R1",
+        "status": "ISSUED",
+        "shareUrl": "https://hoantiendp.com/s/AbCdEf1234",
+        "factsSettled": true,
+        "network": "shopee",
+        "perShop": true,
+        "product": {
+          "name": "Bún Chả Hương Liên",
+          "price": null
+        },
+        "estimate": null
+      },
+      "text": "🍜 Link đặt ShopeeFood của bạn đã sẵn sàng\n\n🍽️ Bún Chả Hương Liên\n🔗 https://hoantiendp.com/s/AbCdEf1234\n\n🎁 Bạn sẽ nhận 80% hoa hồng tích lũy của đơn sau khi giao hàng thành công (Shopee áp dụng trần hoa hồng cho từng quán)!\n\n👉 Bấm link trên để mở App Shopee / ShopeeFood và đặt món.\n💡 Nên đặt món ngay sau khi mở link và hạn chế bấm link khác trước khi chốt đơn bạn nhé!",
+      "bold": [
+        [
+          3,
+          39
+        ],
+        [
+          3,
+          39
+        ],
+        [
+          117,
+          26
+        ],
+        [
+          231,
+          54
+        ],
+        [
+          231,
+          54
+        ],
+        [
+          290,
+          32
+        ]
+      ],
+      "mentions": []
+    },
+    {
+      "name": "link reply, ShopeeFood with the generic name, in the group",
+      "source": "zalo_assistant/assistant_worker.js:723-748",
+      "kind": "link",
+      "tag": {
+        "userId": "70005",
+        "name": "Minh"
+      },
+      "facts": {
+        "requestId": "R1",
+        "status": "ISSUED",
+        "shareUrl": "https://hoantiendp.com/s/AbCdEf1234",
+        "factsSettled": true,
+        "network": "shopee",
+        "perShop": true,
+        "product": {
+          "name": "Quán ăn ShopeeFood",
+          "price": null
+        },
+        "estimate": null
+      },
+      "text": "@Minh\n🍜 Link đặt ShopeeFood của bạn đã sẵn sàng\n\n🔗 https://hoantiendp.com/s/AbCdEf1234\n\n🎁 Bạn sẽ nhận 80% hoa hồng tích lũy của đơn sau khi giao hàng thành công (Shopee áp dụng trần hoa hồng cho từng quán)!\n\n👉 Bấm link trên để mở App Shopee / ShopeeFood và đặt món.\n💡 Nên đặt món ngay sau khi mở link và hạn chế bấm link khác trước khi chốt đơn bạn nhé!",
+      "bold": [
+        [
+          9,
+          39
+        ],
+        [
+          9,
+          39
+        ],
+        [
+          100,
+          26
+        ],
+        [
+          214,
+          54
+        ],
+        [
+          214,
+          54
+        ],
+        [
+          273,
+          32
+        ]
+      ],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 5
+        }
+      ]
+    },
+    {
+      "name": "unsupported shop (Lazada)",
+      "source": "zalo_assistant/assistant_worker.js:580-584",
+      "kind": "key",
+      "key": "link_network_unsupported",
+      "values": {},
+      "text": "Dạ hiện tại hệ thống chỉ hỗ trợ hoàn tiền cho các đơn hàng trên Shopee và TikTok Shop thôi bạn nhé! 🛍️✨\n\n👉 Bạn hãy gửi link sản phẩm Shopee hoặc TikTok Shop để nhận lại đến 80% tiền hoàn nha! 💖",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "product not in the affiliate program (TikTok Shop)",
+      "source": "zalo_assistant/assistant_worker.js:606-612",
+      "kind": "key",
+      "key": "link_not_in_affiliate",
+      "values": {},
+      "text": "⚠️ Rất tiếc, người bán (Shop) của sản phẩm này hiện không tham gia chương trình hoàn tiền / tiếp thị liên kết trên TikTok Shop nên hệ thống không thể tạo link hoàn tiền được bạn nhé! 🛍️\n\n👉 Bạn hãy thử tìm sản phẩm tương tự từ các Shop khác xem sao nha!",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/help in the group",
+      "source": "zalo_assistant/assistant_worker.js:1400-1464",
+      "kind": "key",
+      "key": "command_help",
+      "values": {},
+      "tag": {
+        "userId": "70001",
+        "name": "Lan"
+      },
+      "text": "@Lan\n📋 HƯỚNG DẪN NHẬN HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP\n\n1️⃣ Gửi link sản phẩm Shopee hoặc TikTok Shop bạn muốn mua vào nhóm hoặc inbox riêng cho mình.\n2️⃣ Nhận lại link mua hàng đã kích hoạt hoàn tiền 80% hoa hồng.\n3️⃣ Bấm link và tiến hành đặt hàng trực tiếp trên sàn Shopee hoặc TikTok Shop.\n4️⃣ Nhắn tin riêng cho mình gõ /id để lấy Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com.\n5️⃣ Cài đặt số tài khoản ngân hàng bằng cách nhắn tin trực tiếp (lệnh /stk) hoặc trên Web, tiền hoàn sẽ được tự động chuyển về cho bạn sau khi sàn đối soát.\n\n• /id: Lấy Mã Khách Hàng (Dùng tạo link web & đăng nhập)\n• /matkhau: Lấy mật khẩu đăng nhập website hoantiendp.com\n• /sodu: Tra cứu số dư tiền hoàn đã tích lũy\n• /stk: Cập nhật hoặc tra cứu số tài khoản ngân hàng nhận tiền hoàn\n• /chinhsach: Chính sách hoàn tiền 80% & các khoản khấu trừ\n• /web: Website tra cứu đơn & cập nhật STK ngân hàng",
+      "bold": [
+        [
+          8,
+          49
+        ],
+        [
+          132,
+          20
+        ],
+        [
+          194,
+          22
+        ],
+        [
+          244,
+          18
+        ],
+        [
+          328,
+          3
+        ],
+        [
+          356,
+          8
+        ],
+        [
+          386,
+          22
+        ],
+        [
+          685,
+          5
+        ],
+        [
+          798,
+          10
+        ],
+        [
+          858,
+          4
+        ]
+      ],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "/web in the group",
+      "source": "zalo_assistant/assistant_worker.js:1577-1609",
+      "kind": "key",
+      "key": "command_web",
+      "values": {},
+      "tag": {
+        "userId": "70001",
+        "name": "Lan"
+      },
+      "text": "@Lan\n🌐 Website chính thức: https://hoantiendp.com\n\n👉 Bạn truy cập website để kiểm tra lịch sử đơn hàng, theo dõi tiến độ tiền hoàn và cập nhật số tài khoản ngân hàng nhận tiền nhé!",
+      "bold": [
+        [
+          28,
+          22
+        ],
+        [
+          136,
+          31
+        ]
+      ],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "/chinhsach",
+      "source": "zalo_assistant/assistant_worker.js:1610-1657",
+      "kind": "key",
+      "key": "command_policy",
+      "values": {},
+      "text": "💡 CHÍNH SÁCH HOÀN TIỀN 80% SHOPEE & TIKTOK SHOP\n\n• Tỷ lệ hoàn tiền: Bạn nhận trọn 80% hoa hồng thực tế mà hệ thống nhận được từ Shopee Affiliate & TikTok Shop (AccessTrade).\n• Mức ước tính ban đầu: Được tính trên giá niêm yết hiện tại của sản phẩm.\n• Số tiền thực nhận: Sẽ được tính theo hoa hồng thực tế sàn duyệt sau khi trừ voucher giảm giá và các khoản thuế/khấu trừ theo quy định (nếu có).\n• Thời gian chi trả: Tiền sẽ được tự động chuyển cho bạn sau khi sàn đối soát (thường từ 30 - 70 ngày kể từ khi đơn giao thành công).\n• Tra cứu minh bạch: Truy cập website https://hoantiendp.com để xem chi tiết từng đơn hàng và số tiền tích lũy nhé!",
+      "bold": [
+        [
+          3,
+          45
+        ],
+        [
+          83,
+          20
+        ],
+        [
+          129,
+          30
+        ],
+        [
+          289,
+          26
+        ],
+        [
+          358,
+          13
+        ],
+        [
+          430,
+          22
+        ],
+        [
+          453,
+          20
+        ],
+        [
+          485,
+          12
+        ],
+        [
+          568,
+          22
+        ]
+      ],
+      "mentions": []
+    },
+    {
+      "name": "/ping",
+      "source": "zalo_assistant/assistant_worker.js:1396-1399",
+      "kind": "key",
+      "key": "command_ping",
+      "values": {
+        "groupName": "Hoàn Tiền Shopee"
+      },
+      "text": "Pong! 🏓 Trợ lý Hoàn Tiền đang hoạt động ổn định 24/7 tại Hoàn Tiền Shopee.",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "pointer to the private chat (group /sodu, /matkhau, /id)",
+      "source": "zalo_assistant/assistant_worker.js:1225-1261",
+      "kind": "key",
+      "key": "command_private_only",
+      "values": {},
+      "tag": {
+        "userId": "70001",
+        "name": "Lan"
+      },
+      "text": "@Lan\n🔒 Để bảo mật thông tin tài khoản và mật khẩu cá nhân, bạn hãy bấm vào ảnh đại diện của mình và NHẮN TIN RIÊNG (inbox 1-1) cho mình nhé:\n\n👉 Gõ \"/id\" để nhận Mã Khách Hàng riêng của bạn\n👉 Gõ \"/matkhau\" để nhận mật khẩu đăng nhập website https://hoantiendp.com\n\n⚠️ Tuyệt đối không lấy mật khẩu ở nhóm chung để tránh lộ tài khoản nha!",
+      "bold": [
+        [
+          101,
+          14
+        ],
+        [
+          150,
+          3
+        ],
+        [
+          198,
+          8
+        ],
+        [
+          243,
+          22
+        ],
+        [
+          270,
+          41
+        ]
+      ],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "group /donhang",
+      "source": "zalo_assistant/assistant_worker.js:1211-1223",
+      "kind": "key",
+      "key": "command_orders_private_only",
+      "values": {},
+      "tag": {
+        "userId": "70001",
+        "name": "Lan"
+      },
+      "text": "@Lan\n🔒 Danh sách đơn hàng và số tiền hoàn là thông tin riêng của bạn. Bạn nhắn riêng cho mình rồi gõ /donhang nhé!",
+      "bold": [],
+      "mentions": [
+        {
+          "pos": 0,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "private nudge after /matkhau in the group",
+      "source": "zalo_assistant/assistant_worker.js:1266-1271",
+      "kind": "key",
+      "key": "command_password_from_group",
+      "values": {
+        "name": "Lan"
+      },
+      "text": "Chào Lan 👋! Mình thấy bạn vừa hỏi mật khẩu trong nhóm. Để đảm bảo an toàn, bạn hãy gửi lệnh /matkhau ngay tại khung chat riêng này với mình để nhận mật khẩu đăng nhập website https://hoantiendp.com nhé! 🔒",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "private code after /id in the group",
+      "source": "zalo_assistant/assistant_worker.js:1279-1289",
+      "kind": "key",
+      "key": "command_id_from_group",
+      "values": {
+        "name": "Lan",
+        "customerCode": "DP00012"
+      },
+      "text": "✨ MÃ KHÁCH HÀNG (ID) CỦA BẠN ✨\n\n👤 Tên Zalo: Lan\n🆔 Mã Khách Hàng: DP00012\n🌐 Website tra cứu: https://hoantiendp.com\n\n💡 Bạn dùng Mã ID này để dán vào website khi tạo link hoàn tiền.\n🏦 Để cài đặt STK ngân hàng nhận tiền hoàn: Bạn chỉ cần gửi tin nhắn STK cho mình (Ví dụ: /stk 0123456789 MB NGUYEN VAN A) hoặc gõ /matkhau để đăng nhập web.",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/id in a private chat",
+      "source": "zalo_assistant/assistant_worker.js:1305-1315",
+      "kind": "command",
+      "reply": {
+        "kind": "id",
+        "customerCode": "DP00012"
+      },
+      "context": {
+        "name": "Lan"
+      },
+      "text": "✨ THÔNG TIN MÃ KHÁCH HÀNG CỦA BẠN ✨\n\n👤 Tên Zalo: Lan\n🆔 Mã Khách Hàng (ID): DP00012\n🌐 Website tra cứu: https://hoantiendp.com\n\n📌 HƯỚNG DẪN SỬ DỤNG:\n1️⃣ Khi dán link sản phẩm Shopee hoặc TikTok Shop trên website https://hoantiendp.com, bạn nhập Mã Khách Hàng ở trên để hệ thống tự động ghi nhận hoàn tiền 80% cho bạn.\n2️⃣ Để cài đặt STK ngân hàng nhận tiền hoàn, bạn có thể nhắn trực tiếp cho mình theo cú pháp /stk <Số_tài_khoản> <Tên_ngân_hàng> <Tên_chủ_tài_khoản> (hoặc gõ /matkhau để đăng nhập web cài đặt nhé).",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/sodu with a bank account",
+      "source": "zalo_assistant/assistant_worker.js:1350-1365",
+      "kind": "command",
+      "reply": {
+        "kind": "balance",
+        "payable": 79216,
+        "waiting": 9263,
+        "paid": 150000,
+        "deducted": 0,
+        "owedAfter": 0,
+        "customerCode": "DP00012",
+        "bank": {
+          "bankName": "Vietcombank",
+          "lastFour": "6789",
+          "held": false
+        }
+      },
+      "context": {
+        "name": "Lan"
+      },
+      "text": "💰 SỐ DƯ TIỀN HOÀN CỦA BẠN 💰\n\n👤 Khách hàng: Lan (DP00012)\n💵 Đã tích lũy sẵn sàng nhận: 79.216đ\n⏳ Đang chờ Shopee đối soát: 9.263đ\n🎉 Đã chuyển khoản về ví: 150.000đ\n🏦 Trạng thái ngân hàng: ✅ Đã cài đặt STK (Vietcombank - ···6789)\n\n🌐 Xem chi tiết từng đơn hàng tại: https://hoantiendp.com",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/sodu without a bank account",
+      "source": "zalo_assistant/assistant_worker.js:1350-1365",
+      "kind": "command",
+      "reply": {
+        "kind": "balance",
+        "payable": 0,
+        "waiting": 0,
+        "paid": 0,
+        "deducted": 0,
+        "owedAfter": 0,
+        "customerCode": "DP00012",
+        "bank": null
+      },
+      "context": {
+        "name": "Lan"
+      },
+      "text": "💰 SỐ DƯ TIỀN HOÀN CỦA BẠN 💰\n\n👤 Khách hàng: Lan (DP00012)\n💵 Đã tích lũy sẵn sàng nhận: 0đ\n⏳ Đang chờ Shopee đối soát: 0đ\n🎉 Đã chuyển khoản về ví: 0đ\n🏦 Trạng thái ngân hàng: ⚠️ Chưa cài đặt STK ngân hàng (Nhắn /stk để cài đặt ngay nhé)\n\n🌐 Xem chi tiết từng đơn hàng tại: https://hoantiendp.com",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/donhang with orders today",
+      "source": "src/cashback/messaging/notifications.py:625-638",
+      "kind": "command",
+      "reply": {
+        "kind": "orders",
+        "todayTotal": 88479,
+        "orders": [
+          {
+            "orderId": "261101W0001",
+            "status": "AWAITING_APPROVAL",
+            "cashback": null,
+            "rejectionReason": null,
+            "amount": 9263,
+            "recordedAt": "2026-11-01T02:00:00.000Z",
+            "today": true
+          },
+          {
+            "orderId": "261101A0001",
+            "status": "APPROVED",
+            "cashback": 79216,
+            "rejectionReason": null,
+            "amount": 79216,
+            "recordedAt": "2026-11-01T01:00:00.000Z",
+            "today": true
+          }
+        ]
+      },
+      "context": {
+        "name": "Lan",
+        "now": "2026-11-01T03:00:00.000Z"
+      },
+      "text": "📦 Đơn hàng ngày 01/11/2026:\n\n1. 261101W0001 — HH: 9.263đ\n2. 261101A0001 — HH: 79.216đ\n\n💰 Tổng hoa hồng: 88.479đ\n\n🔗 Xem chi tiết tất cả đơn hàng tại: https://hoantiendp.com/orders",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/donhang without an order today",
+      "source": "src/cashback/messaging/notifications.py:639-650",
+      "kind": "command",
+      "reply": {
+        "kind": "orders",
+        "todayTotal": 0,
+        "orders": [
+          {
+            "orderId": "261020P0001",
+            "status": "PAID",
+            "cashback": 36000,
+            "rejectionReason": null,
+            "amount": 36000,
+            "recordedAt": "2026-10-20T05:00:00.000Z",
+            "today": false
+          },
+          {
+            "orderId": "261019R0001",
+            "status": "REJECTED",
+            "cashback": null,
+            "rejectionReason": "order_cancelled",
+            "amount": 0,
+            "recordedAt": "2026-10-19T05:00:00.000Z",
+            "today": false
+          }
+        ]
+      },
+      "context": {
+        "name": "Lan",
+        "now": "2026-11-01T03:00:00.000Z"
+      },
+      "text": "📭 Ngày 01/11/2026 anh/chị chưa có đơn hàng nào.\n\n📦 Danh sách 2 đơn hàng gần nhất:\n\n1. 261020P0001 (20/10) — HH: 36.000đ\n2. 261019R0001 (19/10) — HH: 0đ\n\n🔗 Xem chi tiết tất cả đơn hàng tại: https://hoantiendp.com/orders",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "/donhang with no order at all",
+      "source": "src/cashback/messaging/notifications.py:588-593",
+      "kind": "command",
+      "reply": {
+        "kind": "orders",
+        "todayTotal": 0,
+        "orders": []
+      },
+      "context": {
+        "name": "Lan",
+        "now": "2026-11-01T03:00:00.000Z"
+      },
+      "text": "📭 Ngày 01/11/2026 anh/chị chưa có đơn hàng nào.\n\n🔗 Xem chi tiết tất cả đơn hàng tại: https://hoantiendp.com/orders",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "link failed",
+      "source": "src/cashback/messaging/notifications.py:545-546",
+      "kind": "key",
+      "key": "link_failed",
+      "values": {},
+      "text": "😞 Mình chưa tạo được link cho sản phẩm này.\n\nBạn gửi lại link giúp mình nhé, hoặc thử sản phẩm khác.\n\n(Nếu gửi lại vẫn không được thì báo chủ nhóm giúp mình.)",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "friend request greeting",
+      "source": "zalo_assistant/assistant_worker.js:169-175 (wording.friend_request)",
+      "kind": "key",
+      "key": "friend_request_greeting",
+      "values": {},
+      "text": "Mình là trợ lý Hoàn Tiền DP. Kết bạn để nhận thông báo đơn hàng và tiền hoàn ngay trong hộp thư chính nhé!",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "link on its way",
+      "source": "resources/messages.vi.json received",
+      "kind": "key",
+      "key": "link_on_its_way",
+      "values": {},
+      "text": "✅ Đã nhận link rồi nhé!\n\nMình đang tạo link cho bạn, khoảng 1 phút nữa gửi lại.",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "order rejected",
+      "source": "src/cashback/messaging/notifications.py:483-486",
+      "kind": "notification",
+      "notification": {
+        "id": 1,
+        "dedupKey": "order:O1:rejected",
+        "zaloUserId": "70001",
+        "messageKey": "notice_order",
+        "params": {
+          "orderId": "261020R1",
+          "status": "REJECTED",
+          "reason": "commission_zero"
+        },
+        "link": null
+      },
+      "text": "😞 Đơn này không được sàn ghi nhận hoa hồng.\n\nMã đơn: 261020R1\nLý do: sàn không trả hoa hồng cho đơn này\n\nNên đơn này mình không hoàn được, mong bạn thông cảm. Đơn sau bạn cứ gửi link, mình làm tiếp nhé.",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "order recorded (the live payout window read 'khoảng khoảng'; the doubled word is the one deliberate fix)",
+      "source": "src/cashback/messaging/notifications.py:430-440, cli/commands/service.py:19",
+      "kind": "notification",
+      "notification": {
+        "id": 2,
+        "dedupKey": "order:O2:recorded",
+        "zaloUserId": "70001",
+        "messageKey": "notice_order_recorded",
+        "params": {
+          "orderId": "261020W1",
+          "status": "AWAITING_APPROVAL",
+          "estimate": 9263
+        },
+        "link": null
+      },
+      "text": "📥 Sàn đã ghi nhận đơn của bạn!\n\nDự kiến hoàn: ~9.263đ\nMã đơn: 261020W1\n\n⏳ Giờ chờ sàn duyệt, khoảng 30–70 ngày (theo kỳ đối soát sàn). Khi nào có tiền mình tự nhắn bạn — bạn không cần hỏi lại.\n\n(Nếu bạn trả hàng hoặc huỷ đơn thì đơn này không được hoàn nhé.)",
+      "liveText": "📥 Sàn đã ghi nhận đơn của bạn!\n\nDự kiến hoàn: ~9.263đ\nMã đơn: 261020W1\n\n⏳ Giờ chờ sàn duyệt, khoảng khoảng 30–70 ngày (theo kỳ đối soát sàn). Khi nào có tiền mình tự nhắn bạn — bạn không cần hỏi lại.\n\n(Nếu bạn trả hàng hoặc huỷ đơn thì đơn này không được hoàn nhé.)",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "payout recorded (the live message without its user line)",
+      "source": "src/cashback/web/dashboard.py:3037-3064",
+      "kind": "notification",
+      "notification": {
+        "id": 3,
+        "dedupKey": "payout:7:recorded",
+        "zaloUserId": "70001",
+        "messageKey": "payout_recorded",
+        "params": {
+          "payoutId": 7,
+          "amount": 79216,
+          "receiptToken": "rcpt_test_token_0001",
+          "totalPaid": 231216,
+          "paidAt": "2026-11-02T12:42:00.000Z"
+        },
+        "link": null
+      },
+      "text": "✅ Xác nhận thanh toán thành công!\n💰 Số tiền: 79.216đ\n📥 Tổng đã nhận: 231.216đ\n📅 Ngày: 02/11/2026 19:42\n🔗 Bill: https://hoantiendp.com/b/rcpt_test_token_0001",
+      "liveText": "✅ Xác nhận thanh toán thành công!\n💰 Số tiền: 79.216đ\n📥 Tổng đã nhận: 231.216đ\n📅 Ngày: 02/11/2026 19:42\n🔗 Bill: https://hoantiendp.com/b/rcpt_test_token_0001\n👤 User: @Lan",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "password (resources password_issued)",
+      "source": "resources/messages.vi.json password_issued",
+      "kind": "command",
+      "reply": {
+        "kind": "password",
+        "customerCode": "DP00012",
+        "password": "Ab3dEf7h"
+      },
+      "context": {
+        "name": "Lan"
+      },
+      "text": "🔑 MẬT KHẨU MỚI CỦA BẠN\n\nMã đăng nhập: DP00012\nMật khẩu: Ab3dEf7h\n\n⚠️ Mật khẩu CŨ không dùng được nữa, và nếu bạn đang đăng nhập ở đâu thì cũng bị thoát ra.\n\nĐăng nhập xong nên đổi mật khẩu ngay trên trang cho dễ nhớ.\nQuên thì cứ gõ /matkhau, mình cấp mật khẩu mới — mình không xem lại được mật khẩu cũ của bạn đâu.",
+      "bold": [],
+      "mentions": []
+    },
+    {
+      "name": "group welcome 1, 1 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_1",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        }
+      ],
+      "text": "Hello @Lan! Rất vui được đón tiếp bạn đến với Hoàn Tiền Shopee ✨\n👉 Chuẩn bị mua sắm trên Shopee hoặc TikTok Shop, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
+      "bold": [
+        [
+          122,
+          49
+        ],
+        [
+          185,
+          23
+        ],
+        [
+          273,
+          3
+        ],
+        [
+          284,
+          13
+        ],
+        [
+          301,
+          8
+        ],
+        [
+          392,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 6,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "group welcome 1, 2 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_1",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        }
+      ],
+      "text": "Hello @Lan & @Minh Anh! Rất vui được đón tiếp bạn đến với Hoàn Tiền Shopee ✨\n👉 Chuẩn bị mua sắm trên Shopee hoặc TikTok Shop, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
+      "bold": [
+        [
+          134,
+          49
+        ],
+        [
+          197,
+          23
+        ],
+        [
+          285,
+          3
+        ],
+        [
+          296,
+          13
+        ],
+        [
+          313,
+          8
+        ],
+        [
+          404,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 6,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 13,
+          "len": 9
+        }
+      ]
+    },
+    {
+      "name": "group welcome 1, 3 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_1",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        },
+        {
+          "userId": "70003",
+          "name": null
+        }
+      ],
+      "text": "Hello @Lan, @Minh Anh & @bạn 0003! Rất vui được đón tiếp bạn đến với Hoàn Tiền Shopee ✨\n👉 Chuẩn bị mua sắm trên Shopee hoặc TikTok Shop, bạn cứ dán thẳng link vào nhóm hoặc inbox riêng cho mình là được nha, nhận trọn 80% hoàn tiền siêu tiện lợi!\n🔑 Bạn hãy bấm vào avatar mình nhắn tin riêng gõ /id để lấy Mã Khách Hàng và /matkhau để nhận mật khẩu đăng nhập website cài đặt STK ngân hàng nhé!\n🌐 Website tra cứu: https://hoantiendp.com",
+      "bold": [
+        [
+          145,
+          49
+        ],
+        [
+          208,
+          23
+        ],
+        [
+          296,
+          3
+        ],
+        [
+          307,
+          13
+        ],
+        [
+          324,
+          8
+        ],
+        [
+          415,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 6,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 12,
+          "len": 9
+        },
+        {
+          "userId": "70003",
+          "pos": 24,
+          "len": 9
+        }
+      ]
+    },
+    {
+      "name": "group welcome 2, 1 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_2",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        }
+      ],
+      "text": "Chào mừng @Lan đã gia nhập Hoàn Tiền Shopee! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee / TikTok Shop vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
+      "bold": [
+        [
+          62,
+          90
+        ],
+        [
+          171,
+          13
+        ],
+        [
+          233,
+          3
+        ],
+        [
+          245,
+          13
+        ],
+        [
+          262,
+          8
+        ],
+        [
+          292,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 10,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "group welcome 2, 2 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_2",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        }
+      ],
+      "text": "Chào mừng @Lan & @Minh Anh đã gia nhập Hoàn Tiền Shopee! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee / TikTok Shop vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
+      "bold": [
+        [
+          74,
+          90
+        ],
+        [
+          183,
+          13
+        ],
+        [
+          245,
+          3
+        ],
+        [
+          257,
+          13
+        ],
+        [
+          274,
+          8
+        ],
+        [
+          304,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 10,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 17,
+          "len": 9
+        }
+      ]
+    },
+    {
+      "name": "group welcome 2, 3 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_2",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        },
+        {
+          "userId": "70003",
+          "name": null
+        }
+      ],
+      "text": "Chào mừng @Lan, @Minh Anh & @bạn 0003 đã gia nhập Hoàn Tiền Shopee! 🎉\n👉 Bạn có thể nhắn tin trực tiếp cho mình hoặc gửi thẳng link sản phẩm Shopee / TikTok Shop vào nhóm này, mình sẽ tạo link hoàn tiền 80% ngay cho bạn nhé!\n🔑 Nhắn tin riêng cho mình gõ /id để nhận Mã Khách Hàng và /matkhau để đăng nhập website https://hoantiendp.com cài đặt STK nhận tiền nha!",
+      "bold": [
+        [
+          85,
+          90
+        ],
+        [
+          194,
+          13
+        ],
+        [
+          256,
+          3
+        ],
+        [
+          268,
+          13
+        ],
+        [
+          285,
+          8
+        ],
+        [
+          315,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 10,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 16,
+          "len": 9
+        },
+        {
+          "userId": "70003",
+          "pos": 28,
+          "len": 9
+        }
+      ]
+    },
+    {
+      "name": "group welcome 3, 1 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_3",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        }
+      ],
+      "text": "Chào mừng thành viên mới @Lan! 🚀\n👉 Để nhận hoàn tiền 80% Shopee & TikTok Shop, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
+      "bold": [
+        [
+          45,
+          13
+        ],
+        [
+          45,
+          20
+        ],
+        [
+          88,
+          52
+        ],
+        [
+          218,
+          3
+        ],
+        [
+          226,
+          13
+        ],
+        [
+          242,
+          8
+        ],
+        [
+          285,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 25,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "group welcome 3, 2 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_3",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        }
+      ],
+      "text": "Chào mừng thành viên mới @Lan & @Minh Anh! 🚀\n👉 Để nhận hoàn tiền 80% Shopee & TikTok Shop, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
+      "bold": [
+        [
+          57,
+          13
+        ],
+        [
+          57,
+          20
+        ],
+        [
+          100,
+          52
+        ],
+        [
+          230,
+          3
+        ],
+        [
+          238,
+          13
+        ],
+        [
+          254,
+          8
+        ],
+        [
+          297,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 25,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 32,
+          "len": 9
+        }
+      ]
+    },
+    {
+      "name": "group welcome 3, 3 member(s)",
+      "source": "zalo_assistant/assistant_worker.js:299-366, zalo_assistant/config.js:107-111",
+      "kind": "welcome",
+      "key": "group_welcome_3",
+      "members": [
+        {
+          "userId": "70001",
+          "name": "Lan"
+        },
+        {
+          "userId": "70002",
+          "name": "Minh Anh"
+        },
+        {
+          "userId": "70003",
+          "name": null
+        }
+      ],
+      "text": "Chào mừng thành viên mới @Lan, @Minh Anh & @bạn 0003! 🚀\n👉 Để nhận hoàn tiền 80% Shopee & TikTok Shop, bạn cứ gửi link sản phẩm vào nhóm hoặc inbox riêng cho mình để nhận link mua hàng ngay nhé!\n🔑 Hãy bấm vào avatar mình nhắn tin riêng gõ /id lấy Mã Khách Hàng & /matkhau lấy mật khẩu quản lý đơn hàng tại https://hoantiendp.com nhé!",
+      "bold": [
+        [
+          68,
+          13
+        ],
+        [
+          68,
+          20
+        ],
+        [
+          111,
+          52
+        ],
+        [
+          241,
+          3
+        ],
+        [
+          249,
+          13
+        ],
+        [
+          265,
+          8
+        ],
+        [
+          308,
+          22
+        ]
+      ],
+      "mentions": [
+        {
+          "userId": "70001",
+          "pos": 25,
+          "len": 4
+        },
+        {
+          "userId": "70002",
+          "pos": 31,
+          "len": 9
+        },
+        {
+          "userId": "70003",
+          "pos": 43,
+          "len": 9
+        }
+      ]
+    }
+  ]
+}

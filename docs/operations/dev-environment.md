@@ -40,7 +40,7 @@ listed resource is refused with the key names and reasons, never the values. Whe
 `prod.env` is on the same machine, its ports, folders, Zalo groups, chat and admin host join the
 list, and a dev secret equal to its production value (`INTERNAL_TOKEN`, `ASSISTANT_TOKEN`,
 `TELEGRAM_BOT_TOKEN`, `ACCESS_AUDIENCE`, `FINGERPRINT_KEY`, `BRIDGE_TOKEN`, and `ACCESSTRADE_API_KEY`
-unless allowed) is refused. In every environment `BRIDGE_MODE=browser` needs a `BRIDGE_TOKEN`, and
+or `ADDLIVETAG_API_KEY` unless allowed) is refused. In every environment `BRIDGE_MODE=browser` needs a `BRIDGE_TOKEN`, and
 the bridge token must differ from `INTERNAL_TOKEN` and `ASSISTANT_TOKEN`. A `dev.env` that is the `prod.env` file
 (same path, link or hard link) is refused. Production is refused when `BRIDGE_MODE` or `ZALO_MODE`
 is `fake`.
@@ -86,6 +86,10 @@ ASSISTANT_TOKEN=<at least 32 random characters, different from INTERNAL_TOKEN>
 # FINGERPRINT_KEY=<a dev key, never the production key>
 # HEARTBEAT_URL=<a heartbeat check of dev's own, https; production's URL is refused at start (Story 8.4)>
 # ACCESSTRADE_API_KEY=<a dev key; the production key also needs ALLOW_PROD_ACCESSTRADE_KEY=1>
+# The third party asked first for a product's rates (owner decision 2026-11-02); off in dev unless
+# THIRD_PARTY_LOOKUP=on, which needs a key. The production key also needs ALLOW_PROD_ADDLIVETAG_KEY=1.
+# ADDLIVETAG_API_KEY=<a key; production's comes from the live C:\Project\mmo\.env, never the repository>
+# THIRD_PARTY_LOOKUP=on
 # LIVE_LEDGER_PATH=<absolute path of the live copy a rehearsal reads, outside data/dev>
 # PUBLIC_BASE_URL stays unset in dev. Production requires it; the website accepts sign-ins from it
 # and from its www twin (https://hoantiendp.com and https://www.hoantiendp.com).
