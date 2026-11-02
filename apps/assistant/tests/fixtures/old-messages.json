@@ -762,8 +762,8 @@
       "mentions": []
     },
     {
-      "name": "password (resources password_issued)",
-      "source": "resources/messages.vi.json password_issued",
+      "name": "password (bare, as the live assistant sent it; owner decision 2026-11-02)",
+      "source": "zalo_assistant/assistant_worker.js /matkhau sent the bare password",
       "kind": "command",
       "reply": {
         "kind": "password",
@@ -773,7 +773,7 @@
       "context": {
         "name": "Lan"
       },
-      "text": "🔑 MẬT KHẨU MỚI CỦA BẠN\n\nMã đăng nhập: DP00012\nMật khẩu: Ab3dEf7h\n\n⚠️ Mật khẩu CŨ không dùng được nữa, và nếu bạn đang đăng nhập ở đâu thì cũng bị thoát ra.\n\nĐăng nhập xong nên đổi mật khẩu ngay trên trang cho dễ nhớ.\nQuên thì cứ gõ /matkhau, mình cấp mật khẩu mới — mình không xem lại được mật khẩu cũ của bạn đâu.",
+      "text": "Ab3dEf7h",
       "bold": [],
       "mentions": []
     },

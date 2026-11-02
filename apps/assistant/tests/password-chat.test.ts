@@ -62,8 +62,8 @@ describe("Story 6.8: /matkhau issues a new password and ends other sessions", ()
     expect(zalo.sent.filter((s) => s.text.includes(PASSWORD))).toHaveLength(1);
   });
 
-  it("AC2: the reply tells the customer every other sign-in has ended", () => {
-    expect(messageText("command_password", { password: PASSWORD, customerCode: "DP00012" })).toMatch(/tho\u00e1t ra/u);
+  it("AC2 (owner decision 2026-11-02): the reply is the bare password only, so it copies in one tap", () => {
+    expect(messageText("command_password", { password: PASSWORD, customerCode: "DP00012" })).toBe(PASSWORD);
   });
 
   it("AC3: /matkhau in the group is refused with the pointer to the private chat and no password", async () => {
