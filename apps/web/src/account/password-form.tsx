@@ -8,13 +8,15 @@
  */
 import { MIN_CUSTOMER_PASSWORD } from "@cashback/contracts";
 import { formatVnTimeOf } from "@cashback/core";
-import { Button, EyeIcon, EyeOffIcon, Input, KeyRoundIcon, Label } from "@cashback/ui";
+import { Button, cn, EyeIcon, EyeOffIcon, Input, KeyRoundIcon, Label } from "@cashback/ui";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { ApiError } from "../api/api.queries";
 import { formErrorOf, serverFieldErrors } from "../api/field-errors";
 import { errorText, webText } from "../labels";
 import { CommandHint } from "../shell/command-hint";
+import { FIELD_ICON, ICON_FIELD } from "../shell/field-styles";
+import { LockIcon } from "../shell/page-icons";
 import { useChangePassword } from "./account.queries";
 
 const FIELDS = ["currentPassword", "newPassword"] as const;
@@ -52,12 +54,13 @@ interface SecretProps {
 function SecretField({ id, label, autoComplete, value, onChange, error, shown, onShown, hint }: SecretProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-[15px]">
+      <Label htmlFor={id} className="text-[15px] font-semibold">
         {label}
       </Label>
       <div className="relative">
-        <Input id={id} type={shown ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error !== undefined} aria-describedby={error === undefined ? undefined : `${id}-error`} className="h-11 pr-12 text-base md:text-base" />
-        <Button type="button" variant="ghost" className="absolute top-0 right-0 size-11" aria-pressed={shown} aria-label={webText(shown ? "sign_in_hide_password" : "sign_in_show_password")} onClick={onShown}>
+        <LockIcon aria-hidden className={FIELD_ICON} />
+        <Input id={id} type={shown ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error !== undefined} aria-describedby={error === undefined ? undefined : `${id}-error`} className={cn(ICON_FIELD, "pr-12")} />
+        <Button type="button" variant="ghost" className="absolute top-0.5 right-0.5 size-11 text-muted-foreground" aria-pressed={shown} aria-label={webText(shown ? "sign_in_hide_password" : "sign_in_show_password")} onClick={onShown}>
           {shown ? <EyeOffIcon aria-hidden className="size-5" /> : <EyeIcon aria-hidden className="size-5" />}
         </Button>
       </div>
@@ -105,7 +108,7 @@ function PasswordFields({ customerCode, onDone }: { readonly customerCode: strin
           {formError}
         </p>
       )}
-      <Button type="submit" className="h-11 w-full text-[15px] md:w-fit md:px-6" disabled={change.isPending}>
+      <Button type="submit" className="h-12 w-full rounded-xl text-base font-semibold" disabled={change.isPending}>
         {webText(change.isPending ? "password_submitting" : "password_submit")}
       </Button>
     </form>
@@ -116,12 +119,12 @@ export function PasswordSection({ customerCode }: { readonly customerCode: strin
   const [open, setOpen] = useState(false);
   const [changed, setChanged] = useState(false);
   return (
-    <section aria-labelledby="password-title" className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-6">
+    <section aria-labelledby="password-title" className="flex flex-col gap-3 border-t border-border pt-6">
       <div className="flex flex-col gap-1">
-        <h2 id="password-title" className="text-[19px] leading-snug font-semibold">
+        <h2 id="password-title" className="text-[17px] leading-snug font-semibold">
           {webText("password_title")}
         </h2>
-        <p className="text-[15px] text-muted-foreground">{webText("password_lead")}</p>
+        <p className="text-meta text-muted-foreground md:text-sm">{webText("password_lead")}</p>
       </div>
       {changed && (
         <p role="status" data-password-done className="rounded-lg bg-primary/8 px-3 py-2.5 text-[15px] font-medium text-primary">
@@ -137,7 +140,7 @@ export function PasswordSection({ customerCode }: { readonly customerCode: strin
           }}
         />
       ) : (
-        <Button type="button" variant="outline" className="h-11 w-full text-[15px] md:w-fit md:px-5" onClick={() => setOpen(true)}>
+        <Button type="button" variant="outline" className="h-11 w-fit rounded-lg bg-card px-4 text-[15px] font-semibold" onClick={() => setOpen(true)}>
           <KeyRoundIcon aria-hidden />
           {webText("password_open")}
         </Button>

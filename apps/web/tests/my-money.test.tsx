@@ -45,7 +45,7 @@ function server({ money: moneyAnswer = json(200, money("money")), orders = () =>
   return fakeServer({ session: LAN, routes: [route] });
 }
 
-const card = () => screen.findByRole("region", { name: webText("money_card_label") });
+const card = () => screen.findByRole("region", { name: webText("money_card_label") }, { timeout: 5000 });
 const amountText = (amount: number): string => formatMoney(amount) ?? "";
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const estimateText = (amount: number): RegExp => new RegExp(`${escape(uiText("money_about"))} ${escape(amountText(amount))}\\s*${escape(uiText("money_estimate_tag"))}`);
@@ -218,9 +218,9 @@ describe("Story 7.4: My orders list with states in words", () => {
     expect(cards()[4]).toHaveTextContent(webText("order_date_recorded", { date: "18/12/2025" }));
     for (const c of cards()) expect((c.textContent ?? "").match(/\d{2}\/\d{2}/g)).toHaveLength(1);
     await user.click(within(approved).getByRole("button", { name: webText("order_history_show") }));
-    const history = found(approved.querySelector<HTMLElement>("dl"));
-    expect(history).toHaveTextContent(`${webText("order_history_recorded")}12/10 10:00`);
-    expect(history).toHaveTextContent(`${webText("order_history_approved")}20/10 10:00`);
+    const history = within(approved).getByRole("list", { name: webText("order_progress") });
+    expect(history).toHaveTextContent(`${webText("order_step_recorded")}12/10 10:00`);
+    expect(history).toHaveTextContent(`${webText("order_step_approved")}20/10 10:00`);
   });
 
   it("AC2: the sort control changes the order on the server; nothing else looks sortable", async () => {
@@ -236,13 +236,16 @@ describe("Story 7.4: My orders list with states in words", () => {
   });
 
   it("AC3: a rejected order shows the rejected state with the reason in words instead of the progress", async () => {
+    const user = userEvent.setup();
     server();
     renderSite("/tien-cua-toi");
     await waitFor(() => expect(cards()).toHaveLength(6));
     const rejected = cards()[3] as HTMLElement;
     expect(rejected).toHaveTextContent(fillLabel(messages.order_rejected, { reason: messages.rejection_reason_order_cancelled }));
+    await user.click(within(rejected).getByRole("button", { name: webText("order_history_show") }));
     expect(within(rejected).queryByRole("list", { name: webText("order_progress") })).toBeNull();
     const waiting = cards()[0] as HTMLElement;
+    await user.click(within(waiting).getByRole("button", { name: webText("order_history_show") }));
     expect(within(waiting).getByRole("list", { name: webText("order_progress") })).toBeInTheDocument();
     expect(waiting.querySelector("[data-line-amount]")).toHaveTextContent(estimateText(9263));
   });

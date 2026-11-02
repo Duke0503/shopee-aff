@@ -153,7 +153,7 @@ for (const [label, width, height] of WIDTHS) {
   await shoot(`my-orders-list-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, money: "money" } }, async (page) => {
     await page.locator("[data-order-line]").first().waitFor();
     await page.locator("[data-order-line]").nth(1).getByRole("button").last().click();
-    await page.locator("[data-order-line]").nth(1).locator("dl").scrollIntoViewIfNeeded();
+    await page.locator("[data-order-line]").nth(1).locator("ol").scrollIntoViewIfNeeded();
   });
   await shoot(`my-orders-filtered-${label}`, width, height, "/tien-cua-toi?filter[status]=APPROVED", { session: LAN, my: { ...MY, money: "money" } }, (page) => page.locator("[data-order-line]").first().waitFor());
   await shoot(`my-orders-empty-${label}`, width, height, "/tien-cua-toi", { session: LAN, my: { ...MY, orders: "ordersEmpty" } }, (page) => page.locator("[data-list-empty]").waitFor());
@@ -182,7 +182,10 @@ await shoot("account-menu-phone-390", 390, 844, "/tien-cua-toi", { session: LAN 
 // Stories 7.5 to 7.7: Account, the Home link converter and the Guide.
 const convert = (url, code) => async (page) => {
   await page.locator("#link-url").fill(url);
-  if (code !== undefined) await page.locator("#link-code").fill(code);
+  if (code !== undefined) {
+    await page.locator("[aria-controls=link-code]").click();
+    await page.locator("#link-code").fill(code);
+  }
   await page.locator("[data-link-form] button[type=submit]").click();
   await page.waitForTimeout(400);
 };

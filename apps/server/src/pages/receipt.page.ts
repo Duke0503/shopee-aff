@@ -88,9 +88,8 @@ export function receiptHtml(receipt: Receipt, clock: Clock): string {
   const card = [
     `<section class="card${receipt.voided ? " card-voided" : ""}" aria-labelledby="receipt-title" data-receipt="${receipt.voided ? "voided" : "paid"}">`,
     `<header class="card-head"><h1 id="receipt-title">${escapeHtml(text("receipt_title"))}</h1>${status}</header>`,
+    `<p class="amount"><span class="sr-only">${escapeHtml(text("receipt_amount"))} </span>${money(receipt.amount)}</p>`,
     voided,
-    `<p class="amount-label">${escapeHtml(text("receipt_amount"))}</p>`,
-    `<p class="amount">${money(receipt.amount)}</p>`,
     `<dl class="facts">${facts}</dl>`,
     "</section>",
     `<p class="note">${escapeHtml(text("receipt_help"))}</p>`,

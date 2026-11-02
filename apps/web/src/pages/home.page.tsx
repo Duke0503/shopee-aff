@@ -1,61 +1,60 @@
 /**
- * Home (W1, Stories 7.1 and 7.6, UJ-4): one task, get a cashback link. The converter is the main
- * action; the Zalo button stays as the quiet second way (it points to the fallback contact while
- * chat is down). Signed out, a quiet line offers sign-in. Phone: a small mascot above the
- * headline; desktop: the converter left, the mascot right.
+ * Home (W1, pen.dev DPZAp phone 390, B2nRu tablet 820, BEOJK desktop 1440; Stories 7.1 and 7.6, UJ-4):
+ * one task, get a cashback link. Phone and tablet: one 640 px column, the headline, the lead and
+ * the converter right under it, then the real example with the mascot, the steps on hairlines,
+ * the facts the customer can check, the anti-scam note and the Zalo panel. Desktop: the promise
+ * and the converter on the left, the mascot and the example on the right; below, the steps on the
+ * left and the facts with the Zalo panel on the right. Once a link is sent the page keeps only the
+ * converter's answer in the 640 px column (pen.dev KF7d9, R0mtJ).
  */
-import { CUSTOMER_PATHS } from "@cashback/contracts";
-import { cn } from "@cashback/ui";
-import { Link } from "@tanstack/react-router";
+import { lazy, Suspense, useState } from "react";
 
 import { webText } from "../labels";
 import { LinkConverter } from "../link/link-converter";
 import { useCustomerSession } from "../session/session.queries";
-import { FOCUS_RING } from "../shell/nav-items";
 import { useDocumentTitle } from "../shell/use-document-title";
-import { ZaloButton } from "../shell/zalo-button";
+
+// The parts under the converter load right after it, outside Home's first-load budget (Story 7.1 AC3).
+const ExampleCard = lazy(() => import("../home/home-sections").then((m) => ({ default: m.ExampleCard })));
+const HowItWorks = lazy(() => import("../home/home-sections").then((m) => ({ default: m.HowItWorks })));
+const TrustBlock = lazy(() => import("../home/home-sections").then((m) => ({ default: m.TrustBlock })));
+
+const FOCUSED = "mx-auto max-w-[640px] px-4 pt-6 md:px-6 md:pt-14";
+const GRID = "mx-auto grid max-w-[640px] gap-8 px-4 pt-7 md:gap-12 md:px-0 md:pt-12 xl:max-w-[1264px] xl:grid-cols-[640px_minmax(0,1fr)] xl:gap-x-[72px] xl:gap-y-16 xl:px-8 xl:pt-[72px]";
 
 export function HomePage() {
   useDocumentTitle(null);
   const session = useCustomerSession();
+  const [focused, setFocused] = useState(false);
+  // While the session is checked the converter waits, so a signed-in customer never sees the code field flash.
+  const converter = session.isPending ? null : <LinkConverter customerCode={session.data?.customerCode ?? null} onFocusChange={setFocused} />;
+  // The converter keeps its place in the tree in both forms, so sending a link never resets it.
   return (
-    <div className="mx-auto grid max-w-[640px] gap-6 px-4 pt-6 md:px-6 md:pt-12 xl:max-w-5xl xl:grid-cols-[1fr_300px] xl:items-start xl:gap-16 xl:pt-20">
-      <div className="flex min-w-0 flex-col gap-5">
-        <div className="flex items-end gap-3">
-          {/* Two lines on purpose: the headline breaks after the comma at every width. */}
-          <h1 className="text-[28px] leading-[1.15] font-bold tracking-[-0.02em] md:text-[38px] xl:text-[44px] xl:leading-[1.12]">
-            <span className="block">{webText("home_title")}</span> <span className="block">{webText("home_title_rest")}</span>
-          </h1>
-          <img src="/mascot-happy-360.webp" alt="" width={263} height={360} decoding="async" fetchPriority="low" className="ml-auto h-20 w-auto shrink-0 object-contain md:h-28 xl:hidden" />
-        </div>
-        <p className="max-w-[52ch] text-[15px] text-muted-foreground md:text-[17px]">{webText("home_lead")}</p>
-        {/* While the session is checked the converter waits, so a signed-in customer never sees the code field flash. */}
-        {session.isPending ? null : <LinkConverter customerCode={session.data?.customerCode ?? null} />}
-        <div className="flex flex-col gap-3 border-t border-border pt-5 md:flex-row md:items-center md:justify-between">
-          <p className="text-[15px] text-muted-foreground">{webText("home_or_zalo")}</p>
-          <ZaloButton labelKey="zalo_button" variant="outline" className="w-full md:w-fit" />
-        </div>
-        {session.isError && (
-          <p className="text-[15px] text-muted-foreground">
-            {webText("home_sign_in_hint")}{" "}
-            <Link to={CUSTOMER_PATHS.signIn} className={cn("inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline", FOCUS_RING)}>
-              {webText("home_sign_in")}
-            </Link>
-          </p>
-        )}
+    <div className={focused ? FOCUSED : GRID}>
+      <div className="flex min-w-0 flex-col gap-5 md:gap-6 xl:max-w-[600px]">
+        <h1 className={focused ? "sr-only" : "text-[30px] leading-[1.15] font-bold tracking-[-0.02em] md:text-[40px] xl:text-[48px] xl:leading-[1.1]"}>{webText("home_title")}</h1>
+        {!focused && <p className="text-[17px] leading-relaxed text-muted-foreground md:text-lg">{webText("home_lead")}</p>}
+        <div className={focused ? undefined : "pt-1"}>{converter}</div>
       </div>
-      <img
-        src="/mascot-happy-360.webp"
-        srcSet="/mascot-happy-360.webp 263w, /mascot-happy.webp 610w"
-        sizes="234px"
-        alt=""
-        loading="lazy"
-        width={263}
-        height={360}
-        decoding="async"
-        fetchPriority="low"
-        className="hidden h-80 w-auto object-contain xl:block xl:justify-self-center"
-      />
+      {!focused && (
+        <div className="min-w-0 xl:ml-auto xl:w-[420px]">
+          <Suspense fallback={<div className="h-[260px]" />}>
+            <ExampleCard />
+          </Suspense>
+        </div>
+      )}
+      {!focused && (
+        <div className="min-w-0 xl:pt-2">
+          <Suspense fallback={null}>
+            <HowItWorks />
+          </Suspense>
+        </div>
+      )}
+      {!focused && (
+        <Suspense fallback={null}>
+          <TrustBlock />
+        </Suspense>
+      )}
     </div>
   );
 }

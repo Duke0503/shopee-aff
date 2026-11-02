@@ -3,14 +3,15 @@
  * the right opens the account menu). For now it holds the code as a copyable chip and sign-out;
  * the link to Account (the bank account and the password, Story 7.5). A bottom sheet on phone, a right sheet wider.
  */
-import { Button, buttonVariants, CircleUserIcon, cn, CodeChip, LandmarkIcon, LogOutIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, useLayout } from "@cashback/ui";
+import { Button, buttonVariants, cn, CodeChip, LandmarkIcon, LogOutIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, useLayout } from "@cashback/ui";
 import { CUSTOMER_PATHS } from "@cashback/contracts";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { webText } from "../labels";
 import { useSignOut } from "../session/session.queries";
-import { FOCUS_RING } from "./nav-items";
+import { CORNER_PILL, FOCUS_RING } from "./nav-items";
+import { UserIcon } from "./site-icons";
 
 export function AccountSheet({ customerCode }: { readonly customerCode: string }) {
   const [open, setOpen] = useState(false);
@@ -27,8 +28,8 @@ export function AccountSheet({ customerCode }: { readonly customerCode: string }
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button type="button" aria-label={webText("account_menu", { code: customerCode })} className={`flex h-11 min-w-11 items-center gap-1.5 rounded-lg px-2 font-mono text-sm font-medium hover:bg-muted ${FOCUS_RING}`}>
-          <CircleUserIcon aria-hidden className="size-5 text-primary" />
+        <button type="button" aria-label={webText("account_menu", { code: customerCode })} className={cn(CORNER_PILL, "min-w-11", FOCUS_RING)}>
+          <UserIcon aria-hidden className="size-4" />
           <span>{customerCode}</span>
         </button>
       </SheetTrigger>

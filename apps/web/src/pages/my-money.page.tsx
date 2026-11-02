@@ -3,8 +3,8 @@
  * The balance card, then the bank card (the one thing to fix when money waits for an account),
  * then the order lines or payouts. The card and the lists are separate reads: a failing list
  * keeps the balance, a failing balance keeps the list, and each says so with its own retry.
- * Phone and tablet: one 640 px column. Desktop: the money column on the left stays in view
- * beside the list.
+ * Phone and tablet: one 640 px column (pen.dev ktmGZ, jW4fD, YtS6u). Desktop: the title across the
+ * top, the money column on the left stays in view beside the list.
  */
 import { Button, CodeChip, RefreshCwIcon, Skeleton, type ChangeOptions } from "@cashback/ui";
 import { useEffect, useMemo, useRef } from "react";
@@ -26,7 +26,7 @@ export interface MyMoneyPageProps {
 function Lead({ code }: { readonly code: string }) {
   const [before = "", after = ""] = webText("my_money_lead", { code: "\u0000" }).split("\u0000");
   return (
-    <p className="text-[15px] text-muted-foreground">
+    <p className="text-[15px] text-muted-foreground md:text-base">
       {before}
       <CodeChip code={code} className="mx-0.5 align-middle" />
       {after}
@@ -88,14 +88,18 @@ function MyMoney({ code, search: raw, onSearch }: MyMoneyPageProps & { readonly 
   const money = useMyMoney();
   const search = useCanonicalSearch(raw, onSearch);
   return (
-    <div className="mx-auto flex max-w-[640px] flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10 xl:grid xl:max-w-[1120px] xl:grid-cols-[400px_minmax(0,1fr)] xl:items-start xl:gap-x-10">
-      <div className="flex flex-col gap-4 xl:sticky xl:top-20">
+    <div className="mx-auto flex max-w-[640px] flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10 xl:max-w-[1024px] xl:gap-8 xl:px-8 xl:pt-16">
+      <div className="flex flex-col gap-1.5">
         <PageTitle>{webText("my_money_title")}</PageTitle>
         <Lead code={code} />
-        <MoneyColumn money={money} />
       </div>
-      <div className="min-w-0 xl:pt-1">
-        <MoneyLists view={viewOf(search["view"])} search={search} money={money.data} onSearch={onSearch} />
+      <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[400px_minmax(0,1fr)] xl:items-start xl:gap-x-10">
+        <div className="flex flex-col gap-4 xl:sticky xl:top-20">
+          <MoneyColumn money={money} />
+        </div>
+        <div className="min-w-0">
+          <MoneyLists view={viewOf(search["view"])} search={search} money={money.data} onSearch={onSearch} />
+        </div>
       </div>
     </div>
   );

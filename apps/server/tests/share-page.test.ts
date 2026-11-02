@@ -86,7 +86,8 @@ describe("Story 5.8 AC1: Android in Zalo goes to Chrome", () => {
 describe("Story 5.8 AC2: iPhone in Zalo shows the Safari step", () => {
   it("AC2: an iOS Zalo user agent sees the step and a copy-link button, and the page does not redirect", async () => {
     const res = await open(app(shareLedger()), NEW_CODE, UA.iosZalo);
-    expect(res.body).toContain(escapeHtml("B\u1ea5m \u2022\u2022\u2022 r\u1ed3i ch\u1ecdn M\u1edf b\u1eb1ng Safari"));
+    expect(res.body).toContain(label("share_ios_step_1"));
+    expect(res.body).toContain(escapeHtml("M\u1edf b\u1eb1ng Safari"));
     expect(res.body).toContain(`data-copy="${BASE}/s/${NEW_CODE}"`);
     expect(res.body).toContain(label("share_copy_link"));
     expect(refreshOf(res.body)).toBeNull();
@@ -101,7 +102,8 @@ describe("Story 5.8 AC3: a real browser sees the product, then the stored link",
     expect(res.body).toContain("450.000\u0111");
     // No payout batch is known yet, so the estimate is withheld (D54): 11,700 commission, 8,332 cashback.
     expect(res.body).toContain('data-estimate="8332"');
-    expect(res.body).toContain(`${label("share_about")} <b>8.332\u0111</b>`);
+    expect(res.body).toContain(`${label("share_cashback_label")} <span class="estimate-about">${label("share_about")}</span>`);
+    expect(res.body).toContain("<b>8.332\u0111</b>");
     expect(res.body).toContain(label("share_estimate_tag"));
     expect(res.body).toContain(`${label("share_rate_shopee", { rate: "2,6%" })}</span><span>11.700\u0111`);
     expect(res.body).toContain(`${label("share_rate_customer_share_withheld", { rate: "80%" })}</span><span>8.332\u0111`);

@@ -16,7 +16,7 @@ import { NAV_ITEMS } from "../src/shell/nav-items";
 import { ASSISTANT_CHAT, asZaloBrowser, DOWN, FALLBACK, fakeServer, LAN, renderSite, UP } from "./app-harness";
 import { setViewportWidth } from "./viewport";
 
-const HOME_TITLE = `${webText("home_title")} ${webText("home_title_rest")}`;
+const HOME_TITLE = webText("home_title");
 const banner = () => screen.queryByRole("region", { name: webText("zalo_down_title") });
 const tabs = () => document.querySelector<HTMLElement>("[data-bottom-tabs]");
 
@@ -74,7 +74,7 @@ describe("Story 7.1 AC1: with the assistant reported down, every page shows the 
       return found as HTMLAnchorElement;
     });
     expect(button).toHaveAttribute("href", webText("zalo_url"));
-    expect(button).toHaveTextContent(webText("zalo_button"));
+    expect(button).toHaveTextContent(webText("zalo_panel_button"));
   });
 });
 
@@ -128,7 +128,8 @@ describe("Story 7.1 AC4: at 360 px in the Zalo in-app browser, each tab opens, t
     renderSite("/");
     await screen.findByRole("heading", { level: 1, name: HOME_TITLE });
     for (const link of within(tabs() as HTMLElement).getAllByRole("link")) expect(link).toHaveClass("h-14", "min-h-11");
-    expect(await screen.findByRole("link", { name: webText("sign_in_link") })).toHaveClass("h-11");
+    // The sign-in pill is drawn 32 px tall; its ::after tap area adds 12 px (the browser check measures it).
+    expect(await screen.findByRole("link", { name: webText("sign_in_link") })).toHaveClass("h-8", "after:-top-1.5", "after:-bottom-1.5");
     for (const link of within(document.querySelector("[data-top-nav]") as HTMLElement).getAllByRole("link", { hidden: true })) expect(link).toHaveClass("h-11");
   });
 

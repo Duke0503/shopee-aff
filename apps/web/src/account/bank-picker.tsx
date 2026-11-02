@@ -6,11 +6,12 @@
  * wider (Story 7.5 AC5).
  */
 import type { BankChoice } from "@cashback/contracts";
-import { Button, ChevronDownIcon, cn, Input, RefreshCwIcon, SearchIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Skeleton, useLayout } from "@cashback/ui";
+import { Button, cn, Input, LandmarkIcon, RefreshCwIcon, SearchIcon, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Skeleton, useLayout } from "@cashback/ui";
 import { useMemo, useState } from "react";
 
 import { foldText } from "../api/field-errors";
 import { webText } from "../labels";
+import { ChevronsUpDownIcon } from "../shell/page-icons";
 import { useBankList } from "./account.queries";
 
 interface BankPickerProps {
@@ -64,7 +65,7 @@ export function BankPicker({ value, onChange, error }: BankPickerProps) {
   };
   return (
     <div className="flex flex-col gap-1.5">
-      <span id="bank-field-label" className="text-[15px] font-medium">
+      <span id="bank-field-label" className="text-[15px] font-semibold">
         {webText("bank_field_bank")}
       </span>
       <button
@@ -75,19 +76,22 @@ export function BankPicker({ value, onChange, error }: BankPickerProps) {
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-base focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+          "flex h-12 w-full items-center gap-3 rounded-xl border border-input bg-card px-4 text-left text-base focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:text-[17px]",
           error !== undefined && "border-destructive",
         )}
       >
-        <span id="bank-field-value" className={cn("truncate", value === null && "text-muted-foreground")}>
+        <LandmarkIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+        <span id="bank-field-value" className={cn("min-w-0 flex-1 truncate", value === null && "text-muted-foreground")}>
           {value === null ? webText("bank_pick") : value.shortName}
         </span>
-        <ChevronDownIcon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+        <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       </button>
-      {error !== undefined && (
+      {error !== undefined ? (
         <p id="bank-field-error" className="text-meta font-medium text-destructive">
           {error}
         </p>
+      ) : (
+        <p className="text-meta text-muted-foreground">{webText("bank_pick_hint")}</p>
       )}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side={phone ? "bottom" : "right"} data-bank-picker={phone ? "drawer" : "sheet"} className={cn("flex flex-col gap-3", phone ? "h-[85dvh] rounded-t-xl pb-[env(safe-area-inset-bottom)]" : "w-[400px]")}>

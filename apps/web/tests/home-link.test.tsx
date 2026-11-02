@@ -51,7 +51,10 @@ function server({ queue, results = [READY] }: Answers = {}, session: typeof LAN 
 
 async function convert(user: ReturnType<typeof userEvent.setup>, url: string, code?: string) {
   await user.type(await screen.findByLabelText(webText("link_url_label")), url);
-  if (code !== undefined) await user.type(screen.getByLabelText(webText("link_code_label")), code);
+  if (code !== undefined) {
+    await user.click(screen.getByRole("button", { name: webText("home_code_toggle") }));
+    await user.type(await screen.findByLabelText(webText("link_code_label")), code);
+  }
   await user.click(screen.getByRole("button", { name: webText("link_submit") }));
 }
 
@@ -118,11 +121,13 @@ describe("Story 7.6: Home link converter with a customer code or as a guest", ()
       { timeout: 6000 },
     );
     expect(card).toHaveTextContent("Ao thun cotton");
-    expect(card).toHaveTextContent(webText("link_price", { price: formatMoney(159000) ?? "" }));
-    expect(card.querySelector("[data-estimate]")).toHaveTextContent(`${uiText("money_about")} ${formatMoney(7234) ?? ""}${uiText("money_estimate_tag")}`);
+    expect(card.querySelector("[data-product-meta]")).toHaveTextContent(`${webText("platform_shopee")} \u00b7 ${formatMoney(159000) ?? ""}`);
+    const estimate = card.querySelector("[data-estimate]");
+    expect(estimate).toHaveTextContent(`${webText("link_cashback_label")}${uiText("money_estimate_tag")}`);
+    expect(estimate).toHaveTextContent(`${uiText("money_about")}${formatMoney(7234) ?? ""}`);
     expect(within(card).getByRole("link", { name: webText("link_open") })).toHaveAttribute("href", READY.sharePath);
     expect(within(card).getByRole("button", { name: webText("link_copy") })).toBeInTheDocument();
-    expect(card.querySelector("[data-share-url]")).toHaveTextContent(`${window.location.origin}${READY.sharePath ?? ""}`);
+    expect(card.querySelector("[data-share-url]")).toHaveTextContent(`${window.location.host}${READY.sharePath ?? ""}`);
   });
 
   it("AC4: without an estimate the card says so instead of an amount", async () => {
@@ -178,6 +183,7 @@ describe("Story 7.6: Home link converter with a customer code or as a guest", ()
     const site = server();
     const user = userEvent.setup();
     renderSite("/");
+    await user.click(await screen.findByRole("button", { name: webText("home_code_toggle") }));
     await user.type(await screen.findByLabelText(webText("link_code_label")), "abc");
     await user.click(screen.getByRole("button", { name: webText("link_submit") }));
     expect(await screen.findByText(webText("link_url_required"))).toBeInTheDocument();

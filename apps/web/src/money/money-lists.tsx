@@ -1,7 +1,7 @@
 /**
  * The lower half of My money (Story 7.4, W2): the customer's order lines or payouts, each a
  * DataList in its card form on its own list endpoint, or the clawed-back orders the deduction line
- * opens. Two plain tabs switch between orders and payouts; the view and each list's state live in
+ * opens. Two headings (pen.dev ktmGZ), the current one in the text colour, switch between orders and payouts; the view and each list's state live in
  * the URL. Search, the status chips with their counts, the one sort (newest or oldest first) and
  * the pages all go to the server (LC-1); loading, empty, no matches and error are their own states
  * (LC-9): an error never reads as "no orders".
@@ -106,7 +106,7 @@ function Deductions({ money }: { readonly money: MyMoney | undefined }) {
   );
 }
 
-const TAB = cn("inline-flex h-11 flex-1 items-center justify-center rounded-md px-3 text-[15px] font-medium md:flex-none", FOCUS_RING);
+const TAB = cn("inline-flex h-11 items-center rounded-md text-lg font-semibold md:text-xl", FOCUS_RING);
 
 function ViewTabs({ view }: { readonly view: MoneyView }) {
   const tabs: readonly [MoneyView, "view_orders" | "view_payouts"][] = [
@@ -114,9 +114,9 @@ function ViewTabs({ view }: { readonly view: MoneyView }) {
     ["payouts", "view_payouts"],
   ];
   return (
-    <nav aria-label={webText("lists_label")} className="flex gap-1 rounded-lg bg-muted p-1">
+    <nav aria-label={webText("lists_label")} className="flex items-center gap-5">
       {tabs.map(([target, label]) => (
-        <Link key={target} to={CUSTOMER_PATHS.myMoney} search={moneyLink(target)} aria-current={view === target ? "page" : undefined} className={cn(TAB, view === target ? "bg-card font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+        <Link key={target} to={CUSTOMER_PATHS.myMoney} search={moneyLink(target)} aria-current={view === target ? "page" : undefined} className={cn(TAB, view === target ? "text-foreground" : "font-medium text-muted-foreground hover:text-foreground")}>
           {webText(label)}
         </Link>
       ))}

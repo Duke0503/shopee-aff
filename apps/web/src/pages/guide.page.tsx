@@ -1,78 +1,68 @@
 /**
- * Guide (W2, Story 7.7, FR-20, FR-13, NFR-7, D11): open to everyone. The steps, how cashback is
- * split with the server's example amounts, the chat commands of Stories 6.7 and 6.8 as copy chips,
- * and when cashback is not paid. Written fresh from the label file: no payout date, no automatic
- * transfer, no minimum amount is promised. One 640 px column that reflows down to 360 px.
+ * Guide (W2, pen.dev a2PNz phone and W7Y4C desktop, Story 7.7, FR-20, FR-13, NFR-7, D11): open to
+ * everyone. One reading column with no cards: the chat commands of Stories 6.7 and 6.8 as copy
+ * chips on hairlines, the soft green "how much you get" box with the server's example amounts
+ * (the step-by-step split folds open under it), and when cashback is not paid as a dashed list.
+ * Written fresh from the label file: no payout date, no automatic transfer, no minimum amount is
+ * promised. 680 px wide on desktop; it reflows down to 360 px.
  */
 import { CodeChip } from "@cashback/ui";
-import type { ReactNode } from "react";
 
 import { MoneyExample } from "../guide/money-example";
 import { webText, type WebKey } from "../labels";
 import { PageTitle } from "../shell/page-title";
+import { MinusIcon } from "../shell/page-icons";
 
-const STEPS: readonly WebKey[] = ["guide_step_link", "guide_step_buy", "guide_step_approve", "guide_step_pay"];
-
-/** The chat commands in the order of /help: each with its chip and what it does. */
+/** The chat commands in the order the pen.dev guide lists them, /help last: each with its chip and what it does. */
 export const GUIDE_COMMANDS: readonly { readonly command: WebKey; readonly text: WebKey }[] = [
   { command: "command_id", text: "guide_command_id" },
+  { command: "command_password", text: "guide_command_password" },
   { command: "command_balance", text: "guide_command_balance" },
   { command: "command_orders", text: "guide_command_orders" },
   { command: "command_bank", text: "guide_command_bank" },
-  { command: "command_password", text: "guide_command_password" },
   { command: "command_help", text: "guide_command_help" },
 ];
 
-const NOT_PAID: readonly WebKey[] = ["guide_none_zalo_browser", "guide_none_guest", "guide_none_rejected", "guide_none_not_in_program", "guide_none_after_payout"];
+const NOT_PAID: readonly WebKey[] = ["guide_none_guest", "guide_none_zalo_browser", "guide_none_rejected", "guide_none_other_code"];
 
-function Section({ id, title, children }: { readonly id: string; readonly title: WebKey; readonly children: ReactNode }) {
-  return (
-    <section aria-labelledby={id} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-6">
-      <h2 id={id} className="text-[19px] leading-snug font-semibold">
-        {webText(title)}
-      </h2>
-      {children}
-    </section>
-  );
-}
+const SECTION_TITLE = "text-lg leading-snug font-semibold md:text-xl";
 
 export function GuidePage() {
   return (
-    <div className="mx-auto flex max-w-[640px] min-w-0 flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10">
+    <div className="mx-auto flex max-w-[680px] min-w-0 flex-col gap-7 px-4 pt-6 md:px-6 md:pt-10 xl:px-0 xl:pt-14">
       <PageTitle lead={webText("guide_lead")}>{webText("guide_title")}</PageTitle>
-      <Section id="guide-steps" title="guide_steps_title">
-        <ol className="flex flex-col gap-3">
-          {STEPS.map((key, i) => (
-            <li key={key} className="flex gap-3 text-[15px]">
-              <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary tabular-nums">
-                {i + 1}
-              </span>
-              <span className="min-w-0 pt-0.5">{webText(key)}</span>
-            </li>
-          ))}
-        </ol>
-      </Section>
-      <Section id="guide-split" title="guide_split_title">
-        <MoneyExample />
-      </Section>
-      <Section id="guide-commands" title="guide_commands_title">
-        <p className="text-[15px] text-muted-foreground">{webText("guide_commands_lead")}</p>
-        <ul className="flex flex-col divide-y divide-border" data-guide-commands>
+      <section aria-labelledby="guide-commands" className="flex flex-col gap-2">
+        <h2 id="guide-commands" className={SECTION_TITLE}>
+          {webText("guide_commands_title")}
+        </h2>
+        <ul className="flex flex-col divide-y divide-border border-b border-border" data-guide-commands>
           {GUIDE_COMMANDS.map(({ command, text }) => (
-            <li key={command} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 py-2.5">
-              <CodeChip code={webText(command)} className="w-fit" />
+            <li key={command} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-4 py-3">
+              <CodeChip code={webText(command)} className="h-7 w-24 justify-between border-0 bg-muted font-semibold" />
               <span className="min-w-0 text-[15px]">{webText(text)}</span>
             </li>
           ))}
         </ul>
-      </Section>
-      <Section id="guide-not-paid" title="guide_none_title">
-        <ul className="flex list-disc flex-col gap-2 pl-5 text-[15px] marker:text-muted-foreground">
+      </section>
+      <section aria-labelledby="guide-split" className="flex flex-col gap-2 rounded-xl bg-money-soft p-4 md:p-5">
+        <h2 id="guide-split" className="text-[17px] font-semibold">
+          {webText("guide_share_title")}
+        </h2>
+        <MoneyExample />
+      </section>
+      <section aria-labelledby="guide-not-paid" className="flex flex-col gap-2">
+        <h2 id="guide-not-paid" className={SECTION_TITLE}>
+          {webText("guide_none_title")}
+        </h2>
+        <ul className="flex flex-col gap-2 text-[15px]">
           {NOT_PAID.map((key) => (
-            <li key={key}>{webText(key)}</li>
+            <li key={key} className="flex gap-3">
+              <MinusIcon aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
+              {webText(key)}
+            </li>
           ))}
         </ul>
-      </Section>
+      </section>
     </div>
   );
 }

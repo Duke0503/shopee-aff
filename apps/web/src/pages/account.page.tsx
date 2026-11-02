@@ -2,9 +2,10 @@
  * Account (W2, Story 7.5, UJ-3, FR-10, FR-9): signed in only. One main task, the bank account the
  * money goes to (add, change, erase, and the wait for the Zalo confirmation); the password below
  * it, closed behind one button. The bank state is My money's own read, so both pages always name
- * the same account. One 640 px column at every width.
+ * the same account. One 560 px column at every width (pen.dev qHld0, WbIih); the customer code is in
+ * the top bar's menu.
  */
-import { Button, CodeChip, RefreshCwIcon, Skeleton } from "@cashback/ui";
+import { Button, RefreshCwIcon, Skeleton } from "@cashback/ui";
 
 import { BankSection } from "../account/bank-section";
 import { PasswordSection } from "../account/password-form";
@@ -32,14 +33,8 @@ export function AccountPage() {
   return (
     <SignedIn>
       {(code) => (
-        <div className="mx-auto flex max-w-[640px] flex-col gap-5 px-4 pt-6 md:px-6 md:pt-10">
-          <div className="flex flex-col gap-2">
-            <PageTitle>{webText("account_page_title")}</PageTitle>
-            <p className="flex flex-wrap items-center gap-2 text-[15px] text-muted-foreground">
-              {webText("account_code")}
-              <CodeChip code={code} />
-            </p>
-          </div>
+        <div className="mx-auto flex max-w-[560px] flex-col gap-6 px-4 pt-6 md:px-0 md:pt-10 xl:pt-14">
+          <PageTitle lead={webText("account_page_lead")}>{webText("account_page_title")}</PageTitle>
           <Bank />
           <PasswordSection customerCode={code} />
         </div>

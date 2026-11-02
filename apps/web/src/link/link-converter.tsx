@@ -1,21 +1,32 @@
 /**
- * The link converter on Home (W1, EXPERIENCE.md link converter, FR-2, FR-3, UJ-4; Story 7.6): one
- * URL field with a paste button where the browser allows it, and the submit button (link_submit).
- * Signed in, the link carries the customer's own code (said under the field). Signed out, an
- * optional code field: an unknown code is said under it (error.web_link.customer_unknown), never
- * a guest link; without a code the result is a guest link with its warning. The supported
- * networks are named under the URL field; a Lazada link gets the server's polite refusal there.
- * Website busy is the Zalo hand-off panel in place of the result, with no retry button.
+ * The link converter on Home (W1, pen.dev DPZAp, BEOJK, EXPERIENCE.md link converter, FR-2, FR-3,
+ * UJ-4; Story 7.6): one tall link field with the paste button inside, the full-width submit button
+ * with its arrow, and one quiet line under it. Signed in, the line says the link carries the
+ * customer's own code. Signed out, the "enter DP code" link (home_code_toggle) opens the optional code field: an unknown code is
+ * said under it (error.web_link.customer_unknown), never a guest link; without a code the result
+ * is a guest link with its warning. Lazada is named as not supported on that line; a Lazada link
+ * gets the server's polite refusal under the field.
+ *
+ * Once a link is sent the page narrows to that one task (pen.dev KF7d9, R0mtJ): the link as a
+ * one-line box (press it to send another), then the creating state, the result, the busy hand-off
+ * or, for an unknown code, the code field again. The answer scrolls into view once on phone.
  */
-import { CUSTOMER_CODE_INPUT, WEB_LINK_URL_MAX, type WebLinkQueued } from "@cashback/contracts";
-import { Button, ClipboardPasteIcon, CodeChip, Input, Label } from "@cashback/ui";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { CUSTOMER_CODE_INPUT, type WebLinkQueued } from "@cashback/contracts";
+import { Button, cn, CodeChip } from "@cashback/ui";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "../api/api.queries";
 import { errorText, webText } from "../labels";
-import { CommandHint } from "../shell/command-hint";
-import { Creating, HandOff, LinkResult } from "./link-result";
+import { FOCUS_RING } from "../shell/nav-items";
+import { ArrowRightIcon } from "../shell/site-icons";
+import { UrlField, UrlSummary } from "./link-fields";
 import { LINK_SLOW_AFTER_MS, useLinkResult, useQueueLink } from "./link.queries";
+
+// What follows a sent link loads with the first send, not with Home (Story 7.1 AC3 first-load budget).
+const CodeField = lazy(() => import("./code-field").then((m) => ({ default: m.CodeField })));
+const Creating = lazy(() => import("./link-result").then((m) => ({ default: m.Creating })));
+const HandOff = lazy(() => import("./link-result").then((m) => ({ default: m.HandOff })));
+const LinkResult = lazy(() => import("./link-result").then((m) => ({ default: m.LinkResult })));
 
 type Errors = { url?: string; customerCode?: string };
 
@@ -36,7 +47,6 @@ function refusalErrors(error: unknown): Errors {
 }
 
 const isBusy = (error: unknown): boolean => error instanceof ApiError && error.code === "rate_limited";
-const canPaste = (): boolean => typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function";
 
 function useSlow(ticket: string | null): boolean {
   const [slow, setSlow] = useState(false);
@@ -53,66 +63,59 @@ function Result({ queued }: { readonly queued: WebLinkQueued }) {
   const result = useLinkResult(queued.ticket);
   const slow = useSlow(queued.ticket);
   const data = result.data;
-  if (data?.state === "failed" || (data === undefined && result.isError)) return <HandOff textKey="link_failed" />;
+  if (data?.state === "failed" || (data === undefined && result.isError)) return <HandOff titleKey="link_failed_title" textKey="link_failed" />;
   if (data === undefined || data.state === "creating") return <Creating slow={slow} guest={queued.guest} />;
   return <LinkResult result={data} />;
 }
 
-function UrlField({ value, onChange, error }: { readonly value: string; readonly onChange: (v: string) => void; readonly error: string | undefined }) {
-  const paste = async (): Promise<void> => {
-    try {
-      onChange((await navigator.clipboard.readText()).trim());
-    } catch {
-      // The browser refused the clipboard; the customer pastes by hand.
-    }
-  };
+function SubmitButton({ pending }: { readonly pending: boolean }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="link-url" className="text-[15px]">
-        {webText("link_url_label")}
-      </Label>
-      <div className="flex gap-2">
-        <Input id="link-url" type="url" inputMode="url" autoComplete="off" maxLength={WEB_LINK_URL_MAX} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error !== undefined} aria-describedby={`${error === undefined ? "" : "link-url-error "}link-url-hint`} className="h-11 min-w-0 flex-1 text-base md:text-base" />
-        {canPaste() && (
-          <Button type="button" variant="outline" className="h-11 shrink-0 px-3 text-[15px]" onClick={() => void paste()}>
-            <ClipboardPasteIcon aria-hidden />
-            {webText("link_paste")}
-          </Button>
-        )}
-      </div>
-      {error !== undefined && (
-        <p id="link-url-error" role="alert" className="text-meta font-medium text-destructive">
-          {error}
-        </p>
-      )}
-      <p id="link-url-hint" className="text-meta text-muted-foreground">
-        {webText("link_url_hint")}
+    <Button type="submit" className="h-12 w-full rounded-xl text-base font-semibold" disabled={pending}>
+      {webText("link_submit")}
+      <ArrowRightIcon aria-hidden className="size-5" />
+    </Button>
+  );
+}
+
+const TOGGLE = cn("relative font-semibold text-primary underline-offset-4 after:absolute after:inset-x-0 after:-top-3.5 after:-bottom-3.5 after:content-[''] hover:underline", FOCUS_RING);
+
+function FormLine({ customerCode, codeOpen, onOpenCode }: { readonly customerCode: string | null; readonly codeOpen: boolean; readonly onOpenCode: () => void }) {
+  const hint = (
+    <span id="link-url-hint" className="whitespace-nowrap">
+      {webText("link_url_hint")}
+    </span>
+  );
+  if (customerCode !== null) {
+    return (
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-meta text-muted-foreground" data-link-own-code>
+        {webText("link_for_code")}
+        <CodeChip code={customerCode} />
+        <span aria-hidden>{"·"}</span>
+        {hint}
       </p>
-    </div>
-  );
-}
-
-function CodeField({ value, onChange, error }: { readonly value: string; readonly onChange: (v: string) => void; readonly error: string | undefined }) {
+    );
+  }
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="link-code" className="text-[15px]">
-        {webText("link_code_label")}
-      </Label>
-      <Input id="link-code" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={32} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error !== undefined} aria-describedby={`${error === undefined ? "" : "link-code-error "}link-code-hint`} className="h-11 font-mono text-base tracking-wide uppercase md:w-56 md:text-base" />
-      {error !== undefined && (
-        <p id="link-code-error" role="alert" className="text-meta font-medium text-destructive">
-          {error}
-        </p>
+    <p className="text-meta text-muted-foreground">
+      {!codeOpen && (
+        <>
+          {webText("home_code_prompt")}{" "}
+          <button type="button" className={TOGGLE} onClick={onOpenCode} aria-expanded={false} aria-controls="link-code">
+            {webText("home_code_toggle")}
+          </button>{" "}
+          <span aria-hidden>{"·"}</span>{" "}
+        </>
       )}
-      <CommandHint id="link-code-hint" template={webText("link_code_hint")} command={webText("command_id")} />
-    </div>
+      {hint}
+    </p>
   );
 }
 
-export function LinkConverter({ customerCode }: { readonly customerCode: string | null }) {
+export function LinkConverter({ customerCode, onFocusChange }: { readonly customerCode: string | null; readonly onFocusChange?: (focused: boolean) => void }) {
   const queue = useQueueLink();
   const [url, setUrl] = useState("");
   const [code, setCode] = useState("");
+  const [codeOpen, setCodeOpen] = useState(false);
   const [local, setLocal] = useState<Errors>({});
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -122,32 +125,42 @@ export function LinkConverter({ customerCode }: { readonly customerCode: string 
     queue.mutate({ url: url.trim(), ...(customerCode === null && code.trim() !== "" ? { customerCode: code.trim() } : {}) });
   };
   const errors: Errors = { ...(queue.isError ? refusalErrors(queue.error) : {}), ...local };
+  const busy = queue.isError && isBusy(queue.error);
+  const codeRefused = queue.isError && errors.customerCode !== undefined;
+  const focused = queue.isPending || queue.isSuccess || busy || codeRefused;
+  useEffect(() => onFocusChange?.(focused), [focused, onFocusChange]);
   // On a phone the answer appears below the fold: it is brought into view once, when it starts.
   const answer = useRef<HTMLDivElement>(null);
-  const shown = queue.isSuccess ? queue.data.ticket : queue.isError && isBusy(queue.error) ? "busy" : null;
+  const shown = queue.isSuccess ? queue.data.ticket : busy ? "busy" : null;
   useEffect(() => {
     if (shown !== null) answer.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [shown]);
-  return (
-    <div className="flex flex-col gap-4">
-      <form noValidate onSubmit={submit} data-link-form className="flex flex-col gap-4">
-        <UrlField value={url} onChange={setUrl} error={errors.url} />
-        {customerCode === null ? (
-          <CodeField value={code} onChange={setCode} error={errors.customerCode} />
-        ) : (
-          <p className="flex flex-wrap items-center gap-2 text-[15px] text-muted-foreground" data-link-own-code>
-            {webText("link_for_code")}
-            <CodeChip code={customerCode} />
-          </p>
-        )}
-        <Button type="submit" className="h-11 w-full text-[15px] md:w-fit md:px-6" disabled={queue.isPending}>
-          {webText(queue.isPending ? "link_creating" : "link_submit")}
-        </Button>
-      </form>
-      <div ref={answer} className="scroll-mb-24 empty:hidden">
-        {queue.isError && isBusy(queue.error) && <HandOff textKey="link_busy" />}
-        {queue.isSuccess && <Result key={queue.data.ticket} queued={queue.data} />}
+  const showCode = customerCode === null && (codeOpen || code !== "" || errors.customerCode !== undefined);
+
+  if (focused && !codeRefused) {
+    return (
+      <div className="flex flex-col gap-5">
+        <UrlSummary url={url.trim()} onChange={() => queue.reset()} />
+        <div ref={answer} className="scroll-mb-24">
+          <Suspense fallback={<div aria-busy="true" className="h-40" />}>
+          {queue.isPending && <Creating slow={false} guest={customerCode === null && code.trim() === ""} />}
+          {busy && <HandOff titleKey="link_busy_title" textKey="link_busy" />}
+          {queue.isSuccess && <Result key={queue.data.ticket} queued={queue.data} />}
+          </Suspense>
+        </div>
       </div>
-    </div>
+    );
+  }
+  return (
+    <form noValidate onSubmit={submit} data-link-form className="flex flex-col gap-3">
+      {codeRefused ? <UrlSummary url={url.trim()} onChange={() => queue.reset()} /> : <UrlField value={url} onChange={setUrl} error={errors.url} />}
+      {showCode && (
+        <Suspense fallback={<div className="h-28" />}>
+          <CodeField value={code} onChange={setCode} error={errors.customerCode} />
+        </Suspense>
+      )}
+      <SubmitButton pending={queue.isPending} />
+      <FormLine customerCode={customerCode} codeOpen={showCode} onOpenCode={() => setCodeOpen(true)} />
+    </form>
   );
 }

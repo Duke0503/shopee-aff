@@ -19,3 +19,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 ];
 
 export const FOCUS_RING = "outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/** The top bar's right corner: a 32 px soft green pill whose tap area grows to 44 px (DESIGN.md touch target). */
+export const CORNER_PILL =
+  "relative flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3 text-[15px] font-semibold text-primary after:absolute after:inset-x-0 after:-top-1.5 after:-bottom-1.5 after:content-[''] hover:bg-secondary/70";

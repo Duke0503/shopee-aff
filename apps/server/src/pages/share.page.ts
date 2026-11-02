@@ -9,11 +9,15 @@
  *     link in place (the live fallback). The intent's address carries `?via=app`, so the Chrome
  *     visit that follows is not counted as a second click.
  *   - iOS in an app: no page can leave an app's browser on iOS, so it shows the "open in Safari"
- *     step and a copy-link button, and does not redirect.
+ *     steps, the peeking mascot and a copy-link button in place of the product, and does not
+ *     redirect.
  *   - A real browser: product, price and the estimated cashback with its example amounts for about
  *     one second, then the stored link, by a meta refresh: no script is needed for the redirect.
- *   - A guest link (HOUSE, D5): the guest warning replaces the cashback line, the Zalo button is
- *     the main action and the page does not move on by itself, so the warning is read.
+ *   - A guest link (HOUSE, D5): the guest warning replaces the cashback line, the Zalo button inside
+ *     it is the main action and the page does not move on by itself, so the warning is read.
+ *
+ * The look is the pen.dev vOeyy, BRAHc, E2RWg and u7Gna frames: no card, the product picture large and centred, the
+ * soft green cashback box, one 48 px button.
  *
  * The target is only ever the request's stored, checked link (`sharePageLink`): no query parameter
  * is read, so the page is never an open redirect. Every GET by a person records one click; a HEAD
@@ -45,9 +49,21 @@ const text = (key: PageKey, params: Readonly<Record<string, string>> = {}): stri
 const t = (key: PageKey, params: Readonly<Record<string, string>> = {}): string => escapeHtml(text(key, params));
 
 const STYLE = `${readFileSync(join(REPOSITORY_ROOT, "packages/ui/src/styles/tokens.css"), "utf8")}\n${SHARE_CSS}`;
-/** Copies the share link; the page works without it (the link is shown as text). */
-const SCRIPT = `document.querySelectorAll("[data-copy]").forEach(function(b){b.addEventListener("click",function(){if(!navigator.clipboard)return;navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function(){b.textContent=b.getAttribute("data-done")})})});`;
-const LOGO = `data:image/webp;base64,${readFileSync(join(dirname(fileURLToPath(import.meta.url)), "logo-mark-64.webp")).toString("base64")}`;
+/** Copies the share link; the page works without it (the link is shown as text). The button keeps its icon. */
+const SCRIPT = `document.querySelectorAll("[data-copy]").forEach(function(b){b.addEventListener("click",function(){if(!navigator.clipboard)return;navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function(){var l=b.querySelector("[data-label]");if(l)l.textContent=b.getAttribute("data-done")})})});`;
+const HERE = dirname(fileURLToPath(import.meta.url));
+const inlineWebp = (file: string): string => `data:image/webp;base64,${readFileSync(join(HERE, file)).toString("base64")}`;
+const LOGO = inlineWebp("logo-mark-64.webp");
+/** The live brand mascot, small and inlined like the logo: peeking over the Safari steps, waiting on the missing page. */
+const MASCOT_PEEKING = inlineWebp("mascot-peeking-180.webp");
+const MASCOT_WAITING = inlineWebp("mascot-waiting-180.webp");
+/** Lucide shapes (ISC) for the buttons: external link, arrow right, copy, chat bubble. */
+const ICON = {
+  external: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  arrow: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+  copy: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+  chat: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>',
+} as const;
 const hashOf = (source: string): string => `'sha256-${createHash("sha256").update(source, "utf8").digest("base64")}'`;
 
 /** Where Shopee serves product pictures, as CSP host sources; the page shows a picture only from these, and the CSP allows exactly these. */
@@ -104,15 +120,16 @@ function rateLines(estimate: LinkEstimate): string {
   return `<ul class="rates">${lines}</ul>${capped}`;
 }
 
-/** The cashback line: the estimate with its example amounts, or a dash; for a guest link the guest warning instead. */
+/** The cashback box: "about <amount>" centred with its example amounts, or a dash; for a guest link the guest warning instead. */
 function cashbackBlock(reply: LinkReplyData): string {
-  if (reply.guest) return `<div class="panel guest" role="note" data-guest><strong>${t("share_guest_title")}</strong><p>${t("share_guest_body")}</p></div>`;
+  if (reply.guest) return `<div class="panel guest" role="note" data-guest><strong>${t("share_guest_title")}</strong><p>${t("share_guest_body")}</p><a class="btn" href="${t("share_zalo_url")}" rel="noopener">${ICON.chat}${t("share_guest_zalo")}</a></div>`;
   const label = `<p class="cash-label">${t("share_cashback_label")}</p>`;
   if (reply.perShopKey !== null) return `<div class="cash" data-estimate="per-shop">${label}<p class="small">${t("share_shopeefood_per_shop")}</p></div>`;
-  if (reply.estimate === null) return `<div class="cash" data-estimate="none">${label}<p class="cash-line"><span class="missing">${t("value_missing")}</span></p><p class="small">${t("share_no_estimate")}</p></div>`;
+  if (reply.estimate === null) return `<div class="cash" data-estimate="none">${label}<p class="cash-line"><span class="missing">${t("value_missing")}</span></p><p class="cash-note">${t("share_no_estimate")}</p></div>`;
   const e = reply.estimate;
-  const line = `<p class="cash-line"><span class="estimate">${t("share_about")} <b>${money(e.cashback)}</b></span><span class="estimate-tag">${t("share_estimate_tag")}</span></p>`;
-  return `<div class="cash" data-estimate="${e.cashback}">${label}${line}${rateLines(e)}<p class="small">${t("share_estimate_note")}</p></div>`;
+  const line = `<p class="cash-label">${t("share_cashback_label")} <span class="estimate-about">${t("share_about")}</span></p><p class="cash-line"><span class="estimate"><b>${money(e.cashback)}</b></span></p>`;
+  const note = `<p class="cash-note"><span class="estimate-tag">${t("share_estimate_tag")}</span> \u00b7 ${t("share_estimate_note")}</p>`;
+  return `<div class="cash" data-estimate="${e.cashback}">${line}${note}${rateLines(e)}</div>`;
 }
 
 function productBlock(view: ShareView): string {
@@ -120,8 +137,8 @@ function productBlock(view: ShareView): string {
   const image = imageOf(product.imageUrl);
   const name = product.name ?? text("share_title_fallback", { network: networkName(view.link) });
   const thumb = image === null ? "" : `<img class="thumb" src="${escapeHtml(image)}" alt="" referrerpolicy="no-referrer">`;
-  const price = product.price === null ? "" : `<p class="price">${money(product.price)}</p>`;
-  return `<div class="product">${thumb}<div class="product-text"><h1>${escapeHtml(name)}</h1>${price}</div></div>`;
+  const meta = [escapeHtml(networkName(view.link)), ...(product.price === null ? [] : [money(product.price)])].join(" \u00b7 ");
+  return `<div class="product">${thumb}<h1>${escapeHtml(name)}</h1><p class="price">${meta}</p></div>`;
 }
 
 /** Chrome by intent to this same page, marked as the hand-off; the stored link in place when Chrome is missing. */
@@ -132,18 +149,18 @@ function actionBlock(view: ShareView): string {
   const target = escapeHtml(view.link.target);
   if (view.variant === "android_in_app") {
     const intent = escapeHtml(handoffIntent(view));
-    return `<div class="panel handoff" data-variant="android_in_app"><strong>${t("share_android_title")}</strong><p>${t("share_android_body")}</p></div><div class="actions"><a class="btn" href="${intent}" rel="nofollow">${t("share_open_chrome")}</a></div>`;
+    return `<div class="wait" role="status" data-variant="android_in_app"><span class="spinner" aria-hidden="true"></span>${t("share_android_wait")}</div><div class="actions"><a class="btn" href="${intent}" rel="nofollow">${ICON.external}${t("share_open_chrome")}</a></div>`;
   }
-  if (view.variant === "ios_in_app") {
-    const share = escapeHtml(view.shareUrl);
-    const steps = `<ol class="steps"><li>${t("share_ios_step_1")}</li><li>${t("share_ios_step_2", { network })}</li></ol>`;
-    const copy = `<p class="small">${t("share_ios_copy_hint")}</p><code class="share-url">${share}</code><div class="actions"><button type="button" class="btn btn-outline" data-copy="${share}" data-done="${t("share_copied")}">${t("share_copy_link")}</button></div>`;
-    return `<div class="panel handoff" data-variant="ios_in_app"><strong>${t("share_ios_title")}</strong><p>${t("share_ios_body")}</p>${steps}</div>${copy}`;
-  }
-  if (view.reply.guest) {
-    return `<div class="actions"><a class="btn" href="${t("share_zalo_url")}" rel="noopener">${t("share_guest_zalo")}</a><a class="btn btn-outline" href="${target}" rel="nofollow noreferrer">${t("share_guest_go", { network })}</a></div>`;
-  }
-  return `<div class="actions"><a class="btn" href="${target}" rel="nofollow noreferrer">${t("share_go", { network })}</a></div><p class="status" role="status">${t("share_opening", { network })}</p>`;
+  if (view.reply.guest) return `<div class="actions"><a class="btn btn-outline" href="${target}" rel="nofollow noreferrer">${t("share_guest_go", { network })}</a></div>`;
+  return `<div class="actions"><a class="btn" href="${target}" rel="nofollow noreferrer">${ICON.arrow}${t("share_go", { network })}</a></div><p class="status" role="status">${t("share_redirect_note")}</p>`;
+}
+
+/** iPhone in an app: no product, the Safari steps with the peeking mascot and the copy button (pen.dev BRAHc). */
+function safariBlock(view: ShareView): string {
+  const share = escapeHtml(view.shareUrl);
+  const steps = `<ol class="steps"><li>${t("share_ios_step_1")}</li><li>${t("share_ios_step_2")}</li></ol>`;
+  const copy = `<div class="actions"><button type="button" class="btn btn-outline" data-copy="${share}" data-done="${t("share_copied")}">${ICON.copy}<span data-label>${t("share_copy_link")}</span></button></div><p class="share-url">${share}</p>`;
+  return `<div class="panel safari" data-variant="ios_in_app"><h1>${t("share_ios_title")}</h1><p>${t("share_ios_body")}</p></div>${steps}<img class="mascot" src="${MASCOT_PEEKING}" alt="" width="119" height="180">${copy}`;
 }
 
 /** The meta refresh of the variant: Chrome at once on Android in an app, the shop after a second in a real browser, none otherwise. */
@@ -171,7 +188,7 @@ function documentOf(title: string, body: string, head: readonly string[] = []): 
   ].join("\n");
 }
 
-const topBar = (network: string | null): string => `<header class="top"><p class="brand"><img class="brand-mark" src="${LOGO}" alt="" width="28" height="28">${t("brand_name")}</p>${network === null ? "" : `<span class="network">${escapeHtml(network)}</span>`}</header>`;
+const topBar = (): string => `<header class="top"><p class="brand"><img class="brand-mark" src="${LOGO}" alt="" width="28" height="28">${t("brand_name")}</p></header>`;
 
 export function shareHtml(view: ShareView): string {
   const network = networkName(view.link);
@@ -179,12 +196,12 @@ export function shareHtml(view: ShareView): string {
   const image = imageOf(view.reply.product.imageUrl);
   const refresh = refreshOf(view);
   const head = [`<meta property="og:title" content="${escapeHtml(title)}">`, `<meta property="og:description" content="${t("share_preview", { network })}">`, ...(image === null ? [] : [`<meta property="og:image" content="${escapeHtml(image)}">`]), ...(refresh === null ? [] : [`<meta http-equiv="refresh" content="${escapeHtml(refresh)}">`])];
-  const card = `<section class="card" data-share="${view.variant}">${productBlock(view)}${cashbackBlock(view.reply)}${actionBlock(view)}</section>`;
-  return documentOf(title, `${topBar(network)}${card}`, head);
+  const content = view.variant === "ios_in_app" ? safariBlock(view) : `${productBlock(view)}${cashbackBlock(view.reply)}${actionBlock(view)}`;
+  return documentOf(title, `${topBar()}<section data-share="${view.variant}">${content}</section>`, head);
 }
 
 export function missingShareHtml(): string {
-  const body = `${topBar(null)}<section class="card" data-share="missing"><h1>${t("share_not_found_title")}</h1><p class="body">${t("share_not_found_body")}</p><div class="actions"><a class="btn" href="${t("share_zalo_url")}" rel="noopener">${t("share_open_zalo")}</a></div></section>`;
+  const body = `${topBar()}<section class="missing-page" data-share="missing"><img class="mascot" src="${MASCOT_WAITING}" alt="" width="133" height="180"><h1>${t("share_not_found_title")}</h1><p class="body">${t("share_not_found_body")}</p><div class="actions"><a class="btn" href="${t("share_zalo_url")}" rel="noopener">${ICON.chat}${t("share_open_zalo")}</a></div></section>`;
   return documentOf(text("share_not_found_title"), body);
 }
 

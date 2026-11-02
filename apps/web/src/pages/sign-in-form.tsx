@@ -8,13 +8,16 @@
  */
 import { CUSTOMER_CODE_INPUT } from "@cashback/contracts";
 import { formatVnTimeOf } from "@cashback/core";
-import { Button, EyeIcon, EyeOffIcon, Input, Label } from "@cashback/ui";
+import { Button, cn, EyeIcon, EyeOffIcon, Input, Label } from "@cashback/ui";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { ApiError } from "../api/api.queries";
 import { errorText, webText } from "../labels";
 import { useSignIn } from "../session/session.queries";
 import { CommandHint } from "../shell/command-hint";
+import { FIELD_ICON, ICON_FIELD } from "../shell/field-styles";
+import { LockIcon } from "../shell/page-icons";
+import { CircleAlertIcon, UserIcon } from "../shell/site-icons";
 
 type Field = "customerCode" | "password";
 export type FieldErrors = Partial<Record<Field, string>>;
@@ -63,22 +66,25 @@ interface FieldProps {
 function CodeField({ value, onChange, error, refused }: FieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor="customer-code" className="text-[15px]">
+      <Label htmlFor="customer-code" className="text-[15px] font-semibold">
         {webText("sign_in_code")}
       </Label>
-      <Input
-        id="customer-code"
-        name="username"
-        autoComplete="username"
-        autoCapitalize="characters"
-        autoCorrect="off"
-        spellCheck={false}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error !== undefined || refused}
-        aria-describedby={describedBy(error !== undefined && "customer-code-error", refused && "sign-in-error", "customer-code-hint")}
-        className="h-11 font-mono text-base tracking-wide uppercase md:text-base"
-      />
+      <div className="relative">
+        <UserIcon aria-hidden className={FIELD_ICON} />
+        <Input
+          id="customer-code"
+          name="username"
+          autoComplete="username"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error !== undefined || refused}
+          aria-describedby={describedBy(error !== undefined && "customer-code-error", refused && "sign-in-error", "customer-code-hint")}
+          className={cn(ICON_FIELD, "font-medium tracking-wide uppercase")}
+        />
+      </div>
       {error !== undefined && (
         <p id="customer-code-error" className="text-meta font-medium text-destructive">
           {error}
@@ -92,10 +98,11 @@ function CodeField({ value, onChange, error, refused }: FieldProps) {
 function PasswordField({ value, onChange, error, refused, shown, onShown }: FieldProps & { readonly shown: boolean; readonly onShown: () => void }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor="password" className="text-[15px]">
+      <Label htmlFor="password" className="text-[15px] font-semibold">
         {webText("sign_in_password")}
       </Label>
       <div className="relative">
+        <LockIcon aria-hidden className={FIELD_ICON} />
         <Input
           id="password"
           name="password"
@@ -105,10 +112,10 @@ function PasswordField({ value, onChange, error, refused, shown, onShown }: Fiel
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={error !== undefined || refused}
           aria-describedby={describedBy(error !== undefined && "password-error", refused && "sign-in-error", "password-hint")}
-          className="h-11 pr-12 text-base md:text-base"
+          className={cn(ICON_FIELD, "pr-12")}
         />
-        <Button type="button" variant="ghost" className="absolute top-0 right-0 size-11" aria-pressed={shown} aria-label={webText(shown ? "sign_in_hide_password" : "sign_in_show_password")} onClick={onShown}>
-          {shown ? <EyeOffIcon aria-hidden className="size-5" /> : <EyeIcon aria-hidden className="size-5" />}
+        <Button type="button" variant="ghost" className="absolute top-0.5 right-0.5 size-11 text-muted-foreground" aria-pressed={shown} aria-label={webText(shown ? "sign_in_hide_password" : "sign_in_show_password")} onClick={onShown}>
+          {shown ? <EyeIcon aria-hidden className="size-5" /> : <EyeOffIcon aria-hidden className="size-5" />}
         </Button>
       </div>
       {error !== undefined && (
@@ -143,15 +150,16 @@ export function SignInForm({ onMascot }: { readonly onMascot?: (name: Mascot) =>
   useEffect(() => onMascot?.(mascot), [mascot, onMascot]);
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-5" data-waiting={signIn.isError ? (retryTime(signIn.error) ?? undefined) : undefined}>
+    <form noValidate onSubmit={submit} className="flex flex-col gap-4" data-waiting={signIn.isError ? (retryTime(signIn.error) ?? undefined) : undefined}>
       <CodeField value={customerCode} onChange={setCustomerCode} error={fields.customerCode} refused={formError !== null} />
       <PasswordField value={password} onChange={setPassword} error={fields.password} refused={formError !== null} shown={shown} onShown={() => setShown((s) => !s)} />
       {formError !== null && (
-        <p id="sign-in-error" role="alert" className="rounded-lg bg-destructive/8 px-3 py-2.5 text-[15px] font-medium text-destructive">
+        <p id="sign-in-error" role="alert" className="flex items-start gap-2.5 rounded-xl bg-status-rejected-soft px-4 py-3 text-[15px] text-destructive">
+          <CircleAlertIcon aria-hidden className="mt-0.5 size-5 shrink-0" />
           {formError}
         </p>
       )}
-      <Button type="submit" className="h-11 w-full text-[15px]" disabled={signIn.isPending}>
+      <Button type="submit" className="mt-1 h-12 w-full rounded-xl text-base font-semibold" disabled={signIn.isPending}>
         {webText(signIn.isPending ? "sign_in_submitting" : "sign_in_submit")}
       </Button>
     </form>

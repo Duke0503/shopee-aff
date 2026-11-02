@@ -93,7 +93,7 @@ describe("Story 7.7: Basic guide page with the money rules stated correctly", ()
     const text = (document.querySelector("main") ?? document.body).textContent?.toLowerCase() ?? "";
     const all = `${GUIDE_LABELS.map(([, t]) => t.toLowerCase()).join(" ")} ${text}`;
     for (const promise of ["t\u1ef1 \u0111\u1ed9ng", "h\u00e0ng tu\u1ea7n", "m\u1ed7i tu\u1ea7n", "h\u00e0ng th\u00e1ng", "trong v\u00f2ng", "ch\u1eadm nh\u1ea5t", "th\u1ee9 ", "s\u1ebd chuy\u1ec3n v\u00e0o ng\u00e0y", "t\u1ed1i thi\u1ec3u \u0111\u1ec3"]) expect([promise, all.includes(promise)]).toEqual([promise, false]);
-    expect(webText("guide_step_pay")).toContain("Kh\u00f4ng h\u1eb9n ng\u00e0y c\u1ed1 \u0111\u1ecbnh");
+    expect(webText("home_step_3_body")).toContain("Kh\u00f4ng h\u1eb9n ng\u00e0y c\u1ed1 \u0111\u1ecbnh");
   });
 
   it("AC3: the commands are those of Stories 6.7 and 6.8: /id, /sodu, /donhang, /stk, /matkhau, /help, each a copy chip named in /help", async () => {
@@ -107,7 +107,9 @@ describe("Story 7.7: Basic guide page with the money rules stated correctly", ()
     const chips = [...list.querySelectorAll("button")].map((b) => b.textContent);
     expect(chips.sort()).toEqual(["/donhang", "/help", "/id", "/matkhau", "/sodu", "/stk"]);
     expect(GUIDE_COMMANDS).toHaveLength(ASSISTANT_COMMANDS.length);
-    for (const chip of chips) expect(messages.command_help).toContain(`${chip ?? ""}:`);
+    // /help is the live bot's text word for word (message parity, 2026-11-02), bold marked with **; it never listed /donhang or /help.
+    const help = messages.command_help.replaceAll("**", "");
+    for (const chip of chips.filter((c) => c !== "/donhang" && c !== "/help")) expect(help).toContain(`${chip ?? ""}:`);
   });
 
   it("AC4: at 360 px the page has no fixed width wider than the screen", async () => {

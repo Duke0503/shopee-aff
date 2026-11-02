@@ -7,10 +7,13 @@
  */
 import { BANK_HOLDER_INPUT_MAX, BANK_NUMBER_INPUT_MAX, type BankAccountSaved, type BankChoice } from "@cashback/contracts";
 import { Button, CheckIcon, cn, Input, Label } from "@cashback/ui";
-import { useState, type FormEvent } from "react";
+import { useState, type ComponentType, type FormEvent } from "react";
 
 import { formErrorOf, serverFieldErrors } from "../api/field-errors";
 import { errorText, webText } from "../labels";
+import { FIELD_ICON, ICON_FIELD } from "../shell/field-styles";
+import { HashIcon } from "../shell/page-icons";
+import { CircleAlertIcon, UserIcon } from "../shell/site-icons";
 import { useSaveBank } from "./account.queries";
 import { BankPicker } from "./bank-picker";
 
@@ -35,7 +38,8 @@ function checkForm(bank: BankChoice | null, number: string, holder: string, cons
 function FieldError({ id, text }: { readonly id: string; readonly text: string | undefined }) {
   if (text === undefined) return null;
   return (
-    <p id={id} className="text-meta font-medium text-destructive">
+    <p id={id} className="flex items-start gap-1.5 text-meta font-medium text-destructive">
+      <CircleAlertIcon aria-hidden className="mt-px size-4 shrink-0" />
       {text}
     </p>
   );
@@ -50,29 +54,32 @@ interface TextFieldProps {
   readonly onChange: (value: string) => void;
   readonly onBlur?: () => void;
   readonly maxLength: number;
-  readonly mono?: boolean;
+  readonly icon: ComponentType<{ className?: string }>;
 }
 
-function TextField({ id, label, hint, value, error, onChange, onBlur, maxLength, mono = false }: TextFieldProps) {
+function TextField({ id, label, hint, value, error, onChange, onBlur, maxLength, icon: Icon }: TextFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-[15px]">
+      <Label htmlFor={id} className="text-[15px] font-semibold">
         {label}
       </Label>
-      <Input
-        id={id}
-        value={value}
-        maxLength={maxLength}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="characters"
-        spellCheck={false}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        aria-invalid={error !== undefined}
-        aria-describedby={`${error === undefined ? "" : `${id}-error `}${id}-hint`}
-        className={`h-11 text-base md:text-base ${mono ? "font-mono tracking-wide" : ""}`}
-      />
+      <div className="relative">
+        <Icon aria-hidden className={FIELD_ICON} />
+        <Input
+          id={id}
+          value={value}
+          maxLength={maxLength}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          aria-invalid={error !== undefined}
+          aria-describedby={`${error === undefined ? "" : `${id}-error `}${id}-hint`}
+          className={ICON_FIELD}
+        />
+      </div>
       <FieldError id={`${id}-error`} text={error} />
       <p id={`${id}-hint`} className={error === undefined ? "text-meta text-muted-foreground" : "sr-only"}>
         {hint}
@@ -126,23 +133,23 @@ export function BankForm({ onSaved, onCancel }: { readonly onSaved: (saved: Bank
   const formError = Object.keys(local).length === 0 && save.isError ? formErrorOf(save.error, FIELDS) : null;
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-5" data-bank-form>
+    <form noValidate onSubmit={submit} className="flex flex-col gap-4" data-bank-form>
       <BankPicker value={bank} onChange={setBank} error={errors.bankBin} />
-      <TextField id="bank-number" label={webText("bank_field_number")} hint={webText("bank_number_hint")} value={number} error={errors.accountNumber} onChange={(v) => setNumber(normaliseNumber(v))} maxLength={BANK_NUMBER_INPUT_MAX} mono />
-      <TextField id="bank-holder" label={webText("bank_field_holder")} hint={webText("bank_holder_hint")} value={holder} error={errors.holderName} onChange={setHolder} onBlur={() => setHolder((h) => h.trim().replace(/\s+/g, " ").toUpperCase())} maxLength={BANK_HOLDER_INPUT_MAX} />
+      <TextField id="bank-number" label={webText("bank_field_number")} hint={webText("bank_number_hint")} value={number} error={errors.accountNumber} onChange={(v) => setNumber(normaliseNumber(v))} maxLength={BANK_NUMBER_INPUT_MAX} icon={HashIcon} />
+      <TextField id="bank-holder" label={webText("bank_field_holder")} hint={webText("bank_holder_hint")} value={holder} error={errors.holderName} onChange={setHolder} onBlur={() => setHolder((h) => h.trim().replace(/\s+/g, " ").toUpperCase())} maxLength={BANK_HOLDER_INPUT_MAX} icon={UserIcon} />
       <ConsentBox checked={consent} onChange={setConsent} error={errors.consent} />
-      <p className="rounded-lg bg-muted px-3 py-2.5 text-meta">{webText("bank_save_note")}</p>
+      <p className="text-meta text-muted-foreground">{webText("bank_save_note")}</p>
       {formError !== null && (
         <p role="alert" className="rounded-lg bg-destructive/8 px-3 py-2.5 text-[15px] font-medium text-destructive">
           {formError}
         </p>
       )}
       <div className="flex flex-col gap-2 md:flex-row">
-        <Button type="submit" className="h-11 w-full text-[15px] md:w-fit md:px-6" disabled={save.isPending}>
+        <Button type="submit" className="h-12 w-full rounded-xl text-base font-semibold md:flex-1" disabled={save.isPending}>
           {webText(save.isPending ? "bank_saving" : "bank_save")}
         </Button>
         {onCancel !== undefined && (
-          <Button type="button" variant="ghost" className="h-11 w-full text-[15px] md:w-fit" onClick={onCancel}>
+          <Button type="button" variant="ghost" className="h-12 w-full rounded-xl text-base md:w-fit md:px-6" onClick={onCancel}>
             {webText("bank_cancel")}
           </Button>
         )}

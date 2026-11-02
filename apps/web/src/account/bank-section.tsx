@@ -1,6 +1,7 @@
 /**
- * The bank account on Account (W2, UX-DR9, FR-10, M-7; Story 7.5): the saved account (bank, the
- * last four digits only, holder) with "change" and "erase"; while a website change waits for the
+ * The bank account on Account (W2, pen.dev qHld0, ZKB0V and WbIih, UX-DR9, FR-10, M-7;
+ * Story 7.5): the saved account (bank, the last four digits only, holder) with "change", the
+ * anti-scam note, and "erase" in its own section below a hairline; while a website change waits for the
  * customer's confirmation in the Zalo private chat, the attention box ("waiting for your
  * confirmation on Zalo", bank_held) with the confirm command as a copy chip and the Zalo button; without an account, the form
  * itself. A save says the last four digits it saved; erase asks once (AlertDialog).
@@ -23,6 +24,8 @@ import { useState } from "react";
 import { formErrorOf } from "../api/field-errors";
 import { webText } from "../labels";
 import { CommandHint } from "../shell/command-hint";
+import { ShieldAlertIcon } from "../shell/page-icons";
+import { ScamNote } from "../shell/trust-notes";
 import { ZaloButton } from "../shell/zalo-button";
 import { useEraseBank } from "./account.queries";
 import { BankForm } from "./bank-form";
@@ -57,40 +60,49 @@ function EraseDialog({ bank, open, onOpenChange, onErased }: { readonly bank: Ba
 
 function HeldBox({ lastFour }: { readonly lastFour: string }) {
   return (
-    <div data-bank-held className="flex flex-col gap-3 rounded-lg bg-status-attention-soft p-3 text-status-attention">
-      <p className="text-[15px] font-semibold">{webText("bank_held")}</p>
-      <CommandHint className="text-[15px] text-foreground" template={webText("bank_held_body")} command={webText("command_bank_confirm", { lastFour })} />
-      <ZaloButton labelKey="account_zalo" className="w-full md:w-fit" />
+    <div data-bank-held className="flex gap-3 rounded-xl bg-warning-soft p-4 text-warning">
+      <ShieldAlertIcon aria-hidden className="mt-0.5 size-5 shrink-0" />
+      <div className="flex min-w-0 flex-col items-start gap-2">
+        <p className="text-base leading-snug font-semibold">{webText("bank_held")}</p>
+        <CommandHint className="text-[15px] text-warning" template={webText("bank_held_body")} command={webText("command_bank_confirm", { lastFour })} />
+        <ZaloButton labelKey="account_zalo" className="h-11 rounded-lg px-4 font-semibold" />
+      </div>
     </div>
   );
 }
 
-function SavedBank({ bank, onChange, onErase }: { readonly bank: Bank; readonly onChange: () => void; readonly onErase: () => void }) {
+function SavedBank({ bank, onChange }: { readonly bank: Bank; readonly onChange: () => void }) {
   return (
-    <div className="flex flex-col gap-4" data-bank={bank.held ? "held" : "saved"}>
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-primary">
-          <LandmarkIcon className="size-5" />
-        </span>
-        <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-5" data-bank={bank.held ? "held" : "saved"}>
+      <div className="flex items-center gap-3">
+        <LandmarkIcon aria-hidden className="size-6 shrink-0 text-primary" />
+        <div className="flex min-w-0 flex-col">
           <p className="flex flex-wrap items-baseline gap-x-2 text-[17px] font-semibold">
             <span className="min-w-0 break-words">{bank.bankName ?? webText("bank_unnamed")}</span>
-            <span className="font-mono whitespace-nowrap tabular-nums">{webText("bank_masked", { lastFour: bank.lastFour })}</span>
+            <span className="whitespace-nowrap tabular-nums">{webText("bank_masked", { lastFour: bank.lastFour })}</span>
           </p>
-          {bank.holderName !== null && <p className="truncate text-[15px] text-muted-foreground">{bank.holderName}</p>}
+          {bank.holderName !== null && <p className="truncate text-meta text-muted-foreground uppercase">{bank.holderName}</p>}
         </div>
       </div>
-      {bank.held && <HeldBox lastFour={bank.lastFour} />}
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" className="h-11 flex-1 text-[15px] md:flex-none md:px-5" onClick={onChange}>
-          {webText("account_bank_change")}
-        </Button>
-        <Button type="button" variant="ghost" className="h-11 px-4 text-[15px] text-destructive hover:text-destructive" onClick={onErase}>
-          <Trash2Icon aria-hidden />
-          {webText("account_bank_erase")}
-        </Button>
-      </div>
+      <Button type="button" variant="outline" className="h-11 w-full rounded-lg bg-card text-[15px] font-semibold md:w-fit md:px-5" onClick={onChange}>
+        {webText("account_bank_change")}
+      </Button>
     </div>
+  );
+}
+
+function EraseSection({ onErase }: { readonly onErase: () => void }) {
+  return (
+    <section aria-labelledby="bank-erase-title" className="flex flex-col items-start gap-2 border-t border-border pt-6">
+      <h2 id="bank-erase-title" className="text-[17px] leading-snug font-semibold">
+        {webText("account_erase_title")}
+      </h2>
+      <p className="text-meta text-muted-foreground md:text-sm">{webText("account_erase_body")}</p>
+      <Button type="button" variant="outline" className="mt-1 h-11 rounded-lg border-destructive bg-card px-4 text-[15px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={onErase}>
+        <Trash2Icon aria-hidden />
+        {webText("account_bank_erase")}
+      </Button>
+    </section>
   );
 }
 
@@ -105,36 +117,39 @@ export function BankSection({ bank }: { readonly bank: MyMoney["bank"] }) {
   const showForm = bank === null || editing;
   const title = bank === null ? "account_bank_add_title" : editing ? "account_bank_change_title" : "account_bank_title";
   return (
-    <section aria-labelledby="bank-section-title" className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-6">
-      <div className="flex flex-col gap-1">
-        <h2 id="bank-section-title" className="text-[19px] leading-snug font-semibold">
+    <>
+      <section aria-labelledby="bank-section-title" className="flex flex-col gap-4">
+        <h2 id="bank-section-title" className="sr-only">
           {webText(title)}
         </h2>
-        <p className="text-[15px] text-muted-foreground">{webText("account_bank_lead")}</p>
-      </div>
-      {done !== null && (
-        <p role="status" data-bank-done className="rounded-lg bg-primary/8 px-3 py-2.5 text-[15px] font-medium text-primary">
-          {done}
-        </p>
-      )}
-      {showForm ? (
-        <BankForm
-          onSaved={(saved) => {
-            setDone(savedText(saved));
-            setEditing(false);
-          }}
-          {...(bank === null ? {} : { onCancel: () => setEditing(false) })}
-        />
-      ) : (
-        <SavedBank
-          bank={bank}
-          onChange={() => {
-            setDone(null);
-            setEditing(true);
-          }}
-          onErase={() => setErasing(true)}
-        />
-      )}
+        {bank?.held === true && <HeldBox lastFour={bank.lastFour} />}
+        {done !== null && (
+          <p role="status" data-bank-done className="rounded-xl bg-secondary px-4 py-3 text-[15px] font-medium text-secondary-foreground">
+            {done}
+          </p>
+        )}
+        <div className={showForm ? "xl:rounded-xl xl:border xl:border-border xl:bg-card xl:p-5" : undefined}>
+          {showForm ? (
+            <BankForm
+              onSaved={(saved) => {
+                setDone(savedText(saved));
+                setEditing(false);
+              }}
+              {...(bank === null ? {} : { onCancel: () => setEditing(false) })}
+            />
+          ) : (
+            <SavedBank
+              bank={bank}
+              onChange={() => {
+                setDone(null);
+                setEditing(true);
+              }}
+            />
+          )}
+        </div>
+        <ScamNote />
+      </section>
+      {bank !== null && <EraseSection onErase={() => setErasing(true)} />}
       {bank !== null && (
         <EraseDialog
           bank={bank}
@@ -147,6 +162,6 @@ export function BankSection({ bank }: { readonly bank: MyMoney["bank"] }) {
           }}
         />
       )}
-    </section>
+    </>
   );
 }
