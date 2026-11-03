@@ -137,3 +137,4 @@ and step 7's checks agreed.
 
 | Date | Duration | Result | Archive | Machine and notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-03 | 5 min | pass | 2026-11-03T01-12-34.567Z-daily.tar | Operator dev machine, `--env dev`, the `.tar.enc` form of the Drive copy with `--key-file`; 23 customers, totals matched the manifest; dev data deleted afterwards |
