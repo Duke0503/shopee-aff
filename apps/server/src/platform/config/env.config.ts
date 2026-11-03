@@ -20,6 +20,7 @@ import { parseEnv } from "node:util";
 import { FALLBACK_CONTACT_URL, ZALO_CHAT_URL } from "@cashback/contracts";
 import { z } from "zod";
 
+import type { DriveWebhookConfig } from "../backup/drive-webhook.adapter";
 import type { OffsiteConfig } from "../backup/offsite.adapter";
 import { BRIDGE_MODES, type BridgeMode } from "../ports/bridge.port";
 import { describeProblems, isolationContext, isolationProblems, isolationWarnings, parseIdList } from "./isolation.config";
@@ -94,6 +95,25 @@ export interface ServerConfig {
    * dev keeps local backups only and production reports every daily off-site copy as failed.
    */
   backupOffsite: OffsiteConfig | null;
+  /**
+   * Which off-site copy the daily backup makes (owner decision 2026-11-03): BACKUP_OFFSITE, or
+   * when unset `rclone` with the age and rclone keys and else `drive_webhook` with
+   * GDRIVE_WEBHOOK_URL; null with neither.
+   */
+  backupOffsiteKind: BackupOffsiteKind | null;
+  /**
+   * The Google Drive webhook (GDRIVE_WEBHOOK_URL, GDRIVE_SECRET_TOKEN), set only when it is the
+   * chosen copy and BACKUP_ENCRYPTION_KEY is valid: nothing is ever sent unencrypted. Both are
+   * secrets, never logged.
+   */
+  backupDriveWebhook: DriveWebhookConfig | null;
+  /**
+   * BACKUP_ENCRYPTION_KEY: 32 random bytes in base64, the AES-256-GCM key of the `.tar.enc`
+   * copies; the restore command decrypts with it. Never logged; kept in the password manager.
+   */
+  backupEncryptionKey: string | null;
+  /** ALLOW_PROD_BACKUP_OFFSITE=1: dev may use the production webhook and key (logged as a warning). */
+  allowProdBackupOffsite: boolean;
   /**
    * The external heartbeat checker's ping URL (AD-29, Story 8.4): https only, a secret (it holds
    * the check's id), never logged. Without it no heartbeat is sent; production logs that as an error.
@@ -199,6 +219,33 @@ function backupOffsiteOf(file: BackupOffsiteFile): OffsiteConfig | null {
   };
 }
 
+export const BACKUP_OFFSITE_KINDS = ["rclone", "drive_webhook"] as const;
+export type BackupOffsiteKind = (typeof BACKUP_OFFSITE_KINDS)[number];
+
+/** 32 bytes in canonical base64 (`node -e` in the backup runbook writes one). */
+const isEncryptionKey = (text: string): boolean => /^[A-Za-z0-9+/]{43}=$/.test(text) && Buffer.from(text, "base64").toString("base64") === text;
+
+type OffsiteChoiceFile = BackupOffsiteFile & { BACKUP_OFFSITE?: BackupOffsiteKind | undefined; GDRIVE_WEBHOOK_URL?: string | undefined; GDRIVE_SECRET_TOKEN?: string | undefined; BACKUP_ENCRYPTION_KEY?: string | undefined };
+
+/**
+ * The chosen off-site copy. Asked for by name, it must be complete (a ConfigError names what is
+ * missing). Chosen because only GDRIVE_WEBHOOK_URL is set (the cutover carries it over), a missing
+ * key does not stop the start: the webhook stays unset, production's daily copy fails with its
+ * alert and the go-live check names BACKUP_ENCRYPTION_KEY.
+ */
+function offsiteChoiceOf(file: OffsiteChoiceFile, rclone: OffsiteConfig | null): Pick<ServerConfig, "backupOffsiteKind" | "backupDriveWebhook"> {
+  const url = file.GDRIVE_WEBHOOK_URL;
+  const key = file.BACKUP_ENCRYPTION_KEY;
+  const kind = file.BACKUP_OFFSITE ?? (rclone !== null ? "rclone" : url !== undefined ? "drive_webhook" : null);
+  if (kind === "rclone" && rclone === null) throw new ConfigError(`config: missing or invalid ${BACKUP_OFFSITE_KEYS.join(", ")}`);
+  if (kind !== "drive_webhook") return { backupOffsiteKind: kind, backupDriveWebhook: null };
+  if (file.BACKUP_OFFSITE === "drive_webhook") {
+    const missing = [url === undefined ? "GDRIVE_WEBHOOK_URL" : null, key === undefined ? "BACKUP_ENCRYPTION_KEY" : null].filter((k) => k !== null);
+    if (missing.length > 0) throw new ConfigError(`config: missing or invalid ${missing.join(", ")}`);
+  }
+  return { backupOffsiteKind: kind, backupDriveWebhook: url !== undefined && key !== undefined ? { url, token: file.GDRIVE_SECRET_TOKEN ?? "" } : null };
+}
+
 /** An age X25519 public key (bech32): never a private key, which starts AGE-SECRET-KEY-. */
 const AGE_RECIPIENT = /^age1[02-9ac-hj-np-z]{58}$/;
 /** An rclone remote name and an optional folder, `gdrive:cashback-backups/prod`. */
@@ -235,6 +282,11 @@ function fileSchema(env: Environment) {
     BACKUP_RCLONE_PATH: z.string().refine(isAbsolute).optional(),
     BACKUP_RCLONE_REMOTE: z.string().regex(RCLONE_REMOTE).optional(),
     BACKUP_RCLONE_CONFIG: z.string().refine(isAbsolute).optional(),
+    BACKUP_OFFSITE: z.enum(BACKUP_OFFSITE_KINDS).optional(),
+    GDRIVE_WEBHOOK_URL: z.url({ protocol: /^https$/ }).optional(),
+    GDRIVE_SECRET_TOKEN: z.string().optional(),
+    BACKUP_ENCRYPTION_KEY: z.string().refine(isEncryptionKey).optional(),
+    ALLOW_PROD_BACKUP_OFFSITE: z.enum(["0", "1"]).optional(),
     PUBLIC_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
     HEARTBEAT_URL: z.url({ protocol: /^https$/ }).optional(),
     FALLBACK_CONTACT_URL: z.string().regex(FALLBACK_CONTACT_URL).optional(),
@@ -270,6 +322,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     throw new ConfigError(`config: missing or invalid ${keys.join(", ")}`);
   }
   const file = parsed.data;
+  const backupOffsite = backupOffsiteOf(file);
   return {
     env,
     publicPort: file.PUBLIC_PORT,
@@ -292,7 +345,10 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     zaloGroupIds: parseIdList(file.ZALO_GROUP_IDS),
     browserProfileDir: file.BROWSER_PROFILE_DIR ?? null,
     telegram: telegramOf(file),
-    backupOffsite: backupOffsiteOf(file),
+    backupOffsite,
+    ...offsiteChoiceOf(file, backupOffsite),
+    backupEncryptionKey: file.BACKUP_ENCRYPTION_KEY ?? null,
+    allowProdBackupOffsite: file.ALLOW_PROD_BACKUP_OFFSITE === "1",
     publicBaseUrl: file.PUBLIC_BASE_URL ?? null,
     heartbeatUrl: file.HEARTBEAT_URL ?? null,
     fallbackContactUrl: file.FALLBACK_CONTACT_URL ?? null,

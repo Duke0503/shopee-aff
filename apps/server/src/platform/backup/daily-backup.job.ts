@@ -10,6 +10,10 @@
  *    raises the high `backup_offsite_failed` alert and keeps the local archive; it never stops the
  *    server or a migration. Without an off-site configuration dev skips this step, while
  *    production counts it as failed, so a production with no off-site copy is never silent.
+ *    Where age and rclone are not installed, the Drive webhook (drive-webhook.adapter.ts, owner
+ *    decision 2026-11-03) encrypts and sends the archive instead; it cannot list or delete, so the
+ *    Drive folder's retention is the owner's, and an archive too large for it raises its own high
+ *    `backup_offsite_too_large` alert.
  *
  * Housekeeping never fails a run: before each run the 3 newest `.corrupt` archives are kept and
  * older ones removed, with work folders and `.age` files a stopped run left behind more than a day
@@ -28,6 +32,7 @@ import type { AlertPort } from "../ports/alert.port";
 import { BACKUP_ALERTS, backupStatusPath, readBackupStatus, writeBackupStatus, type BackupOutcome, type BackupStatus } from "./backup-status";
 import { ARCHIVE_SUFFIX, ENCRYPTED_SUFFIX, retainedArchives } from "./backup-retention";
 import { WORK_PREFIX, writeCheckedArchive, type CheckedArchiveOptions } from "./checked-archive";
+import type { DriveWebhookStore } from "./drive-webhook.adapter";
 import { OffsiteError, type OffsiteStore } from "./offsite.adapter";
 
 export const dailyBackupDir = (dataDir: string): string => join(dataDir, "backups", "daily");
@@ -40,7 +45,7 @@ export interface DailyBackupDeps {
   readonly logger: Pick<Logger, "info" | "warn" | "error">;
   readonly alerts: AlertPort;
   /** Null when the env file names no off-site copy. */
-  readonly offsite: OffsiteStore | null;
+  readonly offsite: OffsiteStore | DriveWebhookStore | null;
   /** Production: a missing off-site configuration is a failure, not a skip. */
   readonly offsiteRequired: boolean;
   readonly writeCopy?: CheckedArchiveOptions["writeCopy"];
@@ -121,6 +126,14 @@ async function copyOffsite(store: OffsiteStore, archive: string, name: string, s
   return [...drop];
 }
 
+/** Encrypts and sends through the Drive webhook; Drive retention is the owner's. */
+async function sendOffsite(store: DriveWebhookStore, archive: string, name: string, signal?: AbortSignal): Promise<string[]> {
+  await store.send(archive, store.remoteName(name), signal);
+  return [];
+}
+
+const isWebhook = (store: OffsiteStore | DriveWebhookStore): store is DriveWebhookStore => "kind" in store && store.kind === "drive_webhook";
+
 async function offsiteStep(deps: DailyBackupDeps, archive: string, name: string, signal?: AbortSignal): Promise<{ outcome: BackupOutcome; removed: string[]; step: string | null }> {
   if (deps.offsite === null) {
     if (!deps.offsiteRequired) return { outcome: "offsite_skipped", removed: [], step: null };
@@ -128,7 +141,8 @@ async function offsiteStep(deps: DailyBackupDeps, archive: string, name: string,
     return { outcome: "offsite_failed", removed: [], step: "not_configured" };
   }
   try {
-    const removed = await copyOffsite(deps.offsite, archive, name, signal);
+    const store = deps.offsite;
+    const removed = isWebhook(store) ? await sendOffsite(store, archive, name, signal) : await copyOffsite(store, archive, name, signal);
     deps.logger.info({ archive: name, removedOffsite: removed.length }, "platform.backup.offsite_copied");
     return { outcome: "ok", removed, step: null };
   } catch (error) {
@@ -171,6 +185,9 @@ async function runSteps(deps: DailyBackupDeps, signal?: AbortSignal): Promise<Da
   const removedLocal = pruneLocal(deps, dir);
   const offsite = await offsiteStep(deps, local.archive, name, signal);
   record(deps, { lastOutcome: offsite.outcome, failedStep: offsite.step, ...(offsite.outcome === "ok" ? { lastOffsiteAt: deps.clock.now() } : {}) });
-  if (offsite.outcome === "offsite_failed") deps.alerts.alert(BACKUP_ALERTS.offsite.kind, BACKUP_ALERTS.offsite.severity);
+  if (offsite.outcome === "offsite_failed") {
+    const alert = offsite.step === "too_large" ? BACKUP_ALERTS.offsiteTooLarge : BACKUP_ALERTS.offsite;
+    deps.alerts.alert(alert.kind, alert.severity);
+  }
   return { outcome: offsite.outcome, archive: local.archive, removedLocal, removedOffsite: offsite.removed };
 }

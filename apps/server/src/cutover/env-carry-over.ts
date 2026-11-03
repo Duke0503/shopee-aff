@@ -1,11 +1,12 @@
 /**
  * The values the new production env file takes over from the live system's `.env` at cutover
  * (Story 8.8, owner decisions of 2026-11-02): the Telegram bot and owner chat, the AccessTrade key,
- * the third party's product lookup key (ADDLIVETAG_API_KEY, in the live `C:\Project\mmo\.env`)
- * and the Zalo group ids. Each is copied only into a key the production file leaves unset or
+ * the third party's product lookup key (ADDLIVETAG_API_KEY, in the live `C:\Project\mmo\.env`),
+ * the Google Drive webhook the daily off-site backup posts to (GDRIVE_WEBHOOK_URL,
+ * GDRIVE_SECRET_TOKEN; owner decision 2026-11-03) and the Zalo group ids. Each is copied only into a key the production file leaves unset or
  * blank, never over a value already there, and the answer names keys only: a value is read from
  * one file and written to the other, never printed, logged or returned. The secrets carried
- * (TELEGRAM_BOT_TOKEN, ACCESSTRADE_API_KEY, ADDLIVETAG_API_KEY) are the only ones the preflight then
+ * (TELEGRAM_BOT_TOKEN, ACCESSTRADE_API_KEY, ADDLIVETAG_API_KEY and the two webhook keys) are the only ones the preflight then
  * accepts as shared with the live `.env` (D51 keeps every other secret new). The third party's key
  * was committed on `main` (the live default); the owner keeps it, so the preflight is run with
  * ADDLIVETAG_API_KEY in its accepted list and reports it as `committed_kept`.
@@ -28,13 +29,15 @@ export const CARRY_RULES: readonly CarryRule[] = [
   { key: "TELEGRAM_CHAT_ID", from: ["TELEGRAM_CHAT_ID"] },
   { key: "ACCESSTRADE_API_KEY", from: ["ACCESSTRADE_API_KEY"] },
   { key: "ADDLIVETAG_API_KEY", from: ["ADDLIVETAG_API_KEY"] },
+  { key: "GDRIVE_WEBHOOK_URL", from: ["GDRIVE_WEBHOOK_URL"] },
+  { key: "GDRIVE_SECRET_TOKEN", from: ["GDRIVE_SECRET_TOKEN"] },
   // The live bot listens to its main group (ZALO_LISTEN_GROUP_IDS or ZALO_MAIN_GROUP_ID); the Dev
   // group is kept so the owner's go-live test link can be sent there.
   { key: "ZALO_GROUP_IDS", from: ["ZALO_LISTEN_GROUP_IDS", "ZALO_MAIN_GROUP_ID", "ZALO_TEST_GROUP_ID"], union: true },
 ];
 
 /** The secrets the preflight accepts as shared with the live `.env`, because they are carried. */
-export const CARRIED_SECRET_KEYS = ["TELEGRAM_BOT_TOKEN", "ACCESSTRADE_API_KEY", "ADDLIVETAG_API_KEY"] as const;
+export const CARRIED_SECRET_KEYS = ["TELEGRAM_BOT_TOKEN", "ACCESSTRADE_API_KEY", "ADDLIVETAG_API_KEY", "GDRIVE_WEBHOOK_URL", "GDRIVE_SECRET_TOKEN"] as const;
 
 export interface CarryPlan {
   /** Keys written now from the live `.env`. */

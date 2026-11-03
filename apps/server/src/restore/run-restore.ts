@@ -3,19 +3,23 @@
  * named on the command line, never taken from a default, so a drill on a dev machine cannot touch
  * production by accident; the env file's isolation check runs as at every start.
  *
- *   pnpm restore:ledger -- --env dev --archive <decrypted .tar> [--replace]
+ *   pnpm restore:ledger -- --env dev --archive <.tar | .tar.enc> [--key-file <file>] [--replace]
  *   pnpm restore:drill-record -- --env prod --at <ISO instant> --minutes <n> --result pass|fail [--archive <name>]
  *
- * `restore:ledger` runs restore-ledger.ts and prints one JSON line with the outcome and the
+ * A `.tar.enc` copy from the Google Drive webhook is decrypted with the key in `--key-file` (a file
+ * holding the base64 key, so it never appears on a command line), else with BACKUP_ENCRYPTION_KEY
+ * from the named environment's env file. `restore:ledger` runs restore-ledger.ts and prints one JSON line with the outcome and the
  * restored balance totals; exit 0 only when the restore passed every check. `restore:drill-record`
  * writes the drill record the Overview health line reads (restore-drill.ts) into the named
  * environment's data folder and prints the row to add to the runbook's drill log.
  */
+import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { parseArgs } from "node:util";
 import { parseInstant, systemClock, toMs, type Instant } from "@cashback/core";
 
 import { balanceTotals } from "../modules/payouts/index";
+import { parseEncryptionKey } from "../platform/backup/archive-cipher";
 import { DRILL_RESULTS, drillRecordPath, writeDrillRecord, type DrillResult } from "../platform/backup/restore-drill";
 import { ConfigError, ENVIRONMENTS, loadConfigFor, type Environment } from "../platform/config/env.config";
 import { restoreLedger } from "./restore-ledger";
@@ -33,12 +37,14 @@ function instantOrNull(text: string | undefined): Instant | null {
 }
 
 async function ledgerCommand(args: string[]): Promise<{ outcome: Outcome; code: number }> {
-  const { values } = parseArgs({ args, options: { env: { type: "string" }, archive: { type: "string" }, replace: { type: "boolean", default: false } } });
+  const { values } = parseArgs({ args, options: { env: { type: "string" }, archive: { type: "string" }, "key-file": { type: "string" }, replace: { type: "boolean", default: false } } });
   const env = environmentOf(values.env);
-  if (env === null || values.archive === undefined) return { outcome: { event: "platform.restore.refused", reason: "usage", usage: "--env dev|prod --archive <file.tar> [--replace]" }, code: 1 };
+  if (env === null || values.archive === undefined) return { outcome: { event: "platform.restore.refused", reason: "usage", usage: "--env dev|prod --archive <file.tar|file.tar.enc> [--key-file <file>] [--replace]" }, code: 1 };
   const config = loadConfigFor(env);
+  const keyFile = values["key-file"];
+  const decryptionKey = parseEncryptionKey(keyFile === undefined ? config.backupEncryptionKey : readFileSync(keyFile, "utf8"));
   const started = toMs(systemClock.now());
-  const result = await restoreLedger({ archive: values.archive, dataDir: config.dataDir, clock: systemClock, replace: values.replace, totals: balanceTotals });
+  const result = await restoreLedger({ archive: values.archive, dataDir: config.dataDir, clock: systemClock, replace: values.replace, totals: balanceTotals, decryptionKey });
   const seconds = Math.floor((toMs(systemClock.now()) - started) / 1000);
   if (!result.ok) return { outcome: { event: result.rolledBack ? "platform.restore.rolled_back" : "platform.restore.refused", env, reason: result.refusal, problems: result.problems, ...(result.rolledBack ? { rolledBack: result.rolledBack } : {}), seconds }, code: 1 };
   return { outcome: { event: "platform.restore.done", env, ledger: result.ledger, files: result.files, totals: result.totals, movedAside: result.movedAside, backupCreatedAt: result.backupCreatedAt, seconds }, code: 0 };

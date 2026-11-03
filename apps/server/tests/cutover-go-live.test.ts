@@ -225,7 +225,7 @@ describe("Story 8.8: carry-over and preflight never print a secret", () => {
     writeFileSync(live, LIVE);
     writeFileSync(prod, "INTERNAL_TOKEN=prod-internal-value-cccccccccccccccc\nTELEGRAM_CHAT_ID=-1000000000009\nACCESSTRADE_API_KEY=\n");
     const answer = carryOverStep(live, prod, { PUBLIC_PORT: "80" }, false);
-    expect(answer.line).toEqual({ step: "carry-over", written: true, carried: ["TELEGRAM_BOT_TOKEN", "ACCESSTRADE_API_KEY", "ZALO_GROUP_IDS"], already: [], kept: ["TELEGRAM_CHAT_ID"], missing: ["ADDLIVETAG_API_KEY"], fixed: ["PUBLIC_PORT"] });
+    expect(answer.line).toEqual({ step: "carry-over", written: true, carried: ["TELEGRAM_BOT_TOKEN", "ACCESSTRADE_API_KEY", "ZALO_GROUP_IDS"], already: [], kept: ["TELEGRAM_CHAT_ID"], missing: ["ADDLIVETAG_API_KEY", "GDRIVE_WEBHOOK_URL", "GDRIVE_SECRET_TOKEN"], fixed: ["PUBLIC_PORT"] });
     const printed = JSON.stringify(answer.line);
     for (const value of ["live-telegram-value", "live-accesstrade-value", "prod-internal-value", "-1000000000001"]) expect(printed).not.toContain(value);
     const text = readFileSync(prod, "utf8");

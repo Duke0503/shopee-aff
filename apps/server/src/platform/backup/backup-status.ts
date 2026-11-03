@@ -37,6 +37,8 @@ export const BACKUP_STALE_AFTER_MS = 26 * 3_600_000;
 export const BACKUP_ALERTS = {
   local: { kind: "backup_failed", severity: "high" },
   offsite: { kind: "backup_offsite_failed", severity: "high" },
+  /** The Drive webhook cannot take an archive this large; the local copy is kept. */
+  offsiteTooLarge: { kind: "backup_offsite_too_large", severity: "high" },
 } as const;
 
 export type BackupAlert = (typeof BACKUP_ALERTS)[keyof typeof BACKUP_ALERTS];

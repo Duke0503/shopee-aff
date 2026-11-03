@@ -5,7 +5,8 @@
  * Dev group, a production Telegram chat or host name, a public base URL (dev has no tunnel), or a
  * secret or the off-site backup folder (Story 8.2) shared with the production env file on the
  * same machine (the external heartbeat URL included, Story 8.4: a dev ping would keep production's
- * check green), or when the dev env file is the
+ * check green; the Google Drive backup webhook and the backup encryption key too, unless
+ * ALLOW_PROD_BACKUP_OFFSITE=1 allows them on purpose), or when the dev env file is the
  * production env file itself. Production is refused when it would run a fake bridge or a fake
  * Zalo client. In every environment the real browser bridge needs its own token (Story 5.3),
  * different from the internal and the assistant tokens.
@@ -56,6 +57,12 @@ export interface IsolationSubject {
   readonly telegram: { readonly botToken: string; readonly chatId: string } | null;
   /** The off-site backup folder (Story 8.2); dev never writes into production's. */
   readonly backupOffsite?: { readonly rcloneRemote: string } | null;
+  /** The Google Drive backup webhook (owner decision 2026-11-03); dev never posts to production's unless allowed. */
+  readonly backupDriveWebhook?: { readonly url: string } | null;
+  /** BACKUP_ENCRYPTION_KEY; dev never shares production's unless allowed. */
+  readonly backupEncryptionKey?: string | null;
+  /** ALLOW_PROD_BACKUP_OFFSITE=1: dev may use production's webhook and key (a drill with production archives). */
+  readonly allowProdBackupOffsite?: boolean;
   readonly publicBaseUrl: string | null;
   /** The external heartbeat URL (Story 8.4); dev never pings production's check. */
   readonly heartbeatUrl?: string | null;
@@ -158,7 +165,7 @@ function sameUrl(one: string, other: string): boolean {
 }
 
 /** Secrets compared with the production env file's values; equal means a copied secret. */
-type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY" | "ADDLIVETAG_API_KEY";
+type SharedSecretKey = "INTERNAL_TOKEN" | "ASSISTANT_TOKEN" | "BRIDGE_TOKEN" | "TELEGRAM_BOT_TOKEN" | "ACCESS_AUDIENCE" | "FINGERPRINT_KEY" | "ACCESSTRADE_API_KEY" | "ADDLIVETAG_API_KEY" | "BACKUP_ENCRYPTION_KEY";
 
 function secretsOf(config: IsolationSubject): Record<SharedSecretKey, string | null> {
   return {
@@ -173,6 +180,8 @@ function secretsOf(config: IsolationSubject): Record<SharedSecretKey, string | n
     ACCESSTRADE_API_KEY: config.allowProdAccesstradeKey ? null : config.accesstradeApiKey,
     // The third party's key spends production's quota with that provider; shared only on purpose.
     ADDLIVETAG_API_KEY: config.allowProdAddlivetagKey === true ? null : (config.addlivetagApiKey ?? null),
+    // Production's backup key in dev would let dev write copies that look like production's.
+    BACKUP_ENCRYPTION_KEY: config.allowProdBackupOffsite === true ? null : (config.backupEncryptionKey ?? null),
   };
 }
 
@@ -224,6 +233,9 @@ export function isolationProblems(config: IsolationSubject, context: IsolationCo
     if (heartbeat !== null && prodHeartbeat !== null && sameUrl(heartbeat, prodHeartbeat)) out.push({ key: "HEARTBEAT_URL", reason: "same_as_production" });
     const remote = config.backupOffsite?.rcloneRemote ?? null;
     if (remote !== null && blank(prod["BACKUP_RCLONE_REMOTE"])?.replace(/\/+$/, "") === remote.replace(/\/+$/, "")) out.push({ key: "BACKUP_RCLONE_REMOTE", reason: "same_as_production" });
+    const webhook = config.allowProdBackupOffsite === true ? null : (config.backupDriveWebhook?.url ?? null);
+    const prodWebhook = blank(prod["GDRIVE_WEBHOOK_URL"]);
+    if (webhook !== null && prodWebhook !== null && sameUrl(webhook, prodWebhook)) out.push({ key: "GDRIVE_WEBHOOK_URL", reason: "same_as_production" });
   }
   return out;
 }
@@ -236,6 +248,10 @@ export function isolationWarnings(config: IsolationSubject, context: IsolationCo
   const out: string[] = [];
   if (shared("ACCESSTRADE_API_KEY", config.allowProdAccesstradeKey, config.accesstradeApiKey)) out.push("ACCESSTRADE_API_KEY shared_with_production");
   if (shared("ADDLIVETAG_API_KEY", config.allowProdAddlivetagKey === true, config.addlivetagApiKey ?? null)) out.push("ADDLIVETAG_API_KEY shared_with_production");
+  if (shared("BACKUP_ENCRYPTION_KEY", config.allowProdBackupOffsite === true, config.backupEncryptionKey ?? null)) out.push("BACKUP_ENCRYPTION_KEY shared_with_production");
+  const webhook = config.backupDriveWebhook?.url ?? null;
+  const prodWebhook = blank(prod["GDRIVE_WEBHOOK_URL"]);
+  if (config.allowProdBackupOffsite === true && webhook !== null && prodWebhook !== null && sameUrl(webhook, prodWebhook)) out.push("GDRIVE_WEBHOOK_URL shared_with_production");
   return out;
 }
 

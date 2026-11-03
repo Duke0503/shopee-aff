@@ -215,6 +215,7 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `assistant_session_conflict` | adapted (notify_zalo_websocket_conflict: details and step 1 name the new assistant; no reconnect count) | Zalo Bot Tranh Chấp WebSocket / Văng Kết Nối |
 | `backup_failed` | new-only, in the report_bug format | Sao Lưu Hằng Ngày Thất Bại |
 | `backup_offsite_failed` | new-only, in the report_bug format | Không Chép Được Bản Sao Lưu Lên Google Drive |
+| `backup_offsite_too_large` | new-only, in the report_bug format | Bản Sao Lưu Quá Lớn Để Gửi Lên Google Drive |
 | `bridge_captcha` | identical (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
 | `bridge_login_lost` | identical (notify_shopee_session_expired) | Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất |
 | `bridge_page_error` | new-only, in the report_bug format | Trang Shopee Báo Lỗi Khi Tạo Link |

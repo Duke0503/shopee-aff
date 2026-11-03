@@ -18,7 +18,9 @@ import { balanceTotals } from "../modules/payouts/index";
 import { backupHealth, backupStatusPath, readBackupStatus, type BackupHealth } from "../platform/backup/backup-status";
 import { runDailyBackup, type DailyBackupDeps } from "../platform/backup/daily-backup.job";
 import { lastDrillOf } from "../platform/backup/restore-drill";
-import { offsiteStore, type RunExecutable } from "../platform/backup/offsite.adapter";
+import { parseEncryptionKey } from "../platform/backup/archive-cipher";
+import { driveWebhookStore, type DriveWebhookStore, type WebhookPost } from "../platform/backup/drive-webhook.adapter";
+import { offsiteStore, type OffsiteStore, type RunExecutable } from "../platform/backup/offsite.adapter";
 import type { ServerConfig } from "../platform/config/env.config";
 import type { Ledger } from "../platform/db/ledger";
 import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
@@ -26,7 +28,8 @@ import type { Job } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
 import type { AlertPort } from "../platform/ports/alert.port";
 
-export type OwnerJobsConfig = Pick<ServerConfig, "env" | "dataDir" | "telegram" | "backupOffsite" | "assistantToken"> & Partial<Pick<ServerConfig, "heartbeatUrl">>;
+export type OwnerJobsConfig = Pick<ServerConfig, "env" | "dataDir" | "telegram" | "backupOffsite" | "assistantToken"> &
+  Partial<Pick<ServerConfig, "heartbeatUrl" | "backupOffsiteKind" | "backupDriveWebhook" | "backupEncryptionKey">>;
 
 export interface OwnerJobsDeps {
   readonly config: OwnerJobsConfig;
@@ -38,6 +41,10 @@ export interface OwnerJobsDeps {
   readonly health: HealthSources;
   /** Tests replace the age and rclone runner. */
   readonly run?: RunExecutable;
+  /** Tests replace the Google Drive webhook's HTTP call. */
+  readonly post?: WebhookPost;
+  /** Tests shorten the webhook's pause before its retry. */
+  readonly webhookRetryDelayMs?: number;
   /** Tests replace the heartbeat's HTTP call. */
   readonly ping?: PingFetch;
 }
@@ -53,6 +60,22 @@ export function healthSourcesFor(config: OwnerJobsConfig, heartbeats: AssistantH
   return { ...(config.assistantToken !== null ? { assistant: (now) => heartbeats.liveness(now) } : {}), backup: lastBackupOf(config.dataDir), drill: lastDrillOf(config.dataDir) };
 }
 
+/** The chosen off-site copy, or null: the webhook only with a valid key, so nothing leaves unencrypted. */
+function offsiteFor(deps: OwnerJobsDeps): OffsiteStore | DriveWebhookStore | null {
+  const { config } = deps;
+  const kind = config.backupOffsiteKind ?? (config.backupOffsite !== null ? "rclone" : null);
+  if (kind === "rclone") return config.backupOffsite === null ? null : offsiteStore(config.backupOffsite, deps.run);
+  const key = parseEncryptionKey(config.backupEncryptionKey);
+  if (kind !== "drive_webhook" || !config.backupDriveWebhook || key === null) return null;
+  return driveWebhookStore(config.backupDriveWebhook, {
+    env: config.env,
+    key,
+    ...(deps.post ? { post: deps.post } : {}),
+    ...(deps.webhookRetryDelayMs !== undefined ? { retryDelayMs: deps.webhookRetryDelayMs } : {}),
+    onRetry: (failed) => deps.logger.warn({ step: failed.step, code: failed.code }, "platform.backup.offsite_retry"),
+  });
+}
+
 export function dailyBackupDeps(deps: OwnerJobsDeps, alerts: AlertPort): DailyBackupDeps {
   const { config } = deps;
   return {
@@ -61,7 +84,7 @@ export function dailyBackupDeps(deps: OwnerJobsDeps, alerts: AlertPort): DailyBa
     clock: deps.clock,
     logger: deps.logger,
     alerts,
-    offsite: config.backupOffsite === null ? null : offsiteStore(config.backupOffsite, deps.run),
+    offsite: offsiteFor(deps),
     offsiteRequired: config.env === "prod",
     // Read the moment the copy is taken; a restore checks the restored ledger against them (Story 8.6).
     totals: (copied) => balanceTotals(copied.db),

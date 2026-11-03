@@ -7,8 +7,10 @@
  * 2. no `-wal`, `-shm` or `-journal` file may sit beside the ledger: newer WAL frames would replay
  *    over the restored file, so the command refuses and the runbook has the owner delete them;
  * 3. an existing ledger is replaced only when asked (`--replace`), and is moved aside, never deleted;
- * 4. the archive (already decrypted with age by the owner) is extracted into a work folder inside
- *    the data folder and must hold its manifest; the ledger's SHA-256, `integrity_check`, the row
+ * 4. the archive is extracted into a work folder inside
+ *    the data folder and must hold its manifest (a `.tar.enc` copy from the Google Drive webhook is
+ *    first decrypted there with BACKUP_ENCRYPTION_KEY; an age file must be decrypted with age by
+ *    the owner first, as before); the ledger's SHA-256, `integrity_check`, the row
  *    counts and the balance totals must all equal what the manifest recorded at backup time;
  * 5. only then the ledger and the proof images are moved into place, and `integrity_check` runs
  *    once more on the file the server will open. If that check (or a move) fails, everything is
@@ -20,12 +22,13 @@
  * the money is checked with the same arithmetic every screen uses. Secrets and the cloudflared
  * credentials are never in an archive; the runbook rebuilds them from the password manager.
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Clock } from "@cashback/core";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 
+import { ArchiveCipherError, decryptArchive, isEncryptedArchive } from "../platform/backup/archive-cipher";
 import { extractArchive } from "../platform/backup/backup-archive";
 import { figureMismatches, MANIFEST_ENTRY, parseManifest, sha256OfFile, type BackupManifest } from "../platform/backup/backup-manifest";
 import { FILES_ENTRY, LEDGER_ENTRY } from "../platform/backup/checked-archive";
@@ -38,6 +41,9 @@ export type RestoreRefusal =
   | "side_files_present"
   | "ledger_exists"
   | "archive_unreadable"
+  | "age_encrypted"
+  | "key_missing"
+  | "decrypt_failed"
   | "no_manifest"
   | "ledger_hash_differs"
   | "integrity_failed"
@@ -71,8 +77,10 @@ export interface RolledBack {
 }
 
 export interface RestoreOptions {
-  /** The decrypted archive (`<name>.tar`). */
+  /** The archive: a plain `<name>.tar`, or a `.tar.enc` copy from the Google Drive webhook. */
   readonly archive: string;
+  /** BACKUP_ENCRYPTION_KEY's 32 bytes, needed only for a `.tar.enc` copy. */
+  readonly decryptionKey?: Buffer | null;
   readonly dataDir: string;
   readonly clock: Clock;
   /** Replace an existing ledger (moved aside first). */
@@ -168,6 +176,38 @@ function rollBack(moves: readonly Move[], stamp: string): RolledBack {
   return { complete: stuck.length === 0, putBack, failed, stuck };
 }
 
+const AGE_HEADER = Buffer.from("age-encryption.org/", "ascii");
+
+function headOf(path: string): Buffer {
+  const fd = openSync(path, "r");
+  try {
+    const head = Buffer.alloc(32);
+    return head.subarray(0, readSync(fd, head, 0, head.length, 0));
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** The plain tar to extract: the archive itself, or its decryption written into `work`. */
+function plainArchive(options: RestoreOptions, work: string): string | RestoreResult {
+  let head: Buffer;
+  try {
+    head = headOf(options.archive);
+  } catch (error) {
+    return refuse("archive_unreadable", [messageOf(error)]);
+  }
+  if (head.subarray(0, AGE_HEADER.length).equals(AGE_HEADER)) return refuse("age_encrypted", ["decrypt the file with age first (restore runbook)"]);
+  if (!isEncryptedArchive(head)) return options.archive;
+  if (!options.decryptionKey) return refuse("key_missing", ["BACKUP_ENCRYPTION_KEY is not set or not valid: set it, or pass --key-file"]);
+  const plain = join(work, ".decrypted.tar");
+  try {
+    writeFileSync(plain, decryptArchive(readFileSync(options.archive), options.decryptionKey));
+  } catch (error) {
+    return refuse("decrypt_failed", [error instanceof ArchiveCipherError ? error.reason : messageOf(error)]);
+  }
+  return plain;
+}
+
 async function restoreLocked(options: RestoreOptions, ledgerPath: string): Promise<RestoreResult> {
   const present = sideFiles(ledgerPath).filter((file) => existsSync(file));
   if (present.length > 0) return refuse("side_files_present", present.map((file) => basename(file)));
@@ -176,10 +216,14 @@ async function restoreLocked(options: RestoreOptions, ledgerPath: string): Promi
   mkdirSync(backups, { recursive: true });
   const work = mkdtempSync(join(backups, ".restore-"));
   try {
+    const archive = plainArchive(options, work);
+    if (typeof archive !== "string") return archive;
     try {
-      await extractArchive(options.archive, work);
+      await extractArchive(archive, work);
     } catch (error) {
       return refuse("archive_unreadable", [messageOf(error)]);
+    } finally {
+      if (archive !== options.archive) rmSync(archive, { force: true });
     }
     const checked = await checkExtracted(work, options);
     if ("ok" in checked) return checked;

@@ -62,7 +62,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 | `ADMIN_HOST`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUDIENCE` | from section 5.2 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `backup-and-alerts-runbook.md` section 1.3 |
 | `HEARTBEAT_URL` | from section 3 |
-| `BACKUP_*` | `backup-and-alerts-runbook.md` section 1.4 |
+| `BACKUP_*` | `backup-and-alerts-runbook.md` section 1.4 (age and rclone) |
+| `BACKUP_OFFSITE`, `GDRIVE_WEBHOOK_URL`, `GDRIVE_SECRET_TOKEN`, `BACKUP_ENCRYPTION_KEY` | `backup-and-alerts-runbook.md` section 1.5 (the Drive webhook, production since 2026-11-03) |
 | `BROWSER_PROFILE_DIR` | `C:\Project\cashback\.browser-profile\prod` |
 | `ZALO_GROUP_IDS`, `ZALO_ASSISTANT_URL`, `FALLBACK_CONTACT_URL`, `ACCESSTRADE_API_KEY` | as in `dev-environment.md`, production values |
 | `ADDLIVETAG_API_KEY` | the third party's product lookup key, carried over from the live `C:\Project\mmo\.env` at cutover (`go-live-runbook.md`); leave `THIRD_PARTY_LOOKUP` unset (on in production when the key is set) or set `off` to use the Shopee pages alone |

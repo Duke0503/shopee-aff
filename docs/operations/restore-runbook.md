@@ -10,15 +10,23 @@ failed, or it is more than 92 days old.
 
 ## 1. What you need
 
+Production copies come in one of two forms (`backup-and-alerts-runbook.md` section 1):
+`cashback-prod-<date>-<HHMM>.tar.enc` from the Google Drive webhook (production since the owner's
+decision of 2026-11-03), or `<instant>-daily.tar.age` from age and rclone. A local
+`<instant>-daily.tar` in `data\prod\backups\daily\` is not encrypted and restores as it is.
+
 From the password manager, never from a backup (secrets are never in one):
 
-- the age private key file `cashback-backup-key.txt` (its public key is `BACKUP_AGE_RECIPIENT`);
-- the Google account of the Drive folder, to authorise rclone (`rclone config` or the Drive web page);
+- for a `.tar.enc` copy: the entry "cashback backup encryption key", the value of
+  `BACKUP_ENCRYPTION_KEY` (44 base64 characters). Without it no `.tar.enc` copy can be read;
+- for a `.age` copy: the age private key file `cashback-backup-key.txt` (its public key is
+  `BACKUP_AGE_RECIPIENT`);
+- the Google account of the Drive folder, to download the copy (the Drive web page, or rclone);
 - for a real restore of production only: every value of `prod.env`, the cloudflared tunnel token,
   the Shopee Affiliate sign-in and the Zalo bot account's phone.
 
 On the machine: the repository built (`production-host-runbook.md` section 2.1), `age` and
-`rclone`, and the env file of the environment you restore into (`prod.env` for production,
+`rclone` only for a `.age` copy, and the env file of the environment you restore into (`prod.env` for production,
 `dev.env` for a drill on a dev machine).
 
 ## 2. Restore steps, in this order
@@ -39,26 +47,42 @@ Write down the start time first; the drill log needs the duration.
    The restore command checks for them first and refuses (`side_files_present`) while
    `ledger.sqlite-wal`, `ledger.sqlite-shm` or `ledger.sqlite-journal` exists. The old
    `ledger.sqlite` itself is kept: the command moves it aside.
-3. **Download the newest archive** from Google Drive:
+3. **Download the newest copy** from Google Drive.
+   - `.tar.enc` (Drive webhook): open drive.google.com with the owner's account, open the Apps
+     Script's backup folder, sort by name or by "Last modified", right-click the newest
+     `cashback-prod-<date>-<HHMM>.tar.enc` and choose Download; move it to `C:\restore\`. When the
+     same name is there twice (a retried upload), either file will do: the restore checks it.
+   - `.tar.age` (age and rclone):
 
-   ```powershell
-   rclone lsf gdrive:cashback-backups/prod
-   rclone copy gdrive:cashback-backups/prod/<name>-daily.tar.age C:\restore\
-   ```
+     ```powershell
+     rclone lsf gdrive:cashback-backups/prod
+     rclone copy gdrive:cashback-backups/prod/<name>-daily.tar.age C:\restore\
+     ```
 
-4. **Decrypt it** with the private key, then delete the key file from this machine:
+4. **Decrypt.**
+   - `.tar.enc`: nothing to do by hand; the restore command decrypts it (step 5). The key comes
+     from `BACKUP_ENCRYPTION_KEY` in the env file of `--env`, or from `--key-file <file>`: a text
+     file holding only the key, pasted from the password manager (on a dev machine, where `dev.env`
+     must not hold production's key). Delete that file after the restore. A wrong key or a damaged
+     download is refused as `decrypt_failed`; nothing is written.
+   - `.tar.age`: decrypt with the private key, then delete the key file from this machine:
 
-   ```powershell
-   age --decrypt -i cashback-backup-key.txt -o C:\restore\backup.tar C:\restore\<name>-daily.tar.age
-   ```
+     ```powershell
+     age --decrypt -i cashback-backup-key.txt -o C:\restore\backup.tar C:\restore\<name>-daily.tar.age
+     ```
 
 5. **Restore**, from the repository folder:
 
    ```powershell
+   pnpm --filter @cashback/server restore:ledger -- --env prod --archive C:\restore\cashback-prod-<date>-<HHMM>.tar.enc --replace
+   pnpm --filter @cashback/server restore:ledger -- --env dev --archive C:\restore\cashback-prod-<date>-<HHMM>.tar.enc --key-file C:\restore\key.txt
    pnpm --filter @cashback/server restore:ledger -- --env prod --archive C:\restore\backup.tar --replace
    ```
 
-   (A drill on a dev machine: `--env dev`; leave out `--replace` when `data\dev\` has no ledger.)
+   (The first line restores production from a Drive webhook copy, the second is a drill on a dev
+   machine, the third restores a decrypted age copy or a local archive. Leave out `--replace` when
+   the data folder has no ledger.) The decrypted archive exists only inside the command's work
+   folder and is deleted when it ends.
    The command takes the server lock (a running server refuses it), extracts the archive inside
    the data folder, and checks the ledger's SHA-256, `integrity_check`, every table's row count
    and the balance totals (customers, gross, payable, waiting, paid, deducted next) against the
@@ -73,6 +97,9 @@ Write down the start time first; the drill log needs the duration.
    | `side_files_present` | step 2 again for the files it names |
    | `ledger_exists` | add `--replace` (the old ledger is moved aside, not deleted) |
    | `archive_unreadable`, `no_manifest` | the wrong file or a broken download: step 3 again, or the previous day's archive |
+   | `key_missing` | a `.tar.enc` copy and no valid key: set `BACKUP_ENCRYPTION_KEY` or pass `--key-file` |
+   | `decrypt_failed` | the wrong key (an older key, if it was ever changed) or a damaged download: check the key, download again |
+   | `age_encrypted` | a `.age` copy: decrypt it with age first (step 4) |
    | `ledger_hash_differs`, `integrity_failed`, `row_counts_differ`, `balances_differ` | this archive is not trustworthy: take the previous day's archive and start again at step 3; report it |
    | `balances_unreadable` | the archive is older than the code's schema: restore it with the commit of its date, or take a newer archive |
    | `platform.restore.rolled_back` (`integrity_failed` or `place_failed` after the swap) | nothing was lost: the previous ledger and `files\` are back under their own names (`rolledBack.putBack`), the restored copies kept as `*.failed-restore-<time>` (`rolledBack.failed`). If `rolledBack.complete` is false, do each move in `rolledBack.stuck` by hand before starting. Then take the previous day's archive |
@@ -83,7 +110,9 @@ Write down the start time first; the drill log needs the duration.
 7. **Check**: the Overview opens; the Payouts total to pay equals `totals.payable` from step 5;
    three customers' balances on the desk equal what they were at backup time.
 8. **Real restore on a new machine only: rebuild what is never backed up**, from the password
-   manager: `prod.env` (`production-host-runbook.md` section 2.2), `rclone.conf`
+   manager: `prod.env` (`production-host-runbook.md` section 2.2; `BACKUP_ENCRYPTION_KEY`,
+   `GDRIVE_WEBHOOK_URL` and `GDRIVE_SECRET_TOKEN` included, so the next daily copy goes to Drive),
+   `rclone.conf` when age and rclone are used
    (`rclone config reconnect gdrive:`), the cloudflared service (`cloudflared service install
    <tunnel token>`), the affiliate Edge sign-in (section 2.4 there) and the Zalo session (scan the
    QR code with the bot account's phone). Then the go-live checklist of that runbook, section 9.

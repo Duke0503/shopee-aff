@@ -7,7 +7,8 @@
  *
  * A failure names the tool, the step and the exit code; the tools' own output is not logged,
  * because rclone may print the remote's address. Tests pass a fake runner, so no test reaches
- * Google Drive.
+ * Google Drive. Where age and rclone are not installed, the Drive webhook copy
+ * (drive-webhook.adapter.ts, owner decision 2026-11-03) takes their place.
  */
 import { spawn } from "node:child_process";
 
@@ -40,14 +41,17 @@ export interface OffsiteStore {
   remove(name: string, signal?: AbortSignal): Promise<void>;
 }
 
-export type OffsiteStep = "encrypt" | "upload" | "list" | "remove";
+/** `send`, `response` and `too_large` are the Drive webhook's steps (drive-webhook.adapter.ts). */
+export type OffsiteStep = "encrypt" | "upload" | "list" | "remove" | "send" | "response" | "too_large";
 
 export class OffsiteError extends Error {
   constructor(
     readonly step: OffsiteStep,
+    /** The tool's exit code, or the webhook's HTTP status; null when it did not finish. */
     readonly code: number | null,
+    unit: "exit code" | "status" = "exit code",
   ) {
-    super(`off-site ${step} failed${code === null ? " (did not finish)" : ` (exit code ${code})`}`);
+    super(`off-site ${step} failed${code === null ? " (did not finish)" : ` (${unit} ${code})`}`);
     this.name = "OffsiteError";
   }
 }
