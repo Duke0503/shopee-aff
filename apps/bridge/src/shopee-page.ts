@@ -12,6 +12,12 @@ import { hostOnDomain, SHOPEE_LINK_DOMAINS } from "@cashback/core";
 export const CUSTOM_LINK_URL = "https://affiliate.shopee.vn/offer/custom_link";
 /** The tab list query that finds the bridge tab again after a restart. */
 export const AFFILIATE_TAB_PATTERN = "https://affiliate.shopee.vn/*";
+/**
+ * The sites a job takes the bridge tab to (the affiliate site, the storefront for a lookup, short
+ * links, ShopeeFood, and Shopee's login and verification pages): a pinned tab on one of them is the
+ * bridge's, whatever page the last job left it on.
+ */
+export const BRIDGE_TAB_SITE = /^https:\/\/([a-z0-9-]+\.)*(shopee\.vn|shopeefood\.vn|shope\.ee|shp\.ee)(\/|$)/;
 
 export const SOURCE_TEXTAREA = ".custom-textarea > textarea";
 export const SUB_ID_FIELDS = [1, 2, 3, 4, 5].map((n) => `#customLink_sub_id${n}`);

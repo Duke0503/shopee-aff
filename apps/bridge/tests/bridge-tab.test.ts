@@ -8,7 +8,7 @@ import { instantFromMs } from "@cashback/core";
 import { describe, expect, it } from "vitest";
 
 import { bridgeService, KEEPALIVE_ALARM, KEEPALIVE_MINUTES } from "../src/bridge-service";
-import { Blocked, chromePageDriver, REPLACE_TAB_EVERY_MS, SCRIPT_ANSWER_MS } from "../src/bridge-tab";
+import { Blocked, chromePageDriver, REPLACE_TAB_EVERY_MS, SCRIPT_ANSWER_MS, TAB_ID_KEY } from "../src/bridge-tab";
 import { runLinkJob } from "../src/link-job";
 import { readPage } from "../src/page-scripts";
 import { runReportJob } from "../src/report-job";
@@ -43,6 +43,43 @@ describe("Story 5.3 AC5: the bridge tab is kept alive", () => {
     chrome.openTabs = [];
     await page.prepare();
     expect(chrome.created).toHaveLength(1);
+  });
+});
+
+describe("fix(bridge): one tab, also after the worker restarts on a storefront page", () => {
+  it("a restarted worker finds its tab by the stored id even when a lookup left it on shopee.vn, and opens no other", async () => {
+    const chrome = fakeChrome();
+    await chromePageDriver(chrome, recordingWait()).prepare();
+    expect(chrome.store[TAB_ID_KEY]).toBe(101);
+    chrome.openTabs[0] = { ...chrome.openTabs[0], url: "https://shopee.vn/product/1/2" };
+    const restarted = chromePageDriver(chrome, recordingWait());
+    await restarted.prepare();
+    expect(restarted.tabId()).toBe(101);
+    expect(chrome.created).toHaveLength(1);
+  });
+
+  it("without a stored id takes a pinned Shopee tab, and closes the other pinned Shopee tabs but never an unpinned one", async () => {
+    const chrome = fakeChrome([
+      { id: 3, url: "https://shopee.vn/product/1/2", pinned: true },
+      { id: 4, url: "https://affiliate.shopee.vn/offer/custom_link", pinned: true },
+      { id: 5, url: "https://shopee.vn/verify/traffic", pinned: true },
+      { id: 6, url: "https://affiliate.shopee.vn/report", pinned: false },
+      { id: 7, url: "https://mail.example.com/", pinned: true },
+    ]);
+    const page = chromePageDriver(chrome, recordingWait());
+    await page.prepare();
+    expect(page.tabId()).toBe(3);
+    expect(chrome.created).toEqual([]);
+    expect(chrome.removed).toEqual([4, 5]);
+    expect(chrome.openTabs.map((t) => t.id)).toEqual([3, 6, 7]);
+  });
+
+  it("a stored id that now belongs to a tab off Shopee (ids restart with the browser) is not taken", async () => {
+    const chrome = fakeChrome([{ id: 3, url: "https://mail.example.com/", pinned: true }], { [TAB_ID_KEY]: 3 });
+    const page = chromePageDriver(chrome, recordingWait());
+    await page.prepare();
+    expect(page.tabId()).toBe(101);
+    expect(chrome.removed).toEqual([]);
   });
 });
 

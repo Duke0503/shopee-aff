@@ -9,6 +9,7 @@ export interface ChromeTab {
   readonly url?: string;
   readonly status?: string;
   readonly discarded?: boolean;
+  readonly pinned?: boolean;
 }
 
 export interface ChromeEvent<A extends unknown[]> {
@@ -21,7 +22,7 @@ export interface InjectionResult<R> {
 
 export interface ChromeApi {
   readonly tabs: {
-    query(query: { url: string }): Promise<ChromeTab[]>;
+    query(query: { url?: string; pinned?: boolean }): Promise<ChromeTab[]>;
     get(tabId: number): Promise<ChromeTab>;
     create(properties: { url: string; pinned: boolean; active: boolean }): Promise<ChromeTab>;
     update(tabId: number, properties: { url?: string; pinned?: boolean; autoDiscardable?: boolean }): Promise<ChromeTab | undefined>;

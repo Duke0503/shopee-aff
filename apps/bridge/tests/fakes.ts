@@ -111,7 +111,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
     listeners,
     alarmsCreated,
     tabs: {
-      query: async () => self.openTabs.filter((t) => (t.url ?? "").startsWith("https://affiliate.shopee.vn/")),
+      query: async (q) => self.openTabs.filter((t) => (q.url === undefined || (t.url ?? "").startsWith(q.url.replace(/\*$/, ""))) && (q.pinned === undefined || (t.pinned === true) === q.pinned)),
       get: async (id) => {
         const tab = self.openTabs.find((t) => t.id === id);
         if (tab === undefined) throw new Error("no tab");
@@ -119,7 +119,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
       },
       create: async (properties) => {
         created.push(properties);
-        const tab = { id: 100 + created.length, url: self.landsAt ?? properties.url, status: "complete" };
+        const tab = { id: 100 + created.length, url: self.landsAt ?? properties.url, status: "complete", pinned: properties.pinned };
         self.openTabs.push(tab);
         return tab;
       },

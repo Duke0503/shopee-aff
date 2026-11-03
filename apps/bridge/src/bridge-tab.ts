@@ -13,12 +13,17 @@
  * because no script runs in the frozen page. A tab that simply froze is answered `page_not_ready`;
  * the next job works in the fresh tab. At most once every `REPLACE_TAB_EVERY_MS`, so a page that
  * keeps freezing cannot make the bridge open and close tabs in a loop.
+ *
+ * The service worker is stopped when idle and forgets everything in memory, while a lookup or a short
+ * link leaves the tab on shopee.vn rather than the affiliate site. So the tab's id is kept in the
+ * profile's storage, a pinned tab on a Shopee site is taken as the bridge's, and any other pinned
+ * Shopee tab (one opened before this fix) is closed: the bridge keeps exactly one tab.
  */
 import type { BridgeFailure } from "@cashback/contracts";
 import { systemClock, toMs, type Clock } from "@cashback/core";
 
 import type { ChromeApi, ChromeTab } from "./chrome-api.types";
-import { AFFILIATE_TAB_PATTERN, CUSTOM_LINK_URL, pageBlock } from "./shopee-page";
+import { AFFILIATE_TAB_PATTERN, BRIDGE_TAB_SITE, CUSTOM_LINK_URL, pageBlock } from "./shopee-page";
 
 export type Wait = (ms: number) => Promise<void>;
 
@@ -64,13 +69,37 @@ export async function keepAlive(chrome: ChromeApi, tabId: number): Promise<void>
   await chrome.tabs.update(tabId, { pinned: true, autoDiscardable: false });
 }
 
+/** Where the bridge tab's id is kept, so a restarted service worker finds the same tab. */
+export const TAB_ID_KEY = "bridgeTabId";
+
+const onBridgeSite = (tab: ChromeTab): boolean => BRIDGE_TAB_SITE.test(tab.url ?? "");
+
+async function storedTabId(chrome: ChromeApi): Promise<number | null> {
+  const value = (await chrome.storage.local.get([TAB_ID_KEY]).catch(() => ({}) as Record<string, unknown>))[TAB_ID_KEY];
+  return typeof value === "number" ? value : null;
+}
+
+async function rememberTab(chrome: ChromeApi, tabId: number): Promise<void> {
+  await chrome.storage.local.set({ [TAB_ID_KEY]: tabId }).catch(() => undefined);
+}
+
+/** The known tab, else the stored one, else a pinned Shopee tab, else any affiliate tab; a known id must still be on a Shopee site. */
 async function findTab(chrome: ChromeApi, known: number | null): Promise<ChromeTab | null> {
-  if (known !== null) {
-    const tab = await chrome.tabs.get(known).catch(() => null);
-    if (tab?.id !== undefined) return tab;
+  for (const id of [known, await storedTabId(chrome)]) {
+    if (id === null) continue;
+    const tab = await chrome.tabs.get(id).catch(() => null);
+    if (tab?.id !== undefined && onBridgeSite(tab)) return tab;
   }
+  const pinned = (await chrome.tabs.query({ pinned: true })).filter(onBridgeSite);
+  if (pinned[0]?.id !== undefined) return pinned[0];
   const [open] = await chrome.tabs.query({ url: AFFILIATE_TAB_PATTERN });
   return open?.id !== undefined ? open : null;
+}
+
+/** Closes every other pinned Shopee tab: extra bridge tabs left by an earlier restart. A tab the operator did not pin is never touched. */
+async function closeExtraTabs(chrome: ChromeApi, keep: number): Promise<void> {
+  const extra = (await chrome.tabs.query({ pinned: true })).filter((t) => t.id !== undefined && t.id !== keep && onBridgeSite(t));
+  for (const tab of extra) await chrome.tabs.remove(tab.id as number).catch(() => undefined);
 }
 
 async function settleTab(chrome: ChromeApi, wait: Wait, id: number): Promise<void> {
@@ -113,7 +142,10 @@ export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = s
     if (replacedAtMs !== null && now - replacedAtMs < REPLACE_TAB_EVERY_MS) return "page_not_ready";
     replacedAtMs = now;
     const fresh = await replaceFrozenTab(chrome, wait, frozen);
-    if (fresh !== null) tabId = fresh.id;
+    if (fresh !== null) {
+      tabId = fresh.id;
+      await rememberTab(chrome, fresh.id);
+    }
     return fresh?.shows ?? "page_not_ready";
   };
   return {
@@ -122,7 +154,9 @@ export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = s
       const found = await findTab(chrome, tabId);
       const tab = found ?? (await chrome.tabs.create({ url: CUSTOM_LINK_URL, pinned: true, active: false }));
       if (tab.id === undefined) throw new BridgeTabError("the bridge tab has no id");
+      if (tab.id !== tabId) await rememberTab(chrome, tab.id);
       tabId = tab.id;
+      await closeExtraTabs(chrome, tab.id);
       await keepAlive(chrome, tab.id);
       if (tab.discarded === true) await chrome.tabs.reload(tab.id);
       await settle(tab.id);
