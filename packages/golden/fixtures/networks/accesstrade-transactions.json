@@ -624,7 +624,7 @@
       }
     },
     {
-      "name": "commission 0 on a pending line is a cancel signal",
+      "name": "commission 0 on a pending line keeps the order awaiting (owner decision 2026-11-03)",
       "provenance": "synthetic-from-code",
       "story": "1.11 AC3",
       "input": {
@@ -670,8 +670,10 @@
               ""
             ],
             "signal": {
-              "kind": "CANCEL",
-              "reason": "commission_zero"
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
             }
           }
         ]

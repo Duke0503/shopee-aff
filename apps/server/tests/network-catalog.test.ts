@@ -140,8 +140,13 @@ describe("report signal precedence (D31, status-flows.md §1)", () => {
     expect(reportSignal(obs("AWAITING", [item("CANCELLED"), item("CANCELLED")]))).toEqual({ kind: "CANCEL", reason: "all_items_cancelled" });
   });
   it("a cancelled item's commission does not keep the order alive, and a cancelled item's 0 does not cancel it", () => {
-    expect(reportSignal(obs(null, [item("CANCELLED", [5000]), item("AWAITING", [0, 0])]))).toEqual({ kind: "CANCEL", reason: "commission_zero" });
+    expect(reportSignal(obs(null, [item("CANCELLED", [5000]), item("APPROVED", [0, 0])]))).toEqual({ kind: "CANCEL", reason: "commission_zero" });
     expect(reportSignal(obs(null, [item("CANCELLED", [0]), item("AWAITING", [10])]))).toEqual({ kind: "AWAITING", liveItems: [1] });
+  });
+  it("a commission of 0 on an item still awaiting validation keeps the order awaiting (owner decision 2026-11-03)", () => {
+    expect(reportSignal(obs("AWAITING", [item("AWAITING", [0, 0])]))).toEqual({ kind: "AWAITING", liveItems: [0] });
+    expect(reportSignal(obs("AWAITING", [item("APPROVED", [0, 0]), item("AWAITING", [0])]))).toEqual({ kind: "AWAITING", liveItems: [0, 1] });
+    expect(reportSignal(obs("AWAITING", [item("APPROVED", [0, 0])]))).toEqual({ kind: "CANCEL", reason: "commission_zero" });
   });
   it("an order with no items, or no reported commission, freezes rather than cancels", () => {
     expect(reportSignal(obs("AWAITING", []))).toEqual({ kind: "FREEZE", reason: "no_items" });

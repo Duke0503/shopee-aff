@@ -11,10 +11,13 @@
  *   5. every item is CANCELLED              CANCEL  (a cancelled item only drops out)
  *   6. a live item is UNKNOWN               FREEZE
  *   7. no live item reports a commission    FREEZE
- *   8. every reported live part is 0        CANCEL
+ *   8. every reported live part is 0        CANCEL when every live item is APPROVED, else AWAITING
  *   9. every live item is APPROVED          APPROVED, else AWAITING
  *
  * A live item is one not CANCELLED; its commission parts are the payable ones (R3).
+ * Shopee shows a commission of 0 on an item still "Pending" (seen 2026-11-02 on orders that later
+ * may still be validated), so a 0 decides only once the network has finished validating: the live
+ * system kept such an order awaiting too (owner decision 2026-11-03).
  * The input is the shape the linking module's report rows have; this file imports no
  * module (code.md §1).
  */
@@ -60,7 +63,8 @@ export function reportSignal(row: ReportObservation): ReportSignal {
 
   const parts = live.flatMap((item) => item.commissionParts);
   if (parts.length === 0) return { kind: "FREEZE", reason: "missing_commission" };
-  if (parts.every((part) => part === 0)) return { kind: "CANCEL", reason: "commission_zero" };
+  const approved = live.every((item) => item.status === "APPROVED");
+  if (approved && parts.every((part) => part === 0)) return { kind: "CANCEL", reason: "commission_zero" };
 
-  return { kind: live.every((item) => item.status === "APPROVED") ? "APPROVED" : "AWAITING", liveItems };
+  return { kind: approved ? "APPROVED" : "AWAITING", liveItems };
 }

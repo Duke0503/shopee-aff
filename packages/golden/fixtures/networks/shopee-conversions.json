@@ -1027,7 +1027,7 @@
       }
     },
     {
-      "name": "commission 0 on every part is a cancel signal (D31)",
+      "name": "commission 0 on every part of a pending item keeps the order awaiting (owner decision 2026-11-03)",
       "provenance": "synthetic-from-code",
       "story": "1.11 AC2",
       "input": {
@@ -1076,15 +1076,17 @@
               ""
             ],
             "signal": {
-              "kind": "CANCEL",
-              "reason": "commission_zero"
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
             }
           }
         ]
       }
     },
     {
-      "name": "a commission below half a dong rounds to 0 and is a cancel signal",
+      "name": "a commission below half a dong rounds to 0; on a pending item the order stays awaiting",
       "provenance": "synthetic-from-code",
       "story": "1.11 AC2",
       "input": {
@@ -1133,8 +1135,10 @@
               ""
             ],
             "signal": {
-              "kind": "CANCEL",
-              "reason": "commission_zero"
+              "kind": "AWAITING",
+              "liveItems": [
+                0
+              ]
             }
           }
         ]

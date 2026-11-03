@@ -23,7 +23,7 @@ Source of truth: the network's conversion report, read by the reconciliation run
 | `APPROVED` | The network approved a commission above 0 | "Sàn đã duyệt, chờ mình chuyển tiền" | Yes |
 | `REVERSED` | Approved, then cancelled before we paid | "Đơn bị huỷ sau khi duyệt, không được hoàn" | No |
 | `PAID` | Covered by a recorded payout | "Đã chuyển tiền" | No (already paid) |
-| `REJECTED` | Cancelled, returned, invalid or 0 commission before approval | "Không được duyệt: <reason>" | No |
+| `REJECTED` | Cancelled, returned, invalid, or approved with 0 commission | "Không được duyệt: <reason>" | No |
 
 Transitions:
 
@@ -43,7 +43,9 @@ Transitions:
 **Cancel signal** (any one is enough, checked in this order): the order-level status maps to
 `CANCELLED` in the network's status map; any item maps to `CANCELLED` (cancelled, returned or
 refunded: the item's commission is removed; the order is rejected when no live item remains);
-commission 0 in a later report. Item status never overrides an order-level cancellation.
+commission 0 in a later report once every live item is approved (a 0 on an item the network still
+shows as pending keeps the order awaiting, as the live system did; owner decision 2026-11-03). Item
+status never overrides an order-level cancellation.
 
 Each network adapter keeps an explicit status map (raw value to `AWAITING`, `APPROVED` or
 `CANCELLED`; anything else is unknown and freezes the order), golden-tested on real report rows
