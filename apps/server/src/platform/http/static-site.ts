@@ -125,6 +125,8 @@ function deskRoutes(options: Extract<StaticBuildOptions, { kind: "desk" }>): Pub
     return sendPage(reply, page, 200, DESK_CSP);
   };
   return (app) => {
+    // The bare admin host opens the desk, so staff need not type /admin/.
+    app.get("/", { constraints: { host: options.host } }, async (_request, reply) => reply.redirect(`${DESK_BASE}/`, 302));
     app.get(DESK_BASE, { constraints: { host: options.host } }, handler);
     app.get(`${DESK_BASE}/*`, { constraints: { host: options.host } }, handler);
   };

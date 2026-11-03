@@ -164,7 +164,10 @@ describe("Story 7.1 review: the admin desk's build on the admin host only", () =
     }
     expect((await get("/admin/assets/desk-def456.js", ADMIN_HOST)).body).toBe("console.log('desk')");
     expect((await get("/admin/assets/index-abc123.js", ADMIN_HOST)).statusCode).toBe(404);
-    for (const path of ["/", "/assets/index-abc123.js", "/dang-nhap"]) expect([path, (await get(path, ADMIN_HOST)).statusCode]).toEqual([path, 404]);
+    const root = await get("/", ADMIN_HOST);
+    expect([root.statusCode, root.headers.location]).toEqual([302, "/admin/"]);
+    expect((await get("/", "hoantiendp.com")).body.includes("desk")).toBe(false);
+    for (const path of ["/assets/index-abc123.js", "/dang-nhap"]) expect([path, (await get(path, ADMIN_HOST)).statusCode]).toEqual([path, 404]);
     for (const path of ["/admin", "/admin/", "/admin/payouts", "/admin/assets/desk-def456.js"]) {
       const res = await get(path, "hoantiendp.com");
       expect([path, res.body.includes("desk")]).toEqual([path, false]);
