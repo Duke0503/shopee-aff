@@ -21,7 +21,7 @@
  * Also the back-off of a request whose submission failed, so it never holds up the queue.
  */
 
-import { hostOnDomain, readShopeeFoodLink, SHOPEE_LINK_DOMAINS, SHOPEE_SHORT_LINK_DOMAINS, shopeeFoodKey } from "@cashback/core";
+import { hostOnDomain, readShopeeFoodLink, readShopeeProduct, SHOPEE_LINK_DOMAINS, SHOPEE_SHORT_LINK_DOMAINS, shopeeFoodKey } from "@cashback/core";
 
 /** The fake bridge's links live on the reserved `.invalid` domain (RFC 2606). */
 export const FAKE_BRIDGE_HOST = "fake-bridge.invalid";
@@ -158,4 +158,22 @@ export function shopKeyFromTarget(sourceUrl: string, sourceTarget: string | null
   if (!source.ok || !source.resolve || !target.ok || target.shopId === null) return { kind: "ignored" };
   if (source.shopId !== null && source.shopId !== target.shopId) return { kind: "ignored" };
   return { kind: "key", productKey: shopeeFoodKey(target.shopId) };
+}
+
+/**
+ * The product key a Shopee short link (`s.shopee.vn/...`, `vn.shp.ee/...`) learns from the product
+ * page the browser resolved it to (2026-11-04): only when the request's own source is a short link
+ * that names no product and the target names exactly one (`shopee:<shop>.<item>`). With the key
+ * the lookup asks the third party first, as it does for a full product link, and the reply waits
+ * for the price. Anything else is ignored (no key) and reported, never trusted.
+ */
+export function productKeyFromTarget(sourceUrl: string, sourceTarget: string | null | undefined): SourceTargetCheck {
+  if (!sourceTarget) return { kind: "none" };
+  const source = parse(sourceUrl);
+  const named = readShopeeProduct(sourceUrl);
+  if (source === null || !hostOnDomain(source.hostname, SHOPEE_SHORT_LINK_DOMAINS) || !named.ok || named.productKey !== null) return { kind: "ignored" };
+  const target = parse(sourceTarget);
+  const product = readShopeeProduct(sourceTarget);
+  if (target === null || target.protocol !== "https:" || !product.ok || product.productKey === null) return { kind: "ignored" };
+  return { kind: "key", productKey: product.productKey };
 }

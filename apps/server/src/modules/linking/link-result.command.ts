@@ -21,7 +21,7 @@ import type { LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import type { BridgeLinkResult, LinkBridgeJob } from "../../platform/ports/bridge.port";
 import { dedupKey, type OutboxPort } from "../../platform/ports/outbox.port";
-import { checkReturnedLink, needsResolution, retryDelayMs, shopKeyFromTarget, type LinkOrigin } from "./domain/link-check";
+import { checkReturnedLink, needsResolution, productKeyFromTarget, retryDelayMs, shopKeyFromTarget, type LinkOrigin } from "./domain/link-check";
 import { handlingOf, LINK_MAX_ATTEMPTS, LINK_QUEUE_ALERTS, PAGE_ERROR_HOLD_MS, pageErrorStep } from "./domain/link-failure";
 import { closeJob, type ApiLinkRequest } from "./link-issue.command";
 import { holdShopeeQueue, notePageError, pauseShopeeQueue, shopeeQueueState } from "./link-queue.command";
@@ -173,17 +173,18 @@ function linkFailure(sub: Submission, answer: Extract<SubmissionAnswer, { outcom
 }
 
 /**
- * A ShopeeFood request made from a short link learns its shop only from the browser that resolved
- * it (Story 5.11, D8): its reuse key `shopeefood:<shopId>` is set from that target when the target
- * can belong to this request (`shopKeyFromTarget`), so the next link to the same shop reuses it. A
- * key the request already has is never replaced; a target that cannot belong is ignored and
- * reported in the result for the job's log line.
+ * A request made from a short link learns its key only from the browser that resolved it (D8): a
+ * ShopeeFood request its shop `shopeefood:<shopId>` (Story 5.11, `shopKeyFromTarget`), a Shopee
+ * product request its product `shopee:<shop>.<item>` (`productKeyFromTarget`, 2026-11-04), so the
+ * lookup can ask the third party and the next link to the same item reuses it. A key the request
+ * already has is never replaced; a target that cannot belong is ignored and reported in the
+ * result for the job's log line.
  */
-function learnedShopKey(db: LedgerDb, requestId: string, sourceTarget: string | null | undefined): { key: string | null; ignored: boolean } {
+function learnedKey(db: LedgerDb, requestId: string, sourceTarget: string | null | undefined): { key: string | null; ignored: boolean } {
   if (!sourceTarget) return { key: null, ignored: false };
   const row = db.select({ sourceUrl: linkRequests.sourceUrl, platform: linkRequests.platform, productKey: linkRequests.productKey }).from(linkRequests).where(eq(linkRequests.requestId, requestId)).get();
-  if (row === undefined || row.platform !== "shopeefood" || row.productKey !== null) return { key: null, ignored: false };
-  const check = shopKeyFromTarget(row.sourceUrl, sourceTarget);
+  if (row === undefined || (row.platform !== "shopeefood" && row.platform !== "shopee") || row.productKey !== null) return { key: null, ignored: false };
+  const check = row.platform === "shopeefood" ? shopKeyFromTarget(row.sourceUrl, sourceTarget) : productKeyFromTarget(row.sourceUrl, sourceTarget);
   return check.kind === "key" ? { key: check.productKey, ignored: false } : { key: null, ignored: check.kind === "ignored" };
 }
 
@@ -208,7 +209,7 @@ function settle(db: LedgerDb, sub: Submission, answer: SubmissionAnswer, clock: 
     notePageError(db, null);
   }
   const shareCode = newShareCode(db, options.makeCode ?? randomShareCode);
-  const learned = learnedShopKey(db, sub.requestId, answer.sourceTarget);
+  const learned = learnedKey(db, sub.requestId, answer.sourceTarget);
   db.update(linkRequests).set({ status: "ISSUED", affiliateUrl: answer.url, attempts: sql`${linkRequests.attempts} + 1`, nextAttemptAt: null, ...(learned.key === null ? {} : { productKey: learned.key }) }).where(eq(linkRequests.requestId, sub.requestId)).run();
   db.insert(shareCodes).values({ code: shareCode, requestId: sub.requestId, createdAt: at }).run();
   return { ...done("issued", null, shareCode), ...(learned.ignored ? { sourceTargetIgnored: true } : {}) };

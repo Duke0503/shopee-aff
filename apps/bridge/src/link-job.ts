@@ -15,13 +15,19 @@
  * invite that names no shop yet is first resolved in this browser; the shop it resolves to is what
  * is submitted, and the target goes back as `sourceTarget`, so the server learns the shop for link
  * reuse without calling Shopee. One that cannot be resolved is `source_unresolved`.
+ *
+ * A Shopee product short link (`s.shopee.vn/...`, `vn.shp.ee/...`) names no product, so the server
+ * cannot ask the third party for its price (2026-11-04). It is submitted as pasted, and followed in
+ * this browser while the form is worked; the product it resolves to goes back as `sourceTarget`
+ * in its canonical form (`https://shopee.vn/product/<shop>/<item>`). One that cannot be resolved
+ * leaves the link as it is, without a target.
  */
 import type { BridgeFailure, BridgeLinkJob } from "@cashback/contracts";
-import { readShopeeFoodLink } from "@cashback/core";
+import { readShopeeFoodLink, readShopeeProduct } from "@cashback/core";
 
 import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FormSelectors } from "./page-scripts";
-import { NO_RESOLUTION, RESOLVE_TIMEOUT_MS, type ResolveLink } from "./short-link";
+import { isShortLink, NO_RESOLUTION, RESOLVE_TIMEOUT_MS, type ResolveLink } from "./short-link";
 import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, pageBlock, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
 
 export type LinkAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure };
@@ -121,11 +127,26 @@ async function sourceToSubmit(sourceUrl: string, resolveSource: ResolveLink): Pr
   return { url: resolved.sourceUrl, target };
 }
 
+/** The product a Shopee product short link resolves to, canonical; null for any other link or no answer. */
+async function productTarget(sourceUrl: string, resolve: ResolveLink): Promise<string | null> {
+  if (readShopeeFoodLink(sourceUrl).ok || !isShortLink(sourceUrl)) return null;
+  const named = readShopeeProduct(sourceUrl);
+  if (!named.ok || named.productKey !== null) return null;
+  const target = await resolve(sourceUrl).catch(() => null);
+  const product = target === null ? null : readShopeeProduct(target);
+  return product !== null && product.ok && product.productKey !== null ? product.sourceUrl : null;
+}
+
 export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wait, resolve: ResolveLink = NO_RESOLUTION, resolveSource: ResolveLink = NO_RESOLUTION): Promise<LinkAnswer> {
   if (!isShopeeLink(job.sourceUrl)) return { outcome: "failed", reason: "bad_job" };
   const source = await sourceToSubmit(job.sourceUrl, resolveSource);
   if (source === null) return { outcome: "failed", reason: "source_unresolved" };
-  const withSource = (answer: LinkAnswer): LinkAnswer => (answer.outcome === "link" && source.target !== undefined ? { ...answer, sourceTarget: source.target } : answer);
+  const product = productTarget(job.sourceUrl, resolve);
+  const withSource = async (answer: LinkAnswer): Promise<LinkAnswer> => {
+    if (answer.outcome !== "link") return answer;
+    const target = source.target ?? (await product) ?? undefined;
+    return target === undefined ? answer : { ...answer, sourceTarget: target };
+  };
   try {
     await openForm(page, wait);
     const previous = await page.run(readResultBox, RESULT_FIELD);
@@ -134,7 +155,7 @@ export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wai
     await wait(BEFORE_SUBMIT_MS);
     const pressed = await page.run(pressSubmit, SUBMIT_BUTTON_TEXT);
     if (!pressed.ok) return { outcome: "failed", reason: "submit_failed" };
-    return withSource(await withTarget(await awaitResult(page, wait, previous, resultWaitMs(job.timeoutMs, source.target !== undefined)), resolve));
+    return await withSource(await withTarget(await awaitResult(page, wait, previous, resultWaitMs(job.timeoutMs, source.target !== undefined)), resolve));
   } catch (error) {
     if (error instanceof StepFailure || error instanceof Blocked) return { outcome: "failed", reason: error.reason };
     return { outcome: "failed", reason: "script_error" };
