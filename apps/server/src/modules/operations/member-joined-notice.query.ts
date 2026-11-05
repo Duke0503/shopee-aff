@@ -21,7 +21,7 @@ const fill = (text: string, values: Record<string, string>): string => text.repl
 
 const escapeHtml = (text: string): string => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const oneLine = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").trim();
+const oneLine = (text: string): string => text.replace(/[\p{Cc}\u2028\u2029]+/gu, " ").trim();
 
 export function memberJoinedText(m: JoinedMember): string {
   return [
