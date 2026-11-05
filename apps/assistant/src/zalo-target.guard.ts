@@ -34,6 +34,7 @@ export function guardTargets(session: ZaloSession, allowedGroupIds: readonly str
     addFriend: (userId, greeting) => session.addFriend(userId, greeting),
     acceptFriend: (userId) => session.acceptFriend(userId),
     pendingFriendRequests: () => session.pendingFriendRequests(),
+    groupMemberCount: (groupId) => session.groupMemberCount(groupId),
     stop: () => session.stop(),
   };
 }

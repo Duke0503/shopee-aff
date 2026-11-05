@@ -242,6 +242,15 @@ export function customerProfileOf(db: LedgerDb, customerId: string): CustomerPro
   return { ...row, status: row.status };
 }
 
+/** All desk customers; a merged record is not counted. */
+export function customerTotal(db: LedgerDb): number {
+  return db
+    .select({ customerId: customers.customerId })
+    .from(customers)
+    .where(and(inArray(customers.role, [...DESK_CUSTOMER_ROLES]), ne(customers.status, "MERGED")))
+    .all().length;
+}
+
 /** Desk customers who joined inside the range (the Overview's new customers); a merged record is not a new customer. */
 export function newCustomerCount(db: LedgerDb, range: { readonly from: string; readonly to: string }): number {
   return db

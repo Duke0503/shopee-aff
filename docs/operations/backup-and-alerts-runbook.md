@@ -56,7 +56,7 @@ stays out of the repository.
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather | both Telegram keys or neither |
 | `TELEGRAM_CHAT_ID` | `-1004416753701` | digits, optional leading `-` |
-| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order and settlement notices (D62, D63) go here and never fall back to the owner's chat |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices (D62, D63, D64) go here and never fall back to the owner's chat |
 | `BACKUP_AGE_PATH` | `C:\Tools\age\age.exe` | absolute; the four `BACKUP_*` keys come together or not at all |
 | `BACKUP_AGE_RECIPIENT` | `age1...` (62 characters) | the public key only; a private key is refused |
 | `BACKUP_RCLONE_PATH` | `C:\Tools\rclone\rclone.exe` | absolute |

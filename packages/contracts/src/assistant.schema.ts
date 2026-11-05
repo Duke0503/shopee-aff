@@ -39,5 +39,19 @@ export const assistantHeartbeatSchema = z.strictObject({
 });
 export type AssistantHeartbeat = z.infer<typeof assistantHeartbeatSchema>;
 
+/** Members who joined a welcome group, for the DP Business group's Telegram notice (D64). */
+export const ASSISTANT_GROUP_JOIN_PATH = "/internal/assistant/group-joins";
+
+export const assistantGroupJoinSchema = z.strictObject({
+  groupName: z.string().min(1).max(200),
+  /** The group's size from Zalo, the notice's rank; null when it could not be read. */
+  memberCount: z.number().int().positive().nullable(),
+  members: z.array(z.strictObject({ userId: z.string().regex(/^[A-Za-z0-9]{1,40}$/), name: z.string().min(1).max(200) })).min(1).max(100),
+});
+export type AssistantGroupJoin = z.infer<typeof assistantGroupJoinSchema>;
+
+export const assistantGroupJoinSentSchema = z.object({ sent: z.number().int().min(0) });
+export type AssistantGroupJoinSent = z.infer<typeof assistantGroupJoinSentSchema>;
+
 export const assistantHeartbeatReceivedSchema = z.object({ receivedAt: z.string().regex(INSTANT_PATTERN) });
 export type AssistantHeartbeatReceived = z.infer<typeof assistantHeartbeatReceivedSchema>;

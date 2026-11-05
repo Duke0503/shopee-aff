@@ -8,6 +8,7 @@ import {
   ASSISTANT_BANK_PATH,
   ASSISTANT_COMMAND_PATH,
   ASSISTANT_FRIEND_CHECK_PATH,
+  ASSISTANT_GROUP_JOIN_PATH,
   ASSISTANT_HEARTBEAT_PATH,
   ASSISTANT_LINK_CLAIM_PATH,
   ASSISTANT_LINK_CONFIRM_PATH,
@@ -22,6 +23,8 @@ import {
   assistantCommandSchema,
   assistantFriendCheckedSchema,
   assistantFriendCheckSchema,
+  assistantGroupJoinSchema,
+  assistantGroupJoinSentSchema,
   assistantHeartbeatReceivedSchema,
   assistantHeartbeatSchema,
   assistantLinkAnswerSchema,
@@ -46,6 +49,8 @@ import {
   type AssistantFriendChecked,
   type AssistantCommandAnswer,
   type AssistantHeartbeat,
+  type AssistantGroupJoin,
+  type AssistantGroupJoinSent,
   type AssistantHeartbeatReceived,
   type AssistantLinkAnswer,
   type AssistantLinkClaim,
@@ -79,6 +84,8 @@ export class InternalApiError extends Error {
 
 export interface InternalApi {
   heartbeat(beat: AssistantHeartbeat, signal?: AbortSignal): Promise<AssistantHeartbeatReceived>;
+  /** Members who joined a welcome group, for the DP Business group's notice (D64). */
+  groupJoined(join: AssistantGroupJoin): Promise<AssistantGroupJoinSent>;
   /** A private message: the sender registered, or found again (Story 6.2). */
   register(person: AssistantRegistration): Promise<AssistantRegistered>;
   /** A pasted link queued for its sender, or refused with its reason; the sender registered on the way when due (Stories 6.2, 6.3). */
@@ -139,6 +146,7 @@ export function internalApi(options: InternalApiOptions): InternalApi {
   const post = (path: string, body: unknown, signal?: AbortSignal): Promise<unknown> => call("POST", path, body, signal);
   return {
     heartbeat: async (beat, signal) => assistantHeartbeatReceivedSchema.parse(await post(ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatSchema.parse(beat), signal)),
+    groupJoined: async (join) => assistantGroupJoinSentSchema.parse(await post(ASSISTANT_GROUP_JOIN_PATH, assistantGroupJoinSchema.parse(join))),
     register: async (person) => assistantRegisteredSchema.parse(await post(ASSISTANT_REGISTRATION_PATH, assistantRegistrationSchema.parse(person))),
     requestLink: async (request) => assistantLinkAnswerSchema.parse(await post(ASSISTANT_LINK_REQUEST_PATH, assistantLinkRequestSchema.parse(request))),
     linkReply: async (query) => assistantLinkReplySchema.parse(await post(ASSISTANT_LINK_REPLY_PATH, assistantLinkReplyQuerySchema.parse(query))),

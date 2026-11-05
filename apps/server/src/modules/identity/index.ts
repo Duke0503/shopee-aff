@@ -15,7 +15,7 @@ export { CLAIMED_CODE, claimedCodeIn, recordMergeClaim, type MergeClaimResult } 
 export { latestZaloSwitch, noteZaloAccount, ZALO_ACCOUNT_ID_PATTERN } from "./zalo-account.command";
 export { CustomerCodeError, issueCustomerCode } from "./customer-code.command";
 export { CustomerRegisterError, DISPLAY_NAME_MAX, registerCustomer, REGISTRATION_CHANNELS, ZALO_USER_ID_PATTERN, type Registered, type RegistrationChannel, type RegistrationInput } from "./customer-register.command";
-export { earnsNothing, erasedIdsOf, ledgerOwnerOf, type LedgerOwner, customerCardOf, newCustomerCount, customerCardsOf, customerCodeOf, customerGreetingOf, customerProfileOf, deskCustomerOf, deskCustomers, DESK_CUSTOMER_ROLES, isDeskCustomer, guestCustomerIds, isGuestCustomer, customerKeys, resolveCustomer, type CustomerKeys, type CustomerProfile, type DeskCustomer, type ResolvedCustomer } from "./customer.query";
+export { earnsNothing, erasedIdsOf, ledgerOwnerOf, type LedgerOwner, customerCardOf, customerTotal, newCustomerCount, customerCardsOf, customerCodeOf, customerGreetingOf, customerProfileOf, deskCustomerOf, deskCustomers, DESK_CUSTOMER_ROLES, isDeskCustomer, guestCustomerIds, isGuestCustomer, customerKeys, resolveCustomer, type CustomerKeys, type CustomerProfile, type DeskCustomer, type ResolvedCustomer } from "./customer.query";
 export { counterAbove, customerCodeNumber, CUSTOMER_CODE_PREFIX, formatCustomerCode } from "./domain/customer-code";
 export {
   IdentityImportError,

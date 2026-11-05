@@ -4,7 +4,7 @@
  * who join the main group are welcomed once ever, tagged; a session another login took is reported
  * to the server at once. Played by the fake session and a fake server: nothing reaches Zalo.
  */
-import { ASSISTANT_FRIEND_CHECK_PATH, ASSISTANT_HEARTBEAT_PATH } from "@cashback/contracts";
+import { ASSISTANT_FRIEND_CHECK_PATH, ASSISTANT_GROUP_JOIN_PATH, ASSISTANT_HEARTBEAT_PATH } from "@cashback/contracts";
 import { parseInstant, systemClock, toMs } from "@cashback/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -169,6 +169,15 @@ describe("cutover: a member who joins the main group is welcomed, tagged, once e
     zalo.emit({ kind: "group_join", groupId: MAIN_GROUP, members: [{ userId: "70001", name: "Lan" }] });
     await vi.advanceTimersByTimeAsync(MINUTE);
     expect(zalo.sent).toHaveLength(1);
+    await assistant.stop();
+  });
+
+  it("D64: a join in a welcome group reaches the server's notice route, and in no other group", async () => {
+    const { zalo, server, assistant } = setup({ welcomeGroupIds: [MAIN_GROUP] });
+    zalo.emit({ kind: "group_join", groupId: DEV_GROUP, members: [{ userId: "70009", name: "Dev" }] });
+    zalo.emit({ kind: "group_join", groupId: MAIN_GROUP, members: [{ userId: "70001", name: "Lan" }] });
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(server.callsTo(ASSISTANT_GROUP_JOIN_PATH)).toEqual([{ groupName: messageText("group_default_name"), memberCount: null, members: [{ userId: "70001", name: "Lan" }] }]);
     await assistant.stop();
   });
 

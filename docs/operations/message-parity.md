@@ -58,7 +58,7 @@ breaks, emoji, bold parts and refusals. This page maps every new label to its ol
 7. Not sent because the new facts lack them: the campaign hint under a link, the ShopeeFood
    group-order tip, the product/link block in order notices, the balance total in the approved
    notice. Old natural-language bank messages ("STK: ...") are not read, so their instructions are dropped.
-8. Telegram: the live new-member notice of the business group has no counterpart in the new platform.
+8. Telegram: the live new-member notice of the business group is in `packages/labels/vi/member-notices.json` (D64), with the same wording. Differences: a rank not known or a total of zero leaves its line out; the group is named by the label `group_default_name`, not read from Zalo; the total counts desk customers without merged records; a name is `dName` only, else the live fallback name; line breaks in a name become spaces.
    The four order notices are back (D62), see "Telegram order notices" below.
 
 ## Server facts added for the old formats

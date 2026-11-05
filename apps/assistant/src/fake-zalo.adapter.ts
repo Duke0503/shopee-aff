@@ -63,6 +63,7 @@ export function fakeZaloSession(clock: Clock, accountId: string = FAKE_ACCOUNT_I
       accepted.push({ userId, at: clock.now() });
     },
     pendingFriendRequests: async () => [...session.pending],
+    groupMemberCount: async () => null,
     emit: (event) => {
       if (event.kind === "session_conflict") {
         conflicted = true;

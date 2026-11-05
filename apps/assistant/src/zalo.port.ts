@@ -85,5 +85,7 @@ export interface ZaloSession {
   acceptFriend(userId: string): Promise<void>;
   /** The people whose friend requests to this account are still waiting, read from Zalo. */
   pendingFriendRequests(): Promise<readonly string[]>;
+  /** The group's size read from Zalo, or null when this session cannot tell. */
+  groupMemberCount(groupId: string): Promise<number | null>;
   stop(): Promise<void>;
 }
