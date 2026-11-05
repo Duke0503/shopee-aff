@@ -25,6 +25,7 @@
     "link_undeliverable": { "title": "Không Gửi Được Link Cho Khách", "source": "linking.link_delivery", "details": "Không gửi được link cho khách sau nhiều lần thử." },
     "notification_daily_cap": { "title": "Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày", "source": "messaging.notifications", "details": "Đã chạm giới hạn tin nhắn Zalo trong ngày; tin còn lại chờ sang ngày mai." },
     "notification_undeliverable": { "title": "Tin Nhắn Zalo Không Gửi Được", "source": "messaging.notifications", "details": "Có tin nhắn Zalo không gửi được cho khách." },
+    "order_frozen": { "title": "Đơn Hàng Bị Tạm Giữ Để Kiểm Tra Lại", "source": "orders.reconciliation", "details": "Một đơn vừa bị tạm giữ để kiểm tra lại; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
     "order_reversed": { "title": "Đơn Đã Duyệt Bị Sàn Hủy", "source": "orders.reconciliation", "details": "Một đơn đã duyệt bị sàn hủy; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
     "reconciliation_failed": { "title": "Đối Soát Thất Bại", "source": "orders.reconciliation", "details": "Đối soát thất bại liên tiếp hoặc quá 3 giờ chưa chạy được." },
     "reconciliation_page_cap": { "title": "Báo Cáo Đối Soát Vượt Giới Hạn Trang", "source": "orders.reconciliation", "details": "Báo cáo đối soát vượt giới hạn trang." },

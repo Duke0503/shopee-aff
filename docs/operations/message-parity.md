@@ -37,6 +37,8 @@ breaks, emoji, bold parts and refusals. This page maps every new label to its ol
   string, same bold code units, same mentions.
 - `apps/server/tests/fixtures/old-telegram-alerts.json` is rendered by the live `telegram_alerts.py`
   at a fixed time; `owner-alerts.test.ts` checks the new text is the same string.
+- `apps/server/tests/fixtures/old-telegram-order-notices.json` is rendered the same way from the
+  live order notices; `order-business-notices.test.ts` checks the new text is the same string.
 
 ## Deliberate differences and gaps (owner to confirm)
 
@@ -56,8 +58,8 @@ breaks, emoji, bold parts and refusals. This page maps every new label to its ol
 7. Not sent because the new facts lack them: the campaign hint under a link, the ShopeeFood
    group-order tip, the product/link block in order notices, the balance total in the approved
    notice. Old natural-language bank messages ("STK: ...") are not read, so their instructions are dropped.
-8. Telegram: the live business-group notices (new member, new/approved/rejected/paid order) have no
-   counterpart in the new platform; only the owner alerts are sent.
+8. Telegram: the live new-member notice of the business group has no counterpart in the new platform.
+   The four order notices are back (D62), see "Telegram order notices" below.
 
 ## Server facts added for the old formats
 
@@ -225,6 +227,7 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `link_undeliverable` | new-only, in the report_bug format | Không Gửi Được Link Cho Khách |
 | `notification_daily_cap` | new-only, in the report_bug format | Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày |
 | `notification_undeliverable` | new-only, in the report_bug format | Tin Nhắn Zalo Không Gửi Được |
+| `order_frozen` | new-only, in the report_bug format | Đơn Hàng Bị Tạm Giữ Để Kiểm Tra Lại |
 | `order_reversed` | new-only, in the report_bug format | Đơn Đã Duyệt Bị Sàn Hủy |
 | `reconciliation_failed` | new-only, in the report_bug format | Đối Soát Thất Bại |
 | `reconciliation_page_cap` | new-only, in the report_bug format | Báo Cáo Đối Soát Vượt Giới Hạn Trang |
@@ -235,3 +238,18 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `shopee_payout_record_unreadable` | new-only, in the report_bug format | Trang Thanh Toán Shopee Đổi Dạng |
 | `shopee_payout_status_refused` | new-only, in the report_bug format | Trạng Thái Thanh Toán Shopee Lạ |
 | `web_link_safety_cap` | new-only, in the report_bug format | Website Chạm Giới Hạn An Toàn Tạo Link |
+
+### Telegram order notices (DP Business group, D62)
+
+Wording in `packages/labels/vi/order-notices.json`.
+
+| Event | Live function | Status | Differences |
+|---|---|---|---|
+| `recorded` | `notify_new_order_received` | adapted | The cashback line is the estimated cashback the customer is told (after the fee and withheld tax), labelled "Hoàn tiền tạm tính" without "(80%)" (owner decision 2026-11-05). A guest's order has no cashback line. A frozen order's status line says "Đang kiểm tra lại". |
+| `approved` | `notify_order_approved` | identical | |
+| `rejected` | `notify_order_rejected` | adapted | The reason is the reason code in words; live's default sentence when there is none. |
+| `reversed` | `notify_order_rejected` | new-only | Same text as rejected, with its own reason label. Live did not tell a reversal apart. |
+| `paid` | `notify_order_paid` | adapted | The live note line is not sent (the new platform has no note on a payout step). |
+
+In all of them the last time line is when the step was taken, not when the message left, and every
+value is HTML-escaped (live left the order id and the platform as they were).

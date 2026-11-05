@@ -90,6 +90,11 @@ export interface ServerConfig {
   /** The owner's Telegram alert chat (AD-27); both or none. */
   telegram: { botToken: string; chatId: string } | null;
   /**
+   * The DP Business group's chat for the order notices (D62), sent by the same bot; never the owner's
+   * chat. Without it no notice is sent and the rows wait; production logs that as an error.
+   */
+  telegramBusinessChatId: string | null;
+  /**
    * The off-site backup (AD-26, D36, Story 8.2): age and rclone executables, the owner's age public
    * key and the rclone remote folder; all four or none (BACKUP_RCLONE_CONFIG optional). Without it
    * dev keeps local backups only and production reports every daily off-site copy as failed.
@@ -277,6 +282,7 @@ function fileSchema(env: Environment) {
     BROWSER_PROFILE_DIR: z.string().refine(isAbsolute).optional(),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().regex(/^-?\d+$/).optional(),
+    TELEGRAM_BUSINESS_CHAT_ID: z.string().regex(/^-?\d+$/).optional(),
     BACKUP_AGE_PATH: z.string().refine(isAbsolute).optional(),
     BACKUP_AGE_RECIPIENT: z.string().regex(AGE_RECIPIENT).optional(),
     BACKUP_RCLONE_PATH: z.string().refine(isAbsolute).optional(),
@@ -345,6 +351,7 @@ export function parseConfig(env: Environment, values: Record<string, string | un
     zaloGroupIds: parseIdList(file.ZALO_GROUP_IDS),
     browserProfileDir: file.BROWSER_PROFILE_DIR ?? null,
     telegram: telegramOf(file),
+    telegramBusinessChatId: file.TELEGRAM_BUSINESS_CHAT_ID ?? null,
     backupOffsite,
     ...offsiteChoiceOf(file, backupOffsite),
     backupEncryptionKey: file.BACKUP_ENCRYPTION_KEY ?? null,

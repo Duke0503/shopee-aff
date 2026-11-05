@@ -10,10 +10,15 @@
  * no heartbeat is sent; production logs each as an error at every start. A start that fails at its
  * pre-migration backup cannot wait for the delivery job, so its alert is sent at once
  * (`startupAlerts`).
+ *
+ * The order notices of the DP Business group (D62) go by the same bot to their own chat. Without
+ * that chat no job runs, the rows wait and production logs an error at start; they never fall back
+ * to the owner's chat.
  */
 import type { Clock } from "@cashback/core";
 
 import { deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
+import { deliverBusinessNotices } from "../modules/orders/index";
 import { balanceTotals } from "../modules/payouts/index";
 import { backupHealth, backupStatusPath, readBackupStatus, type BackupHealth } from "../platform/backup/backup-status";
 import { runDailyBackup, type DailyBackupDeps } from "../platform/backup/daily-backup.job";
@@ -29,7 +34,7 @@ import type { Logger } from "../platform/log/logger";
 import type { AlertPort } from "../platform/ports/alert.port";
 
 export type OwnerJobsConfig = Pick<ServerConfig, "env" | "dataDir" | "telegram" | "backupOffsite" | "assistantToken"> &
-  Partial<Pick<ServerConfig, "heartbeatUrl" | "backupOffsiteKind" | "backupDriveWebhook" | "backupEncryptionKey">>;
+  Partial<Pick<ServerConfig, "telegramBusinessChatId" | "heartbeatUrl" | "backupOffsiteKind" | "backupDriveWebhook" | "backupEncryptionKey">>;
 
 export interface OwnerJobsDeps {
   readonly config: OwnerJobsConfig;
@@ -104,9 +109,25 @@ export function ownerJobs(deps: OwnerJobsDeps): Job[] {
     const sender = telegramSender(config.telegram);
     jobs.push({ name: "alertDelivery", ...JOB_SCHEDULES.alertDelivery, run: async () => void (await deliverPendingAlerts(ledger, sender, clock, logger)) });
   }
+  const notices = businessNoticeJob(deps);
+  if (notices !== null) jobs.push(notices);
   const heartbeat = heartbeatJob(deps);
   if (heartbeat !== null) jobs.push(heartbeat);
   return jobs;
+}
+
+/** The DP Business group's order notices (D62); null without the bot or the group's chat. */
+export function businessNoticeJob(deps: OwnerJobsDeps): Job | null {
+  const { config, ledger, clock, logger } = deps;
+  const chatId = config.telegramBusinessChatId ?? null;
+  if (chatId === null) {
+    if (config.env === "prod") logger.error({ env: config.env }, "orders.business_notice.chat_absent");
+    return null;
+  }
+  // A missing bot is already logged as operations.alert.telegram_absent.
+  if (config.telegram === null) return null;
+  const sender = telegramSender({ botToken: config.telegram.botToken, chatId });
+  return { name: "orderBusinessNotices", ...JOB_SCHEDULES.orderBusinessNotices, run: async () => void (await deliverBusinessNotices(ledger, sender, clock, logger)) };
 }
 
 /** The external heartbeat (Story 8.4), over the same health model the check reads; null without a URL. */

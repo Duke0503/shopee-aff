@@ -1,0 +1,56 @@
+{
+  "$comment": "The Telegram order notices of the DP Business group (D62), in the live format (src/cashback/core/telegram_alerts.py notify_new_order_received, notify_order_approved, notify_order_rejected, notify_order_paid; HTML parse mode; owner confirmed the format 2026-11-05). A line with no value is left out, as live. The mapping is docs/operations/message-parity.md.",
+  "platforms": {
+    "shopee": "🟠 Shopee",
+    "tiktok": "⚫ TikTok Shop",
+    "lazada": "🔵 Lazada",
+    "shopeefood": "🍔 ShopeeFood",
+    "fnb": "☕ F&B Voucher"
+  },
+  "platform_other": "🛒 {platform}",
+  "line_order_id": "📦 <b>Mã đơn hàng:</b> <code>{orderId}</code>",
+  "line_customer": "👤 <b>Khách hàng:</b> {customer}",
+  "customer_guest": "Chưa gắn mã (Khách vãng lai)",
+  "customer_named": "{name} (ID: {id})",
+  "line_order_value": "💰 <b>Giá trị đơn hàng:</b> <b>{amount}đ</b>",
+  "line_order_time": "📅 <b>Thời gian đặt hàng:</b> <code>{time}</code>",
+  "recorded": {
+    "header": "🛒 <b>[ĐƠN HÀNG MỚI GHI NHẬN] {platform}</b>\n",
+    "status": "📊 <b>Trạng thái:</b> ⏳ <b>Chờ duyệt</b> (Awaiting Approval)",
+    "status_frozen": "📊 <b>Trạng thái:</b> 🔍 <b>Đang kiểm tra lại</b> (Under Review)",
+    "commission": "💵 <b>Hoa hồng dự kiến:</b> <b>{amount}đ</b>",
+    "cashback": "🎁 <b>Hoàn tiền tạm tính:</b> <b>{amount}đ</b>",
+    "time_after_order_time": "⏱ <b>Thời gian đồng bộ:</b> <code>{time}</code>",
+    "time_alone": "⏱ <b>Thời gian ghi nhận:</b> <code>{time}</code>"
+  },
+  "approved": {
+    "header": "✅ <b>[ĐƠN HÀNG ĐƯỢC DUYỆT THÀNH CÔNG] {platform}</b>\n",
+    "status": "📊 <b>Trạng thái:</b> 🎉 <b>Đã duyệt</b> (Approved - Sẵn sàng chi trả)",
+    "commission": "💵 <b>Hoa hồng chính thức:</b> <b>{amount}đ</b>",
+    "cashback": "🎁 <b>Hoàn tiền cho khách:</b> <b>{amount}đ</b>",
+    "time_after_order_time": "⏱ <b>Thời gian duyệt đơn:</b> <code>{time}</code>",
+    "time_alone": "⏱ <b>Thời gian duyệt đơn:</b> <code>{time}</code>"
+  },
+  "rejected": {
+    "header": "❌ <b>[ĐƠN HÀNG BỊ HỦY / TỪ CHỐI] {platform}</b>\n",
+    "status": "📊 <b>Trạng thái:</b> 🚫 <b>Đã hủy / Từ chối</b> (Rejected)",
+    "reason": "⚠️ <b>Lý do:</b> {reason}",
+    "time_after_order_time": "⏱ <b>Thời gian ghi nhận hủy:</b> <code>{time}</code>",
+    "time_alone": "⏱ <b>Thời gian ghi nhận:</b> <code>{time}</code>"
+  },
+  "paid": {
+    "header": "💸 <b>[HOÀN TIỀN THÀNH CÔNG] {platform}</b>\n",
+    "status": "📊 <b>Trạng thái:</b> ✅ <b>Đã thanh toán</b> (Paid - Tiền đã chuyển tới khách)",
+    "amount": "💰 <b>Số tiền hoàn:</b> <b>{amount}đ</b>",
+    "time_after_order_time": "⏱ <b>Thời gian hoàn tất:</b> <code>{time}</code>",
+    "time_alone": "⏱ <b>Thời gian chuyển tiền:</b> <code>{time}</code>"
+  },
+  "reasons": {
+    "default": "Bị hủy trong báo cáo đối soát",
+    "reversed": "Sàn hủy đơn sau khi đã duyệt",
+    "order_cancelled": "Sàn báo đơn đã bị hủy",
+    "all_items_cancelled": "Mọi sản phẩm trong đơn đã bị hủy hoặc trả hàng",
+    "commission_zero": "Sàn không trả hoa hồng cho đơn này",
+    "not_eligible": "Đơn không đủ điều kiện hoàn tiền"
+  }
+}

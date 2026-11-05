@@ -43,6 +43,7 @@ export type { ClawbackRequest, OrderAwardsPort, OrderEventsPort, OrderPayoutsPor
 export { markOrderPaid, OrderPayoutError, type OrderPaidDeps, type OrderPayoutErrorCode } from "./order-payout.command";
 export { applyUnpaid, orderStatusOf, unpaidStateOf, type OrderUnpaidDeps, type UnpaidState } from "./order-payout-void.command";
 export { stepEvent } from "./order-steps.command";
+export { deliverBusinessNotices, NOTICE_EXPIRY_MS, NOTICES_PER_RUN, type BusinessNoticeRun, type BusinessNoticeSender } from "./order-business-notice.job";
 export { ledgerDirectory, type LedgerDirectory } from "./ledger-directory.query";
 export { applyReportRow, ReportApplyError, type ApplyDeps, type ApplyOutcome, type ContextDeps, type ApplyReport } from "./report-apply.command";
 export { periodIsWithheld, settlementPeriodOf, splitWithheld, type SplitHolder } from "./domain/settlement";

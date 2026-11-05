@@ -56,11 +56,17 @@ stays out of the repository.
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather | both Telegram keys or neither |
 | `TELEGRAM_CHAT_ID` | `-1004416753701` | digits, optional leading `-` |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order notices (D62) go here and never fall back to the owner's chat |
 | `BACKUP_AGE_PATH` | `C:\Tools\age\age.exe` | absolute; the four `BACKUP_*` keys come together or not at all |
 | `BACKUP_AGE_RECIPIENT` | `age1...` (62 characters) | the public key only; a private key is refused |
 | `BACKUP_RCLONE_PATH` | `C:\Tools\rclone\rclone.exe` | absolute |
 | `BACKUP_RCLONE_REMOTE` | `gdrive:cashback-backups/prod` | remote name, colon, folder |
 | `BACKUP_RCLONE_CONFIG` | `C:\Users\<user>\.config\cashback\rclone.conf` | optional, absolute; rclone's default place when unset |
+
+Without `TELEGRAM_BUSINESS_CHAT_ID` no order notice is sent and the rows stay PENDING in
+`order_business_notices` until the chat is set; the first job run then expires those older than 24
+hours and sends the rest. Production logs `orders.business_notice.chat_absent` as an error at every
+start and still starts.
 
 Without Telegram keys alerts are stored and logged only; production logs
 `operations.alert.telegram_absent` as an error at every start. Without the `BACKUP_*` keys dev
@@ -253,6 +259,7 @@ Every kind the server raises; a test checks this table against the code.
 | `reconciliation_page_cap` | high | a report needed more pages than the safe cap | read the report window by hand; never page further in the browser |
 | `reconciliation_source_stale` | high | the report source returned old data | check the saved report or the bridge source |
 | `order_reversed` | high | an approved order was cancelled by the network; a review case is open | work the review case on the desk |
+| `order_frozen` | high | an order was frozen for review, for any freeze reason (for example an unknown status or a lower approved commission); a review case is open | work the review case on the desk |
 | `notification_daily_cap` | high | the daily Zalo send cap was reached; the rest waits for tomorrow | nothing, unless it repeats daily (then review the cap) |
 | `customer_sign_in_burst` | high | many failed website sign-ins in a short time | watch the desk; nothing to do unless it repeats |
 | `web_link_safety_cap` | high | the website hit its hourly link safety cap | check for abuse; links resume next hour |

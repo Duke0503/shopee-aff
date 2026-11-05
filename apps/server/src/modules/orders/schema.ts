@@ -1,6 +1,7 @@
 /**
  * The orders module's tables (AD-4), as created by migrations/0002_orders.sql,
- * 0008_reconciliation.sql, 0009_review_case_evidence.sql and 0010_reconciliation_runs.sql. Only this module
+ * 0008_reconciliation.sql, 0009_review_case_evidence.sql, 0010_reconciliation_runs.sql and
+ * 0034_order_business_notices.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -150,6 +151,24 @@ export const reconciliationRuns = sqliteTable("reconciliation_runs", {
   frozen: integer("frozen").notNull().default(0),
   casesOpened: integer("cases_opened").notNull().default(0),
   failedRows: integer("failed_rows").notNull().default(0),
+});
+
+/** The order steps the DP Business group is told (D62); a row is owed once per order, event and lifecycle. */
+export const BUSINESS_NOTICE_EVENTS = ["recorded", "approved", "rejected", "reversed", "paid"] as const;
+export type BusinessNoticeEvent = (typeof BUSINESS_NOTICE_EVENTS)[number];
+
+export const orderBusinessNotices = sqliteTable("order_business_notices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  dedupKey: text("dedup_key").notNull().unique(),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => orders.orderId),
+  event: text("event", { enum: BUSINESS_NOTICE_EVENTS }).notNull(),
+  raisedAt: text("raised_at").notNull(),
+  delivery: text("delivery", { enum: ["PENDING", "SENDING", "SENT", "EXPIRED"] }).notNull().default("PENDING"),
+  attempts: integer("attempts").notNull().default(0),
+  sendAttempt: text("send_attempt"),
+  deliveredAt: text("delivered_at"),
 });
 
 export type OrderRow = typeof orders.$inferInsert;

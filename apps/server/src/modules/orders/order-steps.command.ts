@@ -19,6 +19,11 @@
  * The notice carries the target status in its parameters; the assistant writes "update on order
  * X: <status sentence>" from the status registry, then the notice's own detail, so each status
  * sentence lives once, in status-flows.md and the registry (AD-10).
+ *
+ * The DP Business group is told apart from the customer (D62): a step to a notified status inserts
+ * one notice row under the same lifecycle key, guests and steps silent to the customer included,
+ * so what the group is owed commits with the step. A restore after a freeze and a voided payout are
+ * not told; the cutover import does not come through here, so an imported order owes nothing.
  */
 import type { Clock, OrderStatus } from "@cashback/core";
 import { and, eq } from "drizzle-orm";
@@ -28,7 +33,7 @@ import type { AuditValue, CommandAudit } from "../../platform/ports/audit.port";
 import { dedupKey, type OutboxPort } from "../../platform/ports/outbox.port";
 import { customerBankState } from "../identity/index";
 import type { Step } from "./domain/transition";
-import { orderStatusHistory } from "./schema";
+import { BUSINESS_NOTICE_EVENTS, orderBusinessNotices, orderStatusHistory, type BusinessNoticeEvent } from "./schema";
 
 /** The event of a step, as the audit names it (`orders.order.<event>`) and the outbox keys it. */
 export function stepEvent([from, to]: Step): string {
@@ -119,6 +124,8 @@ export interface StepWriters {
   readonly outbox: OutboxPort;
 }
 
+const isBusinessNoticeEvent = (event: string): event is BusinessNoticeEvent => (BUSINESS_NOTICE_EVENTS as readonly string[]).includes(event);
+
 export function recordSteps(db: LedgerDb, s: OrderSteps, w: StepWriters): void {
   const at = w.clock.now();
   for (const step of s.steps) {
@@ -127,6 +134,7 @@ export function recordSteps(db: LedgerDb, s: OrderSteps, w: StepWriters): void {
     const reason = to === "APPROVED" ? (s.approvalReason ?? s.reason) : s.reason;
     db.insert(orderStatusHistory).values({ orderId: s.orderId, fromStatus: from, toStatus: to, actor: w.by.actor.id, reason, changedAt: at }).run();
     w.by.audit.record({ actor: w.by.actor, event: `orders.order.${event}`, entityId: s.orderId, payload: { orderId: s.orderId, customerId: s.customerId, from, to, ...s.facts } });
+    if (isBusinessNoticeEvent(event)) db.insert(orderBusinessNotices).values({ dedupKey: orderEventKey(db, s.orderId, event), orderId: s.orderId, event, raisedAt: at }).onConflictDoNothing().run();
     if (s.customerId === null || s.guest || s.silentEvents?.includes(event)) continue;
     const notice = noticeOf(db, step, s.customerId);
     if (notice === null) continue;

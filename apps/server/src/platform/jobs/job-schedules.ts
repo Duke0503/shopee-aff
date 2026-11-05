@@ -28,6 +28,8 @@ export const JOB_SCHEDULES = {
   alertDelivery: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */
   signInHousekeeping: { context: "identity", schedule: every(60 * 60_000) },
+  /** Pending order notices sent to the DP Business group; a failed send stops the run and is retried on the next (D62). */
+  orderBusinessNotices: { context: "orders", schedule: every(30_000) },
   /** Hourly; the first run 3 minutes after start, so frequent deploys never postpone it (production 2026-11-03). */
   reconcile: { context: "orders", schedule: every(60 * 60_000, 3 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },

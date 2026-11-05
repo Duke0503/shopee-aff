@@ -61,6 +61,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 | `PUBLIC_BASE_URL` | `https://hoantiendp.com` |
 | `ADMIN_HOST`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUDIENCE` | from section 5.2 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `backup-and-alerts-runbook.md` section 1.3 |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat for the order notices (D62), copied from `C:\Project\mmo\.env` without printing it; see section 10 |
 | `HEARTBEAT_URL` | from section 3 |
 | `BACKUP_*` | `backup-and-alerts-runbook.md` section 1.4 (age and rclone) |
 | `BACKUP_OFFSITE`, `GDRIVE_WEBHOOK_URL`, `GDRIVE_SECRET_TOKEN`, `BACKUP_ENCRYPTION_KEY` | `backup-and-alerts-runbook.md` section 1.5 (the Drive webhook, production since 2026-11-03) |
@@ -346,3 +347,74 @@ the block time. The Access test of section 5.2 is logged here too.
 - [ ] 5.1 public hostnames only to `127.0.0.1:8080` (at cutover); outside checks done
 - [ ] 5.2 Access application and policy; test recorded
 - [ ] 5.3 rate-limit and custom rules deployed; section 8 test recorded
+
+## 10. Enabling the DP Business order notices (D62)
+
+Only after the owner approved the merge and the deploy, in this order. Rows are written from the
+moment the new build runs, chat or no chat, so step 1 comes first.
+
+1. Add the chat id to `prod.env` by a script that reads it from the live `.env` and prints only the
+   outcome. On `STOP`, stop this runbook and get the group's chat id from the owner; do not deploy.
+
+```powershell
+$prod = "$env:USERPROFILE\.config\cashback\prod.env"
+$key = 'TELEGRAM_BUSINESS_CHAT_ID'
+$text = [IO.File]::ReadAllText($prod)
+$found = Select-String -LiteralPath C:\Project\mmo\.env -Pattern "^\s*$key\s*=" | Select-Object -First 1
+$value = if ($found) { ($found.Line -split '=', 2)[1].Trim().Trim('"', "'").Trim() } else { '' }
+if ($text -match "(?m)^$key=[ \t`"']*[^\s`"']") { 'already set' }
+elseif ($value -notmatch '^-?\d+$') { 'STOP: no valid chat id in the live .env; get it from the owner' }
+else {
+  $blank = "(?m)^$key=[ \t`"']*(?=\r?$)"
+  if ($text -match $blank) { $text = [regex]::Replace($text, $blank, "$key=$value") }
+  else {
+    if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`r`n" }
+    $text += "$key=$value`r`n"
+  }
+  [IO.File]::WriteAllText($prod, $text)
+  'added'
+}
+```
+
+2. Deploy. Migration `0034_order_business_notices` backfills nothing: an order that takes no new step
+   sends nothing, imported orders included.
+3. Insert the single approved catch-up for the frozen order ending `381J`, with a short script run by
+   `C:\Tools\node-v24\node.exe` and `node:sqlite`. It requires exactly one matching order with status
+   `FROZEN`, and exactly one row inserted. On `STOP`, insert nothing by hand: if the order is no longer
+   `FROZEN` (or no single order matches), stop and ask the owner.
+
+```powershell
+@'
+import { DatabaseSync } from "node:sqlite";
+const stop = (why) => { console.log(`STOP: ${why}`); process.exit(1); };
+const db = new DatabaseSync("C:/Project/cashback/data/prod/ledger.sqlite", { timeout: 5000 });
+const found = db.prepare("SELECT order_id, status FROM orders WHERE order_id LIKE '%381J'").all();
+if (found.length !== 1) stop(`${found.length} orders match`);
+if (found[0].status !== "FROZEN") stop(`the order is ${found[0].status}, not FROZEN`);
+const id = found[0].order_id;
+const { changes } = db
+  .prepare("INSERT INTO order_business_notices (dedup_key, order_id, event, raised_at) VALUES (?, ?, 'recorded', ?)")
+  .run(`order:${id}:recorded`, id, new Date().toISOString());
+if (Number(changes) !== 1) stop(`${changes} rows inserted`);
+console.log("inserted");
+'@ | Set-Content -Encoding ASCII "$env:TEMP\catch-up-381j.mjs"
+& C:\Tools\node-v24\node.exe "$env:TEMP\catch-up-381j.mjs"
+```
+
+   A `UNIQUE constraint failed` error means the notice row already exists: stop and ask the owner.
+
+4. After a minute, check that the row reached `SENT`. The job sends one new-order notice whose status
+   line says under review. If it prints anything else, look for
+   `orders.business_notice.delivery_failed` in the server log and tell the owner; never insert a
+   second row.
+
+```powershell
+@'
+import { DatabaseSync } from "node:sqlite";
+const db = new DatabaseSync("C:/Project/cashback/data/prod/ledger.sqlite", { readOnly: true, timeout: 5000 });
+console.log(db.prepare("SELECT delivery, attempts FROM order_business_notices WHERE dedup_key LIKE 'order:%381J:recorded'").all());
+'@ | Set-Content -Encoding ASCII "$env:TEMP\catch-up-381j-check.mjs"
+& C:\Tools\node-v24\node.exe "$env:TEMP\catch-up-381j-check.mjs"
+```
+
+No other backfill is allowed.

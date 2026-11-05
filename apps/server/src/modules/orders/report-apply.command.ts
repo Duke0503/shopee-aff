@@ -251,6 +251,8 @@ function storeObservation(db: LedgerDb, a: Applying, orderId: string): void {
 }
 
 function carryOut(a: Applying, orderId: string, customerId: string | null, deps: ApplyDeps): void {
+  // The owner hears of every freeze (D62); the text names no order and no customer.
+  if (a.result.steps.some(([, to]) => to === "FROZEN")) deps.alerts.alert("order_frozen", "high");
   for (const e of a.result.effects) {
     if (e.kind === "alert") deps.alerts.alert(e.alert, "high");
     if (e.kind === "awards") deps.awards.move(orderId, e.to);
