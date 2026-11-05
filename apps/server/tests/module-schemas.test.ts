@@ -65,6 +65,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       network_withholding: "orders",
       review_cases: "orders",
       reconciliation_runs: "orders",
+      order_business_notices: "orders",
       product_offers: "linking",
       link_requests: "linking",
       share_codes: "linking",

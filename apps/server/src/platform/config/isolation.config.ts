@@ -55,6 +55,8 @@ export interface IsolationSubject {
   readonly zaloGroupIds: readonly string[];
   readonly browserProfileDir: string | null;
   readonly telegram: { readonly botToken: string; readonly chatId: string } | null;
+  /** The business group's chat (D62); dev never posts to a production chat. */
+  readonly telegramBusinessChatId?: string | null;
   /** The off-site backup folder (Story 8.2); dev never writes into production's. */
   readonly backupOffsite?: { readonly rcloneRemote: string } | null;
   /** The Google Drive backup webhook (owner decision 2026-11-03); dev never posts to production's unless allowed. */
@@ -124,14 +126,14 @@ function withProductionFile(ids: ProductionIdentifiers, prod: Readonly<Record<st
   const ports = ["PUBLIC_PORT", "INTERNAL_PORT"].map(value).filter((v): v is string => v !== null).map(Number);
   const dirs = ["DATA_DIR", "RUN_DIR", "BROWSER_PROFILE_DIR"].map(value).filter((v): v is string => v !== null && isAbsolute(v));
   const groups = parseIdList(value("ZALO_GROUP_IDS"));
-  const chat = value("TELEGRAM_CHAT_ID");
+  const chats = ["TELEGRAM_CHAT_ID", "TELEGRAM_BUSINESS_CHAT_ID"].map(value).filter((v): v is string => v !== null);
   const host = value("ADMIN_HOST");
   return {
     ...ids,
     ports: [...ids.ports, ...ports],
     paths: [...ids.paths, ...dirs.map((path) => ({ path, tree: true }))],
     productionZaloGroups: [...ids.productionZaloGroups, ...groups],
-    telegramChatIds: chat === null ? ids.telegramChatIds : [...ids.telegramChatIds, chat],
+    telegramChatIds: [...ids.telegramChatIds, ...chats],
     hostnames: host === null ? ids.hostnames : [...ids.hostnames, host.toLowerCase()],
   };
 }
@@ -196,6 +198,8 @@ function resourceProblems(config: IsolationSubject, ids: ProductionIdentifiers, 
   if (config.zaloGroupIds.some((g) => !ids.devZaloGroups.includes(g) || ids.productionZaloGroups.includes(g))) add("ZALO_GROUP_IDS", "not_the_dev_group");
   if (config.zaloMode !== "fake" && config.zaloGroupIds.length === 0) add("ZALO_GROUP_IDS", "required");
   if (config.telegram !== null && ids.telegramChatIds.includes(config.telegram.chatId)) add("TELEGRAM_CHAT_ID", "production_value");
+  const businessChat = config.telegramBusinessChatId ?? null;
+  if (businessChat !== null && ids.telegramChatIds.includes(businessChat)) add("TELEGRAM_BUSINESS_CHAT_ID", "production_value");
   if (config.publicBaseUrl !== null) add("PUBLIC_BASE_URL", "must_be_empty");
   if (config.staffAccess !== null && onHost(config.staffAccess.adminHost, ids)) add("ADMIN_HOST", "production_value");
   return out;

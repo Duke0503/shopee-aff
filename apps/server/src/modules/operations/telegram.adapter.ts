@@ -1,6 +1,7 @@
 /**
- * The Telegram sender for owner alerts (AD-27): one `sendMessage` call to the owner's chat per
- * alert, never inside a transaction. The bot token is a secret from platform/config and appears
+ * The Telegram sender (AD-27): one `sendMessage` call per message, never inside a transaction, to
+ * the chat it is bound to: the owner's chat for alerts, and the DP Business group's chat for the
+ * order notices (D62), whose text does carry a customer's name and id. The bot token is a secret from platform/config and appears
  * in no log line or error message. `fetch` is injected so tests use a fake and never reach the
  * network.
  *
@@ -8,8 +9,9 @@
  * (Story 8.3), in the live system's Telegram format (src/cashback/core/telegram_alerts.py
  * `report_bug`, owner requirement 2026-11-02): the severity header with the title, the source, the
  * Vietnam time `HH:MM:SS - DD/MM/YYYY`, the details and the action, sent with `parse_mode: HTML`.
- * Every text is escaped as the live `_sanitize_html` did. Only the label file's words, the time and
- * the repeat count are filled in, so no personal data, bank number or token can reach the chat.
+ * Every text is escaped as the live `_sanitize_html` did. `telegramText` fills in only the label
+ * file's words, the time and the repeat count, so no personal data, bank number or token can reach
+ * the chat through an alert; that guarantee belongs to `telegramText`, not to `telegramSender`.
  */
 import { formatVnAlertStamp, type Instant } from "@cashback/core";
 import ALERT_LABELS from "@cashback/labels/vi/alerts.json" with { type: "json" };
