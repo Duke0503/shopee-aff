@@ -12,6 +12,7 @@
     "./vi/pages.json": "./vi/pages.json",
     "./vi/web.json": "./vi/web.json",
     "./vi/alerts.json": "./vi/alerts.json",
-    "./vi/order-notices.json": "./vi/order-notices.json"
+    "./vi/order-notices.json": "./vi/order-notices.json",
+    "./vi/settlement-notices.json": "./vi/settlement-notices.json"
   }
 }

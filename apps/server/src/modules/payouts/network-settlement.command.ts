@@ -24,7 +24,8 @@
  *
  * A match is computed from a fingerprint of its inputs; an unchanged batch is not matched again and
  * writes nothing. A case staff resolved is not reopened for the same facts. Every record that
- * changes something writes one audit entry.
+ * changes something writes one audit entry, and each change the DP Business group is told writes one
+ * notice row (D63) in the same transaction.
  */
 import { createHash } from "node:crypto";
 import type { NetworkPayoutRecord, NetworkPayoutRecordResponse } from "@cashback/contracts";
@@ -35,7 +36,7 @@ import { and, eq, lt, desc, isNotNull } from "drizzle-orm";
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import { caseResolvedWith, observeWithholding, openOrRefreshCase, settleOrders, settlementCandidates, settlementOrdersOf, type SettlementCaseReason, type SettlementOrder } from "../orders/index";
-import { networkSettlementOrders, networkSettlements, type SettlementMatch, type SettlementOrderOutcome } from "./schema";
+import { networkSettlementOrders, networkSettlements, settlementBusinessNotices, type SettlementMatch, type SettlementNoticeEvent, type SettlementOrderOutcome } from "./schema";
 
 export interface NetworkSettlementDeps {
   readonly clock: Clock;
@@ -230,6 +231,21 @@ function recordFactsChange(db: LedgerDb, s: StoredSettlement, facts: Record<stri
   return raise(db, s, { reason: "settlement_facts_changed", subject: `payout:${s.networkPayoutId}`, orderId: null, candidates: [], facts }, deps);
 }
 
+/** What this record changed that the group is told, status before match: a first record is "created", whatever its status. */
+function noticeEventsOf(before: StoredSettlement | undefined, after: StoredSettlement): SettlementNoticeEvent[] {
+  const events: SettlementNoticeEvent[] = [];
+  if (before === undefined) events.push("created");
+  else if (before.status !== after.status && after.status !== "PROCESSING") events.push(after.status === "PAID" ? "paid" : "failed");
+  if (before?.match !== after.match && (after.match === "MATCHED" || after.match === "MISMATCH")) events.push(after.match === "MATCHED" ? "matched" : "mismatch");
+  return events;
+}
+
+function writeNotices(db: LedgerDb, before: StoredSettlement | undefined, after: StoredSettlement, now: Instant): void {
+  for (const event of noticeEventsOf(before, after)) {
+    db.insert(settlementBusinessNotices).values({ dedupKey: `settlement:${after.settlementId}:${event}`, settlementId: after.settlementId, event, raisedAt: now }).onConflictDoNothing().run();
+  }
+}
+
 /** Records the batch and matches it when it is due; call inside `tx`. */
 export function recordNetworkPayout(db: LedgerDb, record: NetworkPayoutRecord, deps: NetworkSettlementDeps): NetworkPayoutRecordResponse {
   const now = deps.clock.now();
@@ -242,6 +258,7 @@ export function recordNetworkPayout(db: LedgerDb, record: NetworkPayoutRecord, d
   const outcome = matchDue(db, stored, deps);
   const count = (o: SettlementOrderOutcome): number => (outcome.changed ? (outcome.plan?.lines.filter((l) => l.outcome === o).length ?? 0) : 0);
   const after = db.select().from(networkSettlements).where(eq(networkSettlements.settlementId, stored.settlementId)).get() ?? stored;
+  writeNotices(db, existing, after, now);
   const response: NetworkPayoutRecordResponse = {
     settlementId: after.settlementId,
     match: after.match,

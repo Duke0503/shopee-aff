@@ -131,6 +131,11 @@ dismissed; a dismissed case is not reopened for the same facts. Batches imported
 `HISTORIC`: facts and totals only, never matched to orders, no case; window matching uses only
 orders this system approved and starts at the go-live for the first new batch.
 
+The DP Business group is told each change once (D63): a new batch, `PAID`, `FAILED`, and the match
+becoming `MATCHED` or `MISMATCH`. A batch first seen already paid is told as new and then by its
+match, with no separate paid notice. A repeated read, a later paid time or order list, changed facts
+and the cutover import tell nothing, and review cases are not notified on their own.
+
 ## 8. Customer
 
 `ACTIVE`, `LOCKED` (after five failed sign-ins, for a delay that doubles from 1 minute up to 15;

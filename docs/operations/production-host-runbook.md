@@ -61,7 +61,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 | `PUBLIC_BASE_URL` | `https://hoantiendp.com` |
 | `ADMIN_HOST`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUDIENCE` | from section 5.2 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `backup-and-alerts-runbook.md` section 1.3 |
-| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat for the order notices (D62), copied from `C:\Project\mmo\.env` without printing it; see section 10 |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat for the order and settlement notices (D62, D63), copied from `C:\Project\mmo\.env` without printing it; see section 10 |
 | `HEARTBEAT_URL` | from section 3 |
 | `BACKUP_*` | `backup-and-alerts-runbook.md` section 1.4 (age and rclone) |
 | `BACKUP_OFFSITE`, `GDRIVE_WEBHOOK_URL`, `GDRIVE_SECRET_TOKEN`, `BACKUP_ENCRYPTION_KEY` | `backup-and-alerts-runbook.md` section 1.5 (the Drive webhook, production since 2026-11-03) |

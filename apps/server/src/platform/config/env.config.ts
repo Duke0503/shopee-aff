@@ -90,8 +90,8 @@ export interface ServerConfig {
   /** The owner's Telegram alert chat (AD-27); both or none. */
   telegram: { botToken: string; chatId: string } | null;
   /**
-   * The DP Business group's chat for the order notices (D62), sent by the same bot; never the owner's
-   * chat. Without it no notice is sent and the rows wait; production logs that as an error.
+   * The DP Business group's chat for the order and settlement notices (D62, D63), sent by the same
+   * bot; never the owner's chat. Without it no notice is sent and the rows wait; production logs that as an error.
    */
   telegramBusinessChatId: string | null;
   /**
