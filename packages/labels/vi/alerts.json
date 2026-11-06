@@ -35,6 +35,7 @@
       "captcha": { "details": "Yêu cầu tạo link đang chờ vì Shopee dính Captcha.", "action": "Giải Captcha trên trình duyệt Shopee Affiliate. Hàng đợi sẽ chạy lại sau đó." },
       "login_lost": { "details": "Yêu cầu tạo link đang chờ vì Shopee mất phiên đăng nhập.", "action": "Đăng nhập lại Shopee Affiliate rồi mở lại hàng đợi. Hàng đợi sẽ chạy lại sau đó." }
     } },
+    "daily_link_report_failed": { "title": "Không Gửi Được Báo Cáo Link Hằng Ngày", "source": "operations.daily_link_report", "details": "Không gửi được báo cáo link hằng ngày tới nhóm DP Business; hệ thống sẽ thử lại sau 5 phút.", "action": "Kiểm tra bot vẫn ở trong nhóm DP Business. Nếu đến hết ngày vẫn không gửi được, báo cáo của ngày đó sẽ bị bỏ qua." },
     "link_undeliverable": { "title": "Không Gửi Được Link Cho Khách", "source": "linking.link_delivery", "details": "Không gửi được link cho khách sau nhiều lần thử." },
     "notification_daily_cap": { "title": "Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày", "source": "messaging.notifications", "details": "Đã chạm giới hạn tin nhắn Zalo trong ngày; tin còn lại chờ sang ngày mai." },
     "notification_undeliverable": { "title": "Tin Nhắn Zalo Không Gửi Được", "source": "messaging.notifications", "details": "Có tin nhắn Zalo không gửi được cho khách." },

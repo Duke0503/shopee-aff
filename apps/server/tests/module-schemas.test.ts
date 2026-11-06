@@ -77,6 +77,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       outbox_cap_days: "messaging",
       audit_entries: "operations",
       alerts: "operations",
+      daily_link_reports: "operations",
       campaigns: "campaigns",
       campaign_awards: "campaigns",
       payouts: "payouts",

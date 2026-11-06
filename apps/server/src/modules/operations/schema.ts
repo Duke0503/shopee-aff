@@ -1,5 +1,5 @@
 /**
- * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012, 0031, 0036). Only this
+ * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012, 0031, 0036, 0037). Only this
  * module writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -43,3 +43,12 @@ export const alerts = sqliteTable("alerts", {
 });
 
 export type AlertRow = typeof alerts.$inferSelect;
+
+/** One row per reported Vietnam day (migration 0037, D66): one report per day, whatever restarts. */
+export const dailyLinkReports = sqliteTable("daily_link_reports", {
+  reportDate: text("report_date").primaryKey().notNull(),
+  /** JSON array of the messages, written once; it holds names, so it is NULL once sent or dropped. */
+  parts: text("parts"),
+  partsSent: integer("parts_sent").notNull().default(0),
+  sentAt: text("sent_at"),
+});

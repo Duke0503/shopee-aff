@@ -34,6 +34,8 @@ export const JOB_SCHEDULES = {
   orderBusinessNotices: { context: "orders", schedule: every(30_000) },
   /** Pending settlement notices sent to the DP Business group, under the same rules (D63). */
   settlementBusinessNotices: { context: "payouts", schedule: every(30_000) },
+  /** Yesterday's link report to the DP Business group: from 07:00 Vietnam time, once a day, retried until sent (D66). */
+  dailyLinkReport: { context: "operations", schedule: every(5 * 60_000) },
   /** Hourly; the first run 3 minutes after start, so frequent deploys never postpone it (production 2026-11-03). */
   reconcile: { context: "orders", schedule: every(60 * 60_000, 3 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },

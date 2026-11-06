@@ -11,13 +11,13 @@
  * pre-migration backup cannot wait for the delivery job, so its alert is sent at once
  * (`startupAlerts`). The stuck-request check (D65) only stores alerts, so it runs either way.
  *
- * The order and settlement notices of the DP Business group (D62, D63) go by the same bot to their
- * own chat. Without that chat neither job runs, the rows wait and production logs an error at start;
- * they never fall back to the owner's chat.
+ * The order and settlement notices and the daily link report of the DP Business group (D62, D63,
+ * D66) go by the same bot to their own chat. Without that chat none of these jobs runs, the rows wait
+ * and production logs an error at start; they never fall back to the owner's chat.
  */
 import type { Clock } from "@cashback/core";
 
-import { deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, raiseStuckRequestAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
+import { deliverDailyLinkReport, deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, raiseStuckRequestAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
 import { deliverBusinessNotices } from "../modules/orders/index";
 import { balanceTotals, deliverSettlementNotices } from "../modules/payouts/index";
 import { backupHealth, backupStatusPath, readBackupStatus, type BackupHealth } from "../platform/backup/backup-status";
@@ -116,7 +116,7 @@ export function ownerJobs(deps: OwnerJobsDeps): Job[] {
   return jobs;
 }
 
-/** The DP Business group's order and settlement notices (D62, D63), by one sender; none without the bot or the group's chat. */
+/** The DP Business group's order and settlement notices and daily link report (D62, D63, D66), by one sender; none without the bot or the group's chat. */
 export function businessNoticeJobs(deps: OwnerJobsDeps): Job[] {
   const { config, ledger, clock, logger } = deps;
   const chatId = config.telegramBusinessChatId ?? null;
@@ -127,9 +127,11 @@ export function businessNoticeJobs(deps: OwnerJobsDeps): Job[] {
   // A missing bot is already logged as operations.alert.telegram_absent.
   if (config.telegram === null) return [];
   const sender = telegramSender({ botToken: config.telegram.botToken, chatId });
+  const alerts = ledgerAlerts(ledger, clock, logger);
   return [
     { name: "orderBusinessNotices", ...JOB_SCHEDULES.orderBusinessNotices, run: async () => void (await deliverBusinessNotices(ledger, sender, clock, logger)) },
     { name: "settlementBusinessNotices", ...JOB_SCHEDULES.settlementBusinessNotices, run: async () => void (await deliverSettlementNotices(ledger, sender, clock, logger)) },
+    { name: "dailyLinkReport", ...JOB_SCHEDULES.dailyLinkReport, run: async () => void (await deliverDailyLinkReport(ledger, sender, clock, logger, alerts)) },
   ];
 }
 

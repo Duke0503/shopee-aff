@@ -1,7 +1,7 @@
 /**
  * The Telegram sender (AD-27): one `sendMessage` call per message, never inside a transaction, to
  * the chat it is bound to: the owner's chat for alerts, and the DP Business group's chat for the
- * order, settlement and new-member notices (D62, D63, D64); an order notice's text carries a customer's name and id, and a new-member notice a joiner's name and Zalo id. The bot token is a secret from platform/config and appears
+ * order, settlement and new-member notices and the daily link report (D62, D63, D64, D66); an order notice's text carries a customer's name and id, and a new-member notice a joiner's name and Zalo id. The bot token is a secret from platform/config and appears
  * in no log line or error message. `fetch` is injected so tests use a fake and never reach the
  * network.
  *

@@ -82,6 +82,7 @@ export {
   LINK_REQUESTS_LIST,
   linkRequestCountOf,
 } from "./link-requests.list";
+export { linkCountsOfDay, type CustomerLinkCounts } from "./link-day.query";
 export { deliveredLinkCounts, failedLinkCount, oldestDueLinkRequest, waitingLinkRequests, type NetworkCount, type WaitingLinks } from "./link-overview.query";
 export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type LinkRequestNote, type QueuedLinkRequest } from "./link-request.command";
 export { claimLinkJob, claimLinkWork, type ApiLinkRequest, type ClaimOptions, type LinkWork } from "./link-issue.command";

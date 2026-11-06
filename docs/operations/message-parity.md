@@ -240,6 +240,7 @@ Counts (messages.json, 99 keys): 12 adapted, 45 identical, 35 new-only, 7 not-za
 | `shopee_payout_record_unreadable` | new-only, in the report_bug format | Trang Thanh Toán Shopee Đổi Dạng |
 | `shopee_payout_status_refused` | new-only, in the report_bug format | Trạng Thái Thanh Toán Shopee Lạ |
 | `web_link_safety_cap` | new-only, in the report_bug format | Website Chạm Giới Hạn An Toàn Tạo Link |
+| `daily_link_report_failed` | new-only, in the report_bug format (D66) | Không Gửi Được Báo Cáo Link Hằng Ngày |
 
 ### Telegram order notices (DP Business group, D62)
 
@@ -269,3 +270,20 @@ known is left out, and no notice names a customer.
 | `failed` | `PROCESSING -> FAILED` | Payout id, status, the batch's amount |
 | `matched` | Match becomes `MATCHED` | Payout id, orders settled, matched gross, unattributed (left out when negative), a warning naming the batch's open review cases when it has any |
 | `mismatch` | Match becomes `MISMATCH` | Payout id, gross, the batch's open review cases (or the Payouts page when none is open) |
+
+### Telegram daily link report (DP Business group, D66)
+
+Wording in `packages/labels/vi/link-report.json`. New-only: the live system sent no such report. Each
+day from 07:00 Vietnam time one report covers yesterday, with statuses as they stand when it is written.
+
+| Part | Label keys | Shows |
+|---|---|---|
+| Header | `header` | The day it covers, `DD/MM/YYYY` |
+| Totals | `line_products`, `line_succeeded`, `line_failed`, `line_waiting` | Products and customers, then successes (delivered or converted), failures, and those still waiting (queued or issued) |
+| Quiet day | `quiet` | In place of the totals and customers when no request was made |
+| One customer, by most requests | `line_customer` with `customer_named`, `customer_id` or `customer_guest`, and `customer_waiting` | Name and id, the id alone (no name, erased or unknown), or the guest line; products, successes, failures, and those still waiting when not zero |
+| Failed product | `line_failed_product` | Under its customer: the looked-up name, or the source link when that is empty; cut to 200 characters. Left out for an erased or unknown customer |
+
+Over 4,096 characters the report goes as several messages, split at a line break, with every value
+HTML-escaped. A customer stays in one message with its failed products unless that block alone is over
+the limit.

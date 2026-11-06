@@ -262,7 +262,7 @@ ${(LABELS["line_repeated"] as string).replace("{count}", "2")}`);
     expect(ownerJobs({ config: { ...base, telegram: null }, ledger, clock, logger, heartbeats, health: healthSourcesFor({ ...base, telegram: null }, heartbeats) }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck"]);
     expect(lines.some((l) => l.includes('"level":50') && l.includes("operations.alert.telegram_absent"))).toBe(true);
     expect(ownerJobs({ config: { ...base, telegram: { botToken: BOT_TOKEN, chatId: CHAT_ID } }, ledger, clock, logger, heartbeats, health: {} }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "alertDelivery"]);
-    expect(ownerJobs({ config: { ...base, telegram: { botToken: BOT_TOKEN, chatId: CHAT_ID }, telegramBusinessChatId: "-1009" }, ledger, clock, logger, heartbeats, health: {} }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "alertDelivery", "orderBusinessNotices", "settlementBusinessNotices"]);
+    expect(ownerJobs({ config: { ...base, telegram: { botToken: BOT_TOKEN, chatId: CHAT_ID }, telegramBusinessChatId: "-1009" }, ledger, clock, logger, heartbeats, health: {} }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "alertDelivery", "orderBusinessNotices", "settlementBusinessNotices", "dailyLinkReport"]);
   });
 
   it("the runbook's alert table lists every alert kind with its severity", () => {

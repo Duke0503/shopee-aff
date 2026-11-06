@@ -1,6 +1,6 @@
 /**
- * The operations module (AD-1): audit entries, alerts, their Telegram delivery and the one health
- * model (AD-17, AD-27); it implements the platform audit and alert ports. It sits on top and may
+ * The operations module (AD-1): audit entries, alerts, their Telegram delivery, the daily link
+ * report (D66) and the one health model (AD-17, AD-27); it implements the platform audit and alert ports. It sits on top and may
  * import identity, linking, orders and payouts. Other modules reach it only through this file (code.md §1), and the modules
  * below it only through the ports.
  */
@@ -8,6 +8,8 @@ export { AuditEntryError, auditFor, commandAudit, recordAudit } from "./audit.co
 export { ALERT_MAX_ATTEMPTS, alertsFor, claimForSending, expireAlerts, ledgerAlerts, markAlertDelivery, pendingAlerts, raiseAlert, raiseKeyedAlert, type AlertOutcome, type KeyedAlert } from "./alert.command";
 export { parseAlertDetail, renderStoredAlert } from "./alert-render.query";
 export { LINK_REQUEST_STUCK_ALERT, raiseStuckRequestAlerts } from "./link-stuck.job";
+export { DAILY_LINK_REPORT_FAILED_ALERT, DAILY_LINK_REPORT_FROM, deliverDailyLinkReport, type DailyLinkReportRun } from "./daily-link-report.job";
+export { dailyLinkReportOf, splitReportBlocks, TELEGRAM_TEXT_MAX, type DailyLinkReport } from "./daily-link-report.query";
 export { ALERT_EXPIRY_MS, ALERTS_PER_RUN, BOOKKEEPING_ATTEMPTS, deliverPendingAlerts, immediateAlerts, type DeliveryResult } from "./alert-delivery.job";
 export { ALERT_COOLDOWN_MS, alertText } from "./domain/alert-cooldown";
 export { isIdentifierKey, isPersonalKey, payloadProblems, type AuditProblem } from "./domain/audit-payload";

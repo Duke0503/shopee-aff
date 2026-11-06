@@ -56,7 +56,7 @@ stays out of the repository.
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather | both Telegram keys or neither |
 | `TELEGRAM_CHAT_ID` | `-1004416753701` | digits, optional leading `-` |
-| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices (D62, D63, D64) go here and never fall back to the owner's chat |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices and the daily link report (D62, D63, D64, D66) go here and never fall back to the owner's chat |
 | `BACKUP_AGE_PATH` | `C:\Tools\age\age.exe` | absolute; the four `BACKUP_*` keys come together or not at all |
 | `BACKUP_AGE_RECIPIENT` | `age1...` (62 characters) | the public key only; a private key is refused |
 | `BACKUP_RCLONE_PATH` | `C:\Tools\rclone\rclone.exe` | absolute |
@@ -65,7 +65,8 @@ stays out of the repository.
 
 Without `TELEGRAM_BUSINESS_CHAT_ID` no order or settlement notice is sent and the rows stay PENDING in
 `order_business_notices` and `settlement_business_notices` until the chat is set; the first run of
-each job then expires those older than 24 hours and sends the rest. Production logs `orders.business_notice.chat_absent` as an error at every
+each job then expires those older than 24 hours and sends the rest. The daily link report does not run
+either, and a day without the chat is never made up (section 4.4). Production logs `orders.business_notice.chat_absent` as an error at every
 start and still starts.
 
 Without Telegram keys alerts are stored and logged only; production logs
@@ -267,6 +268,7 @@ Every kind the server raises; a test checks this table against the code.
 | `bridge_page_error` | warning | a Shopee page error while making a link; the queue is held | nothing unless it repeats; then restart the bridge tab |
 | `bridge_short_link_unresolved` | warning | a customer's short link could not be opened | nothing; the customer gets the failure message |
 | `link_request_stuck` | high | a customer's Shopee link request waits behind a stopped queue (captcha or lost login); one message per request, with the customer's name and id, the product and the reason (D65) | clear the captcha or sign in again as the reason says; the queue resumes after it |
+| `daily_link_report_failed` | high | the daily link report could not be sent to the DP Business group; it is retried every 5 minutes (D66) | check that the bot is still in the group and `TELEGRAM_BUSINESS_CHAT_ID` is right; a report not sent by 24:00 Vietnam time is dropped |
 | `link_queue_stuck` | warning | a due link request on an open queue has waited over 10 minutes | check the link job and the bridge in the server log |
 | `link_undeliverable` | warning | a link could not be handed to the customer after its tries | nothing unless it repeats |
 | `notification_undeliverable` | warning | a Zalo message could not be delivered | nothing unless it repeats |
@@ -277,3 +279,19 @@ Every kind the server raises; a test checks this table against the code.
 
 A new kind needs a line in `packages/labels/vi/alerts.json` and a row here; the tests fail until
 both exist.
+
+### 4.4 The daily link report (D66)
+
+From 07:00 Vietnam time the job reports yesterday to `TELEGRAM_BUSINESS_CHAT_ID`, one row per day in
+`daily_link_reports`. Its stored `parts` hold customer names and are cleared only when the job runs:
+when the report is sent, or when a later day's report replaces an unsent one. While the server is down
+or the chat is unset, they stay. These log lines carry counts, HTTP statuses and error names only:
+
+| Log event | Level | Meaning |
+| --- | --- | --- |
+| `operations.daily_link_report.written` | info | the day's report was rendered and stored: customers, requests, parts |
+| `operations.daily_link_report.delivered` | info | the run sent the rest of the report |
+| `operations.daily_link_report.delivery_failed` | warn | a send failed; the next run retries it, and `daily_link_report_failed` is raised |
+| `operations.daily_link_report.earlier_days_skipped` | warn | a new day's report started: `unsent` older reports were dropped and `missed` days had none |
+| `operations.daily_link_report.bookkeeping_failed` | warn | one try at writing how far the report went failed |
+| `operations.daily_link_report.bookkeeping_lost` | error | all three tries failed; the run stops and the next run sends the uncounted part again |
