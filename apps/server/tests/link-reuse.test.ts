@@ -234,21 +234,26 @@ describe("Story 5.2: what is never handed back", () => {
 });
 
 describe("Story 5.2 review: only a link that names one product is ever reused", () => {
-  it("review 3: a search, the home page, a shop page, a flash sale and a short link get no product key and are never handed back", () => {
+  it("review 3, D68: a search, the home page, a shop page, a flash sale and a short link get no product key and are handed back only while they wait", () => {
     const pages = ["https://shopee.vn/search?keyword=a", "https://shopee.vn/search?keyword=b", "https://shopee.vn/", "https://shopee.vn", "https://shopee.vn/shop/166586877", "https://shopee.vn/flash_sale?promotionId=123456", "https://s.shopee.vn/AbC123"];
     for (const url of pages) expect([url, shopeeProductKey(url)]).toEqual([url, null]);
     const ledger = seededLedger();
     for (const url of pages) {
       const first = ask(ledger, "DP00001", url);
-      const again = ask(ledger, "DP00001", url);
+      const waiting = ask(ledger, "DP00001", url);
       expect(first.reused).toBe(false);
+      expect(waiting).toMatchObject({ requestId: first.requestId, reused: true });
+      ledger.sqlite.prepare("UPDATE link_requests SET status = 'ISSUED', affiliate_url = 'https://s.shopee.vn/made' WHERE request_id = ?").run(first.requestId);
+      const again = ask(ledger, "DP00001", url);
       expect(again.reused).toBe(false);
       expect(again.requestId).not.toBe(first.requestId);
+      // Two of these pages are stored as one link: nothing is left waiting for the next round.
+      ledger.sqlite.prepare("UPDATE link_requests SET status = 'ISSUED', affiliate_url = 'https://s.shopee.vn/made' WHERE request_id = ?").run(again.requestId);
     }
     // Search "a" never hands out the link made for search "b", nor a guest's search link.
     const guestA = ask(ledger, "HOUSE", "https://shopee.vn/search?keyword=a");
     expect(ask(ledger, "HOUSE", "https://shopee.vn/search?keyword=b").requestId).not.toBe(guestA.requestId);
-    expect(ask(ledger, "HOUSE", "https://shopee.vn/search?keyword=a").reused).toBe(false);
+    expect(ask(ledger, "DP00001", "https://shopee.vn/search?keyword=z").requestId).not.toBe(guestA.requestId);
   });
 
   it("review 4: migration 0023 keys every request stored before it, so a pre-migration request is reused and the guest keeps one link per product", () => {

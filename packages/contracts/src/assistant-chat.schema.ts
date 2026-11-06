@@ -68,7 +68,7 @@ export type LinkRefusal = (typeof LINK_REFUSALS)[number];
  * so the assistant decides the welcome from this one call.
  */
 export const assistantLinkAnswerSchema = z.discriminatedUnion("outcome", [
-  z.object({ outcome: z.literal("queued"), customerId, customerCode, registered: z.boolean(), requestId, reused: z.boolean() }),
+  z.object({ outcome: z.literal("queued"), customerId, customerCode, registered: z.boolean(), requestId, reused: z.boolean(), status: z.enum(["QUEUED", "ISSUED", "DELIVERED", "CONVERTED"]) }),
   z.object({ outcome: z.literal("refused"), reason: z.enum(LINK_REFUSALS), customerId: customerId.nullable(), customerCode, registered: z.boolean() }),
 ]);
 export type AssistantLinkAnswer = z.infer<typeof assistantLinkAnswerSchema>;

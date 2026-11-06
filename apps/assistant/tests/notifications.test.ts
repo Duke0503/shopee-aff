@@ -293,7 +293,7 @@ describe("Sprint 26 review: nothing is sent with a raw placeholder", () => {
 describe("Story 6.5: link delivered once, by chat or by notification (assistant)", () => {
   const madeReply = replyOf("26110100001", { status: "ISSUED", shareUrl: SHARE, factsSettled: true, product: { name: "Ao thun", price: 150_000 }, estimate: { cashback: 12_345, shareBps: 8_000, withheld: true } });
   const LINK = "https://shopee.vn/Ao-thun-i.11001.22001";
-  const known = (reused = false) => () => ok({ outcome: "queued", customerId: "70001", customerCode: "DP00001", registered: false, requestId: "26110100001", reused });
+  const known = (reused = false, status = reused ? "ISSUED" : "QUEUED") => () => ok({ outcome: "queued", customerId: "70001", customerCode: "DP00001", registered: false, requestId: "26110100001", reused, status });
 
   async function replyTo(server: FakeServer, zaloSession?: FakeZaloSession, reply = madeReply) {
     server.routes[ASSISTANT_LINK_REPLY_PATH] = () => ok(reply);
@@ -360,6 +360,17 @@ describe("Story 6.5: link delivered once, by chat or by notification (assistant)
     const { zalo, assistant } = await replyTo(server);
     await paste(zalo);
     expect(zalo.sent).toEqual([]);
+    await assistant.stop();
+  });
+
+  it("D68: a resend of a request still QUEUED when asked sends no link once the first send has delivered it", async () => {
+    const server = fakeServer();
+    server.routes["/internal/assistant/link-requests"] = known(true, "QUEUED");
+    server.routes[ASSISTANT_LINK_CLAIM_PATH] = () => ok({ claim: "delivered" });
+    const { zalo, assistant } = await replyTo(server, undefined, { ...madeReply, status: "DELIVERED" });
+    await paste(zalo);
+    expect(zalo.sent).toEqual([]);
+    expect(server.callsTo(ASSISTANT_LINK_CONFIRM_PATH)).toEqual([]);
     await assistant.stop();
   });
 

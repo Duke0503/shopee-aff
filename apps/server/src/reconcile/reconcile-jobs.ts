@@ -10,15 +10,16 @@
  */
 import type { Clock, Instant } from "@cashback/core";
 
-import { accessTradeWindowSource, ReportSourceError, shopeeBridgeSource, shopeeFileWindowSource, type WindowedReportSource } from "../modules/linking/index";
+import { accessTradeWindowSource, ReportSourceError, shopeeBridgeSource, shopeeFileWindowSource, shopeeQueueGate, type WindowedReportSource } from "../modules/linking/index";
 import { alertsFor } from "../modules/operations/index";
 import type { ServerConfig } from "../platform/config/env.config";
-import type { Ledger } from "../platform/db/ledger";
+import type { Ledger, LedgerDb } from "../platform/db/ledger";
 import { JOB_SCHEDULES } from "../platform/jobs/job-schedules";
-import type { Job, JobTimer } from "../platform/jobs/scheduler";
+import type { Job, JobTimer, Scheduler, TriggerResult } from "../platform/jobs/scheduler";
 import type { Logger } from "../platform/log/logger";
 import type { BridgePort } from "../platform/ports/bridge.port";
 import { isSilent, wouldBeSends } from "../modules/messaging/index";
+import { latestRunFailed } from "../modules/orders/index";
 import { runHourlyReconcile, type ReconcileContext } from "./hourly-reconcile.job";
 import { runNightlySweep, SWEEP_PACING, timerWait, type Wait } from "./nightly-sweep.job";
 
@@ -82,6 +83,22 @@ export async function reportingWouldBeSends(ctx: Pick<ReconcileContext, "ledger"
   } finally {
     logWouldBeSends(ctx, since, job);
   }
+}
+
+/**
+ * A captcha hold just ended (D68): a Shopee read the captcha broke runs again now rather than at its
+ * next turn. Nothing starts after a successful run, nor while a lost login keeps the queue paused,
+ * where the read would only record another failure. A run already going is left alone.
+ */
+export function reconcileAfterCaptchaCleared(db: LedgerDb, clock: Clock, jobs: Pick<Scheduler, "trigger">): TriggerResult | null {
+  if (shopeeQueueGate(db, clock.now()) !== "open" || !latestRunFailed(db, "shopee")) return null;
+  return jobs.trigger("reconcile");
+}
+
+/** The composition root's callback for a cleared captcha; `jobs` is null before the scheduler is built. Logs whether a reconcile started. */
+export function onCaptchaCleared(db: LedgerDb, clock: Clock, jobs: Pick<Scheduler, "trigger"> | null, logger: Pick<Logger, "info">): void {
+  const result = jobs === null ? null : reconcileAfterCaptchaCleared(db, clock, jobs);
+  logger.info({ started: result === "started", result }, "orders.reconciliation.after_captcha_cleared");
 }
 
 export function reconcileJobs(input: ReconcileJobsInput): Job[] {

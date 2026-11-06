@@ -65,7 +65,7 @@ export function fakeServer(): FakeServer {
     // A private message registers its sender; in the group the fake treats the member as known.
     [ASSISTANT_LINK_REQUEST_PATH]: (body) => {
       const { id, code, created } = body["chat"] === "private" ? register(body) : { id: String(body["zaloUserId"]), code: "DP00009", created: false };
-      return ok({ outcome: "queued", customerId: id, customerCode: code, registered: created, requestId: "26110100001", reused: false });
+      return ok({ outcome: "queued", customerId: id, customerCode: code, registered: created, requestId: "26110100001", reused: false, status: "QUEUED" });
     },
     [ASSISTANT_LINK_REPLY_PATH]: (body) => ok(replyOf(String(body["requestId"]))),
     // Story 6.5: the reply claims its link; nothing is due in the outbox unless a test says so.

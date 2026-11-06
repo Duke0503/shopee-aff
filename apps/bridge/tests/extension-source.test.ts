@@ -8,10 +8,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BRIDGE_INSTANCE_HEADER, BRIDGE_TOKEN_HEADER } from "@cashback/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { loopbackOrigin, parseSettings } from "../src/bridge-settings";
-import { serverClient, type Fetch } from "../src/server-client";
+import { serverClient, VERIFICATION_POST_TIMEOUT_MS, type Fetch } from "../src/server-client";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SOURCES = readdirSync(join(ROOT, "src")).filter((f) => f.endsWith(".ts")).map((f) => ({ file: f, text: readFileSync(join(ROOT, "src", f), "utf8") }));
@@ -59,6 +59,40 @@ describe("Story 5.3 AC4: no Shopee signature and no direct Shopee API call", () 
 });
 
 describe("Story 5.3: the token goes only to this machine's internal listener", () => {
+  it("D68: the captcha cleared post carries the bridge token and no body, and reads the server's answer", async () => {
+    const calls: { url: string; method: string; headers: Record<string, string>; body?: string }[] = [];
+    const replies = [{ status: 200, body: { cleared: true } }, { status: 200, body: { cleared: false } }, { status: 401, body: null }, { status: 503, body: null }];
+    const fetch: Fetch = async (url, init) => {
+      calls.push({ url, ...init });
+      const reply = replies.shift() ?? { status: 500, body: null };
+      return { status: reply.status, json: async () => reply.body };
+    };
+    const client = serverClient({ serverOrigin: "http://127.0.0.1:9081", token: "b".repeat(40), instance: "c".repeat(32) }, fetch);
+    expect(await client.verificationCleared()).toBe(true);
+    expect(await client.verificationCleared()).toBe(false);
+    expect(await client.verificationCleared()).toBe(false);
+    await expect(client.verificationCleared()).rejects.toThrow("503");
+    expect(calls[0]).toEqual({ url: "http://127.0.0.1:9081/internal/bridge/verification-cleared", method: "POST", headers: { [BRIDGE_TOKEN_HEADER]: "b".repeat(40), [BRIDGE_INSTANCE_HEADER]: "c".repeat(32) }, signal: expect.any(AbortSignal) });
+  });
+
+  it("D68: a stalled captcha cleared post gives up after 10 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetch: Fetch = (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+      const client = serverClient({ serverOrigin: "http://127.0.0.1:9081", token: "b".repeat(40), instance: "c".repeat(32) }, fetch);
+      let ended = false;
+      const post = client.verificationCleared().finally(() => (ended = true));
+      const failed = expect(post).rejects.toThrow("aborted");
+      await vi.advanceTimersByTimeAsync(VERIFICATION_POST_TIMEOUT_MS - 1);
+      expect(ended).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await failed;
+      expect(VERIFICATION_POST_TIMEOUT_MS).toBe(10_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("accepts only http://127.0.0.1:<port> with nothing after it, and a token of at least 32 characters", () => {
     expect(loopbackOrigin("http://127.0.0.1:9081")).toBe("http://127.0.0.1:9081");
     expect(loopbackOrigin(" http://127.0.0.1:9081/ ")).toBe("http://127.0.0.1:9081");

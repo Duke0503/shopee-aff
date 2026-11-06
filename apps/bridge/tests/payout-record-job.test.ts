@@ -26,6 +26,8 @@ function fakePayoutPage(looks: PayoutLook[]): PageDriver & { calls: string[] } {
   const calls: string[] = [];
   return {
     calls,
+    replaceTab: async () => null,
+    replacements: () => 0,
     prepare: async () => void calls.push("prepare"),
     href: async () => PAYOUT_RECORD_URL,
     open: async (url) => void calls.push(`open ${url}`),

@@ -30,6 +30,8 @@ function lookupPage(store: Partial<StorefrontLook>, offers: OfferLook[], href?: 
   return {
     opened,
     looks,
+    replaceTab: async () => null,
+    replacements: () => 0,
     prepare: async () => undefined,
     href: async () => at,
     open: async (url) => {

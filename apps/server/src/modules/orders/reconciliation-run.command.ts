@@ -242,6 +242,12 @@ export function lastSucceededRun(db: LedgerDb, network: WindowedReportSource["ne
   return (last?.finishedAt ?? null) as Instant | null;
 }
 
+/** Whether the network's latest run, of any kind, failed; false with no run yet (D68). */
+export function latestRunFailed(db: LedgerDb, network: WindowedReportSource["network"]): boolean {
+  const last = db.select({ outcome: reconciliationRuns.outcome }).from(reconciliationRuns).where(eq(reconciliationRuns.network, network)).orderBy(desc(reconciliationRuns.runId)).limit(1).get();
+  return last?.outcome === "FAILED";
+}
+
 /** Whether any run of this kind was recorded for the network, whatever its outcome. */
 export function hasRun(db: LedgerDb, network: WindowedReportSource["network"], kind: RunKind): boolean {
   return db.select({ runId: reconciliationRuns.runId }).from(reconciliationRuns).where(and(eq(reconciliationRuns.network, network), eq(reconciliationRuns.kind, kind))).limit(1).get() !== undefined;

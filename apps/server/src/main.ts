@@ -21,7 +21,7 @@ import { adminBuildRoutes } from "./admin/admin-build";
 import { adminDesk } from "./admin/admin-desk";
 import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
-import { accessTradeLinksFor, environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, subIdPrefixFor, type LinkBridge } from "./links/link-jobs";
+import { accessTradeLinksFor, environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, subIdPrefixFor, verificationClearedRoutes, type LinkBridge } from "./links/link-jobs";
 import { healthSourcesFor, ownerJobs, startupAlerts } from "./health/owner-jobs";
 import { assistantGroupJoinRoutes, assistantHeartbeatRoutes, assistantHeartbeats, commandAudit, telegramSender } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
@@ -42,7 +42,7 @@ import { shutdownRoutes } from "./platform/lifecycle/shutdown.routes";
 import { acquireServerLock, lockFilePath, type ServerLock } from "./platform/lock/server-lock";
 import { createLogger, type Logger } from "./platform/log/logger";
 import { payoutRecordJobs } from "./reconcile/payout-record.job";
-import { reconcileJobs } from "./reconcile/reconcile-jobs";
+import { onCaptchaCleared, reconcileJobs } from "./reconcile/reconcile-jobs";
 import { customerSite } from "./web/customer-site";
 
 function readConfig(): ServerConfig | null {
@@ -98,6 +98,8 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     const staff = config.staffAccess ? adminDesk({ access: config.staffAccess, ledger, clock: systemClock, production: config.env === "prod", logger, proofs, health }) : undefined;
     if (!staff) logger.warn({ env: config.env }, "platform.staff.routes_absent");
     const internal = [adminCommandRoutes({ ledger, clock: systemClock }), linkQueueRoutes({ ledger, clock: systemClock }), messagingSilentRoutes({ ledger, clock: systemClock }), payoutWindowRoutes({ ledger, clock: systemClock }), networkPayoutInternalRoutes({ ledger, clock: systemClock, audit: (db, actor) => commandAudit(db, systemClock, actor) }), ...linkRoutes({ config, ledger, clock: systemClock, logger }, bridge)];
+    // A captcha cleared in the browser ends its hold at once, and a read it broke runs again (D68).
+    internal.push(...verificationClearedRoutes({ ledger, clock: systemClock }, bridge, (db) => onCaptchaCleared(db, systemClock, jobs, logger)));
     // dev:stop and `pnpm host stop` ask for an ordered stop here (Stories 8.1, 8.5): on Windows a signal ends the process at once.
     internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     if (config.assistantToken !== null) {

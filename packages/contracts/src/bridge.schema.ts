@@ -8,7 +8,8 @@
  * kept in its profile: the job out belongs to that instance, so a second browser never gets it
  * (no duplicate submission) and the same instance polling again after a restart gets it back. Link
  * jobs, product lookups (Story 5.6), Shopee report pages (Story 5.9) and the Shopee payout record
- * page (Story 4.22) are worked.
+ * page (Story 4.22) are worked. `POST /internal/bridge/verification-cleared` says a Shopee tab left
+ * the verification page, so a captcha hold ends at once (D68).
  */
 import { SHOPEE_SOURCE_MAX_LENGTH } from "@cashback/core";
 import { z } from "zod";
@@ -19,6 +20,7 @@ export const BRIDGE_INSTANCE_HEADER = "x-bridge-instance";
 export const BRIDGE_INSTANCE_PATTERN = /^[a-f0-9]{32}$/;
 export const BRIDGE_NEXT_PATH = "/internal/bridge/next";
 export const BRIDGE_RESULTS_PATH = "/internal/bridge/results";
+export const BRIDGE_VERIFICATION_CLEARED_PATH = "/internal/bridge/verification-cleared";
 
 const alnum = z.string().regex(/^[A-Za-z0-9]+$/).max(64);
 const ticket = z.string().regex(/^[a-f0-9]{32}$/);
@@ -149,6 +151,10 @@ export type BridgeLookupValue = z.infer<typeof bridgeLookupValueSchema>;
 
 export const bridgeResultAcceptedSchema = z.object({ accepted: z.boolean() });
 export type BridgeResultAccepted = z.infer<typeof bridgeResultAcceptedSchema>;
+
+/** `cleared` is true when a captcha hold was running and has ended (D68). */
+export const bridgeVerificationClearedSchema = z.object({ cleared: z.boolean() });
+export type BridgeVerificationCleared = z.infer<typeof bridgeVerificationClearedSchema>;
 
 /** The report page's rows per page and the most pages one read takes (the live `report_reader.py`). */
 export const SHOPEE_REPORT_PAGE_SIZE = 50;

@@ -6,7 +6,7 @@
 import type { PageDriver, Wait } from "../src/bridge-tab";
 import type { ChromeApi, ChromeTab } from "../src/chrome-api.types";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FillInput, type ResultLook } from "../src/page-scripts";
-import { CUSTOM_LINK_URL } from "../src/shopee-page";
+import { CUSTOM_LINK_URL, pageBlock } from "../src/shopee-page";
 
 export interface FakePageState {
   href: string;
@@ -20,6 +20,8 @@ export interface FakePageState {
   formAfterOpens?: number;
   /** Where Shopee sends every page load (a verification or login page). */
   stuckAt?: string;
+  /** Where a replaced tab lands and what its page loads end at; null when no fresh tab can be had. */
+  fresh?: { href: string; stuckAt?: string } | null;
 }
 
 export function fakePage(over: Partial<FakePageState> = {}): PageDriver & { state: FakePageState; calls: string[]; filled: FillInput[]; waited: number[] } {
@@ -28,6 +30,7 @@ export function fakePage(over: Partial<FakePageState> = {}): PageDriver & { stat
   const filled: FillInput[] = [];
   let looks = -1;
   let opens = 0;
+  let replacements = 0;
   const answerLook = (previous: string): ResultLook => {
     if (looks < 0 || state.answer === null) return { state: "waiting" };
     looks++;
@@ -42,6 +45,15 @@ export function fakePage(over: Partial<FakePageState> = {}): PageDriver & { stat
     calls,
     filled,
     waited: [],
+    replacements: () => replacements,
+    replaceTab: async () => {
+      calls.push("replace");
+      if (state.fresh === null) return null;
+      replacements++;
+      state.href = state.fresh?.href ?? CUSTOM_LINK_URL;
+      state.stuckAt = state.fresh?.stuckAt;
+      return { shows: pageBlock(state.href, false) };
+    },
     prepare: async () => void calls.push("prepare"),
     href: async () => state.href,
     open: async (url) => {
@@ -89,9 +101,13 @@ export interface FakeChrome extends ChromeApi {
   readonly listeners: Record<string, ((...args: never[]) => void)[]>;
   readonly alarmsCreated: { name: string; periodInMinutes: number }[];
   openTabs: ChromeTab[];
+  /** Whether the last focused window still has the focus: false with Chrome in the background. A tab whose `windowId` is not 1 is in another window. */
+  windowFocused: boolean;
   /** Where a newly opened tab lands (a verification or login page); its own address when unset. */
   landsAt?: string;
 }
+
+const WINDOW = 1;
 
 export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unknown> = {}): FakeChrome {
   const updates: FakeChrome["updates"] = [];
@@ -103,6 +119,7 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
   const event = (name: string) => ({ addListener: (fn: (...args: never[]) => void) => void (listeners[name] ??= []).push(fn) });
   const self: FakeChrome = {
     openTabs,
+    windowFocused: true,
     updates,
     created,
     reloads,
@@ -130,9 +147,12 @@ export function fakeChrome(openTabs: ChromeTab[] = [], store: Record<string, unk
       reload: async (tabId) => void reloads.push(tabId),
       remove: async (tabId) => {
         removed.push(tabId);
-        self.openTabs = self.openTabs.filter((t) => t.id !== tabId);
+        self.openTabs = self.openTabs.filter((t) => t.id !== tabId); for (const fire of listeners["tabs.onRemoved"] ?? []) (fire as (id: number, info: object) => void)(tabId, {});
       },
+      onUpdated: event("tabs.onUpdated"),
+      onRemoved: event("tabs.onRemoved"),
     },
+    windows: { getLastFocused: async () => ({ focused: self.windowFocused, tabs: self.openTabs.filter((t) => (t.windowId ?? WINDOW) === WINDOW) }) },
     scripting: { executeScript: async () => [] },
     storage: {
       local: { get: async (keys) => Object.fromEntries(keys.filter((k) => k in store).map((k) => [k, store[k]])), set: async (items) => void Object.assign(store, items) },
