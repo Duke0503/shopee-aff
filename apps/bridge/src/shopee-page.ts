@@ -7,6 +7,7 @@
  * `sub1-sub2---`.
  */
 
+import { BRIDGE_BLOCKED_AT_MAX_LENGTH } from "@cashback/contracts";
 import { hostOnDomain, SHOPEE_LINK_DOMAINS } from "@cashback/core";
 
 export const CUSTOM_LINK_URL = "https://affiliate.shopee.vn/offer/custom_link";
@@ -50,6 +51,14 @@ export function pageBlock(href: string, passwordBox: boolean): PageBlock {
   if (VERIFICATION_MARKERS.some((m) => href.includes(m))) return "captcha";
   if (passwordBox || LOGIN_MARKERS.some((m) => href.includes(m))) return "login_redirect";
   return null;
+}
+
+/** A page's address as an answer may carry it: origin and path only, never a query string or a fragment (D69). */
+export function pageAddress(href: string): string | undefined {
+  if (!URL.canParse(href)) return undefined;
+  const url = new URL(href);
+  if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+  return `${url.origin}${url.pathname}`.slice(0, BRIDGE_BLOCKED_AT_MAX_LENGTH);
 }
 
 /**

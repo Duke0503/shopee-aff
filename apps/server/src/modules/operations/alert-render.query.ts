@@ -4,28 +4,14 @@
  * An erased or unknown customer is named by the id alone, without the product.
  */
 import type { LedgerDb } from "../../platform/db/ledger";
-import { ALERT_SOURCES, type AlertDetail, type AlertSource } from "../../platform/ports/alert.port";
 import { customerCardOf, ledgerOwnerOf } from "../identity/index";
 import { linkRequestSubjectOf } from "../linking/index";
+import { parseAlertDetail } from "./alert.command";
 import type { AlertRow } from "./schema";
 import { telegramText, type AlertRequestFacts } from "./telegram.adapter";
 
 /** The most code points of product text shown, a name or a pasted link: a link can be far longer than one Telegram message holds. */
 const PRODUCT_TEXT_MAX = 200;
-
-const isSource = (value: unknown): value is AlertSource => (ALERT_SOURCES as readonly unknown[]).includes(value);
-
-/** The stored detail, or null for none or one this server cannot read: an alert is still sent without it. */
-export function parseAlertDetail(stored: string | null): AlertDetail | null {
-  if (stored === null) return null;
-  try {
-    const value = JSON.parse(stored) as { source?: unknown; requestId?: unknown } | null;
-    if (!isSource(value?.source)) return null;
-    return typeof value.requestId === "string" ? { source: value.source, requestId: value.requestId } : { source: value.source };
-  } catch {
-    return null;
-  }
-}
 
 function requestFactsOf(db: LedgerDb, requestId: string): AlertRequestFacts {
   const subject = linkRequestSubjectOf(db, requestId);

@@ -25,12 +25,12 @@
 import type { BridgeFailure, BridgeLinkJob } from "@cashback/contracts";
 import { readShopeeFoodLink, readShopeeProduct } from "@cashback/core";
 
-import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { Blocked, blockedAnswer, throwIfBlocked, type PageDriver, type Wait } from "./bridge-tab";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FormSelectors } from "./page-scripts";
 import { isShortLink, NO_RESOLUTION, RESOLVE_TIMEOUT_MS, type ResolveLink } from "./short-link";
-import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, pageBlock, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
+import { CUSTOM_LINK_URL, isShopeeLink, PAGE_ERROR, RESULT_FIELD, SOURCE_TEXTAREA, SUB_ID_FIELDS, SUBMIT_BUTTON_TEXT } from "./shopee-page";
 
-export type LinkAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure };
+export type LinkAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure; blockedAt?: string };
 
 /** How long to wait for the form: first as the page stands, then after one reload (as live). */
 export const FORM_WAITS_MS = [12_000, 20_000] as const;
@@ -67,17 +67,14 @@ const fail = (reason: BridgeFailure): never => {
 };
 
 async function blocked(page: PageDriver): Promise<void> {
-  const look = await page.run(readPage, SELECTORS);
-  const block = pageBlock(look.href, look.passwordBox);
-  if (block !== null) fail(block);
+  throwIfBlocked(await page.run(readPage, SELECTORS));
 }
 
 /** Waits for the form within `limitMs`; true once both the link box and the button are there. */
 async function formAppears(page: PageDriver, wait: Wait, limitMs: number): Promise<boolean> {
   for (let waited = 0; ; waited += FORM_POLL_MS) {
     const look = await page.run(readPage, SELECTORS);
-    const block = pageBlock(look.href, look.passwordBox);
-    if (block !== null) fail(block);
+    throwIfBlocked(look);
     if (look.ready) return true;
     if (waited >= limitMs) return false;
     await wait(FORM_POLL_MS);
@@ -157,7 +154,8 @@ export async function runLinkJob(job: BridgeLinkJob, page: PageDriver, wait: Wai
     if (!pressed.ok) return { outcome: "failed", reason: "submit_failed" };
     return await withSource(await withTarget(await awaitResult(page, wait, previous, resultWaitMs(job.timeoutMs, source.target !== undefined)), resolve));
   } catch (error) {
-    if (error instanceof StepFailure || error instanceof Blocked) return { outcome: "failed", reason: error.reason };
+    if (error instanceof Blocked) return blockedAnswer(error);
+    if (error instanceof StepFailure) return { outcome: "failed", reason: error.reason };
     return { outcome: "failed", reason: "script_error" };
   }
 }

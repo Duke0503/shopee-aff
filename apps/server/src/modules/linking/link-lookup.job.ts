@@ -90,7 +90,7 @@ export async function runProductLookups(deps: LookupJobDeps, signal: AbortSignal
       break;
     }
     const result = deps.ledger.tx((db) => recordLookupResult(db, job, answer, deps.clock, deps.effects));
-    deps.logger.info({ ...where, outcome: result.outcome, reason: result.reason }, "linking.lookup.recorded");
+    deps.logger.info({ ...where, outcome: result.outcome, reason: result.reason, ...(result.page === undefined ? {} : { page: result.page }) }, "linking.lookup.recorded");
     recorded++;
     if (result.outcome === "held" || result.outcome === "paused") break;
   }

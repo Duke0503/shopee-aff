@@ -6,7 +6,7 @@
 import type { PageDriver, Wait } from "../src/bridge-tab";
 import type { ChromeApi, ChromeTab } from "../src/chrome-api.types";
 import { fillForm, pressSubmit, readPage, readResult, readResultBox, type FillInput, type ResultLook } from "../src/page-scripts";
-import { CUSTOM_LINK_URL, pageBlock } from "../src/shopee-page";
+import { CUSTOM_LINK_URL, pageAddress, pageBlock } from "../src/shopee-page";
 
 export interface FakePageState {
   href: string;
@@ -52,7 +52,9 @@ export function fakePage(over: Partial<FakePageState> = {}): PageDriver & { stat
       replacements++;
       state.href = state.fresh?.href ?? CUSTOM_LINK_URL;
       state.stuckAt = state.fresh?.stuckAt;
-      return { shows: pageBlock(state.href, false) };
+      const shows = pageBlock(state.href, false);
+      const blockedAt = shows === null ? undefined : pageAddress(state.href);
+      return blockedAt === undefined ? { shows } : { shows, blockedAt };
     },
     prepare: async () => void calls.push("prepare"),
     href: async () => state.href,

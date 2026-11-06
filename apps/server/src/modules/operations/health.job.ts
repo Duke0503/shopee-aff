@@ -8,14 +8,20 @@
  * assistant check of Story 6.11 inside the same run. A last beat that reports the Zalo session taken
  * by another login raises `assistant_session_conflict` once, without waiting for `assistant_down`:
  * the assistant has stopped reconnecting, and only the owner can tell which login must go.
+ *
+ * A captcha is never raised here: every captcha hold raised `bridge_captcha` at the job that met it,
+ * with the step and the page (D69). While the Shopee queue is held by a captcha and Shopee alone is
+ * stale, reconciliation is not raised either; the state is not noted, so a part still down once the
+ * hold has ended alerts then. The model is unchanged, so the Overview still shows both down.
  */
 import type { Clock } from "@cashback/core";
 
+import { LINK_QUEUE_ALERTS } from "../linking/index";
 import type { Logger } from "../../platform/log/logger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import { runAssistantHealthCheck } from "./assistant-health.job";
 import type { AssistantHeartbeats } from "./assistant-heartbeat.command";
-import type { HealthEntry } from "./health-model.query";
+import { RECONCILIATION_DOWN_ALERT, type HealthEntry } from "./health-model.query";
 
 export interface HealthCheckDeps {
   /** The one health model, read in one snapshot. */
@@ -23,6 +29,8 @@ export interface HealthCheckDeps {
   readonly alerts: AlertPort;
   readonly clock: Clock;
   readonly heartbeats?: AssistantHeartbeats;
+  /** Whether a captcha holds the Shopee queue and Shopee alone is the stale network now. */
+  readonly staleReconciliationByCaptcha?: () => boolean;
   readonly logger?: Pick<Logger, "info" | "warn">;
 }
 
@@ -52,11 +60,13 @@ export function healthCheck(deps: HealthCheckDeps): HealthCheck {
         raised.push(ASSISTANT_SESSION_CONFLICT_ALERT);
       }
       conflicted = conflict;
+      const byCaptcha = deps.staleReconciliationByCaptcha?.() === true;
       for (const entry of model) {
+        if (byCaptcha && entry.alert?.kind === RECONCILIATION_DOWN_ALERT.kind) continue;
         const now = `${entry.state} ${entry.alert?.kind ?? ""}`;
         const before = previous.get(entry.component);
         previous.set(entry.component, now);
-        if ((entry.state !== "down" && entry.state !== "due") || entry.alert === null || before === now) continue;
+        if ((entry.state !== "down" && entry.state !== "due") || entry.alert === null || before === now || entry.alert.kind === LINK_QUEUE_ALERTS.captcha.kind) continue;
         deps.alerts.alert(entry.alert.kind, entry.alert.severity, { source: "health_check" });
         deps.logger?.warn({ component: entry.component, kind: entry.alert.kind }, "operations.health.down");
         raised.push(entry.alert);

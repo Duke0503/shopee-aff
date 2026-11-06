@@ -8,7 +8,8 @@
  * While the Shopee queue is held or paused no page is asked for; a page answered with a captcha
  * or the login page holds or pauses the queue as a link submission does. Anything but a readable
  * page fails the read, so nothing is recorded from it; a batch with a status Shopee added since is
- * only left out and named in `skipped`.
+ * only left out and named in `skipped`. An error says when a captcha is the cause, which has its own
+ * alert (D69).
  */
 import { bridgePayoutRecordValueSchema, type NetworkPayoutRecord } from "@cashback/contracts";
 import type { Clock } from "@cashback/core";
@@ -17,7 +18,7 @@ import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import type { BridgePort } from "../../platform/ports/bridge.port";
 import { readShopeePayoutRecords, type SkippedPayoutBatch } from "./domain/shopee-payout-record";
-import { shopeeQueueGate } from "./link-queue.command";
+import { shopeeQueueGate, shopeeQueueStopReason } from "./link-queue.command";
 import { blockOnSessionPage } from "./shopee-bridge.adapter";
 
 export type PayoutRecordErrorCode = "payout_record_unavailable" | "payout_record_failed" | "payout_record_unreadable";
@@ -26,6 +27,10 @@ export class PayoutRecordError extends Error {
   constructor(
     readonly code: PayoutRecordErrorCode,
     message: string,
+    /** A captcha is the cause: the page met one, or the queue is held for one (D69). */
+    readonly byCaptcha: boolean = false,
+    /** The page that showed a captcha or a login, origin and path only (D69). */
+    readonly page: string | null = null,
   ) {
     super(message);
     this.name = "PayoutRecordError";
@@ -53,13 +58,14 @@ export interface ShopeePayoutRead {
 export async function readShopeePayouts(deps: ShopeePayoutSourceDeps, signal: AbortSignal): Promise<ShopeePayoutRead> {
   const read = deps.bridge.readPayoutRecords;
   if (read === undefined) throw new PayoutRecordError("payout_record_unavailable", "this bridge reads no payout record page");
-  const gate = shopeeQueueGate(deps.ledger.db, deps.clock.now());
-  if (gate !== "open") throw new PayoutRecordError("payout_record_unavailable", `the Shopee queue is ${gate}; the payout record page is not read`);
+  const now = deps.clock.now();
+  const gate = shopeeQueueGate(deps.ledger.db, now);
+  if (gate !== "open") throw new PayoutRecordError("payout_record_unavailable", `the Shopee queue is ${gate}; the payout record page is not read`, shopeeQueueStopReason(deps.ledger.db, now) === "captcha");
   const answer = await read.call(deps.bridge, signal);
   if (answer.outcome === "unavailable") throw new PayoutRecordError("payout_record_unavailable", `the payout record page: ${answer.reason}`);
   if (answer.outcome === "failed") {
-    blockOnSessionPage(deps, answer.reason, "payout_record");
-    throw new PayoutRecordError("payout_record_failed", `the payout record page: the browser answered ${answer.reason}`);
+    blockOnSessionPage(deps, answer.reason, "payout_record", answer.blockedAt);
+    throw new PayoutRecordError("payout_record_failed", `the payout record page: the browser answered ${answer.reason}`, answer.reason === "captcha", answer.blockedAt ?? null);
   }
   const value = bridgePayoutRecordValueSchema.safeParse(answer.value);
   if (!value.success) throw new PayoutRecordError("payout_record_unreadable", "the payout record page: the answer is not a payout record page");

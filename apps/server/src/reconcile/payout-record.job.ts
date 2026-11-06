@@ -8,7 +8,8 @@
  *
  * The job wakes every hour; from 09:30 Vietnam time it reads the page until one read of the day
  * succeeds, then rests until the next day. A read the bridge could not serve (no browser, the queue
- * held or paused) raises a warning alert and is tried again the next hour.
+ * held or paused) raises a warning alert and is tried again the next hour. A read a captcha stopped
+ * raises none, because the captcha has its own alert (D69); it is logged and tried again the same way.
  *
  * A page that cannot be read whole (no known record shape, an unreadable amount) writes nothing: the
  * run fails loudly and raises an owner alert. A batch with a status the server does not know is
@@ -63,7 +64,8 @@ export async function runShopeePayoutRecords(deps: PayoutRecordDeps, signal: Abo
     read = await readShopeePayouts({ bridge: deps.bridge, ledger: deps.ledger, clock: deps.clock, alerts: (db) => alertsFor(db, deps.clock, deps.logger) }, signal);
   } catch (error) {
     if (error instanceof PayoutRecordError) {
-      deps.logger.error({ code: error.code, reason: error.message }, "payouts.payout_record.read_failed");
+      deps.logger.error({ code: error.code, reason: error.message, ...(error.page === null ? {} : { page: error.page }) }, "payouts.payout_record.read_failed");
+      if (error.byCaptcha) throw error;
       if (error.code === "payout_record_unreadable") alert(deps, "unreadable");
       else if (error.code === "payout_record_failed") alert(deps, "failed");
       else alert(deps, "unavailable");

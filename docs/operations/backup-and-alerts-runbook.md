@@ -210,11 +210,17 @@ minutes, high 15, warning 30**. A repeat of the same kind and severity inside th
 The delivery job sends due alerts to the Telegram chat every 30 seconds, at most 10 per run,
 outside any transaction. A pending alert raised more than 24 hours ago (a first deploy, a long
 Telegram outage) is marked `EXPIRED`, never sent, and counted in one log line
-`operations.alert.older_alerts_skipped`. A failed send goes back to pending and is retried on the
+`operations.alert.older_alerts_skipped`. An alert whose condition has already ended is also marked
+`EXPIRED` and never sent, counted by kind in one log line `operations.alert.ended_alerts_dropped`
+(D69): a `bridge_captcha` after the browser made a link, a Shopee run that succeeded started, or the
+captcha was cleared, later than the alert and the latest captcha; a `reconciliation_failed` once each
+network's latest hourly run succeeded after it; a
+`link_request_stuck` once its request is not QUEUED. With no such evidence it is sent. A failed send goes back to pending and is retried on the
 next run, up to 5 attempts; each failure is the log line `operations.alert.delivery_failed`
 (alert id and kind only). The
 message is the Vietnamese text of `packages/labels/vi/alerts.json`: severity word, what happened,
-and the repeat count. It never carries a name, phone number, bank number, customer code or token.
+and the repeat count. It never carries a name, phone number, bank number, customer code or token, except what D65 allows.
+A `bridge_captcha` adds the line `Trang: {page}` when the bridge named the page: origin and path only (D69).
 
 A start refused at its pre-migration backup cannot wait for the delivery job, so that alert is
 sent at once before the process exits.
@@ -228,9 +234,9 @@ stays down for the same reason nothing more is raised.
 
 | Part | Down when | Alert |
 | --- | --- | --- |
-| Bridge | the Shopee link queue is paused (login lost) or held (captcha, page error) | `bridge_login_lost`, `bridge_captcha` or `bridge_page_error` |
+| Bridge | the Shopee link queue is paused (login lost) or held (captcha, page error) | `bridge_login_lost` or `bridge_page_error`. A captcha hold raises nothing here: the job that met it raised `bridge_captcha`, with the step and the page (D69) |
 | Assistant | no heartbeat with the Zalo session connected for 5 minutes | `assistant_down` |
-| Reconciliation | a network's run, every 6 hours (D67), has not succeeded for 8 hours | `reconciliation_failed` |
+| Reconciliation | a network's run, every 6 hours (D67), has not succeeded for 8 hours | `reconciliation_failed`, not while the queue is held by a captcha and Shopee alone is stale, as the captcha has its own alert (D69); the Overview still shows it down |
 | Backup | the last run failed, or no good copy for 26 hours | `backup_failed` or `backup_offsite_failed` |
 | Queue | a link request that is due (not in a retry wait) on a network whose queue is open has waited more than 10 minutes; a paused or held Shopee queue is the bridge part's. The line shows how many requests wait | `link_queue_stuck` |
 | Drill (state `due`, not down) | no restore drill recorded, the last one failed, or it is more than a quarter (92 days) old; the line reads "đến hạn" (due) | `restore_drill_due` |
@@ -252,11 +258,11 @@ Every kind the server raises; a test checks this table against the code.
 | `assistant_down` | critical | the Zalo assistant has had no connected session for 5 minutes | open the assistant window on the VPS; scan the QR code with the bot account's phone if Zalo asks |
 | `assistant_session_conflict` | critical | another login took the assistant's Zalo account (the old bot left running, Zalo Web); the assistant stopped reconnecting | stop the other session, then restart the assistant (`shadow-run.md#zalo-account-at-cutover`) |
 | `bridge_login_lost` | critical | the affiliate browser was signed out of Shopee; the link queue is paused | sign in again, then resume the queue (`bridge-runbook.md#sign-in-again`) |
-| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while. The text names the step that found it, and on a link request the customer's name and id and the product (D65) | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
+| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while. The text names the step that found it, and on a link request the customer's name and id and the product (D65), and the blocked page when the bridge named it (D69). Dropped unsent if the captcha ended first | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
 | `backup_failed` | high | the daily backup failed a step or was missed for 26 hours | section 2.3 |
 | `backup_offsite_failed` | high | the encrypted copy did not reach Google Drive; the local copy is kept | section 2.3 |
 | `backup_offsite_too_large` | high | the encrypted copy is over the Drive webhook's 45 MB limit and was not sent; the local copy is kept | section 2.3 |
-| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 8 hours | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
+| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 8 hours; not when a captcha is the cause (D69) | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
 | `reconciliation_page_cap` | high | a report needed more pages than the safe cap | read the report window by hand; never page further in the browser |
 | `reconciliation_source_stale` | high | the report source returned old data | check the saved report or the bridge source |
 | `order_reversed` | high | an approved order was cancelled by the network; a review case is open | work the review case on the desk |
@@ -272,8 +278,8 @@ Every kind the server raises; a test checks this table against the code.
 | `link_queue_stuck` | warning | a due link request on an open queue has waited over 10 minutes | check the link job and the bridge in the server log |
 | `link_undeliverable` | warning | a link could not be handed to the customer after its tries | nothing unless it repeats |
 | `notification_undeliverable` | warning | a Zalo message could not be delivered | nothing unless it repeats |
-| `shopee_payout_record_failed` | warning | the Shopee payout page could not be read this time | nothing; the job tries again next hour |
-| `shopee_payout_record_unavailable` | warning | the Shopee payout page has no data yet | nothing |
+| `shopee_payout_record_failed` | warning | the Shopee payout page could not be read this time; not when it met a captcha (D69) | nothing; the job tries again next hour |
+| `shopee_payout_record_unavailable` | warning | the Shopee payout page has no data yet, or could not be asked for (no browser, a lost login, a page error hold); not during a captcha hold (D69) | nothing |
 | `shopee_payout_status_refused` | warning | the payout page showed a batch with a status the server does not know (logged as `payouts.payout_record.unknown_status` with its id and code), or a status the recording refused to move back | report it; that batch was skipped, the other batches were recorded |
 | `restore_drill_due` | warning | the quarterly restore drill is due (none recorded, the last failed, or older than 92 days) | run the drill of `restore-runbook.md` and record it |
 

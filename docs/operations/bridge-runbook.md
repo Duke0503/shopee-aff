@@ -6,7 +6,7 @@ signs in to Shopee itself (D8).
 
 | Alert | Severity | What the server did | What to do |
 |---|---|---|---|
-| `bridge_captcha` | high | The job met a verification page, looked again once in a fresh tab and was still blocked (D68). Held the Shopee link queue for 5 minutes, uncounted; it tries one job again after that, or at once when the verification is cleared | [Clear the verification](#clear-the-verification) |
+| `bridge_captcha` | high | The job met a verification page, looked again once in a fresh tab and was still blocked (D68). Held the Shopee link queue for 5 minutes, uncounted; it tries one job again after that, or at once when the verification is cleared. The alert's `Trang:` line names the blocked page (D69) | [Clear the verification](#clear-the-verification) |
 | `bridge_page_error` | warning | Held the queue for 1 minute, uncounted (the custom-link page did not load, or its script broke). The same request breaking the page again right after backs off alone and the others go first; a request still breaking it 30 minutes after its first page error is FAILED and its customer told | Look at the bridge tab; if it repeats, [restart the bridge tab](#restart-the-bridge-tab) |
 | `bridge_login_lost` | critical | Paused the Shopee link queue until it is resumed; nothing more goes to the browser | [Sign in again](#sign-in-again) |
 | `bridge_short_link_unresolved` | warning | The browser could not follow a returned short link to its target, so its sub_ids could not be checked; that request is retried after 1 minute, uncounted and never FAILED for it | Check the affiliate Chrome is online; if it repeats, [restart the bridge tab](#restart-the-bridge-tab) |
@@ -67,12 +67,17 @@ On a captcha or a frozen page a job opens a fresh tab, closes the old one and ru
 second block is reported. A job gets one such retry, none when more than half of its time is used,
 and the bridge replaces a tab at most once every 5 minutes.
 
+A captcha or a lost login names the blocked page, origin and path only (D69). It is the `page` field of the
+log lines `linking.link.recorded`, `linking.link_queue.paused`, `linking.lookup.recorded`,
+`orders.reconciliation.read_failed` and `payouts.payout_record.read_failed`, and the `Trang:` line of
+`bridge_captcha`. A `/verify/traffic/` page points at traffic checks, which is why it is worth reading.
+
 ## After a deploy that changes the extension
 
 Reload the extension at `chrome://extensions` in the affiliate Chrome, and check the version on its
-card there: 0.2.0 or later has the D68 rules (one tab, the fresh-tab retry, the instant resume), which
-run only after that reload. The extension talks to the same server until then, so the server can be
-deployed first.
+card there: 0.2.0 or later has the D68 rules (one tab, the fresh-tab retry, the instant resume), and
+0.3.0 or later names the blocked page (D69). They run only after that reload. The server must be deployed first, then the extension
+reloaded: a server older than D69 refuses an answer that carries `blockedAt`.
 
 ## Restart the bridge tab
 

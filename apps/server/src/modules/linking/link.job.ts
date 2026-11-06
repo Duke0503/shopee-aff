@@ -59,7 +59,7 @@ async function askBridge(deps: LinkJobDeps, job: LinkBridgeJob, signal: AbortSig
 }
 
 function logRecorded(deps: LinkJobDeps, where: Record<string, unknown>, recorded: LinkResultRecorded, link: string | null): void {
-  const line = { ...where, outcome: recorded.outcome, reason: recorded.reason, requestFailed: recorded.requestFailed };
+  const line = { ...where, outcome: recorded.outcome, reason: recorded.reason, requestFailed: recorded.requestFailed, ...(recorded.page === undefined ? {} : { page: recorded.page }) };
   if (recorded.outcome === "paused") deps.logger.error({ ...line, runbook: RELOGIN_RUNBOOK }, "linking.link_queue.paused");
   else if (recorded.reason?.startsWith("link_") === true) deps.logger.warn({ ...line, link: link === null ? null : linkWithoutQuery(link) }, "linking.link.dropped");
   else deps.logger.info(line, "linking.link.recorded");

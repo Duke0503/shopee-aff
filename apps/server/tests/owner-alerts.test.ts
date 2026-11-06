@@ -325,8 +325,8 @@ describe("Story 8.3: one health model", () => {
     const ledger = freshLedger();
     const clock = movingClock(START);
     const check = healthCheck({ model: () => readHealthModel(ledger, clock, {}), alerts: ledgerAlerts(ledger, clock), clock });
-    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(START as Instant) + 10 * 60_000)));
-    expect(check.run().raised.map((a) => a?.kind)).toEqual(["bridge_captcha"]);
+    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(START as Instant) + 10 * 60_000), START as Instant));
+    expect(check.run().raised).toEqual([]);
     ledger.tx((db) => pauseShopeeQueue(db, "login_redirect", clock.now()));
     expect(check.run().raised.map((a) => a?.kind)).toEqual(["bridge_login_lost"]);
   });

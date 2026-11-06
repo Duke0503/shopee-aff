@@ -103,9 +103,9 @@ describe("Story 5.6: the lookup answers page texts the server reads", () => {
 
   it("answers captcha or login_redirect when Shopee parks the tab, and page_not_ready when the product never shows a name", async () => {
     const captcha = lookupPage({}, [FOUND], () => "https://shopee.vn/verify/traffic/error");
-    expect(await runLookupJob(job(PRODUCT), captcha, recordingWait(), resolveNothing)).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runLookupJob(job(PRODUCT), captcha, recordingWait(), resolveNothing)).toMatchObject({ outcome: "failed", reason: "captcha" });
     const login = lookupPage({}, [FOUND], () => "https://shopee.vn/buyer/login?next=x");
-    expect(await runLookupJob(job(PRODUCT), login, recordingWait(), resolveNothing)).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await runLookupJob(job(PRODUCT), login, recordingWait(), resolveNothing)).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     const blank = lookupPage({ name: null }, [FOUND]);
     const wait = recordingWait();
     expect(await runLookupJob(job(PRODUCT), blank, wait, resolveNothing)).toEqual({ outcome: "failed", reason: "page_not_ready" });

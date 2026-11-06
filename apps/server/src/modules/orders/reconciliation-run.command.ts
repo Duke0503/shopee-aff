@@ -7,7 +7,8 @@
  * - A read that fails applies nothing: a partial read never reaches the ledger. A page cap raises
  *   the owner alert `reconciliation_page_cap` every time (R6); any other read failure raises
  *   `reconciliation_failed` only when the previous run of the same kind and network failed too,
- *   so one passing network error is a log line and two in a row reach the owner.
+ *   so one passing network error is a log line and two in a row reach the owner. A failure whose
+ *   reason is a captcha raises nothing here: the captcha has its own alert (D69).
  * - A saved file whose content (checksum and modification time) was first read more than 24 hours
  *   ago is stale: the run is `SOURCE_STALE`, applies nothing, so no order's last-seen time moves
  *   on old data, and raises `reconciliation_source_stale` (once per cooldown).
@@ -28,7 +29,7 @@ import type { Logger } from "../../platform/log/logger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import { ReportSourceError, type ReportWindow, type SourcedReport, type SourcedRow, type WindowedReportSource } from "../linking/index";
 import type { ApplyReport } from "./report-apply.command";
-import { RECONCILIATION_RUN_KINDS, reconciliationRuns, RUN_OUTCOMES } from "./schema";
+import { ORDER_NETWORKS, RECONCILIATION_RUN_KINDS, reconciliationRuns, RUN_OUTCOMES } from "./schema";
 
 export type RunKind = (typeof RECONCILIATION_RUN_KINDS)[number];
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
@@ -155,7 +156,7 @@ const monotonicOf = (deps: RunDeps): number => (deps.monotonic ?? (() => perform
 function alertFor(deps: RunDeps, e: Ended, failedBefore: boolean): void {
   if (e.errorCode === "report_page_cap") deps.alerts.alert("reconciliation_page_cap", "high");
   else if (e.outcome === "SOURCE_STALE") deps.alerts.alert("reconciliation_source_stale", "high");
-  else if (e.outcome === "FAILED" && failedBefore) deps.alerts.alert("reconciliation_failed", "high");
+  else if (e.outcome === "FAILED" && failedBefore && e.reason !== "captcha") deps.alerts.alert("reconciliation_failed", "high");
 }
 
 function record(deps: RunDeps, e: Ended): RunRecord {
@@ -219,7 +220,8 @@ export async function runReconciliation(kind: RunKind, source: WindowedReportSou
     if (aborted(deps)) return null;
     const errorCode = error instanceof ReportSourceError ? error.code : "report_fetch_failed";
     const reason = error instanceof ReportSourceError ? error.reason : null;
-    deps.logger.error({ network: source.network, errorCode, reason, err: error }, "orders.reconciliation.read_failed");
+    const page = error instanceof ReportSourceError && error.page !== null ? { page: error.page } : {};
+    deps.logger.error({ network: source.network, errorCode, reason, ...page, err: error }, "orders.reconciliation.read_failed");
     return record(deps, { ...s, report: null, counts: emptyCounts(), outcome: "FAILED", errorCode, reason });
   }
   if (aborted(deps)) return null;
@@ -246,6 +248,24 @@ export function lastSucceededRun(db: LedgerDb, network: WindowedReportSource["ne
 export function latestRunFailed(db: LedgerDb, network: WindowedReportSource["network"]): boolean {
   const last = db.select({ outcome: reconciliationRuns.outcome }).from(reconciliationRuns).where(eq(reconciliationRuns.network, network)).orderBy(desc(reconciliationRuns.runId)).limit(1).get();
   return last?.outcome === "FAILED";
+}
+
+/** When the last Shopee run that succeeded started, or null when none did: its whole read came after that moment (D69). */
+export function lastShopeeSuccessStartedAt(db: LedgerDb): Instant | null {
+  const last = db.select({ startedAt: reconciliationRuns.startedAt }).from(reconciliationRuns).where(and(eq(reconciliationRuns.network, "shopee"), eq(reconciliationRuns.outcome, "SUCCEEDED"))).orderBy(desc(reconciliationRuns.runId)).limit(1).get();
+  return (last?.startedAt ?? null) as Instant | null;
+}
+
+/**
+ * Whether each network the health model watches has, as its latest hourly run, one that succeeded
+ * after `at`. A network with no hourly run is no evidence: the model counts it down and raises only on
+ * a change, so an alert dropped wrongly would not come back (D69).
+ */
+export function everyNetworkRecoveredAfter(db: LedgerDb, at: Instant): boolean {
+  return ORDER_NETWORKS.every((network) => {
+    const last = db.select({ outcome: reconciliationRuns.outcome, finishedAt: reconciliationRuns.finishedAt }).from(reconciliationRuns).where(and(eq(reconciliationRuns.network, network), eq(reconciliationRuns.kind, "HOURLY"))).orderBy(desc(reconciliationRuns.runId)).limit(1).get();
+    return last?.outcome === "SUCCEEDED" && toMs(last.finishedAt as Instant) > toMs(at);
+  });
 }
 
 /** Whether any run of this kind was recorded for the network, whatever its outcome. */

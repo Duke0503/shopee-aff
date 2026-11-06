@@ -233,13 +233,13 @@ describe("Story 5.5: captcha, page errors and a lost login pause or fail request
   it("review 7: resuming a queue whose hold has already ended answers resumed false and writes no audit entry", () => {
     const ledger = linkLedger(ledgers);
     const clock = movingClock();
-    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(clock.now()) + CAPTCHA_HOLD_MS)));
+    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(clock.now()) + CAPTCHA_HOLD_MS), clock.now()));
     clock.advance(CAPTCHA_HOLD_MS);
     const by = (db: Parameters<typeof commandAudit>[0]) => commandAudit(db, clock, { kind: "system", id: "test" });
     expect(ledger.tx((db) => resumeShopeeQueue(db, by(db), clock.now()))).toEqual({ resumed: false, pausedReason: null });
     expect(ledger.sqlite.prepare("SELECT count(*) AS n FROM audit_entries WHERE event = 'linking.link_queue.resumed'").get()).toEqual({ n: 0 });
     // A hold still running is cleared and audited.
-    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(clock.now()) + CAPTCHA_HOLD_MS)));
+    ledger.tx((db) => holdShopeeQueue(db, "captcha", instantFromMs(toMs(clock.now()) + CAPTCHA_HOLD_MS), clock.now()));
     expect(ledger.tx((db) => resumeShopeeQueue(db, by(db), clock.now()))).toEqual({ resumed: true, pausedReason: null });
     expect(shopeeQueueGate(ledger.db, clock.now())).toBe("open");
   });

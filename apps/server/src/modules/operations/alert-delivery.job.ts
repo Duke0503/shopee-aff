@@ -14,6 +14,9 @@
  * long Telegram outage) is marked EXPIRED and never sent, counted in one log line per run; an
  * alert held until its cooldown ends waits; and one run sends at most ALERTS_PER_RUN, the rest
  * going out on the next runs, so the owner's chat is never flooded.
+ *
+ * D69: an alert whose condition has already ended (alert-ended.query.ts, read in the claim's
+ * transaction) is marked EXPIRED and never sent, counted by kind in one log line per run.
  */
 import { randomUUID } from "node:crypto";
 import { instantFromMs, toMs, type Clock } from "@cashback/core";
@@ -21,7 +24,8 @@ import { instantFromMs, toMs, type Clock } from "@cashback/core";
 import type { Ledger } from "../../platform/db/ledger";
 import type { Logger } from "../../platform/log/logger";
 import type { AlertPort } from "../../platform/ports/alert.port";
-import { claimForSending, expireAlerts, markAlertDelivery, pendingAlerts } from "./alert.command";
+import { claimForSending, expireAlert, expireAlerts, markAlertDelivery, pendingAlerts } from "./alert.command";
+import { alertConditionEnded } from "./alert-ended.query";
 import { renderStoredAlert } from "./alert-render.query";
 import { telegramText, type AlertSender } from "./telegram.adapter";
 
@@ -30,6 +34,8 @@ export interface DeliveryResult {
   failed: number;
   /** Alerts older than ALERT_EXPIRY_MS skipped in this run, never sent. */
   expired?: number;
+  /** Alerts whose condition had ended before they were due, never sent (D69). */
+  dropped?: number;
 }
 
 /** A pending alert older than this is skipped, never sent. */
@@ -68,9 +74,15 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
   if (expired > 0) logger.warn({ expired }, "operations.alert.older_alerts_skipped");
   const pending = ledger.tx((db) => pendingAlerts(db, now)).slice(0, ALERTS_PER_RUN);
   const result: DeliveryResult = expired > 0 ? { sent: 0, failed: 0, expired } : { sent: 0, failed: 0 };
+  const dropped: { id: number; kind: string }[] = [];
   for (const alert of pending) {
     const attemptId = randomUUID();
-    const text = ledger.tx((db) => (claimForSending(db, alert.id, attemptId) ? renderStoredAlert(db, alert) : null));
+    const claim = ledger.tx((db) => {
+      if (alertConditionEnded(db, alert)) return { dropped: expireAlert(db, alert.id), text: null };
+      return { dropped: false, text: claimForSending(db, alert.id, attemptId) ? renderStoredAlert(db, alert) : null };
+    });
+    if (claim.dropped) dropped.push({ id: alert.id, kind: alert.kind });
+    const text = claim.text;
     if (text === null) continue;
     try {
       await sender.send(text);
@@ -81,6 +93,12 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
     }
     result.sent++;
     recordSent(ledger, alert, attemptId, clock, logger);
+  }
+  if (dropped.length > 0) {
+    result.dropped = dropped.length;
+    const byKind: Record<string, number> = {};
+    for (const { kind } of dropped) byKind[kind] = (byKind[kind] ?? 0) + 1;
+    logger.info({ dropped: byKind, alerts: dropped }, "operations.alert.ended_alerts_dropped");
   }
   if (pending.length > 0) logger.info({ ...result }, "operations.alert.delivered");
   return result;

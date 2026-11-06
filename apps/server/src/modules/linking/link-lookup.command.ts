@@ -173,6 +173,8 @@ export interface LookupRecorded {
   readonly requestId: string;
   readonly outcome: "found" | "not_found" | "failed" | "held" | "paused" | "stale";
   readonly reason: string | null;
+  /** The page that showed a captcha or a login, for the log line (D69). */
+  readonly page?: string;
 }
 
 export type RecordedLookupAnswer = Exclude<BridgeLookupResult, { outcome: "unavailable" }>;
@@ -184,14 +186,15 @@ export function recordLookupResult(db: LedgerDb, job: LookupBridgeJob, answer: R
   if (db.select({ status: bridgeJobs.status }).from(bridgeJobs).where(eq(bridgeJobs.jobId, job.jobId)).get()?.status !== "PENDING") return done("stale");
   if (answer.outcome === "failed") {
     closeJob(db, job.jobId, answer.reason, at);
+    const page = answer.blockedAt === undefined ? {} : { page: answer.blockedAt };
     if (answer.reason === "captcha") {
-      holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS));
-      effects(db).alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "product_lookup" });
-      return done("held", answer.reason);
+      holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS), at);
+      effects(db).alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "product_lookup", ...page });
+      return { ...done("held", answer.reason), ...page };
     }
     if (answer.reason === "login_redirect") {
       if (pauseShopeeQueue(db, "login_redirect", at)) effects(db).alerts.alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);
-      return done("paused", answer.reason);
+      return { ...done("paused", answer.reason), ...page };
     }
     return done("failed", answer.reason);
   }

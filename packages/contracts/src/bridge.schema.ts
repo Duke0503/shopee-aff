@@ -26,6 +26,11 @@ const alnum = z.string().regex(/^[A-Za-z0-9]+$/).max(64);
 const ticket = z.string().regex(/^[a-f0-9]{32}$/);
 const httpsUrl = z.string().max(2048).regex(/^https:\/\//);
 
+/** The longest blocked page address an answer carries; the bridge cuts a longer one to this. */
+export const BRIDGE_BLOCKED_AT_MAX_LENGTH = 512;
+/** A page's origin and path: never a query string, a fragment or credentials, so no customer data (D69). */
+export const BRIDGE_BLOCKED_AT_PATTERN = /^https?:\/\/[^\s?#@/]+(?:\/[^\s?#]*)?$/;
+
 /** The kinds in their order of service: a link is never held up by more than one report page. */
 export const BRIDGE_JOB_KINDS = ["link", "lookup", "report", "payout_record"] as const;
 export type BridgeJobKind = (typeof BRIDGE_JOB_KINDS)[number];
@@ -119,7 +124,13 @@ export const bridgeResultSchema = z.discriminatedUnion("outcome", [
     /** The job's own source link as this browser resolved it (a ShopeeFood short link or invite, Story 5.11). */
     sourceTarget: httpsUrl.optional(),
   }),
-  z.strictObject({ ticket, outcome: z.literal("failed"), reason: z.enum(BRIDGE_FAILURES) }),
+  z.strictObject({
+    ticket,
+    outcome: z.literal("failed"),
+    reason: z.enum(BRIDGE_FAILURES),
+    /** Which page showed the captcha or the login (D69). An extension before 0.3.0 sends none. */
+    blockedAt: z.string().max(BRIDGE_BLOCKED_AT_MAX_LENGTH).regex(BRIDGE_BLOCKED_AT_PATTERN).optional(),
+  }),
   z.strictObject({ ticket, outcome: z.literal("value"), value: z.json() }),
 ]);
 export type BridgeResult = z.infer<typeof bridgeResultSchema>;

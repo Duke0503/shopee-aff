@@ -60,7 +60,7 @@ export type BridgeWork =
   | { kind: "report"; page: number; purchaseTimeStart: number; purchaseTimeEnd: number }
   | { kind: "payout_record" };
 
-export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
+export type BridgeAnswer = { outcome: "link"; url: string; resolvedUrl?: string; sourceTarget?: string } | { outcome: "failed"; reason: BridgeFailure; blockedAt?: string } | { outcome: "value"; value: unknown } | { outcome: "unavailable"; reason: BridgeUnavailable };
 
 export interface BrowserBridge extends BridgePort {
   readonly mode: "browser";
@@ -99,14 +99,14 @@ const newTicket = (): string => randomBytes(16).toString("hex");
 /** The answer to a link job in the port's terms; a lookup or report answer to a link job is a failure. */
 function linkResultOf(answer: BridgeAnswer): BridgeLinkResult {
   if (answer.outcome === "link") return { outcome: "link", url: answer.url, resolvedUrl: answer.resolvedUrl ?? null, ...(answer.sourceTarget === undefined ? {} : { sourceTarget: answer.sourceTarget }) };
-  if (answer.outcome === "unavailable") return answer;
-  return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
+  if (answer.outcome === "unavailable" || answer.outcome === "failed") return answer;
+  return { outcome: "failed", reason: "bad_answer" };
 }
 
 /** The answer to a lookup job in the port's terms; a link answer to a lookup is a failure. */
 function lookupResultOf(answer: BridgeAnswer): BridgeLookupResult {
-  if (answer.outcome === "value" || answer.outcome === "unavailable") return answer;
-  return { outcome: "failed", reason: answer.outcome === "failed" ? answer.reason : "bad_answer" };
+  if (answer.outcome !== "link") return answer;
+  return { outcome: "failed", reason: "bad_answer" };
 }
 
 /** The in-memory work list: queued jobs, the one job out (and whose it is) and the held polls. */

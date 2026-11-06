@@ -64,6 +64,8 @@ export interface LinkResultRecorded {
   readonly requestFailed: boolean;
   /** The browser's resolved source could not belong to this request and set no key (Story 5.11 review item 10). */
   readonly sourceTargetIgnored?: boolean;
+  /** The page that showed a captcha or a login, for the log line (D69). */
+  readonly page?: string;
 }
 
 /** One submission as `settle` sees it: whose sub_ids, who made the link and the bridge job, if any. */
@@ -78,7 +80,7 @@ interface Submission {
 /** A link with what came back with it, or a failure. */
 type SubmissionAnswer =
   | { readonly outcome: "link"; readonly url: string; readonly resolvedUrl?: string | null; readonly sourceTarget?: string | null; readonly echoedSubIds?: { readonly sub1: string | null; readonly sub2: string | null } }
-  | { readonly outcome: "failed"; readonly reason: string };
+  | { readonly outcome: "failed"; readonly reason: string; readonly blockedAt?: string };
 
 function newShareCode(db: LedgerDb, makeCode: () => string): string {
   for (let tries = 0; tries < 5; tries++) {
@@ -136,7 +138,7 @@ function pageError(db: LedgerDb, requestId: string, at: Instant, effects: LinkEf
 }
 
 /** Every failure not counted or counted, by its handling; the outcome and whether the request is now FAILED. */
-function settleFailure(db: LedgerDb, sub: Submission, reason: string, at: Instant, effects: LinkEffects): { outcome: LinkResultRecorded["outcome"]; requestFailed: boolean } {
+function settleFailure(db: LedgerDb, sub: Submission, reason: string, at: Instant, effects: LinkEffects, page: string | undefined): { outcome: LinkResultRecorded["outcome"]; requestFailed: boolean } {
   const handling = handlingOf(reason);
   if (handling.kind === "page_error") {
     const outcome = pageError(db, sub.requestId, at, effects);
@@ -147,8 +149,8 @@ function settleFailure(db: LedgerDb, sub: Submission, reason: string, at: Instan
     case "counted":
       return { outcome: "failed", requestFailed: countFailure(db, sub.requestId, at, effects) };
     case "hold":
-      holdShopeeQueue(db, handling.reason, instantFromMs(toMs(at) + handling.ms));
-      effects.alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "link_request", requestId: sub.requestId });
+      holdShopeeQueue(db, handling.reason, instantFromMs(toMs(at) + handling.ms), at);
+      effects.alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "link_request", requestId: sub.requestId, ...(page === undefined ? {} : { page }) });
       return { outcome: "held", requestFailed: false };
     case "pause":
       if (pauseShopeeQueue(db, handling.reason, at)) effects.alerts.alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);
@@ -201,8 +203,9 @@ function settle(db: LedgerDb, sub: Submission, answer: SubmissionAnswer, clock: 
   if (answer.outcome === "failed" || reason !== null) {
     const why = reason ?? "failed";
     if (sub.jobId !== null) closeJob(db, sub.jobId, why, at);
-    const settled = settleFailure(db, sub, why, at, options.effects(db));
-    return done(settled.outcome, why, null, settled.requestFailed);
+    const page = answer.outcome === "failed" ? answer.blockedAt : undefined;
+    const settled = settleFailure(db, sub, why, at, options.effects(db), page);
+    return { ...done(settled.outcome, why, null, settled.requestFailed), ...(page === undefined ? {} : { page }) };
   }
   if (sub.jobId !== null) {
     db.update(bridgeJobs).set({ status: "DONE", resultUrl: answer.url, finishedAt: at }).where(eq(bridgeJobs.jobId, sub.jobId)).run();

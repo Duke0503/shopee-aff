@@ -129,12 +129,12 @@ describe("Story 5.9: one report page job", () => {
   it("answers a verification page as captcha and the login page as login_redirect, before or after the request", async () => {
     const verify = "https://shopee.vn/verify/traffic/error";
     const stuck = fakeReportPage(listed([]), CUSTOM_LINK_URL, { stuckAt: verify });
-    expect(await runReportJob(JOB, stuck, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runReportJob(JOB, stuck, recordingWait())).toMatchObject({ outcome: "failed", reason: "captcha" });
     expect(stuck.asked).toEqual([]);
     const before = fakeReportPage(listed([]), REPORT_PAGE_URL, { passwordBox: true });
-    expect(await runReportJob(JOB, before, recordingWait())).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await runReportJob(JOB, before, recordingWait())).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     expect(before.asked).toEqual([]);
-    expect(await runReportJob(JOB, fakeReportPage({ ok: false, why: "report_http_error" }, REPORT_PAGE_URL, { after: verify }), recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runReportJob(JOB, fakeReportPage({ ok: false, why: "report_http_error" }, REPORT_PAGE_URL, { after: verify }), recordingWait())).toMatchObject({ outcome: "failed", reason: "captcha" });
   });
 
   it("answers the request's own reason code, and a list it cannot pass on as report_bad_answer", async () => {

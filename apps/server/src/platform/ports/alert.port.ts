@@ -15,11 +15,13 @@ export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 export const ALERT_SOURCES = ["link_request", "product_lookup", "conversion_report", "payout_record", "health_check", "captcha", "login_lost"] as const;
 export type AlertSource = (typeof ALERT_SOURCES)[number];
 
-/** Ids and names of steps only: the customer's name and the product are read when the alert is sent (D65). */
+/** Ids, names of steps and a page's address only: the customer's name and the product are read when the alert is sent (D65). */
 export interface AlertDetail {
   readonly source: AlertSource;
   /** The link request a message is about; its customer is named in the owner's chat only. */
   readonly requestId?: string;
+  /** The Shopee page that showed the block, origin and path only (D69). */
+  readonly page?: string;
 }
 
 export interface AlertPort {

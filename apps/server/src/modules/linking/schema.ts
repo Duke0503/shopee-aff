@@ -111,6 +111,9 @@ export const linkQueueState = sqliteTable("link_queue_state", {
   heldReason: text("held_reason", { enum: ["captcha", "page_error"] }),
   heldUntil: text("held_until"),
   lastPageErrorRequest: text("last_page_error_request"),
+  // When a captcha was last met and last cleared (migration 0038, D69).
+  lastCaptchaAt: text("last_captcha_at"),
+  captchaClearedAt: text("captcha_cleared_at"),
 });
 
 /** `buy` is the live buy-button tap, imported only; the share page records `browser` and `in_app`. */
