@@ -36,6 +36,7 @@ export { customerProofRoutes, type CustomerProofRouteDeps } from "./http/custome
 export { answerCustomerPayouts, answerPayoutHistory, PAYOUT_HISTORY_LIST, payoutCountOf } from "./payout-history.list";
 export { matchDue, NetworkSettlementError, recordNetworkPayout, withholdingOf, type NetworkSettlementDeps, type StoredSettlement } from "./network-settlement.command";
 export { answerNetworkSettlements, NETWORK_SETTLEMENT_LIST, networkSettlementDetail } from "./network-settlement.list";
+export { deliverSettlementNotices } from "./settlement-business-notice.job";
 export { NETWORK_SYNC_ACTOR, networkPayoutInternalRoutes, networkSettlementRoutes, type NetworkPayoutRouteDeps } from "./http/network-payout.routes";
 export { importNetworkSettlements, type ImportedNetworkSettlement, type NetworkSettlementsImportResult } from "./network-settlement-import.command";
 export { answerCustomersList, bankStateOf, CUSTOMERS_LIST, customerFlags, customerRows } from "./customers.list";

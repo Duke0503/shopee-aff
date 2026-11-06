@@ -56,16 +56,16 @@ stays out of the repository.
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather | both Telegram keys or neither |
 | `TELEGRAM_CHAT_ID` | `-1004416753701` | digits, optional leading `-` |
-| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order notices (D62) go here and never fall back to the owner's chat |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices (D62, D63, D64) go here and never fall back to the owner's chat |
 | `BACKUP_AGE_PATH` | `C:\Tools\age\age.exe` | absolute; the four `BACKUP_*` keys come together or not at all |
 | `BACKUP_AGE_RECIPIENT` | `age1...` (62 characters) | the public key only; a private key is refused |
 | `BACKUP_RCLONE_PATH` | `C:\Tools\rclone\rclone.exe` | absolute |
 | `BACKUP_RCLONE_REMOTE` | `gdrive:cashback-backups/prod` | remote name, colon, folder |
 | `BACKUP_RCLONE_CONFIG` | `C:\Users\<user>\.config\cashback\rclone.conf` | optional, absolute; rclone's default place when unset |
 
-Without `TELEGRAM_BUSINESS_CHAT_ID` no order notice is sent and the rows stay PENDING in
-`order_business_notices` until the chat is set; the first job run then expires those older than 24
-hours and sends the rest. Production logs `orders.business_notice.chat_absent` as an error at every
+Without `TELEGRAM_BUSINESS_CHAT_ID` no order or settlement notice is sent and the rows stay PENDING in
+`order_business_notices` and `settlement_business_notices` until the chat is set; the first run of
+each job then expires those older than 24 hours and sends the rest. Production logs `orders.business_notice.chat_absent` as an error at every
 start and still starts.
 
 Without Telegram keys alerts are stored and logged only; production logs

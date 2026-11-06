@@ -180,6 +180,7 @@ describe("the scheduler's own rules", () => {
       alertDelivery: { context: "operations", schedule: { kind: "every", delayMs: 30_000 } },
       signInHousekeeping: { context: "identity", schedule: { kind: "every", delayMs: 3_600_000 } },
       orderBusinessNotices: { context: "orders", schedule: { kind: "every", delayMs: 30_000 } },
+      settlementBusinessNotices: { context: "payouts", schedule: { kind: "every", delayMs: 30_000 } },
       reconcile: { context: "orders", schedule: { kind: "every", delayMs: 3_600_000, firstDelayMs: 180_000 } },
       nightlySweep: { context: "orders", schedule: { kind: "daily_vn", at: { hour: 2, minute: 0 } } },
       backup: { context: "platform", schedule: { kind: "daily_vn", at: { hour: 3, minute: 0 } } },

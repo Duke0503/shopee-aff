@@ -66,6 +66,7 @@ export function relayZaloSession(options: RelayOptions): ZaloSession {
       throw new ZaloTargetRefused();
     },
     pendingFriendRequests: async () => [],
+    groupMemberCount: async () => null,
     stop: async () => {
       open = false;
     },

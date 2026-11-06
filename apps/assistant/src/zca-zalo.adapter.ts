@@ -161,6 +161,7 @@ type ZcaApi = Pick<
   | "getOwnId"
   | "getContext"
   | "getFriendRecommendations"
+  | "getGroupInfo"
 > & {
   readonly listener: Pick<API["listener"], "on" | "start" | "stop">;
 };
@@ -247,6 +248,12 @@ export async function openZcaSession(
       );
     },
     ...friendMethods(api, (event) => events?.(event)),
+    // As the live bot read it: the group's member count, or the length of its member list.
+    groupMemberCount: async (groupId) => {
+      const info = (await api.getGroupInfo(groupId)).gridInfoMap[groupId];
+      const count = info?.totalMember || info?.memVerList?.length || 0;
+      return count > 0 ? count : null;
+    },
     onEvent: (next) => {
       events = next;
     },

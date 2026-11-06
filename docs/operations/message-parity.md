@@ -58,7 +58,7 @@ breaks, emoji, bold parts and refusals. This page maps every new label to its ol
 7. Not sent because the new facts lack them: the campaign hint under a link, the ShopeeFood
    group-order tip, the product/link block in order notices, the balance total in the approved
    notice. Old natural-language bank messages ("STK: ...") are not read, so their instructions are dropped.
-8. Telegram: the live new-member notice of the business group has no counterpart in the new platform.
+8. Telegram: the live new-member notice of the business group is in `packages/labels/vi/member-notices.json` (D64), with the same wording. Differences: a rank not known or a total of zero leaves its line out; the group is named by the label `group_default_name`, not read from Zalo; the total counts desk customers without merged records; a name is `dName` only, else the live fallback name; line breaks in a name become spaces.
    The four order notices are back (D62), see "Telegram order notices" below.
 
 ## Server facts added for the old formats
@@ -253,3 +253,17 @@ Wording in `packages/labels/vi/order-notices.json`.
 
 In all of them the last time line is when the step was taken, not when the message left, and every
 value is HTML-escaped (live left the order id and the platform as they were).
+
+### Telegram settlement notices (DP Business group, D63)
+
+Wording in `packages/labels/vi/settlement-notices.json`. All are new-only: the live system never told
+the group about network payouts. Amounts come from the stored settlement at send time, a value not
+known is left out, and no notice names a customer.
+
+| Event | Trigger | Shows |
+|---|---|---|
+| `created` | First record of a payout id, whatever its status | Network, payout id, status, gross, received, fee, tax, creation time |
+| `paid` | `PROCESSING -> PAID` | Payout id, status, received, paid time |
+| `failed` | `PROCESSING -> FAILED` | Payout id, status, the batch's amount |
+| `matched` | Match becomes `MATCHED` | Payout id, orders settled, matched gross, unattributed (left out when negative), a warning naming the batch's open review cases when it has any |
+| `mismatch` | Match becomes `MISMATCH` | Payout id, gross, the batch's open review cases (or the Payouts page when none is open) |

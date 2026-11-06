@@ -311,7 +311,7 @@ export {
   type AssistantBankSave,
   type BankDetailRule,
 } from "./assistant-bank.schema";
-export { ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
+export { ASSISTANT_GROUP_JOIN_PATH, assistantGroupJoinSchema, assistantGroupJoinSentSchema, type AssistantGroupJoin, type AssistantGroupJoinSent, ASSISTANT_HEARTBEAT_INTERVAL_MS, ASSISTANT_HEARTBEAT_PATH, assistantHeartbeatReceivedSchema, assistantHeartbeatSchema, ZALO_SESSION_MODES, ZALO_SESSION_STATES, type AssistantHeartbeat, type AssistantHeartbeatReceived } from "./assistant.schema";
 export { DESK_LINK_REQUEST_NETWORKS, DESK_LINK_REQUESTS_PATH, deskLinkRequestRowSchema, deskLinkRequestsResponseSchema, LINK_REQUEST_CHANNELS, type DeskLinkRequestRow } from "./link-request-list.schema";
 export {
   ASSISTANT_LINK_CLAIM_PATH,

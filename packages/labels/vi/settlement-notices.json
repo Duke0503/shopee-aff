@@ -1,0 +1,42 @@
+{
+  "$comment": "The Telegram settlement notices of the DP Business group (D63; HTML parse mode), with the admin desk's words for a network batch. Not in the live system. A line with no value is left out. The mapping is docs/operations/message-parity.md.",
+  "networks": {
+    "shopee": "🟠 Shopee",
+    "accesstrade": "🟢 AccessTrade"
+  },
+  "statuses": {
+    "PROCESSING": "⏳ <b>Sàn đang xử lý</b> (Processing)",
+    "PAID": "✅ <b>Sàn đã trả</b> (Paid)",
+    "FAILED": "🚫 <b>Sàn trả không thành công</b> (Failed)"
+  },
+  "line_payout_id": "🧾 <b>Mã lần trả:</b> <code>{payoutId}</code>",
+  "line_status": "📊 <b>Trạng thái:</b> {status}",
+  "line_gross": "💰 <b>Hoa hồng sàn tính:</b> <b>{amount}đ</b>",
+  "line_received": "💵 <b>Sàn trả:</b> <b>{amount}đ</b>",
+  "line_fee": "🧮 <b>Phí sàn:</b> <b>{amount}đ</b>",
+  "line_tax": "🧾 <b>Thuế khấu trừ:</b> <b>{amount}đ</b>",
+  "line_created_at": "📅 <b>Ngày sàn tạo:</b> <code>{time}</code>",
+  "line_paid_at": "⏱ <b>Thời gian sàn trả:</b> <code>{time}</code>",
+  "created": {
+    "header": "🏦 <b>[LẦN SÀN TRẢ MỚI] {network}</b>\n"
+  },
+  "paid": {
+    "header": "💸 <b>[SÀN ĐÃ TRẢ TIỀN] {network}</b>\n"
+  },
+  "failed": {
+    "header": "❌ <b>[SÀN TRẢ KHÔNG THÀNH CÔNG] {network}</b>\n",
+    "amount": "💵 <b>Số tiền của lần trả:</b> <b>{amount}đ</b>"
+  },
+  "matched": {
+    "header": "✅ <b>[ĐỐI CHIẾU KHỚP] {network}</b>\n",
+    "orders_settled": "📦 <b>Số đơn sàn đã trả:</b> <b>{count}</b>",
+    "matched_gross": "💰 <b>Đơn của khách:</b> <b>{amount}đ</b>",
+    "unattributed": "🗂 <b>Đơn khác:</b> <b>{amount}đ</b>",
+    "case_warning": "⚠️ <b>Cần xem:</b> ca {caseIds} trong mục Review của bàn quản trị"
+  },
+  "mismatch": {
+    "header": "⚠️ <b>[ĐỐI CHIẾU KHÔNG KHỚP] {network}</b>\n",
+    "case_open": "🔎 <b>Cần xem:</b> ca {caseIds} trong mục Review của bàn quản trị",
+    "case_none": "🔎 <b>Cần xem:</b> lần trả này trong mục Chuyển tiền của bàn quản trị"
+  }
+}

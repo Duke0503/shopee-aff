@@ -60,6 +60,7 @@ function fakeApi() {
       isSeenFriendReq: false,
     })),
     getOwnId: vi.fn(() => OWN_ID),
+    getGroupInfo: vi.fn(async (): Promise<{ gridInfoMap: Record<string, { totalMember?: number; memVerList?: string[] }> }> => ({ gridInfoMap: {} })),
     getFriendRecommendations: vi.fn(async (): Promise<{ recommItems: { dataInfo: { userId: string; recommType: number } }[] }> => ({ recommItems: [] })),
     context: { settings: { features: { socket: { close_and_retry_codes: [1000, 1006, 3000, 3003] } } } },
     getContext() {
@@ -332,6 +333,16 @@ describe("zca adapter: sends", () => {
     const session = await open();
     api.getFriendRecommendations.mockResolvedValueOnce({ recommItems: [{ dataInfo: { userId: "70001", recommType: 2 } }, { dataInfo: { userId: "70002", recommType: 1 } }, { dataInfo: { userId: " ", recommType: 2 } }] });
     expect(await session.pendingFriendRequests()).toEqual(["70001"]);
+  });
+
+  it("D64: reads a group's size as the live bot did, and null when Zalo does not say", async () => {
+    const session = await open();
+    api.getGroupInfo.mockResolvedValueOnce({ gridInfoMap: { G1: { totalMember: 42 } } });
+    expect(await session.groupMemberCount("G1")).toBe(42);
+    api.getGroupInfo.mockResolvedValueOnce({ gridInfoMap: { G1: { memVerList: ["a", "b"] } } });
+    expect(await session.groupMemberCount("G1")).toBe(2);
+    api.getGroupInfo.mockResolvedValueOnce({ gridInfoMap: {} });
+    expect(await session.groupMemberCount("G1")).toBeNull();
   });
 });
 

@@ -9,6 +9,7 @@
 import type { AssistantHeartbeat } from "@cashback/contracts";
 
 import type { FriendAccepter } from "./friend-accept";
+import type { GroupJoinNotice } from "./group-join-notice";
 import type { WelcomeOutcome } from "./group-welcome";
 import type { InternalApi } from "./internal-api.adapter";
 import type { GroupMember, SessionEventHandler } from "./zalo.port";
@@ -16,6 +17,8 @@ import type { GroupMember, SessionEventHandler } from "./zalo.port";
 export interface SessionEventDeps {
   readonly friends: FriendAccepter;
   readonly welcome: (groupId: string, members: readonly GroupMember[]) => Promise<WelcomeOutcome>;
+  /** Tells the DP Business group, apart from the welcome so neither delays the other (D64). */
+  readonly joinNotice: GroupJoinNotice;
   readonly api: Pick<InternalApi, "heartbeat">;
   readonly beat: () => AssistantHeartbeat;
   readonly onError: (event: string, error: unknown) => void;
@@ -27,6 +30,7 @@ export function sessionEventHandler(deps: SessionEventDeps): SessionEventHandler
       void deps.friends.accept(event.userId).catch((error: unknown) => deps.onError("assistant.friend.accept_failed", error));
     } else if (event.kind === "group_join") {
       void deps.welcome(event.groupId, event.members).catch((error: unknown) => deps.onError("assistant.group.welcome_failed", error));
+      void deps.joinNotice(event.groupId, event.members).catch((error: unknown) => deps.onError("assistant.group.join_notice_failed", error));
     } else {
       deps.onError("assistant.zalo.session_conflict", new Error("zalo session taken by another login"));
       void deps.api.heartbeat(deps.beat()).catch((error: unknown) => deps.onError("assistant.heartbeat.failed", error));

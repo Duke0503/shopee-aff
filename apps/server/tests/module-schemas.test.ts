@@ -87,6 +87,7 @@ describe("module schemas (Stories 2.3, 2.4, 2.5, 3.2, AD-4)", () => {
       network_settlements: "payouts",
       network_settlement_orders: "payouts",
       payout_settings: "payouts",
+      settlement_business_notices: "payouts",
     });
   });
 });

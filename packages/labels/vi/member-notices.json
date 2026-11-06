@@ -1,0 +1,9 @@
+{
+  "$comment": "The Telegram notice of the DP Business group when someone joins the Zalo group (D64; HTML parse mode), in the live format (src/cashback/core/telegram_alerts.py notify_new_member_joined). The mapping is docs/operations/message-parity.md.",
+  "header": "🎉 <b>[THÀNH VIÊN MỚI GIA NHẬP ZALO]</b>\n",
+  "line_name": "👤 <b>Tên:</b> <b>{name}</b>",
+  "line_rank": "👥 <b>Thứ tự trong nhóm:</b> Là thành viên thứ <b>#{rank}</b> của nhóm <i>{group}</i>",
+  "line_total": "🌐 <b>Tổng khách hệ thống:</b> <b>{total}</b> khách hàng",
+  "line_uid": "🆔 <b>Zalo UID:</b> <code>{uid}</code>",
+  "line_time": "⏱ <b>Thời gian:</b> <code>{time}</code>"
+}

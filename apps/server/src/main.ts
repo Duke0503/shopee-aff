@@ -23,7 +23,7 @@ import { assistantBankRoutes } from "./links/assistant-bank.routes";
 import { assistantCommandRoutes } from "./links/assistant-command.routes";
 import { accessTradeLinksFor, environmentModes, linkBridge, linkJobs, linkRoutes, shareBaseUrlFor, subIdPrefixFor, type LinkBridge } from "./links/link-jobs";
 import { healthSourcesFor, ownerJobs, startupAlerts } from "./health/owner-jobs";
-import { assistantHeartbeatRoutes, assistantHeartbeats, commandAudit } from "./modules/operations/index";
+import { assistantGroupJoinRoutes, assistantHeartbeatRoutes, assistantHeartbeats, commandAudit, telegramSender } from "./modules/operations/index";
 import { customerProofRoutes, fileProofStore, networkPayoutInternalRoutes, proofFilesDir, runClaimExpiry } from "./modules/payouts/index";
 import { notificationJobs } from "./notifications/notification-expiry.job";
 import { notificationRoutes } from "./notifications/notification.routes";
@@ -102,6 +102,9 @@ async function start(config: ServerConfig, logger: Logger, lock: ServerLock, sto
     internal.push(shutdownRoutes(() => stopper.stop("shutdown_route")));
     if (config.assistantToken !== null) {
       internal.push(assistantHeartbeatRoutes({ clock: systemClock, heartbeats, ledger }));
+      // Members who joined the Zalo group, told to the DP Business group (D64).
+      const businessChat = config.telegramBusinessChatId;
+      internal.push(assistantGroupJoinRoutes({ ledger, clock: systemClock, sender: config.telegram !== null && businessChat !== null ? telegramSender({ botToken: config.telegram.botToken, chatId: businessChat }) : null }));
       // The assistant pulls the outbox one row at a time and acknowledges each send (Story 6.4).
       // Chat commands: /id, /sodu, /donhang, /stk, /help (Story 6.7).
       internal.push(assistantCommandRoutes({ ledger, clock: systemClock }));

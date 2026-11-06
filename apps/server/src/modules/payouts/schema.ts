@@ -1,8 +1,8 @@
 /**
  * The payouts module's tables (AD-4), as created by migrations/0007_payouts.sql,
  * 0013_payout_claims.sql, 0014_payout_confirm.sql, 0015_payout_proofs_and_void.sql and
- * 0017_network_settlements.sql and 0032_payout_cutover_window.sql (whose generated payouts.paid_amount is read by the history list only,
- * so it is not declared here). Only this module
+ * 0017_network_settlements.sql, 0032_payout_cutover_window.sql (whose generated payouts.paid_amount is read by the history list only,
+ * so it is not declared here) and 0035_settlement_business_notices.sql. Only this module
  * writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -152,6 +152,24 @@ export const networkSettlementOrders = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.settlementId, t.orderId] })],
 );
+
+/** The settlement changes the DP Business group is told (D63); a row is owed once per settlement and event. */
+export const SETTLEMENT_NOTICE_EVENTS = ["created", "paid", "failed", "matched", "mismatch"] as const;
+export type SettlementNoticeEvent = (typeof SETTLEMENT_NOTICE_EVENTS)[number];
+
+export const settlementBusinessNotices = sqliteTable("settlement_business_notices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  dedupKey: text("dedup_key").notNull().unique(),
+  settlementId: integer("settlement_id")
+    .notNull()
+    .references(() => networkSettlements.settlementId),
+  event: text("event", { enum: SETTLEMENT_NOTICE_EVENTS }).notNull(),
+  raisedAt: text("raised_at").notNull(),
+  delivery: text("delivery", { enum: ["PENDING", "SENDING", "SENT", "EXPIRED"] }).notNull().default("PENDING"),
+  attempts: integer("attempts").notNull().default(0),
+  sendAttempt: text("send_attempt"),
+  deliveredAt: text("delivered_at"),
+});
 
 /** The one row of payout flags: the cutover's no-payout window end (Story 8.8), null when closed. */
 export const payoutSettings = sqliteTable("payout_settings", {

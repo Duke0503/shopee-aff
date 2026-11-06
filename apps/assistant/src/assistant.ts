@@ -19,6 +19,7 @@ import { chatReplier, type ChatSend, type ChatSendWhenDue, type Tag } from "./ch
 import { runHeartbeat, sessionBeat } from "./heartbeat.job";
 import { friendAccepter } from "./friend-accept";
 import { friendRequestLimiter, requestFriend, type FriendRequestLimiter, type FriendRequestOutcome, type FriendStateStore } from "./friend-request";
+import { groupJoinNotice } from "./group-join-notice";
 import { groupWelcomer, memoryWelcomeStore, type WelcomeStore } from "./group-welcome";
 import type { InternalApi } from "./internal-api.adapter";
 import { messageText, styledMessage } from "./messages";
@@ -68,7 +69,8 @@ function listenToSessionEvents(deps: AssistantDeps, run: { zalo: ZaloSession; pa
   const { zalo, pacer } = run;
   const friends = friendAccepter({ limiter: run.limiter, pacer, zalo, api: deps.api, clock: deps.clock, sleep: deps.sleep, random: deps.random ?? Math.random, signal: run.signal });
   const welcome = groupWelcomer({ welcomeGroupIds: deps.welcomeGroupIds ?? [], store: deps.welcomeState ?? memoryWelcomeStore(), random: deps.random ?? Math.random, send: (target, message, mentions) => pacer.send(() => zalo.sendText(target, message.text, mentions, message.styles)) });
-  zalo.onEvent(sessionEventHandler({ friends, welcome, api: deps.api, beat: run.beat, onError: deps.onError }));
+  const joinNotice = groupJoinNotice({ welcomeGroupIds: deps.welcomeGroupIds ?? [], zalo, api: deps.api, onError: deps.onError });
+  zalo.onEvent(sessionEventHandler({ friends, welcome, joinNotice, api: deps.api, beat: run.beat, onError: deps.onError }));
   rescanFriendRequests(friends, deps.onError);
 }
 
