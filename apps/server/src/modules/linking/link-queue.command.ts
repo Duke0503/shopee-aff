@@ -5,14 +5,17 @@
  * affiliate browser in again. While either lasts, the link job hands no Shopee job to the bridge.
  * Resuming clears both, audits who did it, and the queue goes on in its usual order, so the oldest
  * request of the highest priority is served first. Each function runs inside the caller's `tx`.
+ *
+ * "Stopped" (D65) is what the customer and the owner are told about: a captcha hold or a pause. A
+ * page error hold is not, because it lasts one minute.
  */
 import { toMs, type Instant } from "@cashback/core";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { CommandAudit } from "../../platform/ports/audit.port";
 import type { QueueHoldReason, QueuePauseReason } from "./domain/link-failure";
-import { linkQueueState } from "./schema";
+import { linkQueueState, linkRequests } from "./schema";
 
 const SHOPEE = "shopee" as const;
 
@@ -41,6 +44,26 @@ export function shopeeQueueGate(db: LedgerDb, now: Instant): QueueGate {
   if (state.pausedAt !== null) return "paused";
   if (state.heldUntil !== null && toMs(state.heldUntil as Instant) > toMs(now)) return "held";
   return "open";
+}
+
+export type QueueStopReason = "captcha" | "login_lost";
+
+/** Why the Shopee queue is stopped now, or null when it is open or only held for a page error. */
+export function shopeeQueueStopReason(db: LedgerDb, now: Instant): QueueStopReason | null {
+  const gate = shopeeQueueGate(db, now);
+  if (gate === "paused") return "login_lost";
+  return gate === "held" && shopeeQueueState(db).heldReason !== "page_error" ? "captcha" : null;
+}
+
+/** The requests the Shopee queue would serve, oldest first: the ones a stopped queue keeps waiting. */
+export function queuedShopeeRequests(db: LedgerDb): string[] {
+  return db
+    .select({ requestId: linkRequests.requestId })
+    .from(linkRequests)
+    .where(and(eq(linkRequests.status, "QUEUED"), eq(linkRequests.origin, "REQUEST"), sql`coalesce(${linkRequests.network}, 'shopee') = 'shopee'`))
+    .orderBy(asc(linkRequests.createdAt), asc(linkRequests.requestId))
+    .all()
+    .map((row) => row.requestId);
 }
 
 function write(db: LedgerDb, values: Partial<LinkQueueState>): void {

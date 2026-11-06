@@ -1,5 +1,5 @@
 {
-  "$comment": "Owner alert texts sent to Telegram (AD-27, Story 8.3), in the live system's format (src/cashback/core/telegram_alerts.py report_bug, HTML parse mode; owner requirement 2026-11-02): a header by severity, the source, the time, the details and the action. One entry per alert kind under kinds; badge shows another severity's header where the live system used one for the same alert. No personal data, bank number or token is ever filled in: the only values are the kind's own texts, the time and the repeat count. The mapping is docs/operations/message-parity.md; the runbook table is docs/operations/backup-and-alerts-runbook.md.",
+  "$comment": "Owner alert texts sent to Telegram (AD-27, Story 8.3), in the live system's format (src/cashback/core/telegram_alerts.py report_bug, HTML parse mode; owner requirement 2026-11-02): a header by severity, the source, the time, the details and the action. One entry per alert kind under kinds; badge shows another severity's header where the live system used one for the same alert. steps gives a kind other words by the step that found the problem (D65). No bank number or token is ever filled in: the values are the kind's own texts, the time, the repeat count and, only for an alert about one link request (a captcha on its submission, link_request_stuck), the customer's name and id and the product, read at send time (D65). The mapping is docs/operations/message-parity.md; the runbook table is docs/operations/backup-and-alerts-runbook.md.",
   "header_critical": "🚨🔴 <b>[BUG CRITICAL - KHẨN CẤP] {title}</b>",
   "header_high": "⚠️🟠 <b>[BUG HIGH - QUAN TRỌNG] {title}</b>",
   "header_warning": "⚠️🟡 <b>[CẢNH BÁO HỆ THỐNG - WARNING] {title}</b>",
@@ -8,6 +8,9 @@
   "line_details": "📝 <b>Chi tiết sự cố:</b>\n{details}",
   "line_action": "\n👉 <b>Hành động xử lý:</b>\n{action}",
   "line_repeated": "\n🔁 <b>Lặp lại:</b> thêm {count} lần trong thời gian chờ",
+  "line_customer_named": "Khách: {name} (ID: {id})",
+  "line_customer_id": "Khách ID: {id}",
+  "line_product": "Sản phẩm: {product}",
   "default_source": "Backend Service",
   "unknown_kind": { "title": "Cảnh báo hệ thống", "details": "Loại cảnh báo: {kind}" },
   "kinds": {
@@ -16,18 +19,29 @@
     "backup_failed": { "title": "Sao Lưu Hằng Ngày Thất Bại", "source": "platform.backup", "details": "Sao lưu hằng ngày thất bại hoặc bị lỡ.", "action": "Xem mục Sao lưu trong runbook." },
     "backup_offsite_failed": { "title": "Không Chép Được Bản Sao Lưu Lên Google Drive", "source": "platform.backup", "details": "Không chép được bản sao lưu lên Google Drive. Bản sao trên máy vẫn còn.", "action": "Kiểm tra cấu hình sao lưu ngoài máy (Google Drive webhook, khóa mã hóa) theo runbook sao lưu." },
     "backup_offsite_too_large": { "title": "Bản Sao Lưu Quá Lớn Để Gửi Lên Google Drive", "source": "platform.backup", "details": "Bản sao lưu đã mã hóa vượt giới hạn khoảng 45 MB của Google Drive webhook nên không được gửi. Bản sao trên máy vẫn còn.", "action": "Chép bản sao lưu trên máy lên Drive bằng tay và xem mục Sao lưu trong runbook." },
-    "bridge_captcha": { "title": "Shopee dính Captcha Xác Minh (Slider/Traffic)", "source": "shopee.link_generator", "badge": "critical", "details": "Trang tạo link Shopee Affiliate yêu cầu xác thực bảo mật.\nURL: affiliate.shopee.vn/verify/...", "action": "Mở trình duyệt Google Chrome trên máy chạy Extension và thực hiện kéo thanh trượt / giải Captcha để tiếp tục tạo link." },
+    "bridge_captcha": { "title": "Shopee dính Captcha Xác Minh (Slider/Traffic)", "source": "shopee.link_generator", "badge": "critical", "details": "Trang tạo link Shopee Affiliate yêu cầu xác thực bảo mật.\nURL: affiliate.shopee.vn/verify/...", "action": "Mở trình duyệt Google Chrome trên máy chạy Extension và thực hiện kéo thanh trượt / giải Captcha để tiếp tục tạo link.", "steps": {
+      "link_request": { "details": "Phát hiện khi tạo link cho khách.\nTrang tạo link Shopee Affiliate yêu cầu xác thực bảo mật.\nURL: affiliate.shopee.vn/verify/..." },
+      "product_lookup": { "source": "shopee.product_lookup", "details": "Phát hiện khi tra cứu thông tin sản phẩm.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
+      "conversion_report": { "source": "shopee.conversion_report", "details": "Phát hiện khi đọc báo cáo chuyển đổi.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
+      "payout_record": { "source": "shopee.payout_record", "details": "Phát hiện khi đọc trang thanh toán.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
+      "health_check": { "source": "operations.health", "details": "Phát hiện bởi kiểm tra sức khỏe hệ thống: hàng đợi link Shopee đang bị giữ vì Captcha." }
+    } },
     "bridge_login_lost": { "title": "Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất", "source": "shopee.link_generator", "details": "Tab tạo link đã bị chuyển hướng về trang đăng nhập hoặc hết hạn token.\nURL: passport.shopee.vn / login", "action": "Mở Google Chrome trên máy chủ, truy cập lại affiliate.shopee.vn và đăng nhập lại tài khoản Shopee Affiliate." },
     "bridge_page_error": { "title": "Trang Shopee Báo Lỗi Khi Tạo Link", "source": "shopee.link_generator", "details": "Trang Shopee báo lỗi khi tạo link, hàng đợi link Shopee đang tạm giữ.", "action": "Mở Google Chrome trên máy chạy Extension, kiểm tra tab Shopee Affiliate rồi mở lại hàng đợi link." },
     "bridge_short_link_unresolved": { "title": "Không Mở Được Link Rút Gọn", "source": "shopee.link_generator", "details": "Không mở được link rút gọn của khách." },
     "customer_sign_in_burst": { "title": "Nhiều Lần Đăng Nhập Sai Trên Website", "source": "identity.customer_sign_in", "details": "Nhiều lần đăng nhập sai trên website trong thời gian ngắn.", "action": "Kiểm tra nhật ký đăng nhập trên trang quản trị." },
     "link_queue_stuck": { "title": "Hàng Đợi Link Bị Kẹt", "source": "linking.link_queue", "details": "Hàng đợi link có yêu cầu chờ quá 10 phút.", "action": "1. Kiểm tra xem Chrome có đang mở không.\n2. Đảm bảo tab Shopee Affiliate vẫn đang chạy và Extension đã bật kết nối Bridge." },
+    "link_request_stuck": { "title": "Khách Đang Chờ Link Shopee", "source": "linking.link_queue", "details": "Một yêu cầu tạo link đang chờ vì hàng đợi link Shopee đang dừng.", "steps": {
+      "captcha": { "details": "Yêu cầu tạo link đang chờ vì Shopee dính Captcha.", "action": "Giải Captcha trên trình duyệt Shopee Affiliate. Hàng đợi sẽ chạy lại sau đó." },
+      "login_lost": { "details": "Yêu cầu tạo link đang chờ vì Shopee mất phiên đăng nhập.", "action": "Đăng nhập lại Shopee Affiliate rồi mở lại hàng đợi. Hàng đợi sẽ chạy lại sau đó." }
+    } },
+    "daily_link_report_failed": { "title": "Không Gửi Được Báo Cáo Link Hằng Ngày", "source": "operations.daily_link_report", "details": "Không gửi được báo cáo link hằng ngày tới nhóm DP Business; hệ thống sẽ thử lại sau 5 phút.", "action": "Kiểm tra bot vẫn ở trong nhóm DP Business. Nếu đến hết ngày vẫn không gửi được, báo cáo của ngày đó sẽ bị bỏ qua." },
     "link_undeliverable": { "title": "Không Gửi Được Link Cho Khách", "source": "linking.link_delivery", "details": "Không gửi được link cho khách sau nhiều lần thử." },
     "notification_daily_cap": { "title": "Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày", "source": "messaging.notifications", "details": "Đã chạm giới hạn tin nhắn Zalo trong ngày; tin còn lại chờ sang ngày mai." },
     "notification_undeliverable": { "title": "Tin Nhắn Zalo Không Gửi Được", "source": "messaging.notifications", "details": "Có tin nhắn Zalo không gửi được cho khách." },
     "order_frozen": { "title": "Đơn Hàng Bị Tạm Giữ Để Kiểm Tra Lại", "source": "orders.reconciliation", "details": "Một đơn vừa bị tạm giữ để kiểm tra lại; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
     "order_reversed": { "title": "Đơn Đã Duyệt Bị Sàn Hủy", "source": "orders.reconciliation", "details": "Một đơn đã duyệt bị sàn hủy; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
-    "reconciliation_failed": { "title": "Đối Soát Thất Bại", "source": "orders.reconciliation", "details": "Đối soát thất bại liên tiếp hoặc quá 3 giờ chưa chạy được." },
+    "reconciliation_failed": { "title": "Đối Soát Thất Bại", "source": "orders.reconciliation", "details": "Đối soát thất bại liên tiếp hoặc quá 8 giờ chưa chạy được." },
     "reconciliation_page_cap": { "title": "Báo Cáo Đối Soát Vượt Giới Hạn Trang", "source": "orders.reconciliation", "details": "Báo cáo đối soát vượt giới hạn trang." },
     "reconciliation_source_stale": { "title": "Nguồn Báo Cáo Đối Soát Đã Cũ", "source": "orders.reconciliation", "details": "Nguồn báo cáo đối soát đã cũ." },
     "restore_drill_due": { "title": "Đến Hạn Diễn Tập Khôi Phục Sao Lưu", "source": "platform.backup", "details": "Đã đến hạn diễn tập khôi phục sao lưu (mỗi quý một lần).", "action": "Xem runbook khôi phục." },

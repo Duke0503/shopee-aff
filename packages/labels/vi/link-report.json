@@ -1,0 +1,15 @@
+{
+  "$comment": "The daily link report of the DP Business group (D66; HTML parse mode): totals, then one line per customer, with the failed products under it. Not in the live system. The mapping is docs/operations/message-parity.md.",
+  "header": "📊 <b>[BÁO CÁO LINK NGÀY {date}]</b>\n",
+  "line_products": "🔗 <b>Tổng sản phẩm:</b> <b>{products}</b> của <b>{customers}</b> khách",
+  "line_succeeded": "✅ <b>Thành công:</b> <b>{count}</b>",
+  "line_failed": "❌ <b>Thất bại:</b> <b>{count}</b>",
+  "line_waiting": "⏳ <b>Đang chờ:</b> <b>{count}</b>",
+  "quiet": "📭 Không có yêu cầu link nào trong ngày.",
+  "line_customer": "👤 {customer}: <b>{products}</b> sản phẩm, <b>{succeeded}</b> thành công, <b>{failed}</b> thất bại{waiting}",
+  "customer_waiting": ", <b>{count}</b> đang chờ",
+  "customer_named": "{name} (ID: {id})",
+  "customer_id": "Khách ID: {id}",
+  "customer_guest": "Khách vãng lai",
+  "line_failed_product": "   ❌ {product}"
+}

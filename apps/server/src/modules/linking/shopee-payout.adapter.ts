@@ -58,7 +58,7 @@ export async function readShopeePayouts(deps: ShopeePayoutSourceDeps, signal: Ab
   const answer = await read.call(deps.bridge, signal);
   if (answer.outcome === "unavailable") throw new PayoutRecordError("payout_record_unavailable", `the payout record page: ${answer.reason}`);
   if (answer.outcome === "failed") {
-    blockOnSessionPage(deps, answer.reason);
+    blockOnSessionPage(deps, answer.reason, "payout_record");
     throw new PayoutRecordError("payout_record_failed", `the payout record page: the browser answered ${answer.reason}`);
   }
   const value = bridgePayoutRecordValueSchema.safeParse(answer.value);

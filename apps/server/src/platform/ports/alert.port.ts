@@ -8,7 +8,21 @@
 export const ALERT_SEVERITIES = ["critical", "high", "warning"] as const;
 export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 
+/**
+ * The step that found a problem, or why a request is stuck (D65). `captcha` and `login_lost` are the
+ * reasons of a stuck request; the others are the steps that can meet a captcha.
+ */
+export const ALERT_SOURCES = ["link_request", "product_lookup", "conversion_report", "payout_record", "health_check", "captcha", "login_lost"] as const;
+export type AlertSource = (typeof ALERT_SOURCES)[number];
+
+/** Ids and names of steps only: the customer's name and the product are read when the alert is sent (D65). */
+export interface AlertDetail {
+  readonly source: AlertSource;
+  /** The link request a message is about; its customer is named in the owner's chat only. */
+  readonly requestId?: string;
+}
+
 export interface AlertPort {
-  /** `kind` is a stable snake_case name (`backup_failed`); the alert carries no personal data. */
-  alert(kind: string, severity: AlertSeverity): void;
+  /** `kind` is a stable snake_case name (`backup_failed`); only the detail can bring a customer into the text (D65). */
+  alert(kind: string, severity: AlertSeverity, detail?: AlertDetail): void;
 }

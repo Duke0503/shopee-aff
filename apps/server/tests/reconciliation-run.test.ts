@@ -163,7 +163,7 @@ describe("Story 3.7 acceptance criteria", () => {
 });
 
 describe("Story 3.7: window, networks and row failures", () => {
-  it("reads the last 7 Vietnam days, today included, up to now; the job runs every 60 minutes", () => {
+  it("reads the last 7 Vietnam days, today included, up to now; the job runs every 6 hours (D67)", () => {
     const clock = movingClock("2026-10-30T18:30:00.000Z");
     // 01:30 on 31 October in Vietnam: the window starts at 00:00 on 25 October, Vietnam time.
     expect(hourlyWindow(clock)).toEqual({
@@ -172,7 +172,7 @@ describe("Story 3.7: window, networks and row failures", () => {
     });
     expect(JOB_SCHEDULES.reconcile).toEqual({
       context: "orders",
-      schedule: { kind: "every", delayMs: 60 * 60_000, firstDelayMs: 3 * 60_000 },
+      schedule: { kind: "every", delayMs: 6 * 60 * 60_000, firstDelayMs: 3 * 60_000 },
     });
   });
 

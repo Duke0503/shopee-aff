@@ -5,10 +5,12 @@
  * them: a request with an estimate, a link that is not a Shopee product (TikTok Shop, ShopeeFood,
  * a search or shop link), or a request whose lookup job has ended needs no more waiting.
  */
+import type { Instant } from "@cashback/core";
 import { and, eq, ne } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { ProductSnapshotFacts } from "./domain/link-reply";
+import { shopeeQueueStopReason } from "./link-queue.command";
 import { httpsImageUrl } from "./product-snapshot.query";
 import { bridgeJobs, linkRequests, shareCodes, type LINK_REQUEST_STATUSES } from "./schema";
 
@@ -18,6 +20,11 @@ export interface LinkReplyFacts extends ProductSnapshotFacts {
   readonly status: (typeof LINK_REQUEST_STATUSES)[number];
   readonly shareCode: string | null;
   readonly factsSettled: boolean;
+}
+
+/** True while this request waits behind a stopped Shopee queue (D65): a TikTok Shop request is served all the same. */
+export function waitsBehindStoppedQueue(db: LedgerDb, facts: Pick<LinkReplyFacts, "status" | "network">, now: Instant): boolean {
+  return facts.status === "QUEUED" && facts.network === "shopee" && shopeeQueueStopReason(db, now) !== null;
 }
 
 export function linkReplyFactsOf(db: LedgerDb, requestId: string): LinkReplyFacts | null {

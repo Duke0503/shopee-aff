@@ -56,7 +56,7 @@ stays out of the repository.
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather | both Telegram keys or neither |
 | `TELEGRAM_CHAT_ID` | `-1004416753701` | digits, optional leading `-` |
-| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices (D62, D63, D64) go here and never fall back to the owner's chat |
+| `TELEGRAM_BUSINESS_CHAT_ID` | the DP Business group's chat id, copied from the live `.env` | optional, same format, same bot; the order, settlement and new-member notices and the daily link report (D62, D63, D64, D66) go here and never fall back to the owner's chat |
 | `BACKUP_AGE_PATH` | `C:\Tools\age\age.exe` | absolute; the four `BACKUP_*` keys come together or not at all |
 | `BACKUP_AGE_RECIPIENT` | `age1...` (62 characters) | the public key only; a private key is refused |
 | `BACKUP_RCLONE_PATH` | `C:\Tools\rclone\rclone.exe` | absolute |
@@ -65,7 +65,8 @@ stays out of the repository.
 
 Without `TELEGRAM_BUSINESS_CHAT_ID` no order or settlement notice is sent and the rows stay PENDING in
 `order_business_notices` and `settlement_business_notices` until the chat is set; the first run of
-each job then expires those older than 24 hours and sends the rest. Production logs `orders.business_notice.chat_absent` as an error at every
+each job then expires those older than 24 hours and sends the rest. The daily link report does not run
+either, and a day without the chat is never made up (section 4.4). Production logs `orders.business_notice.chat_absent` as an error at every
 start and still starts.
 
 Without Telegram keys alerts are stored and logged only; production logs
@@ -229,7 +230,7 @@ stays down for the same reason nothing more is raised.
 | --- | --- | --- |
 | Bridge | the Shopee link queue is paused (login lost) or held (captcha, page error) | `bridge_login_lost`, `bridge_captcha` or `bridge_page_error` |
 | Assistant | no heartbeat with the Zalo session connected for 5 minutes | `assistant_down` |
-| Reconciliation | a network's hourly run has not succeeded for 3 hours | `reconciliation_failed` |
+| Reconciliation | a network's run, every 6 hours (D67), has not succeeded for 8 hours | `reconciliation_failed` |
 | Backup | the last run failed, or no good copy for 26 hours | `backup_failed` or `backup_offsite_failed` |
 | Queue | a link request that is due (not in a retry wait) on a network whose queue is open has waited more than 10 minutes; a paused or held Shopee queue is the bridge part's. The line shows how many requests wait | `link_queue_stuck` |
 | Drill (state `due`, not down) | no restore drill recorded, the last one failed, or it is more than a quarter (92 days) old; the line reads "đến hạn" (due) | `restore_drill_due` |
@@ -251,11 +252,11 @@ Every kind the server raises; a test checks this table against the code.
 | `assistant_down` | critical | the Zalo assistant has had no connected session for 5 minutes | open the assistant window on the VPS; scan the QR code with the bot account's phone if Zalo asks |
 | `assistant_session_conflict` | critical | another login took the assistant's Zalo account (the old bot left running, Zalo Web); the assistant stopped reconnecting | stop the other session, then restart the assistant (`shadow-run.md#zalo-account-at-cutover`) |
 | `bridge_login_lost` | critical | the affiliate browser was signed out of Shopee; the link queue is paused | sign in again, then resume the queue (`bridge-runbook.md#sign-in-again`) |
-| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
+| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while. The text names the step that found it, and on a link request the customer's name and id and the product (D65) | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
 | `backup_failed` | high | the daily backup failed a step or was missed for 26 hours | section 2.3 |
 | `backup_offsite_failed` | high | the encrypted copy did not reach Google Drive; the local copy is kept | section 2.3 |
 | `backup_offsite_too_large` | high | the encrypted copy is over the Drive webhook's 45 MB limit and was not sent; the local copy is kept | section 2.3 |
-| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 3 hours | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
+| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 8 hours | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
 | `reconciliation_page_cap` | high | a report needed more pages than the safe cap | read the report window by hand; never page further in the browser |
 | `reconciliation_source_stale` | high | the report source returned old data | check the saved report or the bridge source |
 | `order_reversed` | high | an approved order was cancelled by the network; a review case is open | work the review case on the desk |
@@ -266,6 +267,8 @@ Every kind the server raises; a test checks this table against the code.
 | `shopee_payout_record_unreadable` | high | the Shopee payout page changed shape and cannot be read | report it for a fix; enter the payout by hand meanwhile |
 | `bridge_page_error` | warning | a Shopee page error while making a link; the queue is held | nothing unless it repeats; then restart the bridge tab |
 | `bridge_short_link_unresolved` | warning | a customer's short link could not be opened | nothing; the customer gets the failure message |
+| `link_request_stuck` | high | a customer's Shopee link request waits behind a stopped queue (captcha or lost login); one message per request, with the customer's name and id, the product and the reason (D65) | clear the captcha or sign in again as the reason says; the queue resumes after it |
+| `daily_link_report_failed` | high | the daily link report could not be sent to the DP Business group; it is retried every 5 minutes (D66) | check that the bot is still in the group and `TELEGRAM_BUSINESS_CHAT_ID` is right; a report not sent by 24:00 Vietnam time is dropped |
 | `link_queue_stuck` | warning | a due link request on an open queue has waited over 10 minutes | check the link job and the bridge in the server log |
 | `link_undeliverable` | warning | a link could not be handed to the customer after its tries | nothing unless it repeats |
 | `notification_undeliverable` | warning | a Zalo message could not be delivered | nothing unless it repeats |
@@ -276,3 +279,19 @@ Every kind the server raises; a test checks this table against the code.
 
 A new kind needs a line in `packages/labels/vi/alerts.json` and a row here; the tests fail until
 both exist.
+
+### 4.4 The daily link report (D66)
+
+From 07:00 Vietnam time the job reports yesterday to `TELEGRAM_BUSINESS_CHAT_ID`, one row per day in
+`daily_link_reports`. Its stored `parts` hold customer names and are cleared only when the job runs:
+when the report is sent, or when a later day's report replaces an unsent one. While the server is down
+or the chat is unset, they stay. These log lines carry counts, HTTP statuses and error names only:
+
+| Log event | Level | Meaning |
+| --- | --- | --- |
+| `operations.daily_link_report.written` | info | the day's report was rendered and stored: customers, requests, parts |
+| `operations.daily_link_report.delivered` | info | the run sent the rest of the report |
+| `operations.daily_link_report.delivery_failed` | warn | a send failed; the next run retries it, and `daily_link_report_failed` is raised |
+| `operations.daily_link_report.earlier_days_skipped` | warn | a new day's report started: `unsent` older reports were dropped and `missed` days had none |
+| `operations.daily_link_report.bookkeeping_failed` | warn | one try at writing how far the report went failed |
+| `operations.daily_link_report.bookkeeping_lost` | error | all three tries failed; the run stops and the next run sends the uncounted part again |

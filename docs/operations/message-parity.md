@@ -69,7 +69,7 @@ today's total; the recorded notice's estimated cashback (`estimate`); the payout
 (`totalPaid`) and time (`paidAt`). A payout queued before this change is sent without those two lines.
 
 ## Mapping
-Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-zalo.
+Counts (messages.json, 99 keys): 12 adapted, 45 identical, 35 new-only, 7 not-zalo.
 
 | Key | Status | Old source | Note |
 |---|---|---|---|
@@ -94,6 +94,7 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `platform_accesstrade` | identical | assistant_worker.js:588 | Fragment (TikTok Shop). |
 | `shopeefood_generic_store` | identical | assistant_worker.js:727 | Fragment (a name that is not shown). |
 | `link_on_its_way` | identical | resources/messages.vi.json `received` | The live assistant waited 52 s and then sent its busy message; the new one says the link follows by message, in the old bot's `received` words. |
+| `link_queue_stopped` | new-only | D65, owner-approved wording | Sent at once, instead of `link_on_its_way`, while the Shopee queue is held by a captcha or paused by a lost login and the link is not made. |
 | `link_network_unsupported` | identical | assistant_worker.js:580-584 |  |
 | `link_not_in_affiliate` | identical | assistant_worker.js:606-612 (platformLabel TikTok Shop) | The only network that reports it. |
 | `link_failed` | identical | resources `link_failed`, sent by notifications.py:545-546 |  |
@@ -218,12 +219,13 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `backup_failed` | new-only, in the report_bug format | Sao Lưu Hằng Ngày Thất Bại |
 | `backup_offsite_failed` | new-only, in the report_bug format | Không Chép Được Bản Sao Lưu Lên Google Drive |
 | `backup_offsite_too_large` | new-only, in the report_bug format | Bản Sao Lưu Quá Lớn Để Gửi Lên Google Drive |
-| `bridge_captcha` | identical (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
+| `bridge_captcha` | identical without a step (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept); a raised alert now says the step that found it (D65) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
 | `bridge_login_lost` | identical (notify_shopee_session_expired) | Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất |
 | `bridge_page_error` | new-only, in the report_bug format | Trang Shopee Báo Lỗi Khi Tạo Link |
 | `bridge_short_link_unresolved` | new-only, in the report_bug format | Không Mở Được Link Rút Gọn |
 | `customer_sign_in_burst` | new-only, in the report_bug format | Nhiều Lần Đăng Nhập Sai Trên Website |
 | `link_queue_stuck` | new-only, in the report_bug format | Hàng Đợi Link Bị Kẹt |
+| `link_request_stuck` | new-only, in the report_bug format (D65) | Khách Đang Chờ Link Shopee |
 | `link_undeliverable` | new-only, in the report_bug format | Không Gửi Được Link Cho Khách |
 | `notification_daily_cap` | new-only, in the report_bug format | Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày |
 | `notification_undeliverable` | new-only, in the report_bug format | Tin Nhắn Zalo Không Gửi Được |
@@ -238,6 +240,7 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `shopee_payout_record_unreadable` | new-only, in the report_bug format | Trang Thanh Toán Shopee Đổi Dạng |
 | `shopee_payout_status_refused` | new-only, in the report_bug format | Trạng Thái Thanh Toán Shopee Lạ |
 | `web_link_safety_cap` | new-only, in the report_bug format | Website Chạm Giới Hạn An Toàn Tạo Link |
+| `daily_link_report_failed` | new-only, in the report_bug format (D66) | Không Gửi Được Báo Cáo Link Hằng Ngày |
 
 ### Telegram order notices (DP Business group, D62)
 
@@ -267,3 +270,20 @@ known is left out, and no notice names a customer.
 | `failed` | `PROCESSING -> FAILED` | Payout id, status, the batch's amount |
 | `matched` | Match becomes `MATCHED` | Payout id, orders settled, matched gross, unattributed (left out when negative), a warning naming the batch's open review cases when it has any |
 | `mismatch` | Match becomes `MISMATCH` | Payout id, gross, the batch's open review cases (or the Payouts page when none is open) |
+
+### Telegram daily link report (DP Business group, D66)
+
+Wording in `packages/labels/vi/link-report.json`. New-only: the live system sent no such report. Each
+day from 07:00 Vietnam time one report covers yesterday, with statuses as they stand when it is written.
+
+| Part | Label keys | Shows |
+|---|---|---|
+| Header | `header` | The day it covers, `DD/MM/YYYY` |
+| Totals | `line_products`, `line_succeeded`, `line_failed`, `line_waiting` | Products and customers, then successes (delivered or converted), failures, and those still waiting (queued or issued) |
+| Quiet day | `quiet` | In place of the totals and customers when no request was made |
+| One customer, by most requests | `line_customer` with `customer_named`, `customer_id` or `customer_guest`, and `customer_waiting` | Name and id, the id alone (no name, erased or unknown), or the guest line; products, successes, failures, and those still waiting when not zero |
+| Failed product | `line_failed_product` | Under its customer: the looked-up name, or the source link when that is empty; cut to 200 characters. Left out for an erased or unknown customer |
+
+Over 4,096 characters the report goes as several messages, split at a line break, with every value
+HTML-escaped. A customer stays in one message with its failed products unless that block alone is over
+the limit.

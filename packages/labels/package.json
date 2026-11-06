@@ -14,6 +14,7 @@
     "./vi/alerts.json": "./vi/alerts.json",
     "./vi/order-notices.json": "./vi/order-notices.json",
     "./vi/settlement-notices.json": "./vi/settlement-notices.json",
-    "./vi/member-notices.json": "./vi/member-notices.json"
+    "./vi/member-notices.json": "./vi/member-notices.json",
+    "./vi/link-report.json": "./vi/link-report.json"
   }
 }

@@ -57,7 +57,7 @@ export function healthCheck(deps: HealthCheckDeps): HealthCheck {
         const before = previous.get(entry.component);
         previous.set(entry.component, now);
         if ((entry.state !== "down" && entry.state !== "due") || entry.alert === null || before === now) continue;
-        deps.alerts.alert(entry.alert.kind, entry.alert.severity);
+        deps.alerts.alert(entry.alert.kind, entry.alert.severity, { source: "health_check" });
         deps.logger?.warn({ component: entry.component, kind: entry.alert.kind }, "operations.health.down");
         raised.push(entry.alert);
       }

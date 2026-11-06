@@ -283,7 +283,7 @@ and `payouts` publish events that `campaigns` and `messaging` consume in the sam
 
 - **Binds:** FR-25, FR-30, FR-36, NFR-4, NFR-6
 - **Prevents:** personal data in logs; alert storms; health shown differently on the Overview and in alerts
-- **Rule:** All server and assistant logs are pino JSON with a redaction list (bank numbers, phone numbers, tokens, session ids, passwords). Owner alerts go to Telegram only, through one `operations.alert(kind, severity)` with cooldowns (critical 5 min, high 15, warning 30). One health model (bridge, assistant, last reconciliation, last backup, queue depth) feeds both the Overview (FR-25) and the alerts.
+- **Rule:** All server and assistant logs are pino JSON with a redaction list (bank numbers, phone numbers, tokens, session ids, passwords). Owner alerts go to Telegram only, through one `operations.alert(kind, severity)` with cooldowns (critical 5 min, high 15, warning 30). An alert may carry an optional detail (the step that found it and a request id), and a keyed raise outside the cooldown sends one `link_request_stuck` per request, so these kinds may name a customer in the owner chat (D65). One health model (bridge, assistant, last reconciliation, last backup, queue depth) feeds both the Overview (FR-25) and the alerts.
 
 ### AD-28 — v1 cutover scope and build order
 

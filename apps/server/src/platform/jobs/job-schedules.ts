@@ -26,14 +26,18 @@ export const JOB_SCHEDULES = {
   heartbeat: { context: "operations", schedule: every(5 * 60_000) },
   /** Pending owner alerts sent to Telegram; a failed send is retried on the next run (Story 8.3). */
   alertDelivery: { context: "operations", schedule: every(30_000) },
+  /** One owner message per request a stopped Shopee queue keeps waiting (D65). */
+  linkRequestStuck: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */
   signInHousekeeping: { context: "identity", schedule: every(60 * 60_000) },
   /** Pending order notices sent to the DP Business group; a failed send stops the run and is retried on the next (D62). */
   orderBusinessNotices: { context: "orders", schedule: every(30_000) },
   /** Pending settlement notices sent to the DP Business group, under the same rules (D63). */
   settlementBusinessNotices: { context: "payouts", schedule: every(30_000) },
-  /** Hourly; the first run 3 minutes after start, so frequent deploys never postpone it (production 2026-11-03). */
-  reconcile: { context: "orders", schedule: every(60 * 60_000, 3 * 60_000) },
+  /** Yesterday's link report to the DP Business group: from 07:00 Vietnam time, once a day, retried until sent (D66). */
+  dailyLinkReport: { context: "operations", schedule: every(5 * 60_000) },
+  /** Four reads a day, to ask Shopee less often and meet fewer captchas (D67); the first run 3 minutes after start, so frequent deploys never postpone it (production 2026-11-03). */
+  reconcile: { context: "orders", schedule: every(6 * 60 * 60_000, 3 * 60_000) },
   nightlySweep: { context: "orders", schedule: dailyVn(2) },
   /** The checked local archive, then the encrypted copy on Google Drive (Story 8.2). */
   backup: { context: "platform", schedule: dailyVn(3) },

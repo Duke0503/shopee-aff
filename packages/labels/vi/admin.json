@@ -640,7 +640,7 @@
   "ov_runbook": "Cách xử lý",
   "ov_runbook_bridge": "Mở Chrome của sàn trên máy chủ, kiểm tra extension còn bật và tài khoản sàn còn đăng nhập.",
   "ov_runbook_assistant": "Mở cửa sổ trợ lý Zalo trên máy chủ. Nếu Zalo bắt đăng nhập lại, quét mã bằng điện thoại của tài khoản bot.",
-  "ov_runbook_reconciliation": "Đối soát quá 3 giờ chưa chạy được. Kiểm tra trình duyệt sàn còn đăng nhập, rồi chạy lại đối soát.",
+  "ov_runbook_reconciliation": "Đối soát quá 8 giờ chưa chạy được. Kiểm tra trình duyệt sàn còn đăng nhập, rồi chạy lại đối soát.",
   "ov_runbook_backup": "Sao lưu thất bại hoặc chưa chép lên Google Drive. Xem mục Sao lưu trong runbook, kiểm tra age và rclone; giờ hiện bên cạnh là bản sao lưu tốt gần nhất.",
   "ov_runbook_queue": "Có yêu cầu link chờ quá 10 phút. Kiểm tra trình duyệt sàn còn đăng nhập và hàng đợi Shopee không bị tạm dừng.",
   "ov_runbook_drill": "Đã quá một quý chưa diễn tập khôi phục (hoặc lần gần nhất không đạt). Làm theo runbook khôi phục trên máy dev rồi ghi lại kết quả; giờ hiện bên cạnh là lần diễn tập gần nhất.",

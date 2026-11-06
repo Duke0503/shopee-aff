@@ -186,7 +186,7 @@ export function recordLookupResult(db: LedgerDb, job: LookupBridgeJob, answer: R
     closeJob(db, job.jobId, answer.reason, at);
     if (answer.reason === "captcha") {
       holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS));
-      effects(db).alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity);
+      effects(db).alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "product_lookup" });
       return done("held", answer.reason);
     }
     if (answer.reason === "login_redirect") {

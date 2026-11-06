@@ -134,9 +134,9 @@ describe("Story 4.17 acceptance criteria (server)", () => {
     expect(state()).toEqual({ component: "reconciliation", state: "down", at: "2026-10-30T04:30:00.000Z" });
     run("accesstrade", "2026-10-30T04:40:00.000Z");
     expect(state()).toEqual({ component: "reconciliation", state: "up", at: "2026-10-30T04:30:00.000Z" });
-    // The clock moves on: Shopee's last success is now over 3 hours old while AccessTrade's is fresh.
-    run("accesstrade", "2026-10-30T07:50:00.000Z");
-    const later = overviewOf(ledger.db, { period: "today" }, fixedClock("2026-10-30T08:00:00.000Z")).health.find((h) => h.component === "reconciliation");
+    // The clock moves on: Shopee's last success is now over 8 hours old (D67) while AccessTrade's is fresh.
+    run("accesstrade", "2026-10-30T12:50:00.000Z");
+    const later = overviewOf(ledger.db, { period: "today" }, fixedClock("2026-10-30T13:00:00.000Z")).health.find((h) => h.component === "reconciliation");
     expect(later).toEqual({ component: "reconciliation", state: "down", at: "2026-10-30T04:30:00.000Z" });
     expect(overviewOf(ledger.db, { period: "today" }, fixedClock(golden.clock)).health.filter((h) => h.component !== "reconciliation" && h.component !== "queue").every((h) => h.state === "unknown")).toBe(true);
   });

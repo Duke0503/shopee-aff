@@ -406,7 +406,7 @@ describe("configuration", () => {
   it("chat unset: no job, rows stored, the existing chat_absent error once", () => {
     const ledger = payoutLedger();
     const { logger, lines } = memoryLogger();
-    expect(ownerJobs({ config: prod, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health", "alertDelivery"]);
+    expect(ownerJobs({ config: prod, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "alertDelivery"]);
     expect(lines.filter((l) => l.includes('"level":50') && l.includes("orders.business_notice.chat_absent"))).toHaveLength(1);
     record(ledger, batch());
     expect(noticeRows(ledger).map((n) => n.delivery)).toEqual(["PENDING"]);

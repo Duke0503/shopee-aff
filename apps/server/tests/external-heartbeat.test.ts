@@ -118,9 +118,9 @@ describe("Story 8.4: external heartbeat", () => {
     const { logger, lines } = memoryLogger();
     const base = { env: "prod" as const, dataDir: tempDir("cashback-heartbeat-"), telegram: null, backupOffsite: null, assistantToken: null };
     const deps = { ledger, clock, logger, heartbeats: assistantHeartbeats(START as Instant), health: {} };
-    expect(ownerJobs({ config: base, ...deps }).map((j) => j.name)).toEqual(["backup", "health"]);
+    expect(ownerJobs({ config: base, ...deps }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck"]);
     expect(lines.some((l) => l.includes('"level":50') && l.includes("operations.heartbeat.url_absent"))).toBe(true);
-    expect(ownerJobs({ config: { ...base, heartbeatUrl: HEARTBEAT_URL }, ...deps }).map((j) => j.name)).toEqual(["backup", "health", "heartbeat"]);
+    expect(ownerJobs({ config: { ...base, heartbeatUrl: HEARTBEAT_URL }, ...deps }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "heartbeat"]);
   });
 
   it("a dev config that points at the production heartbeat is refused", () => {

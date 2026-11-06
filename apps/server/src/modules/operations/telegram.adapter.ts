@@ -1,7 +1,7 @@
 /**
  * The Telegram sender (AD-27): one `sendMessage` call per message, never inside a transaction, to
  * the chat it is bound to: the owner's chat for alerts, and the DP Business group's chat for the
- * order, settlement and new-member notices (D62, D63, D64); an order notice's text carries a customer's name and id, and a new-member notice a joiner's name and Zalo id. The bot token is a secret from platform/config and appears
+ * order, settlement and new-member notices and the daily link report (D62, D63, D64, D66); an order notice's text carries a customer's name and id, and a new-member notice a joiner's name and Zalo id. The bot token is a secret from platform/config and appears
  * in no log line or error message. `fetch` is injected so tests use a fake and never reach the
  * network.
  *
@@ -10,19 +10,38 @@
  * `report_bug`, owner requirement 2026-11-02): the severity header with the title, the source, the
  * Vietnam time `HH:MM:SS - DD/MM/YYYY`, the details and the action, sent with `parse_mode: HTML`.
  * Every text is escaped as the live `_sanitize_html` did. `telegramText` fills in only the label
- * file's words, the time and the repeat count, so no personal data, bank number or token can reach
- * the chat through an alert; that guarantee belongs to `telegramText`, not to `telegramSender`.
+ * file's words, the time, the repeat count and, for an alert about one link request, the facts its
+ * caller read for it (the customer's name and id and the product, D65). So no bank number or token
+ * can reach the chat through an alert, and a name only through those facts; that guarantee belongs
+ * to `telegramText`, not to `telegramSender`.
  */
 import { formatVnAlertStamp, type Instant } from "@cashback/core";
 import ALERT_LABELS from "@cashback/labels/vi/alerts.json" with { type: "json" };
 
+import type { AlertDetail } from "../../platform/ports/alert.port";
 import type { AlertSeverity } from "./domain/alert-cooldown";
+
+/** What one step says in place of its kind's own words. */
+interface StepText {
+  readonly details: string;
+  readonly source?: string;
+  readonly action?: string;
+}
+
+/** Who and what an alert about one link request names; a null name or product is left out (D65). */
+export interface AlertRequestFacts {
+  readonly id: string;
+  readonly name: string | null;
+  readonly product: string | null;
+}
 
 interface KindText {
   readonly title: string;
   readonly details: string;
   readonly source?: string;
   readonly action?: string;
+  /** By the detail's source: the words that name the step that found it (D65). */
+  readonly steps?: Readonly<Record<string, StepText>>;
   /** The header of another severity, where the live system showed that one for the same alert. */
   readonly badge?: string;
 }
@@ -39,16 +58,30 @@ export const hasAlertLabel = (kind: string): boolean => /^[a-z][a-z0-9_]*$/.test
 
 const isSeverity = (value: string | undefined): value is AlertSeverity => value === "critical" || value === "high" || value === "warning";
 
+/** The kind's words, with those of the step the detail names when the kind has its own for it. */
+function wordsOf(kind: string, detail: AlertDetail | null | undefined): KindText {
+  const known = hasAlertLabel(kind) ? LABELS.kinds[kind] : undefined;
+  if (known === undefined) return { title: LABELS.unknown_kind.title, details: fill(LABELS.unknown_kind.details, { kind }) };
+  const step = detail !== null && detail !== undefined && known.steps !== undefined && Object.hasOwn(known.steps, detail.source) ? known.steps[detail.source] : undefined;
+  return step === undefined ? known : { ...known, ...step };
+}
+
+function requestLines(facts: AlertRequestFacts): string[] {
+  const named = facts.name !== null && facts.name !== facts.id;
+  const customer = named ? fill(LABELS["line_customer_named"] ?? "", { name: facts.name ?? "", id: facts.id }) : fill(LABELS["line_customer_id"] ?? "", { id: facts.id });
+  return facts.product === null ? [customer] : [customer, fill(LABELS["line_product"] ?? "", { product: facts.product })];
+}
+
 /** The Telegram text (HTML) of one stored alert, stamped with the time it was raised. */
-export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number; raisedAt: string }): string {
-  const known = hasAlertLabel(alert.kind) ? LABELS.kinds[alert.kind] : undefined;
-  const text: KindText = known ?? { title: LABELS.unknown_kind.title, details: fill(LABELS.unknown_kind.details, { kind: alert.kind }) };
+export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number; raisedAt: string; detail?: AlertDetail | null }, request?: AlertRequestFacts | null): string {
+  const text = wordsOf(alert.kind, alert.detail);
+  const details = request === null || request === undefined ? text.details : [text.details, ...requestLines(request)].join("\n");
   const severity = isSeverity(text.badge) ? text.badge : alert.severity;
   const lines = [
     fill(LABELS[`header_${severity}`] ?? "{title}", { title: escapeHtml(text.title) }),
     fill(LABELS["line_source"] ?? "", { source: escapeHtml(text.source ?? LABELS["default_source"] ?? "") }),
     fill(LABELS["line_time"] ?? "", { time: formatVnAlertStamp(alert.raisedAt as Instant) }),
-    fill(LABELS["line_details"] ?? "", { details: escapeHtml(text.details) }),
+    fill(LABELS["line_details"] ?? "", { details: escapeHtml(details) }),
   ];
   if (text.action !== undefined) lines.push(fill(LABELS["line_action"] ?? "", { action: escapeHtml(text.action) }));
   if (alert.suppressed > 0) lines.push(fill(LABELS["line_repeated"] ?? "", { count: String(alert.suppressed) }));
