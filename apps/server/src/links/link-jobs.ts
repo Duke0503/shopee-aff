@@ -16,7 +16,7 @@
 import type { Clock } from "@cashback/core";
 
 import { assistantChatRoutes } from "./assistant-chat.routes";
-import { accessTradeLinkCreator, addlivetagLookup, bridgeInternalRoutes, browserBridge, checkLinkDeliveries, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkDeliveryCheck, type LinkEffects, type ThirdPartyLookup } from "../modules/linking/index";
+import { accessTradeLinkCreator, addlivetagLookup, bridgeInternalRoutes, bridgeVerificationRoutes, browserBridge, checkLinkDeliveries, fakeAccessTradeLinks, fakeBridge, linkRequestInternalRoutes, runLinkJob, runProductLookups, type LinkCreator, type LinkDeliveryCheck, type LinkEffects, type ThirdPartyLookup } from "../modules/linking/index";
 import { outboxFor } from "../modules/messaging/index";
 import { alertsFor, commandAudit } from "../modules/operations/index";
 import { DEV_SUB_ID_PREFIX } from "../modules/orders/index";
@@ -90,6 +90,15 @@ export function linkRoutes(input: LinkWiringInput, bridge: LinkBridge): Internal
 
 /** The actor of the link job's own writes: the "link failed" outbox rows (AD-17). */
 export const LINKS_ACTOR: Actor = { kind: "system", id: "links" };
+
+/** The actor of a captcha hold the bridge saw cleared (D68). */
+export const BRIDGE_ACTOR: Actor = { kind: "system", id: "bridge" };
+
+/** The captcha cleared route, for the real bridge only; the fake bridge meets no captcha. */
+export function verificationClearedRoutes(input: Pick<LinkWiringInput, "ledger" | "clock">, bridge: LinkBridge, onCleared: (db: LedgerDb) => void): InternalRoutes[] {
+  if (bridge.port.mode !== "browser") return [];
+  return [bridgeVerificationRoutes({ ledger: input.ledger, clock: input.clock, audit: (db) => commandAudit(db, input.clock, BRIDGE_ACTOR), onCleared })];
+}
 
 /** The outbox and the owner alerts, bound to one result transaction (Story 5.5). */
 export function linkEffectsFor(clock: Clock, logger?: Logger): (db: LedgerDb) => LinkEffects {

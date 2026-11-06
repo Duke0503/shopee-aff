@@ -15,12 +15,17 @@
  * canonical form (packages/core `readShopeeProduct`), so it always fits a bridge job; any other
  * Shopee link longer than a bridge job allows is refused here (`url_too_long`), never queued.
  *
+ * A link the same customer already has waiting is handed back too, whatever it names (D68): the
+ * requester's own QUEUED request with the same stored source link on the same channel, so a customer
+ * who resends a link during a captcha gets one link, not one per send. It costs no quota. Guests are
+ * left out: they are strangers who share the HOUSE account.
+ *
  * A TikTok Shop link is queued for AccessTrade (Story 5.7); a Lazada link, or any other, is refused
  * as `network_unsupported`, whose message names the supported networks (D17). Without an AccessTrade
  * link creator (production with no key) a TikTok Shop link is refused as `tiktok_unavailable`.
  */
 import { vnToday, type Clock } from "@cashback/core";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import { customerKeys, resolveCustomer } from "../identity/index";
@@ -103,6 +108,19 @@ function reusableRequest(db: LedgerDb, requester: Requester, productKey: string,
   return { requestId: chosen.requestId, customerId: requester.customerId, status: chosen.status, reused: true, shareCode: code?.code ?? null };
 }
 
+/** The requester's own oldest waiting request for this exact source link, or null (D68). Dev sees dev requests only (AD-25). */
+function waitingRequest(db: LedgerDb, customerId: string, sourceUrl: string, channel: LinkChannel, requestIdPrefix: string): QueuedLinkRequest | null {
+  const ownerKeys = customerKeys(db, customerId)?.keys ?? [customerId];
+  const waiting = db
+    .select({ requestId: linkRequests.requestId })
+    .from(linkRequests)
+    .where(and(eq(linkRequests.status, "QUEUED"), eq(linkRequests.origin, "REQUEST"), eq(linkRequests.sourceUrl, sourceUrl), eq(linkRequests.channel, channel), inArray(linkRequests.customerId, ownerKeys)))
+    .orderBy(asc(linkRequests.createdAt), asc(linkRequests.requestId))
+    .all()
+    .find((r) => r.requestId.startsWith(requestIdPrefix));
+  return waiting === undefined ? null : { requestId: waiting.requestId, customerId, status: "QUEUED", reused: true, shareCode: null };
+}
+
 /**
  * Writes one QUEUED request, or hands back the requester's own reusable one; call inside `tx`.
  * `requestIdPrefix` is `DEV` in dev, empty in production. `beforeNew` runs only when a new request
@@ -121,6 +139,8 @@ export function queueLinkRequest(db: LedgerDb, input: LinkRequestInput, clock: C
   // Only a link that names one product is ever reused (Story 5.2); a search or shop link is always new.
   const reused = productKey === null ? null : reusableRequest(db, { customerId: customer.customerId, guest: customer.role === "HOUSE" }, productKey, clock, requestIdPrefix, note);
   if (reused !== null) return reused;
+  const waiting = customer.role === "HOUSE" ? null : waitingRequest(db, customer.customerId, sourceUrl, input.channel, requestIdPrefix);
+  if (waiting !== null) return waiting;
   // A quota counts new requests only (the website's, Story 7.6): a reused link costs nothing.
   beforeNew(customer.customerId);
   const requestId = nextRequestId(db, clock, requestIdPrefix);

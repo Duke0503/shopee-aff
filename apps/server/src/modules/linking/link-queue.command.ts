@@ -5,6 +5,8 @@
  * affiliate browser in again. While either lasts, the link job hands no Shopee job to the bridge.
  * Resuming clears both, audits who did it, and the queue goes on in its usual order, so the oldest
  * request of the highest priority is served first. Each function runs inside the caller's `tx`.
+ * When the bridge sees a Shopee tab leave the verification page, a captcha hold ends at once (D68);
+ * that never lifts a pause or a page error hold.
  *
  * "Stopped" (D65) is what the customer and the owner are told about: a captcha hold or a pause. A
  * page error hold is not, because it lasts one minute.
@@ -109,4 +111,16 @@ export function resumeShopeeQueue(db: LedgerDb, by: CommandAudit, now: Instant):
   write(db, NOT_HELD);
   by.audit.record({ actor: by.actor, event: "linking.link_queue.resumed", entityId: SHOPEE, payload: { pausedReason: state.pausedReason, heldReason: state.heldReason } });
   return { resumed: true, pausedReason: state.pausedReason };
+}
+
+/**
+ * A Shopee tab left the verification page (D68): ends a captcha hold still running, audited. A pause,
+ * a page error hold or an expired hold is left as it is. True when a hold ended.
+ */
+export function clearCaptchaHold(db: LedgerDb, by: CommandAudit, now: Instant): boolean {
+  const { heldReason, heldUntil } = shopeeQueueState(db);
+  if (heldReason !== "captcha" || heldUntil === null || toMs(heldUntil as Instant) <= toMs(now)) return false;
+  write(db, { heldReason: null, heldUntil: null });
+  by.audit.record({ actor: by.actor, event: "linking.link_queue.captcha_cleared", entityId: SHOPEE, payload: { heldUntil } });
+  return true;
 }

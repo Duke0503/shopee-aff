@@ -12,6 +12,8 @@ import { hostOnDomain, SHOPEE_LINK_DOMAINS } from "@cashback/core";
 export const CUSTOM_LINK_URL = "https://affiliate.shopee.vn/offer/custom_link";
 /** The tab list query that finds the bridge tab again after a restart. */
 export const AFFILIATE_TAB_PATTERN = "https://affiliate.shopee.vn/*";
+/** The tab list query that finds every custom link tab, pinned or not: the bridge keeps one (D68). */
+export const CUSTOM_LINK_TAB_PATTERN = `${CUSTOM_LINK_URL}*`;
 /**
  * The sites a job takes the bridge tab to (the affiliate site, the storefront for a lookup, short
  * links, ShopeeFood, and Shopee's login and verification pages): a pinned tab on one of them is the

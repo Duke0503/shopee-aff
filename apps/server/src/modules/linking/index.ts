@@ -87,7 +87,7 @@ export { deliveredLinkCounts, failedLinkCount, oldestDueLinkRequest, waitingLink
 export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type LinkRequestNote, type QueuedLinkRequest } from "./link-request.command";
 export { claimLinkJob, claimLinkWork, type ApiLinkRequest, type ClaimOptions, type LinkWork } from "./link-issue.command";
 export { LINK_FAILED_MESSAGE, randomShareCode, recordApiLinkResult, recordLinkResult, recordSilentBridge, SHARE_CODE_LENGTH, SILENT_ANSWERS_BEFORE_FAILURE, type ApiLinkAnswer, type LinkEffects, type LinkResultRecorded, type RecordedBridgeAnswer, type RecordOptions } from "./link-result.command";
-export { holdShopeeQueue, notePageError, pauseShopeeQueue, queuedShopeeRequests, resumeShopeeQueue, shopeeQueueGate, shopeeQueueState, shopeeQueueStopReason, type LinkQueueState, type QueueGate, type QueueResumed, type QueueStopReason } from "./link-queue.command";
+export { clearCaptchaHold, holdShopeeQueue, notePageError, pauseShopeeQueue, queuedShopeeRequests, resumeShopeeQueue, shopeeQueueGate, shopeeQueueState, shopeeQueueStopReason, type LinkQueueState, type QueueGate, type QueueResumed, type QueueStopReason } from "./link-queue.command";
 export { CAPTCHA_HOLD_MS, FINAL_FAILURE_MESSAGES, handlingOf, LINK_MAX_ATTEMPTS, LINK_QUEUE_ALERTS, PAGE_ERROR_FAIL_AFTER_MS, PAGE_ERROR_HOLD_MS, pageErrorStep, RELOGIN_RUNBOOK, RESOLUTION_RETRY_MS, type FailureHandling } from "./domain/link-failure";
 export { ACCESSTRADE_LINK_PATH, accessTradeLinkCreator, fakeAccessTradeLinks, fetchPost, type AccessTradeLinkOptions, type HttpPost, type LinkCreator, type PostAnswer } from "./accesstrade-link.adapter";
 export { checkReturnedLink, isShopeeShortHost, linkWithoutQuery, needsResolution, shopKeyFromTarget, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure, type LinkOrigin } from "./domain/link-check";
@@ -97,7 +97,7 @@ export { isOtherShopLink, OTHER_SHOP_DOMAINS, readProductLink, readShopeeProduct
 export { chooseReusable, isReusable, LINK_REUSE_WINDOW_DAYS, unreadableTimes, type ReuseCandidate, type ReuseRule } from "./domain/link-reuse";
 export { linkRequestInternalRoutes, type LinkRequestRouteDeps } from "./http/link-request.routes";
 export { BRIDGE_ANSWER_GRACE_MS, BRIDGE_JOB_TIMEOUT_MS, BRIDGE_PICKUP_MS, BRIDGE_POLL_MS, browserBridge, type BridgeAnswer, type BridgeTimer, type BridgeWork, type BrowserBridge, type BrowserBridgeOptions } from "./browser-bridge.adapter";
-export { bridgeInternalRoutes, type BridgeRouteDeps } from "./http/bridge.routes";
+export { bridgeInternalRoutes, bridgeVerificationRoutes, type BridgeRouteDeps, type BridgeVerificationRouteDeps } from "./http/bridge.routes";
 export { claimLookupJob, linkWorkDue, LOOKUP_RETRY_MS, LOOKUP_WINDOW_MS, LOOKUPS_PER_REQUEST, PRODUCT_FACTS_FRESH_MS, recordLookupResult, recordSilentLookup, SILENT_LOOKUPS_BEFORE_FAILURE, type LookupRecorded, type RecordedLookupAnswer } from "./link-lookup.command";
 export { MAX_LOOKUPS_PER_RUN, runProductLookups, type LookupJobDeps } from "./link-lookup.job";
 export { ADDLIVETAG_API_URL, ADDLIVETAG_TIMEOUT_MS, addlivetagLookup, type AddlivetagOptions, type ThirdPartyFailure, type ThirdPartyLookup, type ThirdPartyLookupAnswer } from "./addlivetag-lookup.adapter";

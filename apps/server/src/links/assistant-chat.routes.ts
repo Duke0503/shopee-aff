@@ -139,7 +139,7 @@ export function assistantChatRoutes(deps: AssistantChatRouteDeps): (app: Fastify
       if (notServed !== null) return refuse(notServed, sender);
       try {
         const queued = deps.ledger.tx((db) => queueLinkRequest(db, { customer: sender.customerId, url, channel: "zalo" }, deps.clock, deps.requestIdPrefix, (event, detail) => request.log.warn(detail, event), deps.tikTok));
-        return assistantLinkAnswerSchema.parse({ outcome: "queued", customerId: sender.customerId, customerCode: sender.customerCode, registered: sender.created, requestId: queued.requestId, reused: queued.reused });
+        return assistantLinkAnswerSchema.parse({ outcome: "queued", customerId: sender.customerId, customerCode: sender.customerCode, registered: sender.created, requestId: queued.requestId, reused: queued.reused, status: queued.status });
       } catch (error) {
         if (error instanceof LinkRequestError) return refuse(error.code, sender);
         throw error;

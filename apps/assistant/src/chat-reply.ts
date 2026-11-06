@@ -35,7 +35,9 @@
  * claim never confirmed (the assistant stopped) lapses, so the server's delivery check sends the
  * link by notification instead of losing it. `pending` (a notification is on its way) and a claim
  * the server did not answer send "on its way" and no link, so the link is never sent twice.
- * `delivered` sends the link again only for the same product asked again (the request reused).
+ * `delivered` sends the link again only for a request handed back that already had its link when
+ * asked. A resend of a request still QUEUED (D68) sends nothing then: the first send's reply or
+ * notification hands the link over, once.
  */
 import { toMs, vnDateOf, type Clock } from "@cashback/core";
 import { DISPLAY_NAME_MAX_LENGTH, type AssistantChat, type AssistantLinkReply, type LINK_CLAIMS } from "@cashback/contracts";
@@ -143,17 +145,17 @@ async function answerLink(deps: ChatReplyDeps, message: IncomingMessage, url: st
   if (reply === "failed") return;
   if (reply === "queue_stopped") return deps.send(message.chat, "link_queue_stopped", {}, tag);
   if (reply === null) return deps.send(message.chat, "link_on_its_way", {}, tag);
-  return handOver(deps, message.chat, tag, { requestId: answer.requestId, customerId: answer.customerId }, reply, answer.reused);
+  return handOver(deps, message.chat, tag, { requestId: answer.requestId, customerId: answer.customerId }, reply, answer.reused && answer.status !== "QUEUED");
 }
 
 /** Sends a made link in the reply only when the server's claim gives it to the reply (Story 6.5). */
-async function handOver(deps: ChatReplyDeps, chat: ChatTarget, tag: Tag | null, request: { requestId: string; customerId: string }, reply: Made, reused: boolean): Promise<void> {
+async function handOver(deps: ChatReplyDeps, chat: ChatTarget, tag: Tag | null, request: { requestId: string; customerId: string }, reply: Made, askedAgain: boolean): Promise<void> {
   let claim: LinkClaim | null = null;
   // The claim is taken in the send's own turn, so its 2 minutes start right before the send.
   const decide = async (): Promise<ReplyMessage | null> => {
     claim = (await deps.api.claimLink(request).catch(() => null))?.claim ?? null;
     if (claim === null || claim === "pending" || claim === "not_made") return { key: "link_on_its_way", values: {} };
-    if (claim === "delivered" && !reused) return null;
+    if (claim === "delivered" && !askedAgain) return null;
     return linkReplyMessage(reply);
   };
   try {

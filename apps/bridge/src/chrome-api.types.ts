@@ -10,6 +10,14 @@ export interface ChromeTab {
   readonly status?: string;
   readonly discarded?: boolean;
   readonly pinned?: boolean;
+  readonly active?: boolean;
+  readonly windowId?: number;
+}
+
+export interface ChromeWindow {
+  /** True only while this window has the focus: false when Chrome itself is in the background. */
+  readonly focused: boolean;
+  readonly tabs?: ChromeTab[];
 }
 
 export interface ChromeEvent<A extends unknown[]> {
@@ -28,6 +36,11 @@ export interface ChromeApi {
     update(tabId: number, properties: { url?: string; pinned?: boolean; autoDiscardable?: boolean }): Promise<ChromeTab | undefined>;
     reload(tabId: number): Promise<void>;
     remove(tabId: number): Promise<void>;
+    readonly onUpdated: ChromeEvent<[number, { url?: string }, ChromeTab]>;
+    readonly onRemoved: ChromeEvent<[number, unknown]>;
+  };
+  readonly windows: {
+    getLastFocused(info: { populate: boolean }): Promise<ChromeWindow>;
   };
   readonly scripting: {
     executeScript<A extends unknown[], R>(injection: { target: { tabId: number }; world: "MAIN"; func: (...args: A) => R; args: A }): Promise<InjectionResult<Awaited<R>>[]>;

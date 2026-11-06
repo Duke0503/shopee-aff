@@ -35,6 +35,8 @@ function fakeReportPage(answer: ReportApiAnswer, at = REPORT_PAGE_URL, over: { a
     asked: [],
     answerMs: [],
     href_: at,
+    replaceTab: async () => null,
+    replacements: () => 0,
     prepare: async () => void page.calls.push("prepare"),
     href: async () => page.href_,
     open: async (url) => {

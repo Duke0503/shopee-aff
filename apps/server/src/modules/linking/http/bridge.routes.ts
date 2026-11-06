@@ -3,8 +3,9 @@
  *
  *   GET  /internal/bridge/next      `X-Bridge-Token`, `X-Bridge-Instance`: the next job (200), or 204 when the server-side wait ends
  *   POST /internal/bridge/results   `X-Bridge-Token`, `X-Bridge-Instance`: one answer, by its job's ticket
+ *   POST /internal/bridge/verification-cleared   the same headers: a Shopee tab left the verification page (D68)
  *
- * Both are marked as the bridge's, so the listener's token guard checks the bridge token for them
+ * All are marked as the bridge's, so the listener's token guard checks the bridge token for them
  * and no other token opens them. A call without a well-formed instance id is refused (400). The
  * poll is held on the server (the extension never waits in a page) and is let go when the bridge
  * hangs up or the server stops, so a stop never waits out a poll. A job that does not meet the
@@ -12,12 +13,16 @@
  * broken job never fails the poll, so it can never block the line. An answer nobody waits on is
  * accepted as false.
  */
-import { BRIDGE_INSTANCE_HEADER, BRIDGE_INSTANCE_PATTERN, BRIDGE_NEXT_PATH, BRIDGE_RESULTS_PATH, bridgeJobSchema, bridgeResultAcceptedSchema, bridgeResultSchema } from "@cashback/contracts";
+import { BRIDGE_INSTANCE_HEADER, BRIDGE_INSTANCE_PATTERN, BRIDGE_NEXT_PATH, BRIDGE_RESULTS_PATH, BRIDGE_VERIFICATION_CLEARED_PATH, bridgeJobSchema, bridgeResultAcceptedSchema, bridgeResultSchema, bridgeVerificationClearedSchema } from "@cashback/contracts";
+import type { Clock } from "@cashback/core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
+import type { Ledger, LedgerDb } from "../../../platform/db/ledger";
 import { HttpError } from "../../../platform/http/error-envelope";
 import { BRIDGE_ROUTE } from "../../../platform/http/internal-token.guard";
+import type { CommandAudit } from "../../../platform/ports/audit.port";
 import type { BridgeWorkQueue } from "../../../platform/ports/bridge.port";
+import { clearCaptchaHold } from "../link-queue.command";
 
 export interface BridgeRouteDeps {
   readonly work: BridgeWorkQueue;
@@ -54,6 +59,33 @@ export function bridgeInternalRoutes(deps: BridgeRouteDeps): (app: FastifyInstan
       const body = bridgeResultSchema.safeParse(request.body);
       if (!body.success) throw new HttpError("invalid_request", "error.invalid_request");
       return bridgeResultAcceptedSchema.parse({ accepted: deps.work.deliver(body.data, instance) });
+    });
+  };
+}
+
+export interface BridgeVerificationRouteDeps {
+  readonly ledger: Ledger;
+  readonly clock: Clock;
+  readonly audit: (db: LedgerDb) => CommandAudit;
+  /** Runs after a hold ended and its transaction committed; never when nothing changed. A throw is logged: the hold has ended all the same. */
+  readonly onCleared: (db: LedgerDb) => void;
+}
+
+/** The captcha cleared route (D68): only the bridge token opens it, and nothing but a captcha hold changes. */
+export function bridgeVerificationRoutes(deps: BridgeVerificationRouteDeps): (app: FastifyInstance) => void {
+  return (app) => {
+    app.post(BRIDGE_VERIFICATION_CLEARED_PATH, { config: BRIDGE_ROUTE }, async (request) => {
+      instanceOf(request);
+      const cleared = deps.ledger.tx((db) => clearCaptchaHold(db, deps.audit(db), deps.clock.now()));
+      if (cleared) {
+        try {
+          deps.onCleared(deps.ledger.db);
+        } catch (error) {
+          request.log.error({ err: error }, "linking.link_queue.after_clear_failed");
+        }
+      }
+      request.log.info({ cleared }, "linking.link_queue.verification_cleared");
+      return bridgeVerificationClearedSchema.parse({ cleared });
     });
   };
 }

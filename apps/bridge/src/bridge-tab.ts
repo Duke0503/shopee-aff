@@ -17,13 +17,19 @@
  * The service worker is stopped when idle and forgets everything in memory, while a lookup or a short
  * link leaves the tab on shopee.vn rather than the affiliate site. So the tab's id is kept in the
  * profile's storage, a pinned tab on a Shopee site is taken as the bridge's, and any other pinned
- * Shopee tab (one opened before this fix) is closed: the bridge keeps exactly one tab.
+ * Shopee tab (one opened before this fix) is closed, and so is any other custom link tab, pinned or
+ * not: the bridge keeps exactly one tab. Other unpinned Shopee tabs are never touched.
+ *
+ * `replaceTab` does the same replacement for a job that met a captcha, so the job gets one more look
+ * in a fresh tab before it is reported (D68); it shares the cooldown above. The active tab of a
+ * window that has the focus is not closed by any of these, for at most `SPARE_TAB_MAX_MS`: the owner
+ * may be solving the captcha in it, but a tab left there must not keep a frozen bridge tab forever.
  */
 import type { BridgeFailure } from "@cashback/contracts";
 import { systemClock, toMs, type Clock } from "@cashback/core";
 
 import type { ChromeApi, ChromeTab } from "./chrome-api.types";
-import { AFFILIATE_TAB_PATTERN, BRIDGE_TAB_SITE, CUSTOM_LINK_URL, pageBlock } from "./shopee-page";
+import { AFFILIATE_TAB_PATTERN, BRIDGE_TAB_SITE, CUSTOM_LINK_TAB_PATTERN, CUSTOM_LINK_URL, pageBlock } from "./shopee-page";
 
 export type Wait = (ms: number) => Promise<void>;
 
@@ -40,6 +46,17 @@ export interface PageDriver {
    * (default `SCRIPT_ANSWER_MS`) means a frozen page.
    */
   run<A, R>(func: (arg: A) => R, arg: A, answerMs?: number): Promise<R>;
+  /**
+   * Opens a fresh tab, closes this one and says what the fresh tab's address shows. Null when it was
+   * not replaced: the owner is on the tab, the cooldown runs, or the browser would not open one.
+   */
+  replaceTab(): Promise<FreshTab | null>;
+  /** How many times the tab has been replaced, a frozen page's replacement included. */
+  replacements(): number;
+}
+
+export interface FreshTab {
+  readonly shows: BridgeFailure | null;
 }
 
 export const LOAD_WAIT_MS = 30_000;
@@ -47,6 +64,8 @@ const LOAD_POLL_MS = 250;
 /** A page script looks once and returns at once; one not answered in this long is a frozen page. */
 export const SCRIPT_ANSWER_MS = 20_000;
 export const REPLACE_TAB_EVERY_MS = 5 * 60_000;
+/** How long one tab is spared as the owner's, from when it was first spared; after that it counts as unattended. */
+export const SPARE_TAB_MAX_MS = 10 * 60_000;
 
 export class BridgeTabError extends Error {
   constructor(message: string) {
@@ -71,6 +90,8 @@ export async function keepAlive(chrome: ChromeApi, tabId: number): Promise<void>
 
 /** Where the bridge tab's id is kept, so a restarted service worker finds the same tab. */
 export const TAB_ID_KEY = "bridgeTabId";
+/** Which tab is being spared and since when, so a restarted service worker does not start its time again. */
+export const SPARED_TAB_KEY = "sparedTab";
 
 const onBridgeSite = (tab: ChromeTab): boolean => BRIDGE_TAB_SITE.test(tab.url ?? "");
 
@@ -96,10 +117,37 @@ async function findTab(chrome: ChromeApi, known: number | null): Promise<ChromeT
   return open?.id !== undefined ? open : null;
 }
 
-/** Closes every other pinned Shopee tab: extra bridge tabs left by an earlier restart. A tab the operator did not pin is never touched. */
-async function closeExtraTabs(chrome: ChromeApi, keep: number): Promise<void> {
-  const extra = (await chrome.tabs.query({ pinned: true })).filter((t) => t.id !== undefined && t.id !== keep && onBridgeSite(t));
-  for (const tab of extra) await chrome.tabs.remove(tab.id as number).catch(() => undefined);
+/** The active tab of the window that has the focus; null when no window has it (Chrome in the background, nobody there). */
+async function frontTabId(chrome: ChromeApi): Promise<number | null> {
+  const window = await chrome.windows.getLastFocused({ populate: true }).catch(() => null);
+  return window?.focused === true ? (window.tabs?.find((t) => t.active === true)?.id ?? null) : null;
+}
+
+async function sparedTab(chrome: ChromeApi): Promise<{ id: number; sinceMs: number } | null> {
+  const value = (await chrome.storage.local.get([SPARED_TAB_KEY]).catch(() => ({}) as Record<string, unknown>))[SPARED_TAB_KEY] as { id?: unknown; sinceMs?: unknown } | null | undefined;
+  return typeof value?.id === "number" && typeof value.sinceMs === "number" ? { id: value.id, sinceMs: value.sinceMs } : null;
+}
+
+/** True when the tab is the owner's: in front of a focused window, and for less than `SPARE_TAB_MAX_MS` since it was first spared. */
+async function ownerOn(chrome: ChromeApi, clock: Clock, tabId: number): Promise<boolean> {
+  const front = await frontTabId(chrome);
+  const spared = await sparedTab(chrome);
+  if (spared !== null && spared.id !== front) await chrome.storage.local.set({ [SPARED_TAB_KEY]: null }).catch(() => undefined);
+  if (front !== tabId) return false;
+  const now = toMs(clock.now());
+  if (spared?.id === tabId) return now - spared.sinceMs < SPARE_TAB_MAX_MS;
+  await chrome.storage.local.set({ [SPARED_TAB_KEY]: { id: tabId, sinceMs: now } }).catch(() => undefined);
+  return true;
+}
+
+/** Closes every other pinned Shopee tab (left by an earlier restart) and every other custom link tab, except the one the owner is on. Any other unpinned tab is never touched. */
+async function closeExtraTabs(chrome: ChromeApi, clock: Clock, keep: number): Promise<void> {
+  const pinned = (await chrome.tabs.query({ pinned: true })).filter(onBridgeSite);
+  const links = await chrome.tabs.query({ url: CUSTOM_LINK_TAB_PATTERN });
+  const extra = new Set([...pinned, ...links].flatMap((t) => (t.id === undefined || t.id === keep ? [] : [t.id])));
+  for (const id of extra) {
+    if (!(await ownerOn(chrome, clock, id))) await chrome.tabs.remove(id).catch(() => undefined);
+  }
 }
 
 async function settleTab(chrome: ChromeApi, wait: Wait, id: number): Promise<void> {
@@ -111,8 +159,8 @@ async function settleTab(chrome: ChromeApi, wait: Wait, id: number): Promise<voi
 }
 
 /**
- * Opens the custom link page in a fresh tab, closes the frozen one and says what the fresh tab's
- * address shows (only tab-level calls: no script runs in the frozen page). Returns the fresh tab
+ * Opens the custom link page in a fresh tab, closes the frozen or blocked one and says what the fresh
+ * tab's address shows (only tab-level calls: no script runs in a frozen page). Returns the fresh tab
  * and its block, or null when the browser would not open one.
  */
 async function replaceFrozenTab(chrome: ChromeApi, wait: Wait, frozen: number): Promise<{ id: number; shows: BridgeFailure | null } | null> {
@@ -128,35 +176,62 @@ async function replaceFrozenTab(chrome: ChromeApi, wait: Wait, frozen: number): 
   }
 }
 
+/** Replaces a tab at most once every `REPLACE_TAB_EVERY_MS`, whichever asks, and counts it. */
+function tabReplacer(chrome: ChromeApi, wait: Wait, clock: Clock): { replace(old: number): Promise<{ id: number; shows: BridgeFailure | null } | null>; count(): number } {
+  let replacedAtMs: number | null = null;
+  let count = 0;
+  return {
+    count: () => count,
+    async replace(old) {
+      const now = toMs(clock.now());
+      if (replacedAtMs !== null && now - replacedAtMs < REPLACE_TAB_EVERY_MS) return null;
+      replacedAtMs = now;
+      const fresh = await replaceFrozenTab(chrome, wait, old);
+      if (fresh === null) return null;
+      count++;
+      await rememberTab(chrome, fresh.id);
+      return fresh;
+    },
+  };
+}
+
 export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = systemClock): PageDriver & { tabId(): number | null } {
   let tabId: number | null = null;
-  let replacedAtMs: number | null = null;
+  const replacer = tabReplacer(chrome, wait, clock);
   const current = (): number => {
     if (tabId === null) throw new BridgeTabError("no bridge tab");
     return tabId;
   };
   const settle = (id: number): Promise<void> => settleTab(chrome, wait, id);
-  /** What the job answers for a frozen page: the fresh tab's block, else `page_not_ready` (also inside the cooldown). */
+  /** Replaces the tab unless the cooldown runs or the browser would not open one. */
+  const replace = async (old: number): Promise<FreshTab | null> => {
+    const fresh = await replacer.replace(old);
+    if (fresh === null) return null;
+    tabId = fresh.id;
+    return { shows: fresh.shows };
+  };
+  /** What the job answers for a frozen page: the fresh tab's block, else `page_not_ready` (also inside the cooldown). The owner's tab stays, and its address answers. */
   const frozenAnswer = async (frozen: number): Promise<BridgeFailure> => {
-    const now = toMs(clock.now());
-    if (replacedAtMs !== null && now - replacedAtMs < REPLACE_TAB_EVERY_MS) return "page_not_ready";
-    replacedAtMs = now;
-    const fresh = await replaceFrozenTab(chrome, wait, frozen);
-    if (fresh !== null) {
-      tabId = fresh.id;
-      await rememberTab(chrome, fresh.id);
+    if (await ownerOn(chrome, clock, frozen)) {
+      const tab = await chrome.tabs.get(frozen).catch(() => null);
+      return pageBlock(tab?.url ?? "", false) ?? "page_not_ready";
     }
-    return fresh?.shows ?? "page_not_ready";
+    return (await replace(frozen))?.shows ?? "page_not_ready";
   };
   return {
     tabId: () => tabId,
+    replacements: () => replacer.count(),
+    async replaceTab() {
+      if (tabId === null || (await ownerOn(chrome, clock, tabId))) return null;
+      return replace(tabId);
+    },
     async prepare() {
       const found = await findTab(chrome, tabId);
       const tab = found ?? (await chrome.tabs.create({ url: CUSTOM_LINK_URL, pinned: true, active: false }));
       if (tab.id === undefined) throw new BridgeTabError("the bridge tab has no id");
       if (tab.id !== tabId) await rememberTab(chrome, tab.id);
       tabId = tab.id;
-      await closeExtraTabs(chrome, tab.id);
+      await closeExtraTabs(chrome, clock, tab.id);
       await keepAlive(chrome, tab.id);
       if (tab.discarded === true) await chrome.tabs.reload(tab.id);
       await settle(tab.id);

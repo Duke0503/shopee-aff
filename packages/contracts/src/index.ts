@@ -221,6 +221,7 @@ export {
   type Ratio,
 } from "./overview.schema";
 export { ASSISTANT_TOKEN_HEADER, LINK_QUEUE_RESUME_PATH, linkQueueResumedSchema, linkRequestCreatedSchema, linkRequestCreateSchema, type LinkQueueResumed, type LinkRequestCreate, type LinkRequestCreated } from "./link-request.schema";
+export { BRIDGE_VERIFICATION_CLEARED_PATH, bridgeVerificationClearedSchema, type BridgeVerificationCleared } from "./bridge.schema";
 export {
   BRIDGE_FAILURES,
   BRIDGE_INSTANCE_HEADER,

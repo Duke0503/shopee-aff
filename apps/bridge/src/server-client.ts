@@ -1,13 +1,16 @@
 /**
- * The bridge's only network calls: the long poll and the answer post to the server's internal
- * listener on 127.0.0.1 (bridge-settings.ts refuses any other address), each with `X-Bridge-Token`
+ * The bridge's only network calls: the long poll, the answer post and the captcha cleared post
+ * (D68) to the server's internal listener on 127.0.0.1 (bridge-settings.ts refuses any other address), each with `X-Bridge-Token`
  * and this extension's `X-Bridge-Instance`.
  * The extension calls nothing else: no Shopee API, no third party (D8, INV-10). A job that does not
  * match the contract is answered `bad_job` when its ticket can be read, and never worked.
  */
-import { BRIDGE_INSTANCE_HEADER, BRIDGE_NEXT_PATH, BRIDGE_RESULTS_PATH, BRIDGE_TOKEN_HEADER, bridgeJobSchema, bridgeResultAcceptedSchema, type BridgeJob, type BridgeResult } from "@cashback/contracts";
+import { BRIDGE_INSTANCE_HEADER, BRIDGE_NEXT_PATH, BRIDGE_RESULTS_PATH, BRIDGE_TOKEN_HEADER, BRIDGE_VERIFICATION_CLEARED_PATH, bridgeJobSchema, bridgeResultAcceptedSchema, bridgeVerificationClearedSchema, type BridgeJob, type BridgeResult } from "@cashback/contracts";
 
 import type { ConnectedSettings } from "./bridge-settings";
+
+/** A stalled captcha cleared post gives up here: the watcher works one step at a time, so it must not wait for ever. */
+export const VERIFICATION_POST_TIMEOUT_MS = 10_000;
 
 export interface HttpAnswer {
   readonly status: number;
@@ -30,6 +33,8 @@ export interface ServerClient {
   next(signal?: AbortSignal): Promise<Poll>;
   /** True when the server was still waiting on this answer. */
   post(result: BridgeResult): Promise<boolean>;
+  /** Says a Shopee tab left the verification page (D68); true when a captcha hold ended. */
+  verificationCleared(): Promise<boolean>;
 }
 
 const ticketOf = (body: unknown): string | null => {
@@ -48,6 +53,19 @@ export function serverClient(settings: ConnectedSettings, fetchFn: Fetch): Serve
   };
   return {
     post,
+    async verificationCleared() {
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(), VERIFICATION_POST_TIMEOUT_MS);
+      try {
+        const res = await fetchFn(`${settings.serverOrigin}${BRIDGE_VERIFICATION_CLEARED_PATH}`, { method: "POST", headers, signal: stop.signal });
+        if (res.status === 401) return false;
+        if (res.status !== 200) throw new ServerTrouble(res.status);
+        const body = bridgeVerificationClearedSchema.safeParse(await res.json());
+        return body.success && body.data.cleared;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     async next(signal) {
       const res = await fetchFn(`${settings.serverOrigin}${BRIDGE_NEXT_PATH}`, { method: "GET", headers, ...(signal ? { signal } : {}) });
       if (res.status === 204) return { kind: "idle" };
