@@ -28,8 +28,8 @@ import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { AlertSeverity } from "../../platform/ports/alert.port";
 import { ASSISTANT_DOWN_ALERT } from "./assistant-health.job";
 
-/** The hourly reconciliation counts as down when its last success is older than this. */
-export const RECONCILIATION_DOWN_AFTER_MS = 3 * 3_600_000;
+/** Reconciliation runs every 6 hours (D67); it counts as down when its last success is older than this, so one failed run shows within 2 hours. */
+export const RECONCILIATION_DOWN_AFTER_MS = 8 * 3_600_000;
 /** The link queue counts as stuck when its oldest waiting request is older than this. */
 export const QUEUE_STUCK_AFTER_MS = 10 * 60_000;
 

@@ -41,7 +41,7 @@
     "notification_undeliverable": { "title": "Tin Nhắn Zalo Không Gửi Được", "source": "messaging.notifications", "details": "Có tin nhắn Zalo không gửi được cho khách." },
     "order_frozen": { "title": "Đơn Hàng Bị Tạm Giữ Để Kiểm Tra Lại", "source": "orders.reconciliation", "details": "Một đơn vừa bị tạm giữ để kiểm tra lại; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
     "order_reversed": { "title": "Đơn Đã Duyệt Bị Sàn Hủy", "source": "orders.reconciliation", "details": "Một đơn đã duyệt bị sàn hủy; đã mở hồ sơ xem xét.", "action": "Mở hồ sơ xem xét trên trang quản trị." },
-    "reconciliation_failed": { "title": "Đối Soát Thất Bại", "source": "orders.reconciliation", "details": "Đối soát thất bại liên tiếp hoặc quá 3 giờ chưa chạy được." },
+    "reconciliation_failed": { "title": "Đối Soát Thất Bại", "source": "orders.reconciliation", "details": "Đối soát thất bại liên tiếp hoặc quá 8 giờ chưa chạy được." },
     "reconciliation_page_cap": { "title": "Báo Cáo Đối Soát Vượt Giới Hạn Trang", "source": "orders.reconciliation", "details": "Báo cáo đối soát vượt giới hạn trang." },
     "reconciliation_source_stale": { "title": "Nguồn Báo Cáo Đối Soát Đã Cũ", "source": "orders.reconciliation", "details": "Nguồn báo cáo đối soát đã cũ." },
     "restore_drill_due": { "title": "Đến Hạn Diễn Tập Khôi Phục Sao Lưu", "source": "platform.backup", "details": "Đã đến hạn diễn tập khôi phục sao lưu (mỗi quý một lần).", "action": "Xem runbook khôi phục." },

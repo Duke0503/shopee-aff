@@ -230,7 +230,7 @@ stays down for the same reason nothing more is raised.
 | --- | --- | --- |
 | Bridge | the Shopee link queue is paused (login lost) or held (captcha, page error) | `bridge_login_lost`, `bridge_captcha` or `bridge_page_error` |
 | Assistant | no heartbeat with the Zalo session connected for 5 minutes | `assistant_down` |
-| Reconciliation | a network's hourly run has not succeeded for 3 hours | `reconciliation_failed` |
+| Reconciliation | a network's run, every 6 hours (D67), has not succeeded for 8 hours | `reconciliation_failed` |
 | Backup | the last run failed, or no good copy for 26 hours | `backup_failed` or `backup_offsite_failed` |
 | Queue | a link request that is due (not in a retry wait) on a network whose queue is open has waited more than 10 minutes; a paused or held Shopee queue is the bridge part's. The line shows how many requests wait | `link_queue_stuck` |
 | Drill (state `due`, not down) | no restore drill recorded, the last one failed, or it is more than a quarter (92 days) old; the line reads "đến hạn" (due) | `restore_drill_due` |
@@ -256,7 +256,7 @@ Every kind the server raises; a test checks this table against the code.
 | `backup_failed` | high | the daily backup failed a step or was missed for 26 hours | section 2.3 |
 | `backup_offsite_failed` | high | the encrypted copy did not reach Google Drive; the local copy is kept | section 2.3 |
 | `backup_offsite_too_large` | high | the encrypted copy is over the Drive webhook's 45 MB limit and was not sent; the local copy is kept | section 2.3 |
-| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 3 hours | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
+| `reconciliation_failed` | high | reconciliation failed twice in a row, or has not succeeded for 8 hours | check the affiliate browser and the AccessTrade key, then let the next hourly run go |
 | `reconciliation_page_cap` | high | a report needed more pages than the safe cap | read the report window by hand; never page further in the browser |
 | `reconciliation_source_stale` | high | the report source returned old data | check the saved report or the bridge source |
 | `order_reversed` | high | an approved order was cancelled by the network; a review case is open | work the review case on the desk |
