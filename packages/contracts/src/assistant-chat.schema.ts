@@ -83,6 +83,8 @@ export const assistantLinkReplySchema = z.object({
   shareUrl: z.string().max(200).nullable(),
   /** True once the product facts are known or no lookup will add any: the reply need not wait. */
   factsSettled: z.boolean(),
+  /** True while no link is made and the Shopee queue is stopped by a captcha or a lost login: the assistant stops waiting (D65). Absent otherwise. */
+  queueStopped: z.boolean().optional(),
   network: z.enum(["shopee", "accesstrade"]),
   /** A ShopeeFood link: cashback counted per shop, never an amount (D60). */
   perShop: z.boolean(),

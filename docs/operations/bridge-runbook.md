@@ -11,6 +11,12 @@ signs in to Shopee itself (D8).
 | `bridge_login_lost` | critical | Paused the Shopee link queue until it is resumed; nothing more goes to the browser | [Sign in again](#sign-in-again) |
 | `bridge_short_link_unresolved` | warning | The browser could not follow a returned short link to its target, so its sub_ids could not be checked; that request is retried after 1 minute, uncounted and never FAILED for it | Check the affiliate Chrome is online; if it repeats, [restart the bridge tab](#restart-the-bridge-tab) |
 
+While the queue is held for a captcha or paused, a customer who sends a Shopee link is told at once
+that the system has trouble making it (`link_queue_stopped`), and the owner's chat gets one
+`link_request_stuck` message per waiting request, with the customer's name and id, the product and
+the reason (D65). Neither happens for a page error hold, which lasts one minute. A stuck Zalo request
+follows by its usual notification when the queue reopens, once.
+
 TikTok Shop requests go through the AccessTrade API, not the browser, and are served while the
 Shopee queue is held or paused. Each alert kind is sent at most once per cooldown (critical 5
 minutes, high 15, warning 30); repeats inside it are counted on the alert.

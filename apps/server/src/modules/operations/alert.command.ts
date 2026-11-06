@@ -7,7 +7,11 @@
  *   later repeats count on that one, so a second outage inside the cooldown is still told, once,
  *   with its repeat count (Story 8.3: 3 critical alerts in 4 minutes are one Telegram message
  *   inside the cooldown);
- * - a last alert given up as FAILED or skipped as EXPIRED lets the repeat through at once. Inside a command it goes through that command's transaction handle
+ * - a last alert given up as FAILED or skipped as EXPIRED lets the repeat through at once.
+ *
+ * A repeat counted on an alert leaves that alert's detail alone, so the first detail of a cooldown
+ * is the one told (D65). `raiseKeyedAlert` stands outside all this: one alert per key, never
+ * repeated, whatever the kind's cooldown says. Inside a command it goes through that command's transaction handle
  * (`alertsFor`); a job outside any transaction uses `ledgerAlerts`, which opens its own. Every
  * raise is also a log line.
  *
@@ -19,15 +23,27 @@ import { and, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Ledger, LedgerDb } from "../../platform/db/ledger";
 import type { Logger } from "../../platform/log/logger";
-import { ALERT_SEVERITIES, type AlertPort, type AlertSeverity } from "../../platform/ports/alert.port";
+import { ALERT_SEVERITIES, ALERT_SOURCES, type AlertDetail, type AlertPort, type AlertSeverity } from "../../platform/ports/alert.port";
 import { ALERT_COOLDOWN_MS, ALERT_KIND, insideCooldown } from "./domain/alert-cooldown";
 import { alerts, type AlertRow } from "./schema";
 
 export type AlertOutcome = { readonly result: "pending" | "suppressed"; readonly id: number };
 
-export function raiseAlert(db: LedgerDb, clock: Clock, kind: string, severity: AlertSeverity): AlertOutcome {
+const REQUEST_ID = /^[A-Za-z0-9]{1,64}$/;
+
+/** Refuses free text, so no personal data reaches the table through a kind or a detail. */
+function checkAlert(kind: string, severity: AlertSeverity, detail: AlertDetail | undefined): void {
   if (!ALERT_KIND.test(kind)) throw new RangeError(`not an alert kind: ${kind}`);
   if (!(ALERT_SEVERITIES as readonly string[]).includes(severity)) throw new RangeError(`not an alert severity: ${String(severity)}`);
+  if (detail === undefined) return;
+  if (!(ALERT_SOURCES as readonly string[]).includes(detail.source)) throw new RangeError("not an alert source");
+  if (detail.requestId !== undefined && !REQUEST_ID.test(detail.requestId)) throw new RangeError("not a request id");
+}
+
+const storedDetail = (detail: AlertDetail | undefined): string | null => (detail === undefined ? null : JSON.stringify(detail));
+
+export function raiseAlert(db: LedgerDb, clock: Clock, kind: string, severity: AlertSeverity, detail?: AlertDetail): AlertOutcome {
+  checkAlert(kind, severity, detail);
   const now = clock.now();
   const last = db
     .select({ id: alerts.id, raisedAt: alerts.raisedAt, delivery: alerts.delivery })
@@ -45,17 +61,30 @@ export function raiseAlert(db: LedgerDb, clock: Clock, kind: string, severity: A
     return { result: "suppressed", id: last.id };
   }
   const notBefore = inside && last.delivery === "SENT" ? instantFromMs(toMs(last.raisedAt as Instant) + ALERT_COOLDOWN_MS[severity]) : null;
-  const row = db.insert(alerts).values({ kind, severity, raisedAt: now, delivery: "PENDING", notBefore }).returning({ id: alerts.id }).get();
+  const row = db.insert(alerts).values({ kind, severity, raisedAt: now, delivery: "PENDING", notBefore, detail: storedDetail(detail) }).returning({ id: alerts.id }).get();
   return { result: "pending", id: row.id };
+}
+
+export interface KeyedAlert {
+  readonly kind: string;
+  readonly severity: AlertSeverity;
+  readonly dedupKey: string;
+  readonly detail: AlertDetail;
+}
+
+/** Stores the alert of this key unless it has one already; true when it did. Never counted, never held by a cooldown. */
+export function raiseKeyedAlert(db: LedgerDb, clock: Clock, alert: KeyedAlert): boolean {
+  checkAlert(alert.kind, alert.severity, alert.detail);
+  return db.insert(alerts).values({ kind: alert.kind, severity: alert.severity, raisedAt: clock.now(), delivery: "PENDING", detail: storedDetail(alert.detail), dedupKey: alert.dedupKey }).onConflictDoNothing().run().changes === 1;
 }
 
 type AlertLogger = Pick<Logger, "warn">;
 
 /** The alert port bound to one transaction's handle. */
-export function alertsFor(db: LedgerDb, clock: Clock, logger?: AlertLogger): AlertPort & { alert(kind: string, severity: AlertSeverity): AlertOutcome } {
+export function alertsFor(db: LedgerDb, clock: Clock, logger?: AlertLogger): AlertPort & { alert(kind: string, severity: AlertSeverity, detail?: AlertDetail): AlertOutcome } {
   return {
-    alert: (kind, severity) => {
-      const outcome = raiseAlert(db, clock, kind, severity);
+    alert: (kind, severity, detail) => {
+      const outcome = raiseAlert(db, clock, kind, severity, detail);
       logger?.warn({ kind, severity, result: outcome.result }, "operations.alert.raised");
       return outcome;
     },
@@ -64,7 +93,7 @@ export function alertsFor(db: LedgerDb, clock: Clock, logger?: AlertLogger): Ale
 
 /** The alert port for code outside a transaction (jobs): each alert is its own `tx`. */
 export function ledgerAlerts(ledger: Ledger, clock: Clock, logger?: AlertLogger): AlertPort {
-  return { alert: (kind, severity) => void ledger.tx((db) => alertsFor(db, clock, logger).alert(kind, severity)) };
+  return { alert: (kind, severity, detail) => void ledger.tx((db) => alertsFor(db, clock, logger).alert(kind, severity, detail)) };
 }
 
 /** Pending alerts due at `now` (all pending ones without `now`), oldest first. */

@@ -24,3 +24,8 @@ export function findLinkRequestOwner(db: LedgerDb, requestId: string): LinkReque
     .get();
   return row ?? null;
 }
+
+/** Who asked and for what, for an owner alert about one request (D65). */
+export function linkRequestSubjectOf(db: LedgerDb, requestId: string): { customerId: string; productName: string | null; sourceUrl: string } | null {
+  return db.select({ customerId: linkRequests.customerId, productName: linkRequests.productName, sourceUrl: linkRequests.sourceUrl }).from(linkRequests).where(eq(linkRequests.requestId, requestId)).get() ?? null;
+}

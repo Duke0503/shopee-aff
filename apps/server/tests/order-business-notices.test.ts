@@ -422,7 +422,7 @@ describe("configuration", () => {
   it("chat unset: no job, rows stored, production logs an error at start and still starts", () => {
     const ledger = freshLedger();
     const { logger, lines } = memoryLogger();
-    expect(ownerJobs({ config: prod, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health", "alertDelivery"]);
+    expect(ownerJobs({ config: prod, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck", "alertDelivery"]);
     expect(lines.some((l) => l.includes('"level":50') && l.includes("orders.business_notice.chat_absent"))).toBe(true);
     apply(ledger, awaiting("261020WAIT0001"));
     expect(noticeRows(ledger).map((n) => n.delivery)).toEqual(["PENDING"]);
@@ -434,7 +434,7 @@ describe("configuration", () => {
   it("chat_absent is logged only when the chat id is missing, not when only the bot is", () => {
     const ledger = freshLedger();
     const { logger, lines } = memoryLogger();
-    expect(ownerJobs({ config: { ...prod, telegram: null, telegramBusinessChatId: "-1009" }, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health"]);
+    expect(ownerJobs({ config: { ...prod, telegram: null, telegramBusinessChatId: "-1009" }, logger, ...base(ledger) }).map((j) => j.name)).toEqual(["backup", "health", "linkRequestStuck"]);
     expect(lines.some((l) => l.includes("operations.alert.telegram_absent"))).toBe(true);
     expect(lines.some((l) => l.includes("chat_absent"))).toBe(false);
   });

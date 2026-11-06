@@ -148,7 +148,7 @@ function settleFailure(db: LedgerDb, sub: Submission, reason: string, at: Instan
       return { outcome: "failed", requestFailed: countFailure(db, sub.requestId, at, effects) };
     case "hold":
       holdShopeeQueue(db, handling.reason, instantFromMs(toMs(at) + handling.ms));
-      effects.alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity);
+      effects.alerts.alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: "link_request", requestId: sub.requestId });
       return { outcome: "held", requestFailed: false };
     case "pause":
       if (pauseShopeeQueue(db, handling.reason, at)) effects.alerts.alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);

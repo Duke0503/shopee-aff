@@ -69,7 +69,7 @@ today's total; the recorded notice's estimated cashback (`estimate`); the payout
 (`totalPaid`) and time (`paidAt`). A payout queued before this change is sent without those two lines.
 
 ## Mapping
-Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-zalo.
+Counts (messages.json, 99 keys): 12 adapted, 45 identical, 35 new-only, 7 not-zalo.
 
 | Key | Status | Old source | Note |
 |---|---|---|---|
@@ -94,6 +94,7 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `platform_accesstrade` | identical | assistant_worker.js:588 | Fragment (TikTok Shop). |
 | `shopeefood_generic_store` | identical | assistant_worker.js:727 | Fragment (a name that is not shown). |
 | `link_on_its_way` | identical | resources/messages.vi.json `received` | The live assistant waited 52 s and then sent its busy message; the new one says the link follows by message, in the old bot's `received` words. |
+| `link_queue_stopped` | new-only | D65, owner-approved wording | Sent at once, instead of `link_on_its_way`, while the Shopee queue is held by a captcha or paused by a lost login and the link is not made. |
 | `link_network_unsupported` | identical | assistant_worker.js:580-584 |  |
 | `link_not_in_affiliate` | identical | assistant_worker.js:606-612 (platformLabel TikTok Shop) | The only network that reports it. |
 | `link_failed` | identical | resources `link_failed`, sent by notifications.py:545-546 |  |
@@ -218,12 +219,13 @@ Counts (messages.json, 98 keys): 12 adapted, 45 identical, 34 new-only, 7 not-za
 | `backup_failed` | new-only, in the report_bug format | Sao Lưu Hằng Ngày Thất Bại |
 | `backup_offsite_failed` | new-only, in the report_bug format | Không Chép Được Bản Sao Lưu Lên Google Drive |
 | `backup_offsite_too_large` | new-only, in the report_bug format | Bản Sao Lưu Quá Lớn Để Gửi Lên Google Drive |
-| `bridge_captcha` | identical (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
+| `bridge_captcha` | identical without a step (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept); a raised alert now says the step that found it (D65) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
 | `bridge_login_lost` | identical (notify_shopee_session_expired) | Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất |
 | `bridge_page_error` | new-only, in the report_bug format | Trang Shopee Báo Lỗi Khi Tạo Link |
 | `bridge_short_link_unresolved` | new-only, in the report_bug format | Không Mở Được Link Rút Gọn |
 | `customer_sign_in_burst` | new-only, in the report_bug format | Nhiều Lần Đăng Nhập Sai Trên Website |
 | `link_queue_stuck` | new-only, in the report_bug format | Hàng Đợi Link Bị Kẹt |
+| `link_request_stuck` | new-only, in the report_bug format (D65) | Khách Đang Chờ Link Shopee |
 | `link_undeliverable` | new-only, in the report_bug format | Không Gửi Được Link Cho Khách |
 | `notification_daily_cap` | new-only, in the report_bug format | Chạm Giới Hạn Tin Nhắn Zalo Trong Ngày |
 | `notification_undeliverable` | new-only, in the report_bug format | Tin Nhắn Zalo Không Gửi Được |

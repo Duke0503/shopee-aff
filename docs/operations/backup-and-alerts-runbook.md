@@ -251,7 +251,7 @@ Every kind the server raises; a test checks this table against the code.
 | `assistant_down` | critical | the Zalo assistant has had no connected session for 5 minutes | open the assistant window on the VPS; scan the QR code with the bot account's phone if Zalo asks |
 | `assistant_session_conflict` | critical | another login took the assistant's Zalo account (the old bot left running, Zalo Web); the assistant stopped reconnecting | stop the other session, then restart the assistant (`shadow-run.md#zalo-account-at-cutover`) |
 | `bridge_login_lost` | critical | the affiliate browser was signed out of Shopee; the link queue is paused | sign in again, then resume the queue (`bridge-runbook.md#sign-in-again`) |
-| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
+| `bridge_captcha` | high | Shopee showed a captcha; the queue is held for a while. The text names the step that found it, and on a link request the customer's name and id and the product (D65) | clear the verification in the affiliate Edge (`bridge-runbook.md#clear-the-verification`) |
 | `backup_failed` | high | the daily backup failed a step or was missed for 26 hours | section 2.3 |
 | `backup_offsite_failed` | high | the encrypted copy did not reach Google Drive; the local copy is kept | section 2.3 |
 | `backup_offsite_too_large` | high | the encrypted copy is over the Drive webhook's 45 MB limit and was not sent; the local copy is kept | section 2.3 |
@@ -266,6 +266,7 @@ Every kind the server raises; a test checks this table against the code.
 | `shopee_payout_record_unreadable` | high | the Shopee payout page changed shape and cannot be read | report it for a fix; enter the payout by hand meanwhile |
 | `bridge_page_error` | warning | a Shopee page error while making a link; the queue is held | nothing unless it repeats; then restart the bridge tab |
 | `bridge_short_link_unresolved` | warning | a customer's short link could not be opened | nothing; the customer gets the failure message |
+| `link_request_stuck` | high | a customer's Shopee link request waits behind a stopped queue (captcha or lost login); one message per request, with the customer's name and id, the product and the reason (D65) | clear the captcha or sign in again as the reason says; the queue resumes after it |
 | `link_queue_stuck` | warning | a due link request on an open queue has waited over 10 minutes | check the link job and the bridge in the server log |
 | `link_undeliverable` | warning | a link could not be handed to the customer after its tries | nothing unless it repeats |
 | `notification_undeliverable` | warning | a Zalo message could not be delivered | nothing unless it repeats |

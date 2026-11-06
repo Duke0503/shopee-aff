@@ -73,7 +73,7 @@ export {
   type LinksImport,
   type LinksImportResult,
 } from "./link-import.command";
-export { findLinkRequestOwner, type LinkRequestOwner } from "./link-request.query";
+export { findLinkRequestOwner, linkRequestSubjectOf, type LinkRequestOwner } from "./link-request.query";
 export { httpsImageUrl, productSnapshotsOf, type ProductSnapshot } from "./product-snapshot.query";
 export { findShareCode, type SharedLink } from "./share-code.query";
 export { BRIDGE_JOB_KINDS, BRIDGE_JOB_STATUSES, LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";
@@ -86,7 +86,7 @@ export { deliveredLinkCounts, failedLinkCount, oldestDueLinkRequest, waitingLink
 export { LINK_CHANNELS, LinkRequestError, nextRequestId, queueLinkRequest, type LinkChannel, type LinkRequestErrorCode, type LinkRequestInput, type LinkRequestNote, type QueuedLinkRequest } from "./link-request.command";
 export { claimLinkJob, claimLinkWork, type ApiLinkRequest, type ClaimOptions, type LinkWork } from "./link-issue.command";
 export { LINK_FAILED_MESSAGE, randomShareCode, recordApiLinkResult, recordLinkResult, recordSilentBridge, SHARE_CODE_LENGTH, SILENT_ANSWERS_BEFORE_FAILURE, type ApiLinkAnswer, type LinkEffects, type LinkResultRecorded, type RecordedBridgeAnswer, type RecordOptions } from "./link-result.command";
-export { holdShopeeQueue, notePageError, pauseShopeeQueue, resumeShopeeQueue, shopeeQueueGate, shopeeQueueState, type LinkQueueState, type QueueGate, type QueueResumed } from "./link-queue.command";
+export { holdShopeeQueue, notePageError, pauseShopeeQueue, queuedShopeeRequests, resumeShopeeQueue, shopeeQueueGate, shopeeQueueState, shopeeQueueStopReason, type LinkQueueState, type QueueGate, type QueueResumed, type QueueStopReason } from "./link-queue.command";
 export { CAPTCHA_HOLD_MS, FINAL_FAILURE_MESSAGES, handlingOf, LINK_MAX_ATTEMPTS, LINK_QUEUE_ALERTS, PAGE_ERROR_FAIL_AFTER_MS, PAGE_ERROR_HOLD_MS, pageErrorStep, RELOGIN_RUNBOOK, RESOLUTION_RETRY_MS, type FailureHandling } from "./domain/link-failure";
 export { ACCESSTRADE_LINK_PATH, accessTradeLinkCreator, fakeAccessTradeLinks, fetchPost, type AccessTradeLinkOptions, type HttpPost, type LinkCreator, type PostAnswer } from "./accesstrade-link.adapter";
 export { checkReturnedLink, isShopeeShortHost, linkWithoutQuery, needsResolution, shopKeyFromTarget, RETRY_BASE_MS, RETRY_MAX_MS, retryDelayMs, type LinkCheck, type LinkCheckFailure, type LinkOrigin } from "./domain/link-check";
@@ -111,7 +111,7 @@ export { recordLinkClick, type LinkVisit } from "./link-click.command";
 export { LINK_CLICK_AGENTS, type LinkClickAgent } from "./schema";
 export { answerDeskLinkRequests, DESK_LINK_REQUESTS_LIST } from "./link-requests-desk.list";
 export { linkRequestDeskRoutes, type LinkRequestDeskRouteDeps } from "./http/link-request-desk.routes";
-export { linkReplyFactsOf, type LinkReplyFacts } from "./link-reply.query";
+export { linkReplyFactsOf, waitsBehindStoppedQueue, type LinkReplyFacts } from "./link-reply.query";
 export { readShopeePayoutRecords, SHOPEE_PAYOUT_STATUS_MAP, type PayoutRecordRead, type ShopeePayoutBatch, type SkippedPayoutBatch } from "./domain/shopee-payout-record";
 export { PayoutRecordError, readShopeePayouts, type PayoutRecordErrorCode, type ShopeePayoutRead, type ShopeePayoutSourceDeps } from "./shopee-payout.adapter";
 export {

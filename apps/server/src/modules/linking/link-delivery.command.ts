@@ -15,16 +15,18 @@
  *   message, as is a link no one can be told about (a guest's, D5).
  *
  * Ages count from the request's time, as the live system counted them (notifications.py
- * ASSISTANT_WAIT, STALE_AFTER). A link closed without a message keeps `delivered_at` empty.
+ * ASSISTANT_WAIT, STALE_AFTER), with one exception (D65): a Zalo request the browser made late counts
+ * its 2 hours from when the link was made, because a customer held behind a stopped queue was told
+ * the link would follow. A link closed without a message keeps `delivered_at` empty.
  */
 import { instantFromMs, toMs, type Clock, type Instant } from "@cashback/core";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { LedgerDb } from "../../platform/db/ledger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import { dedupKey, dedupKeyParts, type OutboxDeliveryLookup, type OutboxPort } from "../../platform/ports/outbox.port";
 import { guestCustomerIds, resolveCustomer } from "../identity/index";
-import { linkRequests } from "./schema";
+import { bridgeJobs, linkRequests } from "./schema";
 
 /** How long the assistant's own reply may take before the link goes by notification. */
 export const LINK_REPLY_WAIT_MS = 55_000;
@@ -160,8 +162,10 @@ function deliver(db: LedgerDb, row: { requestId: string; customerId: string; att
 export function checkLinkDeliveries(db: LedgerDb, clock: Clock, effects: LinkDeliveryEffects): LinkDeliveryCheck {
   const now = clock.now();
   const claimedBefore = instantFromMs(toMs(now) - LINK_REPLY_WAIT_MS);
+  // Any other channel keeps the request's time: only the Zalo reply promised that the link would follow.
+  const madeAt = sql<string | null>`CASE WHEN ${linkRequests.channel} = 'zalo' THEN (SELECT max(${bridgeJobs.finishedAt}) FROM ${bridgeJobs} WHERE ${bridgeJobs.requestId} = ${linkRequests.requestId} AND ${bridgeJobs.kind} = 'LINK' AND ${bridgeJobs.status} = 'DONE') END`;
   const rows = db
-    .select({ requestId: linkRequests.requestId, customerId: linkRequests.customerId, createdAt: linkRequests.createdAt, attempt: linkRequests.deliveryAttempt })
+    .select({ requestId: linkRequests.requestId, customerId: linkRequests.customerId, createdAt: linkRequests.createdAt, attempt: linkRequests.deliveryAttempt, madeAt })
     .from(linkRequests)
     .where(
       and(
@@ -174,11 +178,11 @@ export function checkLinkDeliveries(db: LedgerDb, clock: Clock, effects: LinkDel
     .limit(CHECK_BATCH)
     .all();
   const guests = new Set(guestCustomerIds(db));
-  const stale = (createdAt: string | null): boolean => createdAt === null || toMs(now) - toMs(createdAt as Instant) > LINK_STALE_AFTER_MS;
+  const stale = (since: string | null): boolean => since === null || toMs(now) - toMs(since as Instant) > LINK_STALE_AFTER_MS;
   let notified = 0;
   let closed = 0;
   for (const row of rows) {
-    if (guests.has(row.customerId) || stale(row.createdAt)) {
+    if (guests.has(row.customerId) || stale(row.madeAt ?? row.createdAt)) {
       close(db, row.requestId);
       closed++;
       continue;

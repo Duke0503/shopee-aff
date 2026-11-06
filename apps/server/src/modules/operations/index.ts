@@ -5,11 +5,13 @@
  * below it only through the ports.
  */
 export { AuditEntryError, auditFor, commandAudit, recordAudit } from "./audit.command";
-export { ALERT_MAX_ATTEMPTS, alertsFor, claimForSending, expireAlerts, ledgerAlerts, markAlertDelivery, pendingAlerts, raiseAlert, type AlertOutcome } from "./alert.command";
+export { ALERT_MAX_ATTEMPTS, alertsFor, claimForSending, expireAlerts, ledgerAlerts, markAlertDelivery, pendingAlerts, raiseAlert, raiseKeyedAlert, type AlertOutcome, type KeyedAlert } from "./alert.command";
+export { parseAlertDetail, renderStoredAlert } from "./alert-render.query";
+export { LINK_REQUEST_STUCK_ALERT, raiseStuckRequestAlerts } from "./link-stuck.job";
 export { ALERT_EXPIRY_MS, ALERTS_PER_RUN, BOOKKEEPING_ATTEMPTS, deliverPendingAlerts, immediateAlerts, type DeliveryResult } from "./alert-delivery.job";
 export { ALERT_COOLDOWN_MS, alertText } from "./domain/alert-cooldown";
 export { isIdentifierKey, isPersonalKey, payloadProblems, type AuditProblem } from "./domain/audit-payload";
-export { hasAlertLabel, TelegramSendError, telegramSender, telegramText, type AlertSender, type FetchLike, type TelegramOptions } from "./telegram.adapter";
+export { hasAlertLabel, TelegramSendError, telegramSender, telegramText, type AlertRequestFacts, type AlertSender, type FetchLike, type TelegramOptions } from "./telegram.adapter";
 export { ALERT_DELIVERIES } from "./schema";
 export { ASSISTANT_DOWN_AFTER_MS, assistantHeartbeats, type AssistantHeartbeats, type AssistantLiveness, type AssistantState, type ReceivedHeartbeat } from "./assistant-heartbeat.command";
 export { ASSISTANT_DOWN_ALERT, runAssistantHealthCheck, type AssistantHealthDeps, type AssistantHealthStep } from "./assistant-health.job";

@@ -24,7 +24,9 @@
  * come) the reply is sent; when the wait ends with the link made but no facts, it is sent without
  * an estimate; with no link yet, or when the server could not be asked, the sender is told it is
  * on its way, and the link follows later by notification (Story 6.5). A request that failed is
- * told by the server's own `link_failed` notification, so nothing is sent for it here.
+ * told by the server's own `link_failed` notification, so nothing is sent for it here. While the
+ * server says the Shopee queue is stopped (D65) the wait ends at that poll: the sender is told the
+ * system has trouble making the link, and it follows by the same notification.
  *
  * A link goes out once (Story 6.5); the server's claim decides who hands it over. The assistant
  * claims it in the reply's own pacer turn, right before the Zalo send, so a long pacer queue never
@@ -96,7 +98,7 @@ export const welcomeValues = (name: string | null, customerCode: string | null):
  * Polls the reply facts until they are complete or the wait ends; null when no link was made in
  * time. A poll the server does not answer is tried again on the next step, not given up on.
  */
-async function awaitReply(deps: ChatReplyDeps, requestId: string, customerId: string): Promise<Made | "failed" | null> {
+async function awaitReply(deps: ChatReplyDeps, requestId: string, customerId: string): Promise<Made | "failed" | "queue_stopped" | null> {
   const deadline = toMs(deps.clock.now()) + (deps.replyWaitMs ?? REPLY_WAIT_MS);
   let made: Made | null = null;
   for (;;) {
@@ -106,6 +108,7 @@ async function awaitReply(deps: ChatReplyDeps, requestId: string, customerId: st
       if (last.factsSettled) return last;
       made = last;
     }
+    if (made === null && last?.queueStopped === true) return "queue_stopped";
     const left = deadline - toMs(deps.clock.now());
     if (left <= 0) return made;
     await deps.sleep(Math.min(deps.pollMs ?? REPLY_POLL_MS, left));
@@ -138,6 +141,7 @@ async function answerLink(deps: ChatReplyDeps, message: IncomingMessage, url: st
   const reply = await awaitReply(deps, answer.requestId, answer.customerId);
   await welcomed();
   if (reply === "failed") return;
+  if (reply === "queue_stopped") return deps.send(message.chat, "link_queue_stopped", {}, tag);
   if (reply === null) return deps.send(message.chat, "link_on_its_way", {}, tag);
   return handOver(deps, message.chat, tag, { requestId: answer.requestId, customerId: answer.customerId }, reply, answer.reused);
 }

@@ -1,7 +1,9 @@
 /**
  * Delivering pending owner alerts (AD-27). Each pending alert is first marked SENDING under a
  * fresh attempt id in a transaction of its own, then sent outside any transaction, then its
- * outcome is written in another, so a slow or failing Telegram never holds the write lock.
+ * outcome is written in another, so a slow or failing Telegram never holds the write lock. The text
+ * is rendered inside the claim's transaction (D65), so a retry reads the customer afresh and an
+ * erased customer's name is never sent.
  *
  * Once the sender accepted an alert it is never marked failed and never sent again: if writing
  * SENT fails, only that bookkeeping is retried, each failure logged; an alert left SENDING is
@@ -20,6 +22,7 @@ import type { Ledger } from "../../platform/db/ledger";
 import type { Logger } from "../../platform/log/logger";
 import type { AlertPort } from "../../platform/ports/alert.port";
 import { claimForSending, expireAlerts, markAlertDelivery, pendingAlerts } from "./alert.command";
+import { renderStoredAlert } from "./alert-render.query";
 import { telegramText, type AlertSender } from "./telegram.adapter";
 
 export interface DeliveryResult {
@@ -67,9 +70,10 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
   const result: DeliveryResult = expired > 0 ? { sent: 0, failed: 0, expired } : { sent: 0, failed: 0 };
   for (const alert of pending) {
     const attemptId = randomUUID();
-    if (!ledger.tx((db) => claimForSending(db, alert.id, attemptId))) continue;
+    const text = ledger.tx((db) => (claimForSending(db, alert.id, attemptId) ? renderStoredAlert(db, alert) : null));
+    if (text === null) continue;
     try {
-      await sender.send(telegramText(alert));
+      await sender.send(text);
     } catch (error) {
       recordFailed(ledger, alert, attemptId, clock, logger, error);
       result.failed++;
@@ -90,9 +94,9 @@ export async function deliverPendingAlerts(ledger: Pick<Ledger, "tx">, sender: A
 export function immediateAlerts(sender: AlertSender, logger: DeliveryLogger, clock: Clock): AlertPort & { settled(): Promise<void> } {
   const sends: Promise<void>[] = [];
   return {
-    alert(kind, severity) {
+    alert(kind, severity, detail) {
       logger.warn({ kind, severity, result: "immediate" }, "operations.alert.raised");
-      sends.push(sender.send(telegramText({ kind, severity, suppressed: 0, raisedAt: clock.now() })).catch((error: unknown) => logger.warn({ kind, error: error instanceof Error ? error.name : "unknown" }, "operations.alert.delivery_failed")));
+      sends.push(sender.send(telegramText({ kind, severity, suppressed: 0, raisedAt: clock.now(), detail: detail ?? null })).catch((error: unknown) => logger.warn({ kind, error: error instanceof Error ? error.name : "unknown" }, "operations.alert.delivery_failed")));
     },
     settled: async () => void (await Promise.all(sends)),
   };

@@ -1,5 +1,5 @@
 /**
- * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012, 0031). Only this
+ * The operations module's tables (AD-4), as created by migrations/0005_operations.sql (and 0012, 0031, 0036). Only this
  * module writes them; tests/module-schemas.test.ts checks these definitions against the migrated
  * database column by column.
  */
@@ -36,6 +36,10 @@ export const alerts = sqliteTable("alerts", {
   deliveredAt: text("delivered_at"),
   /** A repeat queued behind a sent alert goes out only from this instant (migration 0031). */
   notBefore: text("not_before"),
+  /** JSON `AlertDetail`: the step that found the problem, ids only (migration 0036, D65). */
+  detail: text("detail"),
+  /** One alert per key, outside the kind's cooldown; NULL on every alert that has a cooldown (migration 0036). */
+  dedupKey: text("dedup_key").unique(),
 });
 
 export type AlertRow = typeof alerts.$inferSelect;

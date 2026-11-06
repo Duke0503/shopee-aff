@@ -9,7 +9,7 @@
  * Without a Telegram configuration alerts are stored and logged only, and without a heartbeat URL
  * no heartbeat is sent; production logs each as an error at every start. A start that fails at its
  * pre-migration backup cannot wait for the delivery job, so its alert is sent at once
- * (`startupAlerts`).
+ * (`startupAlerts`). The stuck-request check (D65) only stores alerts, so it runs either way.
  *
  * The order and settlement notices of the DP Business group (D62, D63) go by the same bot to their
  * own chat. Without that chat neither job runs, the rows wait and production logs an error at start;
@@ -17,7 +17,7 @@
  */
 import type { Clock } from "@cashback/core";
 
-import { deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
+import { deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, raiseStuckRequestAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
 import { deliverBusinessNotices } from "../modules/orders/index";
 import { balanceTotals, deliverSettlementNotices } from "../modules/payouts/index";
 import { backupHealth, backupStatusPath, readBackupStatus, type BackupHealth } from "../platform/backup/backup-status";
@@ -102,7 +102,8 @@ export function ownerJobs(deps: OwnerJobsDeps): Job[] {
   const backup: Job = { name: "backup", ...JOB_SCHEDULES.backup, run: async (signal) => void (await runDailyBackup(dailyBackupDeps(deps, alerts), signal)) };
   const check = healthCheck({ model: () => readHealthModel(ledger, clock, deps.health), alerts, clock, logger, ...(config.assistantToken !== null ? { heartbeats: deps.heartbeats } : {}) });
   const health: Job = { name: "health", ...JOB_SCHEDULES.health, run: () => void check.run() };
-  const jobs = [backup, health];
+  const stuck: Job = { name: "linkRequestStuck", ...JOB_SCHEDULES.linkRequestStuck, run: () => void raiseStuckRequestAlerts(ledger, clock, logger) };
+  const jobs = [backup, health, stuck];
   if (config.telegram === null) {
     logger[config.env === "prod" ? "error" : "warn"]({ env: config.env }, "operations.alert.telegram_absent");
   } else {

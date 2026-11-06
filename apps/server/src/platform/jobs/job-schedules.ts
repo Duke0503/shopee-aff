@@ -26,6 +26,8 @@ export const JOB_SCHEDULES = {
   heartbeat: { context: "operations", schedule: every(5 * 60_000) },
   /** Pending owner alerts sent to Telegram; a failed send is retried on the next run (Story 8.3). */
   alertDelivery: { context: "operations", schedule: every(30_000) },
+  /** One owner message per request a stopped Shopee queue keeps waiting (D65). */
+  linkRequestStuck: { context: "operations", schedule: every(30_000) },
   /** Customer sign-in throttles pruned and capped, failures on unknown codes tallied (Story 7.2). */
   signInHousekeeping: { context: "identity", schedule: every(60 * 60_000) },
   /** Pending order notices sent to the DP Business group; a failed send stops the run and is retried on the next (D62). */

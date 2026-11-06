@@ -178,6 +178,7 @@ describe("the scheduler's own rules", () => {
       health: { context: "operations", schedule: { kind: "every", delayMs: 60_000 } },
       heartbeat: { context: "operations", schedule: { kind: "every", delayMs: 300_000 } },
       alertDelivery: { context: "operations", schedule: { kind: "every", delayMs: 30_000 } },
+      linkRequestStuck: { context: "operations", schedule: { kind: "every", delayMs: 30_000 } },
       signInHousekeeping: { context: "identity", schedule: { kind: "every", delayMs: 3_600_000 } },
       orderBusinessNotices: { context: "orders", schedule: { kind: "every", delayMs: 30_000 } },
       settlementBusinessNotices: { context: "payouts", schedule: { kind: "every", delayMs: 30_000 } },

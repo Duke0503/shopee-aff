@@ -24,7 +24,8 @@
  *
  * The reply carries the share link `/s/<code>` on the public origin, never the affiliate link, and
  * the estimate from the product snapshot under the current Shopee withholding (the share page's
- * rule). It is answered only for a request of the customer named, through the same aliases.
+ * rule). It is answered only for a request of the customer named, through the same aliases. A
+ * request still queued behind a stopped Shopee queue says so in `queueStopped` (D65).
  * The claim holds the link for 2 minutes so the delivery check of Story 6.5 leaves it to the reply;
  * the confirm makes it DELIVERED (and withdraws a notification enqueued after a lapsed claim, if
  * it is not being sent); a failed send releases it, and a claim never confirmed lapses, so the
@@ -54,7 +55,7 @@ import type { Clock } from "@cashback/core";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
 import { CustomerRegisterError, isGuestCustomer, recordMergeClaim, registerCustomer, type Registered, type RegistrationChannel } from "../modules/identity/index";
-import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery, type LinkEstimate } from "../modules/linking/index";
+import { claimLinkDelivery, confirmLinkDelivery, isLinkRequestOf, isOtherShopLink, LinkRequestError, linkReplyData, linkReplyFactsOf, queueLinkRequest, readProductLink, releaseLinkDelivery, waitsBehindStoppedQueue, type LinkEstimate } from "../modules/linking/index";
 import { isSilent, keyState, withdrawPendingNotification } from "../modules/messaging/index";
 import { commandAudit } from "../modules/operations/index";
 import { periodWithheld, settlementPeriodOf } from "../modules/orders/index";
@@ -103,6 +104,7 @@ export function linkReplyOf(db: LedgerDb, deps: Pick<AssistantChatRouteDeps, "cl
     status: facts.status,
     shareUrl: made ? `${deps.shareBaseUrl.replace(/\/+$/, "")}/s/${facts.shareCode}` : null,
     factsSettled: facts.factsSettled,
+    ...(waitsBehindStoppedQueue(db, facts, deps.clock.now()) ? { queueStopped: true } : {}),
     network: facts.network,
     perShop: reply.perShopKey !== null,
     product: { name: reply.product.name, price: reply.product.price },
