@@ -6,7 +6,8 @@
  */
 export { AuditEntryError, auditFor, commandAudit, recordAudit } from "./audit.command";
 export { ALERT_MAX_ATTEMPTS, alertsFor, claimForSending, expireAlerts, ledgerAlerts, markAlertDelivery, pendingAlerts, raiseAlert, raiseKeyedAlert, type AlertOutcome, type KeyedAlert } from "./alert.command";
-export { parseAlertDetail, renderStoredAlert } from "./alert-render.query";
+export { parseAlertDetail } from "./alert.command";
+export { renderStoredAlert } from "./alert-render.query";
 export { LINK_REQUEST_STUCK_ALERT, raiseStuckRequestAlerts } from "./link-stuck.job";
 export { DAILY_LINK_REPORT_FAILED_ALERT, DAILY_LINK_REPORT_FROM, deliverDailyLinkReport, type DailyLinkReportRun } from "./daily-link-report.job";
 export { dailyLinkReportOf, splitReportBlocks, TELEGRAM_TEXT_MAX, type DailyLinkReport } from "./daily-link-report.query";
@@ -17,7 +18,7 @@ export { hasAlertLabel, TelegramSendError, telegramSender, telegramText, type Al
 export { ALERT_DELIVERIES } from "./schema";
 export { ASSISTANT_DOWN_AFTER_MS, assistantHeartbeats, type AssistantHeartbeats, type AssistantLiveness, type AssistantState, type ReceivedHeartbeat } from "./assistant-heartbeat.command";
 export { ASSISTANT_DOWN_ALERT, runAssistantHealthCheck, type AssistantHealthDeps, type AssistantHealthStep } from "./assistant-health.job";
-export { healthModel, QUEUE_STUCK_AFTER_MS, QUEUE_STUCK_ALERT, readHealthModel, RECONCILIATION_DOWN_AFTER_MS, RECONCILIATION_DOWN_ALERT, withoutAlerts, type HealthAlert, type HealthEntry, type HealthSources } from "./health-model.query";
+export { healthModel, QUEUE_STUCK_AFTER_MS, QUEUE_STUCK_ALERT, readHealthModel, RECONCILIATION_DOWN_AFTER_MS, RECONCILIATION_DOWN_ALERT, staleReconciliationByCaptcha, withoutAlerts, type HealthAlert, type HealthEntry, type HealthSources } from "./health-model.query";
 export { healthCheck, type HealthCheck, type HealthCheckDeps } from "./health.job";
 export { heartbeatPinger, isGreen, type HeartbeatDeps, type PingFetch, type PingOutcome } from "./heartbeat.job";
 export { assistantGroupJoinRoutes, type AssistantGroupJoinRouteDeps } from "./http/assistant-group-join.routes";

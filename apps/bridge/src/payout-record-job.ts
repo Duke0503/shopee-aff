@@ -10,12 +10,12 @@
  */
 import type { BridgeFailure, BridgePayoutRecordJob, BridgePayoutRecordValue } from "@cashback/contracts";
 
-import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { Blocked, blockedAnswer, type PageDriver, type Wait } from "./bridge-tab";
 import { lookUntil } from "./lookup-job";
 import { readPayoutTable, type PayoutTableInput } from "./page-scripts";
 import { PAYOUT_EMPTY, PAYOUT_FIELDS, PAYOUT_FIXED_COPIES, PAYOUT_LOADING, PAYOUT_PAGE_SIZE, PAYOUT_RECORD_URL, PAYOUT_ROW } from "./shopee-page";
 
-export type PayoutRecordAnswer = { outcome: "value"; value: BridgePayoutRecordValue } | { outcome: "failed"; reason: BridgeFailure };
+export type PayoutRecordAnswer = { outcome: "value"; value: BridgePayoutRecordValue } | { outcome: "failed"; reason: BridgeFailure; blockedAt?: string };
 
 const TABLE: PayoutTableInput = { row: PAYOUT_ROW, fixedCopies: PAYOUT_FIXED_COPIES, idField: "payoutId", empty: PAYOUT_EMPTY, loading: PAYOUT_LOADING, maxRows: PAYOUT_PAGE_SIZE, fields: PAYOUT_FIELDS };
 
@@ -29,6 +29,6 @@ export async function runPayoutRecordJob(_job: BridgePayoutRecordJob, page: Page
     const list = look.state === "rows" ? (look.records as BridgePayoutRecordValue["list"]) : [];
     return { outcome: "value", value: { list } };
   } catch (error) {
-    return { outcome: "failed", reason: error instanceof Blocked ? error.reason : "script_error" };
+    return error instanceof Blocked ? blockedAnswer(error) : { outcome: "failed", reason: "script_error" };
   }
 }

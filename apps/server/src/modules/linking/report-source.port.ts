@@ -110,15 +110,18 @@ const REASON = /^[a-z0-9_]{1,48}$/;
  */
 export class ReportSourceError extends Error {
   readonly reason: string | null;
+  /** The page that showed a captcha or a login, origin and path only (D69). */
+  readonly page: string | null;
   constructor(
     readonly code: ReportSourceErrorCode,
     message: string,
-    options?: { cause?: unknown; reason?: string },
+    options?: { cause?: unknown; reason?: string; page?: string | undefined },
   ) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = "ReportSourceError";
     const reason = options?.reason;
     this.reason = reason === undefined ? null : REASON.test(reason) ? reason : "unreadable_reason";
+    this.page = options?.page ?? null;
   }
 }
 

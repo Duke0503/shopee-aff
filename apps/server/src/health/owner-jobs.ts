@@ -17,7 +17,7 @@
  */
 import type { Clock } from "@cashback/core";
 
-import { deliverDailyLinkReport, deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, raiseStuckRequestAlerts, readHealthModel, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
+import { deliverDailyLinkReport, deliverPendingAlerts, healthCheck, heartbeatPinger, immediateAlerts, ledgerAlerts, raiseStuckRequestAlerts, readHealthModel, staleReconciliationByCaptcha, telegramSender, type AssistantHeartbeats, type HealthSources, type PingFetch } from "../modules/operations/index";
 import { deliverBusinessNotices } from "../modules/orders/index";
 import { balanceTotals, deliverSettlementNotices } from "../modules/payouts/index";
 import { backupHealth, backupStatusPath, readBackupStatus, type BackupHealth } from "../platform/backup/backup-status";
@@ -100,7 +100,7 @@ export function ownerJobs(deps: OwnerJobsDeps): Job[] {
   const { config, ledger, clock, logger } = deps;
   const alerts = ledgerAlerts(ledger, clock, logger);
   const backup: Job = { name: "backup", ...JOB_SCHEDULES.backup, run: async (signal) => void (await runDailyBackup(dailyBackupDeps(deps, alerts), signal)) };
-  const check = healthCheck({ model: () => readHealthModel(ledger, clock, deps.health), alerts, clock, logger, ...(config.assistantToken !== null ? { heartbeats: deps.heartbeats } : {}) });
+  const check = healthCheck({ model: () => readHealthModel(ledger, clock, deps.health), alerts, clock, logger, staleReconciliationByCaptcha: () => staleReconciliationByCaptcha(ledger.db, clock.now()), ...(config.assistantToken !== null ? { heartbeats: deps.heartbeats } : {}) });
   const health: Job = { name: "health", ...JOB_SCHEDULES.health, run: () => void check.run() };
   const stuck: Job = { name: "linkRequestStuck", ...JOB_SCHEDULES.linkRequestStuck, run: () => void raiseStuckRequestAlerts(ledger, clock, logger) };
   const jobs = [backup, health, stuck];

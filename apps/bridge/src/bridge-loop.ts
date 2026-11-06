@@ -12,6 +12,7 @@
  * server in time. A hold still follows a second captcha answer, so a real captcha is retried at most
  * once per hold. A second run that fails for a page reason does not hide the captcha the first met:
  * the captcha is answered, so the hold and alert follow and the customer is not counted against.
+ * An answer names the last blocked page it saw, origin and path only (D69).
  */
 import type { BridgeJob, BridgeResult } from "@cashback/contracts";
 import { systemClock, toMs, type Clock } from "@cashback/core";
@@ -66,7 +67,7 @@ export function jobWorker(page: PageDriver, wait: Wait, resolve: ResolveLink = N
     if (!replaced) {
       const fresh = await page.replaceTab();
       if (fresh === null) return first;
-      if (fresh.shows !== null) return { outcome: "failed", reason: fresh.shows };
+      if (fresh.shows !== null) return { outcome: "failed", reason: fresh.shows, ...(fresh.blockedAt === undefined ? {} : { blockedAt: fresh.blockedAt }) };
       // Opening the fresh tab takes time of its own.
       if (used() > job.timeoutMs / 2) return first;
     }

@@ -16,23 +16,18 @@
 import type { BridgeFailure, BridgeLookupJob, BridgeLookupValue } from "@cashback/contracts";
 import { readShopeeProduct } from "@cashback/core";
 
-import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { Blocked, blockedAnswer, throwIfBlocked, type PageDriver, type Wait } from "./bridge-tab";
 import { readOfferResults, readStorefront, type OfferLook, type StorefrontLook } from "./page-scripts";
 import { type ResolveLink } from "./short-link";
-import { COMMISSION_LABEL, isShopeeLink, KEYWORD_WORDS, OFFER_CARD, OFFER_EMPTY, offerSearchUrl, pageBlock, productPageUrl, STOREFRONT_IMAGE, STOREFRONT_NAME, STOREFRONT_PRICE, XTRA_LABEL } from "./shopee-page";
+import { COMMISSION_LABEL, isShopeeLink, KEYWORD_WORDS, OFFER_CARD, OFFER_EMPTY, offerSearchUrl, productPageUrl, STOREFRONT_IMAGE, STOREFRONT_NAME, STOREFRONT_PRICE, XTRA_LABEL } from "./shopee-page";
 
-export type LookupAnswer = { outcome: "value"; value: BridgeLookupValue } | { outcome: "failed"; reason: BridgeFailure };
+export type LookupAnswer = { outcome: "value"; value: BridgeLookupValue } | { outcome: "failed"; reason: BridgeFailure; blockedAt?: string };
 
 export const PAGE_WAIT_MS = 15_000;
 export const PAGE_POLL_MS = 500;
 
 const STOREFRONT = { name: STOREFRONT_NAME, image: STOREFRONT_IMAGE, price: STOREFRONT_PRICE };
 const NOT_FOUND: LookupAnswer = { outcome: "value", value: { found: false } };
-
-const check = (look: { href: string; passwordBox: boolean }): void => {
-  const block = pageBlock(look.href, look.passwordBox);
-  if (block !== null) throw new Blocked(block);
-};
 
 /** The shop and item ids of the job's link, resolving a short link in this browser first. */
 async function productIds(url: string, resolve: ResolveLink): Promise<{ shopId: string; itemId: string } | null> {
@@ -51,7 +46,7 @@ async function productIds(url: string, resolve: ResolveLink): Promise<{ shopId: 
 export async function lookUntil<L extends { href: string; passwordBox: boolean }>(look: () => Promise<L>, ready: (l: L) => boolean, wait: Wait): Promise<L> {
   for (let waited = 0; ; waited += PAGE_POLL_MS) {
     const seen = await look();
-    check(seen);
+    throwIfBlocked(seen);
     if (ready(seen) || waited >= PAGE_WAIT_MS) return seen;
     await wait(PAGE_POLL_MS);
   }
@@ -75,6 +70,6 @@ export async function runLookupJob(job: BridgeLookupJob, page: PageDriver, wait:
     const rates = found === null ? null : { commissionTexts: found.commissionTexts, xtraTexts: found.xtraTexts };
     return { outcome: "value", value: { found: true, ...ids, name: store.name.slice(0, 400), imageUrl: store.image !== null && store.image.length <= 2048 ? store.image : null, priceText: store.priceText ?? found?.priceText ?? null, rates } };
   } catch (error) {
-    return { outcome: "failed", reason: error instanceof Blocked ? error.reason : "script_error" };
+    return error instanceof Blocked ? blockedAnswer(error) : { outcome: "failed", reason: "script_error" };
   }
 }

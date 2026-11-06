@@ -145,9 +145,9 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
 
   it("captcha, fresh tab on a verification or login page too: answered as such with no further page load", async () => {
     const page = onCaptcha({ fresh: { href: VERIFY } });
-    expect(await worker(page)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await worker(page)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(page.calls.filter((c) => c.startsWith("open") || c === "prepare")).toEqual(["prepare", `open ${CUSTOM_LINK_URL}`]);
-    expect(await worker(onCaptcha({ fresh: { href: "https://shopee.vn/buyer/login" } }))(linkJob(1))).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await worker(onCaptcha({ fresh: { href: "https://shopee.vn/buyer/login" } }))(linkJob(1))).toMatchObject({ outcome: "failed", reason: "login_redirect" });
   });
 
   it("captcha, still blocked on the second run: answers captcha, with one retry only", async () => {
@@ -157,14 +157,14 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
       if (func === (readPage as unknown)) page.state.href = VERIFY;
       return look(func, arg);
     };
-    expect(await worker(page)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await worker(page)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(page.calls.filter((c) => c === "replace")).toHaveLength(1);
     expect(page.calls.filter((c) => c === "prepare")).toHaveLength(2);
   });
 
   it("no fresh tab to be had (the owner on the tab, the cooldown, a browser that opens none): answers captcha at once", async () => {
     const page = onCaptcha({ fresh: null });
-    expect(await worker(page)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await worker(page)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(page.calls.filter((c) => c === "prepare")).toHaveLength(1);
   });
 
@@ -176,7 +176,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
       clock.advance(45_001);
       await prepare();
     };
-    expect(await worker(page, clock)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await worker(page, clock)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(page.calls).not.toContain("replace");
   });
 
@@ -189,7 +189,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
       await prepare();
     };
     const wait = recordingWait();
-    expect(await jobWorker(page, wait, undefined, undefined, clock)({ ...linkJob(1), timeoutMs: 120_000 })).toEqual(CAPTCHA);
+    expect(await jobWorker(page, wait, undefined, undefined, clock)({ ...linkJob(1), timeoutMs: 120_000 })).toMatchObject(CAPTCHA);
     expect(page.calls).toContain("replace");
     // The result box is watched for what is left (60 s), not the whole 120 s.
     expect(wait.total()).toBeLessThanOrEqual(resultWaitMs(60_000, false) + RESULT_POLL_MS + BEFORE_SUBMIT_MS);
@@ -203,7 +203,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
       clock.advance(45_001);
       return replace();
     };
-    expect(await worker(page, clock)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await worker(page, clock)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(page.calls.filter((c) => c === "prepare")).toHaveLength(1);
   });
 
@@ -235,13 +235,13 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
           return fill(func, arg);
         };
       }
-      expect([reason, await worker(page)(linkJob(1))]).toEqual([reason, reason === "shopee_refused" ? { outcome: "failed", reason } : CAPTCHA]);
+      expect([reason, await worker(page)(linkJob(1))]).toEqual([reason, reason === "shopee_refused" ? { outcome: "failed", reason } : { ...CAPTCHA, blockedAt: "https://affiliate.shopee.vn/verify/traffic" }]);
     }
   });
 
   it("a login page is never retried, nor any other failure; a page that never showed its form is not a frozen page", async () => {
     const login = fakePage({ href: "https://shopee.vn/buyer/login", stuckAt: "https://shopee.vn/buyer/login" });
-    expect(await worker(login)(linkJob(1))).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await worker(login)(linkJob(1))).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     expect(login.calls).not.toContain("replace");
     const noForm = fakePage({ formReady: false });
     expect(await worker(noForm)(linkJob(1))).toEqual({ outcome: "failed", reason: "page_not_ready" });
@@ -256,7 +256,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
     for (const job of [linkJob(1), report(2), lookup, payout]) {
       const page = onCaptcha({ fresh: { href: VERIFY } });
       page.run = async () => Promise.reject(new Blocked("captcha"));
-      expect(await worker(page)(job)).toEqual(CAPTCHA);
+      expect(await worker(page)(job)).toMatchObject(CAPTCHA);
       expect(page.calls).toContain("replace");
     }
   });
@@ -302,7 +302,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
     chrome.landsAt = VERIFY;
     const clock = clockAt();
     const page = chromePageDriver(chrome, recordingWait(), clock);
-    expect(await jobWorker(page, recordingWait(), undefined, undefined, clock)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await jobWorker(page, recordingWait(), undefined, undefined, clock)(linkJob(1))).toMatchObject(CAPTCHA);
     expect(chrome.created).toHaveLength(1);
     expect(chrome.updates.filter((u) => u.properties["url"] !== undefined)).toEqual([]);
   });
@@ -323,7 +323,7 @@ describe("D68: a fresh tab before a captcha or a frozen page is reported", () =>
     Object.assign(chrome, { scripting: { executeScript: async () => [{ result: { href: VERIFY, ready: false, passwordBox: false } }] } });
     const clock = clockAt();
     const page = chromePageDriver(chrome, recordingWait(), clock);
-    expect(await jobWorker(page, recordingWait(), undefined, undefined, clock)(linkJob(1))).toEqual(CAPTCHA);
+    expect(await jobWorker(page, recordingWait(), undefined, undefined, clock)(linkJob(1))).toMatchObject(CAPTCHA);
     expect([chrome.created, chrome.removed]).toEqual([[], []]);
   });
 });

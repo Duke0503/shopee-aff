@@ -176,15 +176,15 @@ describe("fix(shopee): replace a frozen tab and report what the fresh one shows"
   it("a captcha or the login page behind a frozen tab is answered as such, read from the fresh tab's address without a script", async () => {
     const captcha = chromePageDriver(frozenChrome(CAPTCHA), recordingWait(), movingClock());
     await captcha.prepare();
-    expect(await runLinkJob(JOB, captcha, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runLinkJob(JOB, captcha, recordingWait())).toMatchObject({ outcome: "failed", reason: "captcha" });
     const login = chromePageDriver(frozenChrome("https://shopee.vn/buyer/login?next=x"), recordingWait(), movingClock());
     await login.prepare();
-    await expect(login.run(readPage, LOOK)).rejects.toEqual(new Blocked("login_redirect"));
+    await expect(login.run(readPage, LOOK)).rejects.toMatchObject({ reason: "login_redirect" });
   });
 
   it("a report job on a frozen page answers what the fresh tab shows too (the other jobs share the same driver)", async () => {
     const page = chromePageDriver(frozenChrome(CAPTCHA), recordingWait(), movingClock());
-    expect(await runReportJob({ ticket: "a".repeat(32), kind: "report", page: 1, purchaseTimeStart: 1, purchaseTimeEnd: 2, timeoutMs: 90_000 }, page, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runReportJob({ ticket: "a".repeat(32), kind: "report", page: 1, purchaseTimeStart: 1, purchaseTimeEnd: 2, timeoutMs: 90_000 }, page, recordingWait())).toMatchObject({ outcome: "failed", reason: "captcha" });
   });
 
   it("is done at most once every 5 minutes, so a page that keeps freezing cannot loop", async () => {
@@ -192,12 +192,12 @@ describe("fix(shopee): replace a frozen tab and report what the fresh one shows"
     const clock = movingClock();
     const page = chromePageDriver(chrome, recordingWait(), clock);
     await page.prepare();
-    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("captcha"));
+    await expect(page.run(readPage, LOOK)).rejects.toMatchObject({ reason: "captcha" });
     clock.advance(REPLACE_TAB_EVERY_MS - 1);
     await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("page_not_ready"));
     expect(chrome.created).toHaveLength(1);
     clock.advance(1);
-    await expect(page.run(readPage, LOOK)).rejects.toEqual(new Blocked("captcha"));
+    await expect(page.run(readPage, LOOK)).rejects.toMatchObject({ reason: "captcha" });
     expect(chrome.created).toHaveLength(2);
     expect(chrome.removed).toEqual([9, 101]);
   });
@@ -288,7 +288,7 @@ describe("D68: replacing the tab for a job", () => {
     Object.assign(chrome, { scripting: { executeScript: () => new Promise(() => undefined) } });
     const page = chromePageDriver(chrome, recordingWait(), clockAt());
     await page.prepare();
-    await expect(page.run(readPage, { textarea: "t", subIdFields: [], result: "r", buttonLabel: "b" })).rejects.toEqual(new Blocked("captcha"));
+    await expect(page.run(readPage, { textarea: "t", subIdFields: [], result: "r", buttonLabel: "b" })).rejects.toMatchObject({ reason: "captcha" });
     expect([chrome.created, chrome.removed]).toEqual([[], []]);
   });
 

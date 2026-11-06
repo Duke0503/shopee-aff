@@ -73,7 +73,7 @@ export {
   type LinksImport,
   type LinksImportResult,
 } from "./link-import.command";
-export { findLinkRequestOwner, linkRequestSubjectOf, type LinkRequestOwner } from "./link-request.query";
+export { findLinkRequestOwner, lastBrowserLinkAt, linkRequestStatusOf, linkRequestSubjectOf, type LinkRequestOwner } from "./link-request.query";
 export { httpsImageUrl, productSnapshotsOf, type ProductSnapshot } from "./product-snapshot.query";
 export { findShareCode, type SharedLink } from "./share-code.query";
 export { BRIDGE_JOB_KINDS, BRIDGE_JOB_STATUSES, LINK_NETWORKS, LINK_REQUEST_STATUSES, type LinkNetwork } from "./schema";

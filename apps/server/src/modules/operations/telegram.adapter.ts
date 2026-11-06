@@ -11,7 +11,8 @@
  * Vietnam time `HH:MM:SS - DD/MM/YYYY`, the details and the action, sent with `parse_mode: HTML`.
  * Every text is escaped as the live `_sanitize_html` did. `telegramText` fills in only the label
  * file's words, the time, the repeat count and, for an alert about one link request, the facts its
- * caller read for it (the customer's name and id and the product, D65). So no bank number or token
+ * caller read for it (the customer's name and id and the product, D65), and the blocked page's origin
+ * and path (D69). So no bank number or token
  * can reach the chat through an alert, and a name only through those facts; that guarantee belongs
  * to `telegramText`, not to `telegramSender`.
  */
@@ -75,7 +76,8 @@ function requestLines(facts: AlertRequestFacts): string[] {
 /** The Telegram text (HTML) of one stored alert, stamped with the time it was raised. */
 export function telegramText(alert: { kind: string; severity: AlertSeverity; suppressed: number; raisedAt: string; detail?: AlertDetail | null }, request?: AlertRequestFacts | null): string {
   const text = wordsOf(alert.kind, alert.detail);
-  const details = request === null || request === undefined ? text.details : [text.details, ...requestLines(request)].join("\n");
+  const page = alert.detail?.page === undefined ? [] : [fill(LABELS["line_page"] ?? "", { page: alert.detail.page })];
+  const details = [text.details, ...(request === null || request === undefined ? [] : requestLines(request)), ...page].join("\n");
   const severity = isSeverity(text.badge) ? text.badge : alert.severity;
   const lines = [
     fill(LABELS[`header_${severity}`] ?? "{title}", { title: escapeHtml(text.title) }),

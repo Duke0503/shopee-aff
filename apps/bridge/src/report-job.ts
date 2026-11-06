@@ -16,12 +16,12 @@
  */
 import type { BridgeFailure, BridgeReportJob, BridgeReportValue } from "@cashback/contracts";
 
-import { Blocked, type PageDriver, type Wait } from "./bridge-tab";
+import { Blocked, blockedAnswer, throwIfBlocked, type PageDriver, type Wait } from "./bridge-tab";
 import { readLocation } from "./page-scripts";
 import { fetchReportList } from "./report-api-script";
-import { AFFILIATE_ORIGIN, pageBlock, REPORT_API_PATH, REPORT_PAGE_SIZE, REPORT_PAGE_URL } from "./shopee-page";
+import { AFFILIATE_ORIGIN, REPORT_API_PATH, REPORT_PAGE_SIZE, REPORT_PAGE_URL } from "./shopee-page";
 
-export type ReportAnswer = { outcome: "value"; value: BridgeReportValue } | { outcome: "failed"; reason: BridgeFailure };
+export type ReportAnswer = { outcome: "value"; value: BridgeReportValue } | { outcome: "failed"; reason: BridgeFailure; blockedAt?: string };
 
 /** The live reader let the report page settle this long after opening it, before the first request. */
 export const REPORT_SETTLE_MS = 5_000;
@@ -33,8 +33,7 @@ const onReportPage = (href: string): boolean => href === REPORT_PAGE_URL || href
 /** Looks at where the tab is; a verification or login page ends the job. */
 async function checkSession(page: PageDriver): Promise<string> {
   const seen = await page.run(readLocation, null);
-  const block = pageBlock(seen.href, seen.passwordBox);
-  if (block !== null) throw new Blocked(block);
+  throwIfBlocked(seen);
   return seen.href;
 }
 
@@ -59,6 +58,6 @@ export async function runReportJob(job: BridgeReportJob, page: PageDriver, wait:
     if (answer.list.length > REPORT_PAGE_SIZE || !answer.list.every(isRecord)) return { outcome: "failed", reason: "report_bad_answer" };
     return { outcome: "value", value: { page: job.page, total: answer.total, list: answer.list as BridgeReportValue["list"] } };
   } catch (error) {
-    return { outcome: "failed", reason: error instanceof Blocked ? error.reason : "script_error" };
+    return error instanceof Blocked ? blockedAnswer(error) : { outcome: "failed", reason: "script_error" };
   }
 }

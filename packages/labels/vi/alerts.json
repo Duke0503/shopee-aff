@@ -1,5 +1,5 @@
 {
-  "$comment": "Owner alert texts sent to Telegram (AD-27, Story 8.3), in the live system's format (src/cashback/core/telegram_alerts.py report_bug, HTML parse mode; owner requirement 2026-11-02): a header by severity, the source, the time, the details and the action. One entry per alert kind under kinds; badge shows another severity's header where the live system used one for the same alert. steps gives a kind other words by the step that found the problem (D65). No bank number or token is ever filled in: the values are the kind's own texts, the time, the repeat count and, only for an alert about one link request (a captcha on its submission, link_request_stuck), the customer's name and id and the product, read at send time (D65). The mapping is docs/operations/message-parity.md; the runbook table is docs/operations/backup-and-alerts-runbook.md.",
+  "$comment": "Owner alert texts sent to Telegram (AD-27, Story 8.3), in the live system's format (src/cashback/core/telegram_alerts.py report_bug, HTML parse mode; owner requirement 2026-11-02): a header by severity, the source, the time, the details and the action. One entry per alert kind under kinds; badge shows another severity's header where the live system used one for the same alert. steps gives a kind other words by the step that found the problem (D65). No bank number or token is ever filled in: the values are the kind's own texts, the time, the repeat count and, only for an alert about one link request (a captcha on its submission, link_request_stuck), the customer's name and id and the product, read at send time (D65), and the blocked page's origin and path on a captcha (D69). The mapping is docs/operations/message-parity.md; the runbook table is docs/operations/backup-and-alerts-runbook.md.",
   "header_critical": "🚨🔴 <b>[BUG CRITICAL - KHẨN CẤP] {title}</b>",
   "header_high": "⚠️🟠 <b>[BUG HIGH - QUAN TRỌNG] {title}</b>",
   "header_warning": "⚠️🟡 <b>[CẢNH BÁO HỆ THỐNG - WARNING] {title}</b>",
@@ -11,6 +11,7 @@
   "line_customer_named": "Khách: {name} (ID: {id})",
   "line_customer_id": "Khách ID: {id}",
   "line_product": "Sản phẩm: {product}",
+  "line_page": "Trang: {page}",
   "default_source": "Backend Service",
   "unknown_kind": { "title": "Cảnh báo hệ thống", "details": "Loại cảnh báo: {kind}" },
   "kinds": {
@@ -23,8 +24,7 @@
       "link_request": { "details": "Phát hiện khi tạo link cho khách.\nTrang tạo link Shopee Affiliate yêu cầu xác thực bảo mật.\nURL: affiliate.shopee.vn/verify/..." },
       "product_lookup": { "source": "shopee.product_lookup", "details": "Phát hiện khi tra cứu thông tin sản phẩm.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
       "conversion_report": { "source": "shopee.conversion_report", "details": "Phát hiện khi đọc báo cáo chuyển đổi.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
-      "payout_record": { "source": "shopee.payout_record", "details": "Phát hiện khi đọc trang thanh toán.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." },
-      "health_check": { "source": "operations.health", "details": "Phát hiện bởi kiểm tra sức khỏe hệ thống: hàng đợi link Shopee đang bị giữ vì Captcha." }
+      "payout_record": { "source": "shopee.payout_record", "details": "Phát hiện khi đọc trang thanh toán.\nTrang Shopee Affiliate yêu cầu xác thực bảo mật." }
     } },
     "bridge_login_lost": { "title": "Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất", "source": "shopee.link_generator", "details": "Tab tạo link đã bị chuyển hướng về trang đăng nhập hoặc hết hạn token.\nURL: passport.shopee.vn / login", "action": "Mở Google Chrome trên máy chủ, truy cập lại affiliate.shopee.vn và đăng nhập lại tài khoản Shopee Affiliate." },
     "bridge_page_error": { "title": "Trang Shopee Báo Lỗi Khi Tạo Link", "source": "shopee.link_generator", "details": "Trang Shopee báo lỗi khi tạo link, hàng đợi link Shopee đang tạm giữ.", "action": "Mở Google Chrome trên máy chạy Extension, kiểm tra tab Shopee Affiliate rồi mở lại hàng đợi link." },

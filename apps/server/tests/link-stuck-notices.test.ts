@@ -68,7 +68,7 @@ describe("when the queue counts as stopped", () => {
     expect(reason()).toBeNull();
     ledger.tx((db) => holdShopeeQueue(db, "page_error", instantFromMs(toMs(clock.now()) + PAGE_ERROR_HOLD_MS)));
     expect(reason()).toBeNull();
-    ledger.tx((db) => holdShopeeQueue(db, "captcha", held()));
+    ledger.tx((db) => holdShopeeQueue(db, "captcha", held(), clock.now()));
     expect(reason()).toBe("captcha");
     clock.advance(CAPTCHA_HOLD_MS + 1);
     expect(reason()).toBeNull();
@@ -148,15 +148,30 @@ describe("a captcha alert names the step that found it", () => {
     expect(f.sent[0]).not.toContain(C1);
   });
 
-  it("found by the health check it says so, and the first detail of a cooldown is kept", async () => {
+  it("the health check raises no captcha of its own (D69), and the first detail of a cooldown is kept", async () => {
     const f = fixture();
     const check = healthCheck({ model: () => readHealthModel(f.ledger, f.clock, {}), alerts: ledgerAlerts(f.ledger, f.clock), clock: f.clock });
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
-    check.run();
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
+    expect(check.run().model.find((e) => e.component === "bridge")).toMatchObject({ state: "down", alert: { kind: "bridge_captcha" } });
+    expect(f.ledger.sqlite.prepare("SELECT kind FROM alerts").all()).toEqual([]);
     ledgerAlerts(f.ledger, f.clock).alert("bridge_captcha", "high", { source: "conversion_report" });
-    expect(f.ledger.sqlite.prepare("SELECT detail, suppressed FROM alerts").all()).toEqual([{ detail: '{"source":"health_check"}', suppressed: 1 }]);
+    ledgerAlerts(f.ledger, f.clock).alert("bridge_captcha", "high", { source: "product_lookup" });
+    expect(f.ledger.sqlite.prepare("SELECT detail, suppressed FROM alerts").all()).toEqual([{ detail: '{"source":"conversion_report"}', suppressed: 1 }]);
     await f.deliver();
-    expect(f.sent[0]).toContain("ki\u1ec3m tra s\u1ee9c kh\u1ecfe");
+    expect(f.sent[0]).toContain("b\u00e1o c\u00e1o chuy\u1ec3n \u0111\u1ed5i");
+  });
+
+  it("a repeat's page goes on the waiting row, whose source and request stay; a repeat with no page changes nothing (D69)", () => {
+    const f = fixture();
+    const row = () => f.ledger.sqlite.prepare("SELECT detail, suppressed FROM alerts").get();
+    const alerts = ledgerAlerts(f.ledger, f.clock);
+    alerts.alert("bridge_captcha", "high", { source: "link_request", requestId: "R1" });
+    alerts.alert("bridge_captcha", "high", { source: "conversion_report", page: "https://shopee.vn/verify/a" });
+    expect(row()).toEqual({ detail: '{"source":"link_request","requestId":"R1","page":"https://shopee.vn/verify/a"}', suppressed: 1 });
+    alerts.alert("bridge_captcha", "high", { source: "payout_record" });
+    expect(row()).toEqual({ detail: '{"source":"link_request","requestId":"R1","page":"https://shopee.vn/verify/a"}', suppressed: 2 });
+    alerts.alert("bridge_captcha", "high", { source: "payout_record", page: "https://shopee.vn/verify/b" });
+    expect(row()).toEqual({ detail: '{"source":"link_request","requestId":"R1","page":"https://shopee.vn/verify/b"}', suppressed: 3 });
   });
 
   it("the health check's detail changes no other kind's words, and a bad stored detail is no detail", () => {
@@ -182,7 +197,7 @@ describe("one owner message per stuck request", () => {
     const f = fixture();
     const first = queueLink(f.ledger, C1);
     const second = queueLink(f.ledger, C2, "https://shopee.vn/Noi-com-i.11001.22002");
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     expect(raise(f)).toBe(2);
     expect(raise(f)).toBe(0);
     expect(stuckRows(f.ledger).map((r) => r.dedupKey)).toEqual([`link_request_stuck:${first}`, `link_request_stuck:${second}`]);
@@ -201,7 +216,7 @@ describe("one owner message per stuck request", () => {
     const f = fixture();
     const clock = f.clock;
     queueLink(f.ledger, C1);
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     expect(raise(f)).toBe(1);
     clock.advance(CAPTCHA_HOLD_MS + 1);
     expect(raise(f)).toBe(0);
@@ -221,7 +236,7 @@ describe("one owner message per stuck request", () => {
     expect(raise(f)).toBe(0);
     const g = fixture();
     queueLink(g.ledger, C1, TIKTOK);
-    g.ledger.tx((db) => holdShopeeQueue(db, "captcha", g.held()));
+    g.ledger.tx((db) => holdShopeeQueue(db, "captcha", g.held(), g.clock.now()));
     expect(g.ledger.tx((db) => queuedShopeeRequests(db))).toEqual([]);
     expect(raise(g)).toBe(0);
   });
@@ -229,7 +244,7 @@ describe("one owner message per stuck request", () => {
   it("the row and the log line carry ids and kinds only", () => {
     const f = fixture();
     const requestId = queueLink(f.ledger, C1);
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     const { logger, lines } = memoryLogger();
     raiseStuckRequestAlerts(f.ledger, f.clock, logger);
     expect(stuckRows(f.ledger)[0]?.detail).toBe(JSON.stringify({ source: "captcha", requestId }));
@@ -241,14 +256,14 @@ describe("one owner message per stuck request", () => {
   it("Telegram down: retried, and expired after 24 hours like any alert", async () => {
     const f = fixture();
     queueLink(f.ledger, C1);
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     raise(f);
     await deliverPendingAlerts(f.ledger, { send: () => Promise.reject(new Error("offline")) }, f.clock, SILENT);
     expect(f.ledger.sqlite.prepare("SELECT delivery, attempts FROM alerts WHERE kind = 'link_request_stuck'").get()).toEqual({ delivery: "PENDING", attempts: 1 });
     f.clock.advance(24 * 3_600_000 + 1);
     await f.deliver();
     expect(f.sent).toEqual([]);
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     expect(raise(f)).toBe(0);
   });
 
@@ -257,7 +272,7 @@ describe("one owner message per stuck request", () => {
     for (const telegram of [null, { botToken: "123456789:FAKE-test-token-never-real", chatId: "-100200300400" }]) {
       const f = fixture();
       queueLink(f.ledger, C1);
-      f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+      f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
       const config = { env: "prod" as const, dataDir: tempDir("cashback-stuck-"), telegram, backupOffsite: null, assistantToken: null };
       const job = ownerJobs({ config, ledger: f.ledger, clock: f.clock, logger: memoryLogger().logger, heartbeats, health: healthSourcesFor(config, heartbeats) }).find((j) => j.name === "linkRequestStuck");
       await job?.run(new AbortController().signal);
@@ -267,7 +282,7 @@ describe("one owner message per stuck request", () => {
   });
 
   async function stuckText(f: ReturnType<typeof fixture>): Promise<string> {
-    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held()));
+    f.ledger.tx((db) => holdShopeeQueue(db, "captcha", f.held(), f.clock.now()));
     raise(f);
     await f.deliver();
     return f.sent.at(-1) ?? "";
@@ -404,7 +419,7 @@ describe("the link reply says the queue is stopped", () => {
     const requestId = queueLink(a.ledger, C1);
     a.ledger.tx((db) => holdShopeeQueue(db, "page_error", instantFromMs(toMs(a.clock.now()) + PAGE_ERROR_HOLD_MS)));
     expect(await a.reply(requestId)).not.toHaveProperty("queueStopped");
-    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held()));
+    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held(), a.clock.now()));
     expect((await a.reply(requestId)).queueStopped).toBe(true);
     a.ledger.tx((db) => pauseShopeeQueue(db, "login_redirect", a.clock.now()));
     expect((await a.reply(requestId)).queueStopped).toBe(true);
@@ -417,7 +432,7 @@ describe("the link reply says the queue is stopped", () => {
     const made = queueLink(a.ledger, C1);
     await runLinks(a.ledger, answeringBridge((job) => ({ outcome: "link", url: `https://s.shopee.vn/x?sub_id1=${job.subId1}`, resolvedUrl: `https://shopee.vn/x?utm_content=${job.subId1}-${job.subId2}` })), { clock: a.clock });
     const tiktok = queueLink(a.ledger, C1, TIKTOK);
-    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held()));
+    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held(), a.clock.now()));
     const answer = await a.reply(made);
     expect(answer).not.toHaveProperty("queueStopped");
     expect(await a.reply(tiktok)).not.toHaveProperty("queueStopped");
@@ -427,7 +442,7 @@ describe("the link reply says the queue is stopped", () => {
     const a = app();
     a.ledger.sqlite.prepare("UPDATE customers SET zalo_user_id = '70001' WHERE customer_id = ?").run(C1);
     const requestId = queueLink(a.ledger, C1, SHOPEE_PRODUCT, a.clock);
-    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held()));
+    a.ledger.tx((db) => holdShopeeQueue(db, "captcha", a.held(), a.clock.now()));
     expect((await a.reply(requestId)).queueStopped).toBe(true);
     raiseStuckRequestAlerts(a.ledger, a.clock, SILENT);
     expect(outboxRows(a.ledger)).toEqual([]);

@@ -37,7 +37,7 @@ import type { BridgePort, BridgeReportResult, ReportBridgeJob } from "../../plat
 import { CAPTCHA_HOLD_MS, LINK_QUEUE_ALERTS } from "./domain/link-failure";
 import { mergeShopeeOrders, type ShopeeReadCounts } from "./domain/shopee-report-merge";
 import { linkWorkDue } from "./link-lookup.command";
-import { holdShopeeQueue, pauseShopeeQueue, shopeeQueueGate } from "./link-queue.command";
+import { holdShopeeQueue, pauseShopeeQueue, shopeeQueueGate, shopeeQueueStopReason } from "./link-queue.command";
 import { ReportSourceError, type ReportWindow, type SourcedReport, type WindowedReportSource } from "./report-source.port";
 import { readShopeePages, SHOPEE_MAX_PAGES } from "./shopee-file.adapter";
 
@@ -62,8 +62,8 @@ export interface ShopeeBridgeSourceDeps {
 }
 
 /** Every failure names its reason code, which the reconciliation run logs (production 2026-11-02). */
-const fail = (code: "report_fetch_failed" | "report_source_unavailable" | "report_page_cap", message: string, reason: string): never => {
-  throw new ReportSourceError(code, message, { reason });
+const fail = (code: "report_fetch_failed" | "report_source_unavailable" | "report_page_cap", message: string, reason: string, page?: string): never => {
+  throw new ReportSourceError(code, message, { reason, page });
 };
 
 /** The window as the report page takes it: whole seconds, both ends included. */
@@ -71,14 +71,14 @@ export function reportSeconds(window: ReportWindow): { purchaseTimeStart: number
   return { purchaseTimeStart: Math.floor(toMs(window.since) / 1000), purchaseTimeEnd: Math.ceil(toMs(window.until) / 1000) - 1 };
 }
 
-/** Waits while link work is due, at most `yieldMaxMs`; refuses while the Shopee queue is held or paused. */
+/** Waits while link work is due, at most `yieldMaxMs`; refuses while the Shopee queue is held or paused, naming a captcha as the cause (D69). */
 async function yieldToLinks(deps: ShopeeBridgeSourceDeps, signal: AbortSignal | undefined): Promise<void> {
   const step = deps.yieldPollMs ?? REPORT_YIELD_POLL_MS;
   for (let waited = 0; ; waited += step) {
     if (signal?.aborted === true) fail("report_source_unavailable", "the read was stopped", "stopped");
     const now = deps.clock.now();
     const gate = shopeeQueueGate(deps.ledger.db, now);
-    if (gate !== "open") fail("report_source_unavailable", `the Shopee queue is ${gate}; no report page is read`, `queue_${gate}`);
+    if (gate !== "open") fail("report_source_unavailable", `the Shopee queue is ${gate}; no report page is read`, shopeeQueueStopReason(deps.ledger.db, now) === "captcha" ? "captcha" : `queue_${gate}`);
     if (!linkWorkDue(deps.ledger.db, now) || waited >= (deps.yieldMaxMs ?? REPORT_YIELD_MAX_MS)) return;
     await deps.wait(step, signal);
   }
@@ -88,15 +88,15 @@ async function yieldToLinks(deps: ShopeeBridgeSourceDeps, signal: AbortSignal | 
  * A page that answered with a captcha holds the Shopee queue, the login page pauses it, each with
  * its owner alert, exactly as a link submission does (Story 5.5); any other reason changes nothing.
  * Shared by every report-like page read (the conversion report, the payout record page), each
- * naming itself in the captcha alert as `step` (D65).
+ * naming itself in the captcha alert as `step` (D65) and the blocked page when known (D69).
  */
-export function blockOnSessionPage(deps: Pick<ShopeeBridgeSourceDeps, "ledger" | "clock" | "alerts">, reason: string, step: AlertSource): void {
+export function blockOnSessionPage(deps: Pick<ShopeeBridgeSourceDeps, "ledger" | "clock" | "alerts">, reason: string, step: AlertSource, page?: string): void {
   if (reason !== "captcha" && reason !== "login_redirect") return;
   const at = deps.clock.now();
   deps.ledger.tx((db) => {
     if (reason === "captcha") {
-      holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS));
-      deps.alerts(db).alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: step });
+      holdShopeeQueue(db, "captcha", instantFromMs(toMs(at) + CAPTCHA_HOLD_MS), at);
+      deps.alerts(db).alert(LINK_QUEUE_ALERTS.captcha.kind, LINK_QUEUE_ALERTS.captcha.severity, { source: step, ...(page === undefined ? {} : { page }) });
     } else if (pauseShopeeQueue(db, "login_redirect", at)) {
       deps.alerts(db).alert(LINK_QUEUE_ALERTS.login_redirect.kind, LINK_QUEUE_ALERTS.login_redirect.severity);
     }
@@ -104,15 +104,15 @@ export function blockOnSessionPage(deps: Pick<ShopeeBridgeSourceDeps, "ledger" |
 }
 
 /** A failed page: a captcha holds the queue, the login page pauses it (Story 5.5); the read fails either way. */
-function pageFailed(deps: ShopeeBridgeSourceDeps, page: number, reason: string): never {
-  blockOnSessionPage(deps, reason, "conversion_report");
-  return fail("report_fetch_failed", `report page ${page}: the browser answered ${reason}`, reason);
+function pageFailed(deps: ShopeeBridgeSourceDeps, page: number, reason: string, blockedAt: string | undefined): never {
+  blockOnSessionPage(deps, reason, "conversion_report", blockedAt);
+  return fail("report_fetch_failed", `report page ${page}: the browser answered ${reason}`, reason, blockedAt);
 }
 
 /** The page's rows as the contract allows them, the page it says it shows, and rows that look like conversions. */
 function pageValue(deps: ShopeeBridgeSourceDeps, page: number, answer: BridgeReportResult): BridgeReportValue {
   if (answer.outcome === "unavailable") return fail("report_source_unavailable", `report page ${page}: ${answer.reason}`, answer.reason);
-  if (answer.outcome === "failed") return pageFailed(deps, page, answer.reason);
+  if (answer.outcome === "failed") return pageFailed(deps, page, answer.reason, answer.blockedAt);
   const value = bridgeReportValueSchema.safeParse(answer.value);
   if (!value.success) return fail("report_fetch_failed", `report page ${page}: the answer is not a report page`, "not_a_report_page");
   if (value.data.page !== page) return fail("report_fetch_failed", `report page ${page}: the page shows page ${value.data.page}`, "page_mismatch");

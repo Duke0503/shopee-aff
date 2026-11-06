@@ -163,7 +163,7 @@ describe("D68: one queued request per link for one customer", () => {
 
   it("AC: three sends of one short link while the queue is held make one link and one notification when it reopens", async () => {
     const ledger = seeded();
-    ledger.tx((db) => holdShopeeQueue(db, "captcha", later(CAPTCHA_HOLD_MS).now()));
+    ledger.tx((db) => holdShopeeQueue(db, "captcha", later(CAPTCHA_HOLD_MS).now(), NOW));
     const ids = [ask(ledger, A, SHORT), ask(ledger, A, SHORT), ask(ledger, A, SHORT)].map((r) => r.requestId);
     expect(new Set(ids).size).toBe(1);
     const jobs: unknown[] = [];
@@ -179,7 +179,7 @@ describe("D68: one queued request per link for one customer", () => {
 });
 
 describe("D68: a captcha cleared ends its hold at once", () => {
-  const held = (ledger: Ledger) => ledger.tx((db) => holdShopeeQueue(db, "captcha", later(CAPTCHA_HOLD_MS).now()));
+  const held = (ledger: Ledger) => ledger.tx((db) => holdShopeeQueue(db, "captcha", later(CAPTCHA_HOLD_MS).now(), NOW));
 
   it("clears a captcha hold with one audit entry; the queue opens and the customers stop being told it is stopped", () => {
     const ledger = seeded();

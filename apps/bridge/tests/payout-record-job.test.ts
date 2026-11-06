@@ -95,8 +95,8 @@ describe("Story 4.22: one payout record job", () => {
   });
 
   it("AC4: answers a verification page as captcha and the login page as login_redirect; an empty table is no batches", async () => {
-    expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "waiting", href: "https://shopee.vn/verify/traffic/error" })]), noWait)).toEqual({ outcome: "failed", reason: "captcha" });
-    expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "waiting", passwordBox: true })]), noWait)).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "waiting", href: "https://shopee.vn/verify/traffic/error" })]), noWait)).toMatchObject({ outcome: "failed", reason: "captcha" });
+    expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "waiting", passwordBox: true })]), noWait)).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "waiting" })]), noWait)).toEqual({ outcome: "failed", reason: "page_not_ready" });
     expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "unreadable" })]), noWait)).toEqual({ outcome: "failed", reason: "script_error" });
     expect(await runPayoutRecordJob(JOB, fakePayoutPage([look({ state: "empty" })]), noWait)).toEqual({ outcome: "value", value: { list: [] } });

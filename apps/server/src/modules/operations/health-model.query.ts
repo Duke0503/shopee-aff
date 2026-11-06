@@ -20,7 +20,7 @@
 import type { OverviewHealth } from "@cashback/contracts";
 import { parseInstant, toMs, type Clock, type Instant } from "@cashback/core";
 
-import { LINK_QUEUE_ALERTS, oldestDueLinkRequest, shopeeQueueGate, shopeeQueueState, waitingLinkRequests } from "../linking/index";
+import { LINK_QUEUE_ALERTS, oldestDueLinkRequest, shopeeQueueGate, shopeeQueueState, shopeeQueueStopReason, waitingLinkRequests } from "../linking/index";
 import { hasRun, lastSucceededRun } from "../orders/index";
 import type { BackupHealth } from "../../platform/backup/backup-status";
 import type { DrillHealth } from "../../platform/backup/restore-drill";
@@ -64,20 +64,33 @@ function bridgeHealth(db: LedgerDb, now: Instant): HealthEntry {
   return { component: "bridge", state: "unknown", at: null, alert: null };
 }
 
+/** The hourly reconciliation as the model reads it: each watched network with its last success, and the successes seen; null before any run. */
+function watchedReconciliation(db: LedgerDb) {
+  const networks = ["shopee", "accesstrade"] as const;
+  const last = networks.map((n) => lastSucceededRun(db, n, "HOURLY"));
+  const seen = last.filter((at) => at !== null).sort();
+  const ran = networks.filter((n) => hasRun(db, n, "HOURLY"));
+  if (seen.length === 0 && ran.length === 0) return null;
+  return { seen, watched: networks.map((network, i) => ({ network, ran: ran.includes(network) || last[i] !== null, at: last[i] ?? null })).filter((w) => w.ran || seen.length > 0) };
+}
+
 /**
  * A network whose last success is over 3 hours old, or that never succeeded while it or another
  * network recorded a run, is down. Before any hourly run nothing reports yet. `at` is the oldest
  * of the last successes.
  */
 function reconciliationHealth(db: LedgerDb, now: Instant): HealthEntry {
-  const networks = ["shopee", "accesstrade"] as const;
-  const last = networks.map((n) => lastSucceededRun(db, n, "HOURLY"));
-  const seen = last.filter((at) => at !== null).sort();
-  const ran = networks.filter((n) => hasRun(db, n, "HOURLY"));
-  if (seen.length === 0 && ran.length === 0) return { component: "reconciliation", state: "unknown", at: null, alert: null };
-  const watched = networks.map((n, i) => ({ ran: ran.includes(n) || last[i] !== null, at: last[i] ?? null })).filter((w) => w.ran || seen.length > 0);
-  const down = watched.some((w) => stale(w.at, now, RECONCILIATION_DOWN_AFTER_MS));
-  return { component: "reconciliation", state: down ? "down" : "up", at: seen[0] ?? null, alert: down ? RECONCILIATION_DOWN_ALERT : null };
+  const read = watchedReconciliation(db);
+  if (read === null) return { component: "reconciliation", state: "unknown", at: null, alert: null };
+  const down = read.watched.some((w) => stale(w.at, now, RECONCILIATION_DOWN_AFTER_MS));
+  return { component: "reconciliation", state: down ? "down" : "up", at: read.seen[0] ?? null, alert: down ? RECONCILIATION_DOWN_ALERT : null };
+}
+
+/** True when a captcha holds the Shopee queue and Shopee alone is the stale network, so the captcha's own alert has told it all (D69). */
+export function staleReconciliationByCaptcha(db: LedgerDb, now: Instant): boolean {
+  if (shopeeQueueStopReason(db, now) !== "captcha") return false;
+  const staleNetworks = watchedReconciliation(db)?.watched.filter((w) => stale(w.at, now, RECONCILIATION_DOWN_AFTER_MS)).map((w) => w.network) ?? [];
+  return staleNetworks.length === 1 && staleNetworks[0] === "shopee";
 }
 
 function queueHealth(db: LedgerDb, now: Instant): HealthEntry {

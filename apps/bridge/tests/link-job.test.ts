@@ -44,11 +44,11 @@ describe("Story 5.3: a link job on the custom link page", () => {
 
   it("reports a verification page as captcha and a login page as login_redirect, without filling anything", async () => {
     const captcha = fakePage({ href: "https://shopee.vn/verify/traffic/error", stuckAt: "https://shopee.vn/verify/traffic/error" });
-    expect(await runLinkJob(JOB, captcha, recordingWait())).toEqual({ outcome: "failed", reason: "captcha" });
+    expect(await runLinkJob(JOB, captcha, recordingWait())).toMatchObject({ outcome: "failed", reason: "captcha" });
     const login = fakePage({ href: "https://accounts.shopee.vn/seller/login?next=x", stuckAt: "https://accounts.shopee.vn/seller/login?next=x" });
-    expect(await runLinkJob(JOB, login, recordingWait())).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await runLinkJob(JOB, login, recordingWait())).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     const password = fakePage({ passwordBox: true });
-    expect(await runLinkJob(JOB, password, recordingWait())).toEqual({ outcome: "failed", reason: "login_redirect" });
+    expect(await runLinkJob(JOB, password, recordingWait())).toMatchObject({ outcome: "failed", reason: "login_redirect" });
     for (const page of [captcha, login, password]) expect(page.calls).not.toContain("fill");
   });
 

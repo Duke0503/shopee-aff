@@ -10,6 +10,9 @@
  *
  * "Stopped" (D65) is what the customer and the owner are told about: a captcha hold or a pause. A
  * page error hold is not, because it lasts one minute.
+ *
+ * `last_captcha_at` and `captcha_cleared_at` outlive the hold, so a waiting captcha alert can be judged
+ * at send time (D69); a later hold of any reason leaves them alone.
  */
 import { toMs, type Instant } from "@cashback/core";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -30,14 +33,18 @@ export interface LinkQueueState {
   readonly heldUntil: string | null;
   /** The request whose submission last ended in a page error (Story 5.5 review item 1). */
   readonly lastPageErrorRequest: string | null;
+  /** When the latest captcha was met (D69). */
+  readonly lastCaptchaAt: string | null;
+  /** When a captcha was last cleared (D69). */
+  readonly captchaClearedAt: string | null;
 }
 
-const OPEN: LinkQueueState = { pausedReason: null, pausedAt: null, heldReason: null, heldUntil: null, lastPageErrorRequest: null };
+const OPEN: LinkQueueState = { pausedReason: null, pausedAt: null, heldReason: null, heldUntil: null, lastPageErrorRequest: null, lastCaptchaAt: null, captchaClearedAt: null };
 const NOT_HELD = { pausedReason: null, pausedAt: null, heldReason: null, heldUntil: null } as const;
 
 export function shopeeQueueState(db: LedgerDb): LinkQueueState {
   const row = db.select().from(linkQueueState).where(eq(linkQueueState.queue, SHOPEE)).get();
-  return row === undefined ? OPEN : { pausedReason: row.pausedReason, pausedAt: row.pausedAt, heldReason: row.heldReason, heldUntil: row.heldUntil, lastPageErrorRequest: row.lastPageErrorRequest };
+  return row === undefined ? OPEN : { pausedReason: row.pausedReason, pausedAt: row.pausedAt, heldReason: row.heldReason, heldUntil: row.heldUntil, lastPageErrorRequest: row.lastPageErrorRequest, lastCaptchaAt: row.lastCaptchaAt, captchaClearedAt: row.captchaClearedAt };
 }
 
 /** Whether a Shopee job may be handed to the bridge now. */
@@ -75,8 +82,11 @@ function write(db: LedgerDb, values: Partial<LinkQueueState>): void {
     .run();
 }
 
-/** Holds the queue until `until`; a longer hold already in place is kept. */
-export function holdShopeeQueue(db: LedgerDb, reason: QueueHoldReason, until: Instant): void {
+/** Holds the queue until `until`; a longer hold already in place is kept. A captcha is recorded at `at` either way (D69). */
+export function holdShopeeQueue(db: LedgerDb, reason: "captcha", until: Instant, at: Instant): void;
+export function holdShopeeQueue(db: LedgerDb, reason: "page_error", until: Instant): void;
+export function holdShopeeQueue(db: LedgerDb, reason: QueueHoldReason, until: Instant, at?: Instant): void {
+  if (at !== undefined) write(db, { lastCaptchaAt: at });
   const current = shopeeQueueState(db).heldUntil;
   if (current !== null && toMs(current as Instant) >= toMs(until)) return;
   write(db, { heldReason: reason, heldUntil: until });
@@ -108,19 +118,24 @@ export interface QueueResumed {
 export function resumeShopeeQueue(db: LedgerDb, by: CommandAudit, now: Instant): QueueResumed {
   if (shopeeQueueGate(db, now) === "open") return { resumed: false, pausedReason: null };
   const state = shopeeQueueState(db);
-  write(db, NOT_HELD);
+  const liftsCaptcha = state.heldReason === "captcha" && state.heldUntil !== null && toMs(state.heldUntil as Instant) > toMs(now);
+  write(db, liftsCaptcha ? { ...NOT_HELD, captchaClearedAt: now } : NOT_HELD);
   by.audit.record({ actor: by.actor, event: "linking.link_queue.resumed", entityId: SHOPEE, payload: { pausedReason: state.pausedReason, heldReason: state.heldReason } });
   return { resumed: true, pausedReason: state.pausedReason };
 }
 
 /**
  * A Shopee tab left the verification page (D68): ends a captcha hold still running, audited. A pause,
- * a page error hold or an expired hold is left as it is. True when a hold ended.
+ * a page error hold or an expired hold is left as it is. True when a hold ended. Whichever it is, a
+ * captcha on record counts as cleared from now: an owner slower than the hold still cleared it (D69).
  */
 export function clearCaptchaHold(db: LedgerDb, by: CommandAudit, now: Instant): boolean {
-  const { heldReason, heldUntil } = shopeeQueueState(db);
-  if (heldReason !== "captcha" || heldUntil === null || toMs(heldUntil as Instant) <= toMs(now)) return false;
-  write(db, { heldReason: null, heldUntil: null });
+  const { heldReason, heldUntil, lastCaptchaAt } = shopeeQueueState(db);
+  if (heldReason !== "captcha" || heldUntil === null || toMs(heldUntil as Instant) <= toMs(now)) {
+    if (lastCaptchaAt !== null) write(db, { captchaClearedAt: now });
+    return false;
+  }
+  write(db, { heldReason: null, heldUntil: null, captchaClearedAt: now });
   by.audit.record({ actor: by.actor, event: "linking.link_queue.captcha_cleared", entityId: SHOPEE, payload: { heldUntil } });
   return true;
 }

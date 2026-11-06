@@ -219,7 +219,7 @@ Counts (messages.json, 99 keys): 12 adapted, 45 identical, 35 new-only, 7 not-za
 | `backup_failed` | new-only, in the report_bug format | Sao Lưu Hằng Ngày Thất Bại |
 | `backup_offsite_failed` | new-only, in the report_bug format | Không Chép Được Bản Sao Lưu Lên Google Drive |
 | `backup_offsite_too_large` | new-only, in the report_bug format | Bản Sao Lưu Quá Lớn Để Gửi Lên Google Drive |
-| `bridge_captcha` | identical without a step (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept); a raised alert now says the step that found it (D65) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
+| `bridge_captcha` | identical without a step (telegram_alerts.py notify_shopee_captcha, CRITICAL badge kept); a raised alert now says the step that found it (D65) and adds the line `Trang: {page}` when the bridge named the blocked page (D69) | Shopee dính Captcha Xác Minh (Slider/Traffic) |
 | `bridge_login_lost` | identical (notify_shopee_session_expired) | Shopee Hết Phiên Đăng Nhập / Đã Bị Đăng Xuất |
 | `bridge_page_error` | new-only, in the report_bug format | Trang Shopee Báo Lỗi Khi Tạo Link |
 | `bridge_short_link_unresolved` | new-only, in the report_bug format | Không Mở Được Link Rút Gọn |

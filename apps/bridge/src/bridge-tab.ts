@@ -29,7 +29,7 @@ import type { BridgeFailure } from "@cashback/contracts";
 import { systemClock, toMs, type Clock } from "@cashback/core";
 
 import type { ChromeApi, ChromeTab } from "./chrome-api.types";
-import { AFFILIATE_TAB_PATTERN, BRIDGE_TAB_SITE, CUSTOM_LINK_TAB_PATTERN, CUSTOM_LINK_URL, pageBlock } from "./shopee-page";
+import { AFFILIATE_TAB_PATTERN, BRIDGE_TAB_SITE, CUSTOM_LINK_TAB_PATTERN, CUSTOM_LINK_URL, pageAddress, pageBlock } from "./shopee-page";
 
 export type Wait = (ms: number) => Promise<void>;
 
@@ -57,6 +57,8 @@ export interface PageDriver {
 
 export interface FreshTab {
   readonly shows: BridgeFailure | null;
+  /** The address that shows the block (D69). */
+  readonly blockedAt?: string;
 }
 
 export const LOAD_WAIT_MS = 30_000;
@@ -76,9 +78,31 @@ export class BridgeTabError extends Error {
 
 /** The page answered with a state that ends the job: a verification or login page, or no page (a frozen tab). */
 export class Blocked extends Error {
-  constructor(readonly reason: BridgeFailure) {
+  constructor(
+    readonly reason: BridgeFailure,
+    /** The page that showed it, origin and path only (D69). */
+    readonly blockedAt?: string,
+  ) {
     super(reason);
   }
+}
+
+/** Ends the job when the page it looked at is a verification or login page, naming that page. */
+export function throwIfBlocked(look: { href: string; passwordBox: boolean }): void {
+  const block = pageBlock(look.href, look.passwordBox);
+  if (block !== null) throw new Blocked(block, pageAddress(look.href));
+}
+
+/** The failed answer of a blocked job. */
+export function blockedAnswer(blocked: Blocked): { outcome: "failed"; reason: BridgeFailure; blockedAt?: string } {
+  return { outcome: "failed", reason: blocked.reason, ...(blocked.blockedAt === undefined ? {} : { blockedAt: blocked.blockedAt }) };
+}
+
+/** What a tab's address shows, read from the tab list: no script runs in a frozen page. */
+function shownBy(href: string): FreshTab {
+  const shows = pageBlock(href, false);
+  const blockedAt = shows === null ? undefined : pageAddress(href);
+  return blockedAt === undefined ? { shows } : { shows, blockedAt };
 }
 
 const FROZEN = Symbol("frozen");
@@ -163,21 +187,21 @@ async function settleTab(chrome: ChromeApi, wait: Wait, id: number): Promise<voi
  * tab's address shows (only tab-level calls: no script runs in a frozen page). Returns the fresh tab
  * and its block, or null when the browser would not open one.
  */
-async function replaceFrozenTab(chrome: ChromeApi, wait: Wait, frozen: number): Promise<{ id: number; shows: BridgeFailure | null } | null> {
+async function replaceFrozenTab(chrome: ChromeApi, wait: Wait, frozen: number): Promise<(FreshTab & { id: number }) | null> {
   try {
     const fresh = await chrome.tabs.create({ url: CUSTOM_LINK_URL, pinned: true, active: false });
     if (fresh.id === undefined) return null;
     await chrome.tabs.remove(frozen).catch(() => undefined);
     await keepAlive(chrome, fresh.id);
     await settleTab(chrome, wait, fresh.id).catch(() => undefined);
-    return { id: fresh.id, shows: pageBlock((await chrome.tabs.get(fresh.id)).url ?? "", false) };
+    return { id: fresh.id, ...shownBy((await chrome.tabs.get(fresh.id)).url ?? "") };
   } catch {
     return null;
   }
 }
 
 /** Replaces a tab at most once every `REPLACE_TAB_EVERY_MS`, whichever asks, and counts it. */
-function tabReplacer(chrome: ChromeApi, wait: Wait, clock: Clock): { replace(old: number): Promise<{ id: number; shows: BridgeFailure | null } | null>; count(): number } {
+function tabReplacer(chrome: ChromeApi, wait: Wait, clock: Clock): { replace(old: number): Promise<(FreshTab & { id: number }) | null>; count(): number } {
   let replacedAtMs: number | null = null;
   let count = 0;
   return {
@@ -195,6 +219,17 @@ function tabReplacer(chrome: ChromeApi, wait: Wait, clock: Clock): { replace(old
   };
 }
 
+/** What the job answers for a frozen page: the fresh tab's block, else `page_not_ready` (also inside the cooldown). The owner's tab stays, and its address answers. */
+async function frozenAnswer(chrome: ChromeApi, clock: Clock, frozen: number, replace: (old: number) => Promise<FreshTab | null>): Promise<Blocked> {
+  if (await ownerOn(chrome, clock, frozen)) {
+    const tab = await chrome.tabs.get(frozen).catch(() => null);
+    const seen = shownBy(tab?.url ?? "");
+    return new Blocked(seen.shows ?? "page_not_ready", seen.blockedAt);
+  }
+  const fresh = await replace(frozen);
+  return new Blocked(fresh?.shows ?? "page_not_ready", fresh?.blockedAt);
+}
+
 export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = systemClock): PageDriver & { tabId(): number | null } {
   let tabId: number | null = null;
   const replacer = tabReplacer(chrome, wait, clock);
@@ -208,15 +243,8 @@ export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = s
     const fresh = await replacer.replace(old);
     if (fresh === null) return null;
     tabId = fresh.id;
-    return { shows: fresh.shows };
-  };
-  /** What the job answers for a frozen page: the fresh tab's block, else `page_not_ready` (also inside the cooldown). The owner's tab stays, and its address answers. */
-  const frozenAnswer = async (frozen: number): Promise<BridgeFailure> => {
-    if (await ownerOn(chrome, clock, frozen)) {
-      const tab = await chrome.tabs.get(frozen).catch(() => null);
-      return pageBlock(tab?.url ?? "", false) ?? "page_not_ready";
-    }
-    return (await replace(frozen))?.shows ?? "page_not_ready";
+    const { id: _id, ...shown } = fresh;
+    return shown;
   };
   return {
     tabId: () => tabId,
@@ -249,7 +277,7 @@ export function chromePageDriver(chrome: ChromeApi, wait: Wait, clock: Clock = s
       const id = current();
       const answer = chrome.scripting.executeScript({ target: { tabId: id }, world: "MAIN", func, args: [arg] });
       const looked = await Promise.race([answer, wait(answerMs).then((): typeof FROZEN => FROZEN)]);
-      if (looked === FROZEN) throw new Blocked(await frozenAnswer(id));
+      if (looked === FROZEN) throw await frozenAnswer(chrome, clock, id, replace);
       const [first] = looked as Awaited<typeof answer>;
       if (first === undefined || !("result" in first)) throw new BridgeTabError("the page script returned nothing");
       return first.result as Awaited<ReturnType<typeof func>>;
